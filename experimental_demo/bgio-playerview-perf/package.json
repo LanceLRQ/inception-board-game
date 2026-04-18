@@ -1,0 +1,16 @@
+{
+  "name": "bgio-playerview-perf",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 3: playerView 10 人嵌套过滤性能测试（目标 < 50ms）",
+  "scripts": {
+    "test": "tsx src/perf.ts"
+  },
+  "dependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
