@@ -1,0 +1,48 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "confirm": "确认",
+    "cancel": "取消",
+    "retry": "重试",
+    "close": "关闭"
+  },
+  "landing": {
+    "title": "盗梦都市",
+    "subtitle": "Inception City Online",
+    "localMatch": "单机练习",
+    "multiplayer": "多人房间"
+  },
+  "lobby": {
+    "title": "好友房",
+    "createRoom": "创建房间",
+    "joinRoom": "加入房间",
+    "roomCode": "房间码",
+    "players": "玩家"
+  },
+  "room": {
+    "waiting": "等待玩家加入...",
+    "start": "开始游戏",
+    "share": "分享房间码"
+  },
+  "game": {
+    "yourTurn": "你的回合",
+    "drawPhase": "抽牌阶段",
+    "actionPhase": "出牌阶段",
+    "discardPhase": "弃牌阶段",
+    "hand": "手牌",
+    "deck": "牌库",
+    "layers": "梦境层"
+  },
+  "settings": {
+    "title": "设置",
+    "nickname": "昵称",
+    "avatar": "头像",
+    "language": "语言",
+    "sound": "音效",
+    "animation": "动画"
+  },
+  "about": {
+    "title": "关于",
+    "copyright": "原版桌游《盗梦都市》版权归发行商所有"
+  }
+}
