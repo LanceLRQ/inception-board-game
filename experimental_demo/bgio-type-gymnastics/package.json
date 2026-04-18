@@ -1,0 +1,17 @@
+{
+  "name": "bgio-type-gymnastics",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 2: 验证 TypeScript + Boardgame.io 类型体操可行性",
+  "scripts": {
+    "test": "tsc --noEmit && echo 'ALL TYPE CHECKS PASSED'",
+    "test:runtime": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
