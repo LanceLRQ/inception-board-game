@@ -1,0 +1,16 @@
+{
+  "name": "bgio-engine-adapter",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 5: GameEngine 适配层最小原型（ADR-002 验证）",
+  "scripts": {
+    "test": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
