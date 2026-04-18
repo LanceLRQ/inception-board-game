@@ -1,0 +1,17 @@
+{
+  "name": "bgio-redis-backend",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 7: Redis 状态后端多实例测试",
+  "scripts": {
+    "test": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "boardgame.io": "^0.50.2",
+    "node-persist": "^4.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
