@@ -1,0 +1,1 @@
+{ "name": "ios-safari-background", "version": "0.0.1", "private": true, "description": "Spike 18: iOS Safari 后台断开 Demo", "scripts": { "test": "tsx src/index.ts" }, "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" } }

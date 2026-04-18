@@ -1,0 +1,1 @@
+{ "name": "wechat-qq-compat", "version": "0.0.1", "private": true, "description": "Spike 17: 微信/QQ 内置浏览器兼容测试", "scripts": { "test": "tsx src/index.ts" }, "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" } }

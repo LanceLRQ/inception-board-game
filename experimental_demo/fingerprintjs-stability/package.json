@@ -1,0 +1,1 @@
+{ "name": "fingerprintjs-stability", "version": "0.0.1", "private": true, "description": "Spike 19: FingerprintJS 指纹稳定性测试", "scripts": { "test": "tsx src/index.ts" }, "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" } }
