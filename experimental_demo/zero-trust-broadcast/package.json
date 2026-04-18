@@ -1,0 +1,1 @@
+{ "name": "zero-trust-broadcast", "version": "0.0.1", "private": true, "description": "Spike 15: 零信任事件广播", "scripts": { "test": "tsx src/index.ts" }, "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" } }

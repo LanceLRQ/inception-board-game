@@ -1,0 +1,9 @@
+{
+  "name": "mobile-touch-ux",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 11: 移动端触控交互原型（两步点击/长按/上滑）",
+  "scripts": { "test": "tsx src/index.ts" },
+  "dependencies": { "@use-gesture/react": "^10.3.0", "react": "^18.3.0" },
+  "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" }
+}

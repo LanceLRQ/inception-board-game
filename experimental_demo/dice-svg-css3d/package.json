@@ -1,0 +1,1 @@
+{ "name": "dice-svg-css3d", "version": "0.0.1", "private": true, "description": "Spike 12: 骰子 SVG + CSS 3D", "scripts": { "test": "tsx src/index.ts" }, "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" } }

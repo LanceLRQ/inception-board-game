@@ -1,0 +1,1 @@
+{ "name": "pixel-avatar-algo", "version": "0.0.1", "private": true, "description": "Spike 13: 像素头像算法", "scripts": { "test": "tsx src/index.ts" }, "devDependencies": { "tsx": "^4.21.0", "typescript": "^5.9.0" } }
