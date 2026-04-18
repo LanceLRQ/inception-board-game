@@ -1,0 +1,13 @@
+{
+  "name": "recovery-code-collision",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 10: 恢复码防撞 + 限流验证",
+  "scripts": {
+    "test": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}

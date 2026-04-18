@@ -1,0 +1,16 @@
+{
+  "name": "web-worker-comlink",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 9: Web Worker + Comlink 本地人机验证",
+  "scripts": {
+    "test": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "comlink": "^4.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
