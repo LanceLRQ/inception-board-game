@@ -1,0 +1,1 @@
+cd game && npx --no -- commitlint --edit "$1"
