@@ -1,0 +1,16 @@
+{
+  "name": "bgio-random-bot",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 6: AI Bot 随机策略 Demo（能跑完一局）",
+  "scripts": {
+    "test": "tsx src/bot.ts"
+  },
+  "dependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
