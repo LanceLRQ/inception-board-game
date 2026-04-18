@@ -1,0 +1,206 @@
+// 盗梦都市 - Prisma Schema
+// 对照：plans/design/03-data-model.md §3.8
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// === P0 表 ===
+
+/// 匿名身份主表
+model Player {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nickname      String    @db.VarChar(30)
+  avatarSeed    String    @map("avatar_seed") @db.VarChar(64)
+  avatarPalette String    @default("default") @map("avatar_palette") @db.VarChar(20)
+  locale        String    @default("zh-CN") @db.VarChar(10)
+  preferences   Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+  isBanned      Boolean   @default(false) @map("is_banned")
+  banReason     String?   @map("ban_reason")
+  banUntil      DateTime? @map("ban_until") @db.Timestamptz
+  metadata      Json      @default("{}")
+
+  recoveryCodes      RecoveryCode[]
+  deviceFingerprints DeviceFingerprint[]
+  matchPlayers       MatchPlayer[]
+  tutorialProgress   TutorialProgress?
+  chatLogs           MatchChatLog[]
+
+  @@index([lastSeenAt], map: "idx_players_last_seen")
+  @@index([isBanned], map: "idx_players_banned")
+  @@map("players")
+}
+
+/// 恢复码表
+model RecoveryCode {
+  codeHash   String    @id @map("code_hash") @db.VarChar(64)
+  playerId   String    @map("player_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
+  useCount   Int       @default(0) @map("use_count")
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId], map: "idx_recovery_codes_player")
+  @@map("recovery_codes")
+}
+
+/// 设备指纹
+model DeviceFingerprint {
+  fingerprint String   @db.VarChar(64)
+  playerId    String   @map("player_id") @db.Uuid
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  seenCount   Int      @default(1) @map("seen_count")
+  ipSample    String?  @map("ip_sample") @db.VarChar(45)
+  userAgent   String?  @map("user_agent")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([fingerprint, playerId])
+  @@index([fingerprint], map: "idx_fp_by_fp")
+  @@index([lastSeenAt], map: "idx_fp_last_seen")
+  @@map("device_fingerprints")
+}
+
+/// 对局主表
+model Match {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roomId           String?   @map("room_id") @db.Uuid
+  ruleVariant      String?   @map("rule_variant") @db.VarChar(20)
+  exEnabled        Boolean?  @map("ex_enabled")
+  expansionEnabled Boolean?  @map("expansion_enabled")
+  startedAt        DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  endedAt          DateTime? @map("ended_at") @db.Timestamptz
+  winner           String?   @db.VarChar(10)
+  winReason        String?   @map("win_reason") @db.VarChar(100)
+  playerCount      Int?      @map("player_count") @db.SmallInt
+  rngSeed          String?   @map("rng_seed") @db.VarChar(64)
+  replayCompressed Bytes?    @map("replay_compressed")
+  metadata         Json?
+
+  matchPlayers MatchPlayer[]
+  matchEvents  MatchEvent[]
+  chatLogs     MatchChatLog[]
+
+  @@index([roomId], map: "idx_matches_room")
+  @@index([startedAt], map: "idx_matches_started")
+  @@map("matches")
+}
+
+/// 对局参与者
+model MatchPlayer {
+  matchId           String   @map("match_id") @db.Uuid
+  seat              Int      @db.SmallInt
+  playerId          String?  @map("player_id") @db.Uuid
+  nickname          String   @db.VarChar(50)
+  isBot             Boolean  @default(false) @map("is_bot")
+  botLevel          String?  @map("bot_level") @db.VarChar(20)
+  role              String   @db.VarChar(10)
+  finalFaction      String   @map("final_faction") @db.VarChar(10)
+  characterId       String   @map("character_id") @db.VarChar(50)
+  won               Boolean?
+  score             Int?     @db.SmallInt
+  abandoned         Boolean  @default(false)
+  aiTakeoverSeconds Int      @default(0) @map("ai_takeover_seconds")
+  disconnectCount   Int      @default(0) @map("disconnect_count") @db.SmallInt
+  stats             Json     @default("{}")
+  isMvp             Boolean  @default(false) @map("is_mvp")
+  mvpScore          Decimal? @map("mvp_score") @db.Decimal
+
+  match  Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@id([matchId, seat])
+  @@index([playerId], map: "idx_match_players_player")
+  @@index([abandoned], map: "idx_match_players_abandoned")
+  @@map("match_players")
+}
+
+/// 事件归档
+model MatchEvent {
+  id          BigInt   @id @default(autoincrement())
+  matchId     String   @map("match_id") @db.Uuid
+  moveCounter Int      @map("move_counter")
+  eventKind   String   @map("event_kind") @db.VarChar(30)
+  payload     Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, moveCounter])
+  @@index([matchId, createdAt], map: "idx_match_events_time")
+  @@map("match_events")
+}
+
+/// 预设短语
+model ChatPhrasePreset {
+  id               String  @id @db.VarChar(50)
+  category         String  @db.VarChar(30)
+  textZhCn         String  @map("text_zh_cn")
+  textEnUs         String? @map("text_en_us")
+  displayOrder     Int     @default(0) @map("display_order") @db.SmallInt
+  availableFactions String @default("all") @map("available_factions") @db.VarChar(30)
+  isActive         Boolean @default(true) @map("is_active")
+
+  chatLogs MatchChatLog[]
+
+  @@map("chat_phrase_presets")
+}
+
+/// 聊天归档
+model MatchChatLog {
+  id             BigInt   @id @default(autoincrement())
+  matchId        String   @map("match_id") @db.Uuid
+  senderPlayerId String?  @map("sender_player_id") @db.Uuid
+  senderSeat     Int      @map("sender_seat") @db.SmallInt
+  phraseId       String?  @map("phrase_id") @db.VarChar(50)
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  broadcastTo    String   @default("all") @map("broadcast_to") @db.VarChar(20)
+
+  match  Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender Player?           @relation(fields: [senderPlayerId], references: [id], onDelete: SetNull)
+  phrase ChatPhrasePreset? @relation(fields: [phraseId], references: [id])
+
+  @@index([matchId, sentAt], map: "idx_chat_log_match")
+  @@index([senderPlayerId, sentAt], map: "idx_chat_log_sender")
+  @@map("match_chat_log")
+}
+
+/// 短链
+model ShortLink {
+  code              String    @id @db.VarChar(10)
+  targetType        String    @map("target_type") @db.VarChar(20)
+  targetId          String    @map("target_id") @db.Uuid
+  createdByPlayerId String?   @map("created_by_player_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz
+  hitCount          Int       @default(0) @map("hit_count")
+  lastHitAt         DateTime? @map("last_hit_at") @db.Timestamptz
+
+  @@index([targetType, targetId], map: "idx_short_links_target")
+  @@index([expiresAt], map: "idx_short_links_expires")
+  @@map("short_links")
+}
+
+/// 教学进度
+model TutorialProgress {
+  playerId         String    @id @map("player_id") @db.Uuid
+  firstCompletedAt DateTime? @map("first_completed_at") @db.Timestamptz
+  lastPlayedAt     DateTime  @default(now()) @map("last_played_at") @db.Timestamptz
+  playCount        Int       @default(0) @map("play_count")
+  skippedCount     Int       @default(0) @map("skipped_count")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId], map: "idx_tutorial_never_completed")
+  @@map("tutorial_progress")
+}

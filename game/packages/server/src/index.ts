@@ -1,3 +1,10 @@
-// @icgame/server - Koa + Boardgame.io 服务端
+import { createApp } from './app.js';
+import { logger } from './infra/logger.js';
 
-console.log('@icgame/server - skeleton');
+const PORT = parseInt(process.env.PORT ?? '3001', 10);
+
+const app = createApp();
+
+app.listen(PORT, () => {
+  logger.info({ port: PORT }, 'Server started');
+});
