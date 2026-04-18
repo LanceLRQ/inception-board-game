@@ -1,0 +1,16 @@
+{
+  "name": "bgio-server-validator",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Spike 4: 服务端权威 Validator 接入验证",
+  "scripts": {
+    "test": "tsx src/validator.ts"
+  },
+  "dependencies": {
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0"
+  }
+}
