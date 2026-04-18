@@ -1,0 +1,140 @@
+Inception City Online
+Copyright (c) 2026 LanceLRQ and contributors
+
+================================================================================
+  DUAL COPYRIGHT STRUCTURE / 双重版权结构声明
+================================================================================
+
+This project combines two copyright subjects with DIFFERENT licenses:
+本项目包含两类独立版权客体，适用不同协议：
+
+--------------------------------------------------------------------------------
+  1. SOURCE CODE / 源代码
+--------------------------------------------------------------------------------
+
+License: MIT License (see LICENSE file)
+协议：MIT License（见 LICENSE 文件）
+
+Scope: All original source code authored by this project's contributors,
+       including but not limited to:
+       - Room / matchmaking systems
+       - Anonymous identity & recovery code implementation
+       - Networking, WebSocket event filtering, zero-trust broadcast
+       - UI components, animations, PWA shell
+       - AI decision algorithms (MCTS, heuristics, etc.)
+       - Build tooling, deployment scripts, Docker configs
+
+范围：本项目贡献者原创的所有代码，包括但不限于：
+      房间/匹配系统、匿名身份、网络与事件广播、UI 组件与动画、
+      PWA 外壳、AI 决策算法、构建部署脚本等纯技术实现。
+
+Permissions: Commercial use, modification, distribution, private use — as
+             granted by MIT, SUBJECT to Section 2 below when the code is
+             used together with the game assets.
+
+权限：MIT 允许的所有权利（商用、修改、分发、私有使用），
+      但当与下方游戏素材一并使用时，仍受第 2 节约束。
+
+--------------------------------------------------------------------------------
+  2. GAME ASSETS / 游戏素材
+--------------------------------------------------------------------------------
+
+License: All Rights Reserved by the original publisher of the board game
+         "Inception City" (《盗梦都市》):
+           Guangzhou Qianqi Animation Co., Ltd. (广州千骐动漫有限公司)
+           Address: 3B Zone, Sanrong Building, 51 Luyuan Road, Guangzhou
+           Website: www.cncgcg.com
+         Used in this project under fan-project / fair-use convention only.
+
+协议：版权归原桌游《盗梦都市》发行商所有：
+        广州千骐动漫有限公司
+        地址：广州市麓苑路51号三荣大厦3B区
+        网址：www.cncgcg.com
+      本项目仅在"爱好者作品 / Fair Use"范畴内使用。
+
+Scope: All content derived from the original board game, including but not
+       limited to:
+       - Card artwork and visual designs
+       - Card text, flavor text, ability descriptions
+       - Character names, worldview, faction design
+       - Game rules, turn structure, victory conditions
+       - Any audio / music adapted from the original game
+
+范围：所有源自原版桌游的内容，包括但不限于：
+      卡牌美术、卡牌文案与技能描述、角色命名、世界观、阵营设计、
+      游戏规则与流程、胜负判定、以及任何从原版改编的音乐音效。
+
+Prohibitions / 明确禁止：
+
+  (a) Commercial use of any kind, including but not limited to:
+      paid access, advertising, subscriptions, in-app purchases,
+      donation-for-access, premium tiers, NFT / blockchain monetization.
+      任何形式的商业化使用（付费访问、广告、订阅、内购、
+      付费捐赠、增值服务、NFT / 区块链变现等）。
+
+  (b) Redistribution, repackaging, or re-publication of the project with
+      the original assets, without prior written consent from
+      Guangzhou Qianqi Animation Co., Ltd.
+      在未经广州千骐动漫有限公司书面许可的情况下，将本项目（含素材）
+      重新打包、分发或二次出版。
+
+  (c) Claiming affiliation with, endorsement by, or representation of
+      Guangzhou Qianqi Animation Co., Ltd.
+      声称本项目与广州千骐动漫有限公司存在关联、合作或官方背书。
+
+Self-hosting / 私有部署：
+  Private deployment for a limited community is acceptable under fan-use
+  convention, AS LONG AS the deployment remains non-commercial and
+  complies with all prohibitions above. Self-hosting does not grant any
+  commercial rights.
+  有限社区的私有部署在爱好者范畴内可接受，前提是部署保持非商业化
+  并遵守上述全部禁止条款。私有部署不授予任何商业权利。
+
+--------------------------------------------------------------------------------
+  3. TAKEDOWN POLICY / 下架政策
+--------------------------------------------------------------------------------
+
+If Guangzhou Qianqi Animation Co., Ltd. considers this project infringing
+or otherwise inappropriate, please open a GitHub Issue or contact the
+maintainer. We will cooperate within 7 days, including (as appropriate):
+  - Renaming cards / characters
+  - Replacing artwork with original designs
+  - Disabling affected features
+  - Taking the project offline
+
+如广州千骐动漫有限公司认为本项目存在侵权或使用不当，请通过 GitHub Issue
+或直接联系维护者。我们将在 7 天内配合处理，包括（视情况）：
+修改卡牌 / 角色命名、替换美术素材为原创、禁用相关功能、下架项目。
+
+--------------------------------------------------------------------------------
+  4. DERIVATIVE WORKS / 衍生作品说明
+--------------------------------------------------------------------------------
+
+You ARE permitted (under MIT code license) to:
+  - Fork this codebase
+  - Replace ALL game assets with your own original content
+    (your own cards, art, rules, worldview)
+  - Distribute, including commercially, the resulting derivative work
+
+This is the intended "commercial path" for this codebase: build your own
+game on top of the technical implementation, without using any of the
+original board game's assets.
+
+基于 MIT 代码协议，你有权：
+  - Fork 本代码库
+  - 将全部游戏素材替换为你自己的原创内容（卡牌/美术/规则/世界观）
+  - 自由分发（包括商业化）这类衍生作品
+
+这是本代码库的预期"商业路径"：在技术实现之上做自己的游戏，
+不使用任何原版桌游的素材。
+
+--------------------------------------------------------------------------------
+  5. ACCEPTANCE / 接受条款
+--------------------------------------------------------------------------------
+
+By using, playing, deploying, modifying, or distributing this project
+or any portion of it, you acknowledge that you have read and agree to
+the terms above.
+
+使用、游玩、部署、修改或分发本项目任何部分，即视为你已阅读并同意
+上述全部条款。
