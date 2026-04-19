@@ -205,9 +205,9 @@ describe('masterActivateNightmare · 饥饿撕咬', () => {
     expect(r.usedNightmareIds).toContain('nightmare_hunger_bite');
   });
 
-  it('未实现的梦魇 → 拒绝', () => {
+  it('未知梦魇 id → 拒绝（fallthrough）', () => {
     const s = makeState();
-    s.layers[3]!.nightmareId = 'nightmare_echo' as CardID; // echo 尚未实现
+    s.layers[3]!.nightmareId = 'nightmare_unknown_xyz' as CardID;
     s.layers[3]!.nightmareRevealed = true;
     expect(call('masterActivateNightmare', s, 3)).toBe('INVALID_MOVE');
   });
@@ -328,6 +328,107 @@ describe('masterActivateNightmare · 深空坠落', () => {
     );
     // roll=1 == layer=1 → lost
     expect(r.players['0']!.currentLayer).toBe(0);
+  });
+});
+
+describe('masterActivateNightmare · 回音萦绕', () => {
+  it('action=add：当前心锁值 +1', () => {
+    const s = makeState({
+      layers: {
+        ...makeState().layers,
+        1: { ...makeState().layers[1]!, nightmareId: 'nightmare_echo' as CardID },
+        2: { ...makeState().layers[2]!, heartLockValue: 1 },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = call('masterActivateNightmare', s, 1, { targetLayer: 2, action: 'add' });
+    expect(r.layers[2]!.heartLockValue).toBe(2);
+  });
+
+  it('action=restore：恢复到该玩家数下配置的初始心锁值', () => {
+    // 3 人局（PLAYER_COUNT_CONFIGS 未定义），这里用 playerOrder 3 人 + 测试目标层 1 心锁=当前
+    // 实际 restore 需要一个有效 playerCount；我们构造 4 人的 playerOrder 来走 configs[4]
+    const s = makeState({
+      playerOrder: ['0', '1', '2', '3'],
+      layers: {
+        ...makeState().layers,
+        1: { ...makeState().layers[1]!, nightmareId: 'nightmare_echo' as CardID },
+        2: { ...makeState().layers[2]!, heartLockValue: 1 },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    // 4 人局第 2 层原值 = 3
+    const r = call('masterActivateNightmare', s, 1, { targetLayer: 2, action: 'restore' });
+    expect(r.layers[2]!.heartLockValue).toBe(3);
+  });
+
+  it('缺 params → 拒绝', () => {
+    const s = makeState({
+      layers: {
+        ...makeState().layers,
+        1: { ...makeState().layers[1]!, nightmareId: 'nightmare_echo' as CardID },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    expect(call('masterActivateNightmare', s, 1)).toBe('INVALID_MOVE');
+  });
+});
+
+describe('masterActivateNightmare · 邪念瘟疫', () => {
+  it('未被梦主派发贿赂的当层盗梦者 → 迷失层', () => {
+    const s = makeState({
+      bribePool: [{ id: 'bribe-deal-0', status: 'inPool', heldBy: null, originalOwnerId: null }],
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_plague' as CardID,
+          playersInLayer: ['0', '1', '2'],
+        },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    // bribedTargets 指定 '0'；'1' 未派发 → 迷失层
+    const r = call('masterActivateNightmare', s, 1, { bribedTargets: ['0'] });
+    expect(r.players['0']!.currentLayer).toBe(1);
+    expect(r.players['0']!.bribeReceived).toBe(1);
+    expect(r.players['0']!.faction).toBe('master'); // DEAL 命中
+    expect(r.players['1']!.currentLayer).toBe(0); // 未派发入迷失层
+  });
+
+  it('贿赂池为空时，指定派发也视为未派发 → 迷失层', () => {
+    const s = makeState({
+      bribePool: [],
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_plague' as CardID,
+          playersInLayer: ['0', '1'],
+        },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = call('masterActivateNightmare', s, 1, { bribedTargets: ['0', '1'] });
+    expect(r.players['0']!.currentLayer).toBe(0);
+    expect(r.players['1']!.currentLayer).toBe(0);
+  });
+
+  it('params 空数组 → 全员当层盗梦者入迷失层', () => {
+    const s = makeState({
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_plague' as CardID,
+          playersInLayer: ['0', '1'],
+        },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = call('masterActivateNightmare', s, 1, { bribedTargets: [] });
+    expect(r.players['0']!.currentLayer).toBe(0);
+    expect(r.players['1']!.currentLayer).toBe(0);
   });
 });
 

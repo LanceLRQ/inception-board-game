@@ -15,6 +15,7 @@
 
 import { INVALID_MOVE } from 'boardgame.io/core';
 import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
+import { PLAYER_COUNT_CONFIGS } from './config.js';
 import {
   drawCards,
   discardCard,
@@ -1096,6 +1097,81 @@ function applyNightmareEffect(
         deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...hand] },
       };
       s = movePlayerToLayer(s, pid, layer);
+    }
+    return s;
+  }
+
+  if (nid === 'nightmare_echo') {
+    // 梦主选一层：恢复该层原有心锁数 或 当前心锁数 +1
+    // params: { targetLayer: number, action: 'restore' | 'add' }
+    const targetLayer = _params?.targetLayer as number | undefined;
+    const action = _params?.action as 'restore' | 'add' | undefined;
+    if (!targetLayer || !action) return INVALID_MOVE;
+    const tls = G.layers[targetLayer];
+    if (!tls) return INVALID_MOVE;
+    let newValue: number;
+    if (action === 'add') {
+      newValue = tls.heartLockValue + 1;
+    } else {
+      const cfg = PLAYER_COUNT_CONFIGS[G.playerOrder.length];
+      const original = cfg?.heartLocks[targetLayer - 1] ?? tls.heartLockValue;
+      newValue = Math.max(tls.heartLockValue, original);
+    }
+    return {
+      ...G,
+      layers: { ...G.layers, [targetLayer]: { ...tls, heartLockValue: newValue } },
+    };
+  }
+
+  if (nid === 'nightmare_plague') {
+    // 梦主派发贿赂给当层盗梦者（bribedTargets 指定）；未派发的 → 迷失层
+    // params: { bribedTargets: string[] }
+    const bribed = new Set((_params?.bribedTargets as string[]) ?? []);
+    let s = G;
+    const layerThieves = [...ls.playersInLayer].filter((pid) => {
+      const p = s.players[pid];
+      return p && p.faction === 'thief' && p.isAlive;
+    });
+    for (const pid of layerThieves) {
+      if (bribed.has(pid)) {
+        // 从 pool 抽 1 张随机贿赂；空池则视为未派发 → 入迷失层（manual 说明）
+        const poolIdxs = s.bribePool
+          .map((b, i) => ({ b, i }))
+          .filter(({ b }) => b.status === 'inPool');
+        if (poolIdxs.length === 0) {
+          s = movePlayerToLayer(s, pid, 0);
+          continue;
+        }
+        const pickIdx = (random.Die(poolIdxs.length) - 1) % poolIdxs.length;
+        const pick = poolIdxs[pickIdx]!;
+        const bribe = pick.b;
+        const isDeal = bribe.id.startsWith('bribe-deal-');
+        const target = s.players[pid]!;
+        const nextPool = s.bribePool.map((b, i) =>
+          i === pick.i
+            ? {
+                ...b,
+                status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
+                heldBy: pid,
+                originalOwnerId: pid,
+              }
+            : b,
+        );
+        s = {
+          ...s,
+          bribePool: nextPool,
+          players: {
+            ...s.players,
+            [pid]: {
+              ...target,
+              bribeReceived: target.bribeReceived + 1,
+              faction: isDeal ? ('master' as Faction) : target.faction,
+            },
+          },
+        };
+      } else {
+        s = movePlayerToLayer(s, pid, 0);
+      }
     }
     return s;
   }
