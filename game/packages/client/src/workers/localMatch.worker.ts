@@ -35,6 +35,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playPeek',
     'playGraft',
     'resolveGraft',
+    'playTimeStorm',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -57,6 +58,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   masterDealBribe: 98,
   playPeek: 99,
   playGraft: 100,
+  playTimeStorm: 101,
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,
   doDiscard: 2,

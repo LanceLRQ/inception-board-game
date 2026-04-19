@@ -504,6 +504,44 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 打出时间风暴 - 从牌库顶弃 10 张，该牌效果结算后移出游戏
+        // 对照：docs/manual/04-action-cards.md 时间风暴
+        // MVP：弃牌堆直接收到被弃的 10 张；"从手中弃掉同样触发效果"暂不处理
+        playTimeStorm: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft) return INVALID_MOVE;
+            const player = G.players[ctx.currentPlayer];
+            if (!player || !player.isAlive) return INVALID_MOVE;
+            if (cardId !== 'action_time_storm') return INVALID_MOVE;
+            if (!player.hand.includes(cardId)) return INVALID_MOVE;
+
+            // 从手牌中移除该牌（注：此牌效果结算后"移出游戏"，不入弃牌堆）
+            const handIdx = player.hand.indexOf(cardId);
+            const newHand = [...player.hand];
+            newHand.splice(handIdx, 1);
+
+            // 从牌库顶弃 10 张（不足则全弃）
+            const flipCount = Math.min(10, G.deck.cards.length);
+            const flipped = G.deck.cards.slice(0, flipCount);
+            const remaining = G.deck.cards.slice(flipCount);
+
+            const s: SetupState = {
+              ...G,
+              players: {
+                ...G.players,
+                [ctx.currentPlayer]: { ...player, hand: newHand },
+              },
+              deck: {
+                cards: remaining,
+                discardPile: [...G.deck.discardPile, ...flipped],
+              },
+            };
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
         // 打出凭空造物 - 从牌库顶抽2张牌
         // 对照：docs/manual/04-action-cards.md 凭空造物
         playCreation: {
