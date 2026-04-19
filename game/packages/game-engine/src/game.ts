@@ -203,7 +203,33 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             // 嫁接未结算不得结束行动阶段
             if (G.pendingGraft) return INVALID_MOVE;
-            return setTurnPhase(G, 'discard');
+            // 共鸣归还：弃牌阶段前将 bonder 的全部手牌给予 target
+            // 若 target 已进入迷失层（layer 0）或死亡则保留手牌
+            // 对照：docs/manual/04-action-cards.md 共鸣 解析
+            let s = G;
+            if (s.pendingResonance && s.pendingResonance.bonderPlayerID === ctx.currentPlayer) {
+              const { bonderPlayerID, targetPlayerID } = s.pendingResonance;
+              const bonder = s.players[bonderPlayerID];
+              const target = s.players[targetPlayerID];
+              if (bonder && target) {
+                const targetInLost = target.currentLayer === 0 || !target.isAlive;
+                if (!targetInLost && bonder.hand.length > 0) {
+                  s = {
+                    ...s,
+                    players: {
+                      ...s.players,
+                      [bonderPlayerID]: { ...bonder, hand: [] },
+                      [targetPlayerID]: {
+                        ...target,
+                        hand: [...target.hand, ...bonder.hand],
+                      },
+                    },
+                  };
+                }
+              }
+              s = { ...s, pendingResonance: null };
+            }
+            return setTurnPhase(s, 'discard');
           },
           client: false,
         },
@@ -500,6 +526,46 @@ export const InceptionCityGame = {
               },
               pendingGraft: null,
             };
+          },
+          client: false,
+        },
+
+        // 打出共鸣 - 获取目标全部手牌，回合末归还己手牌（除非目标入迷失层/死亡）
+        // 对照：docs/manual/04-action-cards.md 共鸣
+        playResonance: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft) return INVALID_MOVE;
+            // 每回合限 1 张
+            if (G.pendingResonance) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            const target = G.players[targetPlayerID];
+            if (!self || !target) return INVALID_MOVE;
+            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+
+            // 先把共鸣本身从手牌移除并入弃牌堆
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            // 把 target 全部手牌转给 self
+            const targetHand = [...(s.players[targetPlayerID]?.hand ?? [])];
+            const selfAfter = s.players[ctx.currentPlayer]!;
+            s = {
+              ...s,
+              players: {
+                ...s.players,
+                [targetPlayerID]: { ...s.players[targetPlayerID]!, hand: [] },
+                [ctx.currentPlayer]: {
+                  ...selfAfter,
+                  hand: [...selfAfter.hand, ...targetHand],
+                },
+              },
+              pendingResonance: {
+                bonderPlayerID: ctx.currentPlayer,
+                targetPlayerID,
+              },
+            };
+            return incrementMoveCounter(s);
           },
           client: false,
         },

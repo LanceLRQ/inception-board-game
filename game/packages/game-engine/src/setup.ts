@@ -111,6 +111,12 @@ export interface SetupState {
   pendingGraft: {
     playerID: string;
   } | null;
+  // 共鸣：本回合 bonder 持有 target 的手牌，弃牌阶段前归还己手牌
+  // 对照：docs/manual/04-action-cards.md 共鸣
+  pendingResonance: {
+    bonderPlayerID: string;
+    targetPlayerID: string;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -268,6 +274,7 @@ export function createInitialState(options: {
     activeWorldViews: [],
     pendingUnlock: null,
     pendingGraft: null,
+    pendingResonance: null,
     winner: null,
     winReason: null,
     endTurn: null,
