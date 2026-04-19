@@ -10,6 +10,7 @@ const LocalMatch = lazy(() => import('./pages/LocalMatch'));
 const Replay = lazy(() => import('./pages/Replay'));
 const Settings = lazy(() => import('./pages/Settings'));
 const About = lazy(() => import('./pages/About'));
+const Tutorial = lazy(() => import('./pages/Tutorial'));
 
 function PageLoader() {
   return (
@@ -84,6 +85,14 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <About />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/tutorial',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Tutorial />
           </Suspense>
         ),
       },
