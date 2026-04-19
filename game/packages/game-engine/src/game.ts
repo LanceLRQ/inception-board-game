@@ -293,6 +293,30 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 打出梦魇解封 - 翻开指定层的面朝下梦魇；后续由梦主选择发动/弃掉
+        // 对照：docs/manual/04-action-cards.md 梦魇解封
+        playNightmareUnlock: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, layer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (cardId !== 'action_nightmare_unlock') return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            if (!self || !self.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+            const ls = G.layers[layer];
+            if (!ls || !ls.nightmareId) return INVALID_MOVE;
+            if (ls.nightmareRevealed) return INVALID_MOVE;
+
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            s = {
+              ...s,
+              layers: { ...s.layers, [layer]: { ...ls, nightmareRevealed: true } },
+            };
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
         // --- 梦魇系统（梦主限定）---
         // 对照：docs/manual/07-nightmare-cards.md
         // 梦主行动阶段翻开指定层的梦魇牌（面朝下 → 面朝上）
