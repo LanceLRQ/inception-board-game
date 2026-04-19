@@ -117,6 +117,15 @@ export interface SetupState {
     bonderPlayerID: string;
     targetPlayerID: string;
   } | null;
+  // 万有引力：多目标手牌池 + 轮流挑选
+  // 对照：docs/manual/04-action-cards.md 万有引力
+  pendingGravity: {
+    bonderPlayerID: string;
+    targetIds: string[];
+    pool: CardID[];
+    pickOrder: string[]; // 从 bonder 起按 playOrder 顺序
+    pickCursor: number;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -275,6 +284,7 @@ export function createInitialState(options: {
     pendingUnlock: null,
     pendingGraft: null,
     pendingResonance: null,
+    pendingGravity: null,
     winner: null,
     winReason: null,
     endTurn: null,

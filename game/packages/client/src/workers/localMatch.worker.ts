@@ -37,6 +37,8 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'resolveGraft',
     'playTimeStorm',
     'playResonance',
+    'playGravity',
+    'resolveGravityPick',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -61,6 +63,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   playGraft: 100,
   playTimeStorm: 101,
   playResonance: 102,
+  playGravity: 103,
+  resolveGravityPick: 0, // 必须优先结算进行中的挑选
+
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,
   doDiscard: 2,
@@ -100,6 +105,11 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
   if (state?.G?.pendingGraft?.playerID === botPlayerID && legalMoves.includes('resolveGraft')) {
     return 'resolveGraft';
   }
+  // pendingGravity 存在时由 bonder 驱动挑选（MVP 简化）
+  const pg = state?.G?.pendingGravity;
+  if (pg && pg.bonderPlayerID === botPlayerID && legalMoves.includes('resolveGravityPick')) {
+    return 'resolveGravityPick';
+  }
 
   // discard 阶段：手牌超限必须走 doDiscard；否则 skipDiscard
   // 对照：game-engine skipDiscard guard（hand.length > HAND_LIMIT → INVALID_MOVE）
@@ -136,6 +146,11 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
       // Bot 简单策略：取手牌前 2 张放回牌库顶
       const hand = (self?.hand as string[]) ?? [];
       return [hand.slice(0, 2)];
+    }
+    case 'resolveGravityPick': {
+      // Bot 简单策略：从 pool 挑第 1 张
+      const pool = (G?.pendingGravity?.pool as string[]) ?? [];
+      return [pool[0]];
     }
     default:
       return [];

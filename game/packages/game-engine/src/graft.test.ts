@@ -145,6 +145,7 @@ describe('嫁接 · 直接调用 move 函数（纯单元）', () => {
       pendingUnlock: null,
       pendingGraft: { playerID: '0' },
       pendingResonance: null,
+      pendingGravity: null,
       winner: null,
       winReason: null,
       endTurn: null,

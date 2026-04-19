@@ -201,8 +201,9 @@ export const InceptionCityGame = {
         endActionPhase: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            // 嫁接未结算不得结束行动阶段
+            // 嫁接/万有引力未结算不得结束行动阶段
             if (G.pendingGraft) return INVALID_MOVE;
+            if (G.pendingGravity) return INVALID_MOVE;
             // 共鸣归还：弃牌阶段前将 bonder 的全部手牌给予 target
             // 若 target 已进入迷失层（layer 0）或死亡则保留手牌
             // 对照：docs/manual/04-action-cards.md 共鸣 解析
@@ -525,6 +526,98 @@ export const InceptionCityGame = {
                 cards: [...cardsToReturn, ...G.deck.cards],
               },
               pendingGraft: null,
+            };
+          },
+          client: false,
+        },
+
+        // 打出万有引力 - 指定 1-2 个目标；所有目标手牌入池，从 bonder 起按 playOrder 轮流挑选
+        // 对照：docs/manual/04-action-cards.md 万有引力
+        playGravity: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetIds: string[]) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (!Array.isArray(targetIds) || targetIds.length < 1 || targetIds.length > 2) {
+              return INVALID_MOVE;
+            }
+            const self = G.players[ctx.currentPlayer];
+            if (!self || !self.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+            // 目标：必须都存在 + 不能含自己 + 不能重复
+            const seen = new Set<string>();
+            for (const t of targetIds) {
+              if (t === ctx.currentPlayer) return INVALID_MOVE;
+              if (seen.has(t)) return INVALID_MOVE;
+              seen.add(t);
+              const tp = G.players[t];
+              if (!tp || !tp.isAlive) return INVALID_MOVE;
+            }
+
+            // 弃掉该牌
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+
+            // pickOrder = [bonder, ...targetIds 按 playOrder 排序]
+            const orderIdxMap = new Map<string, number>();
+            G.playerOrder.forEach((pid, i) => orderIdxMap.set(pid, i));
+            const sortedTargets = [...targetIds].sort(
+              (a, b) => (orderIdxMap.get(a) ?? 0) - (orderIdxMap.get(b) ?? 0),
+            );
+            const pickOrder = [ctx.currentPlayer, ...sortedTargets];
+
+            // 按排序后目标顺序收集 target 手牌入 pool，清空 target 手牌
+            const pool: CardID[] = [];
+            const nextPlayers = { ...s.players };
+            for (const t of sortedTargets) {
+              const tp = nextPlayers[t]!;
+              pool.push(...tp.hand);
+              nextPlayers[t] = { ...tp, hand: [] };
+            }
+
+            s = {
+              ...s,
+              players: nextPlayers,
+              pendingGravity:
+                pool.length === 0
+                  ? null // 池为空直接跳过
+                  : {
+                      bonderPlayerID: ctx.currentPlayer,
+                      targetIds: sortedTargets,
+                      pool,
+                      pickOrder,
+                      pickCursor: 0,
+                    },
+            };
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+        // 万有引力挑选（picker 从 pool 选 1 张）
+        // MVP 简化：由 bonder 的客户端代理所有 picker 调用（BGIO stages 未启用）
+        resolveGravityPick: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+            const pg = G.pendingGravity;
+            if (!pg) return INVALID_MOVE;
+            // 仅 bonder 可驱动（MVP），实际 picker 由 pickOrder[cursor] 决定
+            if (ctx.currentPlayer !== pg.bonderPlayerID) return INVALID_MOVE;
+            const picker = pg.pickOrder[pg.pickCursor % pg.pickOrder.length];
+            if (!picker) return INVALID_MOVE;
+            const poolIdx = pg.pool.indexOf(cardId);
+            if (poolIdx === -1) return INVALID_MOVE;
+            const pickerPlayer = G.players[picker];
+            if (!pickerPlayer) return INVALID_MOVE;
+
+            const newPool = [...pg.pool];
+            newPool.splice(poolIdx, 1);
+            const nextCursor = (pg.pickCursor + 1) % pg.pickOrder.length;
+
+            return {
+              ...G,
+              players: {
+                ...G.players,
+                [picker]: { ...pickerPlayer, hand: [...pickerPlayer.hand, cardId] },
+              },
+              pendingGravity:
+                newPool.length === 0 ? null : { ...pg, pool: newPool, pickCursor: nextCursor },
             };
           },
           client: false,
