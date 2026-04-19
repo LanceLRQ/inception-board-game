@@ -95,6 +95,9 @@
     "dreamTransitPick": "SHOOT·梦境穿梭剂：选择结算方式",
     "dreamModeShoot": "以 SHOOT 结算",
     "dreamModeTransit": "以 穿梭剂 结算",
+    "gravityPickTargets": "万有引力：选 1-2 名玩家（不含自己）",
+    "gravityConfirm": "确认打出",
+    "gravityPoolPick": "万有引力：当前挑选",
     "winReason": {
       "secret_vault_opened": "盗梦者打开了秘密金库",
       "all_thieves_dead": "所有盗梦者阵亡",

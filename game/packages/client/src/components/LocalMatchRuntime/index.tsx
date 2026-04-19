@@ -184,6 +184,33 @@ export function LocalMatchRuntime({
   // SHOOT·梦境穿梭剂：选 mode 的中间态
   const [dreamTransitPicker, setDreamTransitPicker] = useState<string | null>(null);
 
+  // 万有引力：1-2 目标的选择中间态
+  const [gravityPicker, setGravityPicker] = useState<{
+    card: string;
+    targets: string[];
+  } | null>(null);
+  const toggleGravityTarget = useCallback(
+    (pid: string) => {
+      setGravityPicker((prev) => {
+        if (!prev) return prev;
+        const idx = prev.targets.indexOf(pid);
+        if (idx >= 0) {
+          const next = [...prev.targets];
+          next.splice(idx, 1);
+          return { ...prev, targets: next };
+        }
+        if (prev.targets.length >= 2) return prev;
+        return { ...prev, targets: [...prev.targets, pid] };
+      });
+    },
+    [setGravityPicker],
+  );
+  const confirmGravity = useCallback(async () => {
+    if (!gravityPicker || gravityPicker.targets.length < 1) return;
+    await makeMove('playGravity', [gravityPicker.card, [...gravityPicker.targets]]);
+    setGravityPicker(null);
+  }, [gravityPicker, makeMove, setGravityPicker]);
+
   // 棋局·易位：选中的 2 个金库索引
   const [chessPick, setChessPick] = useState<number[]>([]);
   const humanCharacterId = (humanPlayer?.characterId as string) ?? '';
@@ -232,6 +259,11 @@ export function LocalMatchRuntime({
         setDreamTransitPicker(card);
         return;
       }
+      // 万有引力：进入多目标选择
+      if (card === 'action_gravity') {
+        setGravityPicker({ card, targets: [] });
+        return;
+      }
       const action = actionMoveFor(card);
       if (!action) return;
       setPendingPlay({
@@ -241,7 +273,7 @@ export function LocalMatchRuntime({
         argOrder: action.argOrder,
       });
     },
-    [setDreamTransitPicker, setPendingPlay],
+    [setDreamTransitPicker, setGravityPicker, setPendingPlay],
   );
 
   const chooseDreamMode = useCallback(
@@ -318,6 +350,19 @@ export function LocalMatchRuntime({
   const effectiveGraftPick = isHumanGraftPending
     ? graftPick.filter((c) => humanHand.includes(c))
     : [];
+
+  // pendingGravity 人类 bonder 驱动池挑选
+  const pendingGravity = G?.pendingGravity as
+    | { bonderPlayerID: string; pool: string[]; pickOrder: string[]; pickCursor: number }
+    | null
+    | undefined;
+  const isHumanGravityBonder = pendingGravity?.bonderPlayerID === '0';
+  const pickGravityCard = useCallback(
+    async (cardId: string) => {
+      await makeMove('resolveGravityPick', [cardId]);
+    },
+    [makeMove],
+  );
   const confirmGraft = useCallback(async () => {
     if (effectiveGraftPick.length !== 2) return;
     await makeMove('resolveGraft', [[...effectiveGraftPick]]);
@@ -754,6 +799,100 @@ export function LocalMatchRuntime({
             >
               {t('common.cancel')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 万有引力：多目标选择 */}
+      {gravityPicker && players && (
+        <div
+          className="mb-4 rounded-md border border-violet-500/40 bg-violet-500/5 p-3 text-xs"
+          data-testid="gravity-targets-picker"
+        >
+          <div className="mb-2 font-medium text-violet-400">
+            {t('localMatch.gravityPickTargets', {
+              defaultValue: '万有引力：选 1-2 名玩家（不含自己）',
+            })}
+          </div>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {Object.entries(players)
+              .filter(([id, p]) => id !== '0' && (p.isAlive as boolean))
+              .map(([id]) => {
+                const picked = gravityPicker.targets.includes(id);
+                return (
+                  <button
+                    key={`grav-tgt-${id}`}
+                    type="button"
+                    onClick={() => toggleGravityTarget(id)}
+                    className={cn(
+                      'rounded-full border px-2 py-0.5 text-[11px]',
+                      picked
+                        ? 'border-violet-400 bg-violet-500/30 text-violet-400'
+                        : 'border-border bg-card hover:border-violet-400/60',
+                    )}
+                    data-testid={`grav-target-${id}`}
+                  >
+                    AI {id}
+                  </button>
+                );
+              })}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={gravityPicker.targets.length < 1}
+              onClick={() => void confirmGravity()}
+              className="rounded-full bg-violet-500 px-3 py-1 text-[11px] text-black disabled:opacity-50"
+              data-testid="gravity-confirm"
+            >
+              {t('localMatch.gravityConfirm', { defaultValue: '确认打出' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setGravityPicker(null)}
+              className="rounded-full border border-muted px-3 py-1 text-[11px] text-muted-foreground"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 万有引力：人类 bonder 的池挑选器 */}
+      {isHumanGravityBonder && pendingGravity && (
+        <div
+          className="mb-4 rounded-md border border-violet-500/40 bg-violet-500/5 p-3 text-xs"
+          data-testid="gravity-pool-picker"
+        >
+          <div className="mb-2 font-medium text-violet-400">
+            {t('localMatch.gravityPoolPick', {
+              defaultValue: '万有引力：轮流挑选',
+              picker:
+                pendingGravity.pickOrder[
+                  pendingGravity.pickCursor % pendingGravity.pickOrder.length
+                ],
+            })}{' '}
+            ·{' '}
+            {(() => {
+              const picker =
+                pendingGravity.pickOrder[
+                  pendingGravity.pickCursor % pendingGravity.pickOrder.length
+                ];
+              return picker === '0' ? t('localMatch.you') : `AI ${picker}`;
+            })()}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {pendingGravity.pool.map((c, idx) => (
+              <button
+                key={`grav-pool-${idx}-${c}`}
+                type="button"
+                onClick={() => void pickGravityCard(c)}
+                className="rounded-full border border-violet-400/60 bg-card px-2 py-0.5 text-[11px] hover:bg-violet-500/10"
+                data-testid={`grav-pool-${idx}`}
+              >
+                {getCardName(c)}
+              </button>
+            ))}
           </div>
         </div>
       )}
