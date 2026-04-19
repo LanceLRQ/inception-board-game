@@ -90,3 +90,39 @@ export {
   defaultRandomBytes,
 } from './shortlink/base58.js';
 export type { RandomBytesFn } from './shortlink/base58.js';
+
+// 教学（B16）
+export {
+  initialProgress,
+  getCurrentStep,
+  isCompleted,
+  computeProgressPercent,
+  advance,
+  jumpToStepId,
+  validateScenario,
+} from './tutorial/engine.js';
+export type {
+  TutorialStep,
+  TutorialStepKind,
+  TutorialScenario,
+  TutorialProgress,
+  TutorialEvent,
+} from './tutorial/types.js';
+export { BASICS_TUTORIAL } from './tutorial/scenarios/basics.js';
+
+// Bot 昵称生成
+export {
+  BOT_NAMES_CONFIG,
+  DEFAULT_UGC_BAN_WORDS,
+  generateBotNickname,
+  generateBatch,
+  getPoolFor,
+  withBotBadge,
+} from './nickname/generator.js';
+export type {
+  BotDifficulty,
+  BotNamesConfig,
+  GenerateOptions,
+  GenerateResult,
+  Suffix,
+} from './nickname/generator.js';
