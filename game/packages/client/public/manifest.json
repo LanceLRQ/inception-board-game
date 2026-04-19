@@ -1,0 +1,14 @@
+{
+  "name": "盗梦都市 · Inception City Online",
+  "short_name": "盗梦都市",
+  "description": "移动端优先的桌游《盗梦都市》在线多人复刻",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1a1a2e",
+  "background_color": "#1a1a2e",
+  "icons": [
+    { "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/pwa-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

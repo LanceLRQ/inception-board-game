@@ -45,3 +45,14 @@ export type {
   MoveCounter,
   GameState,
 } from './types/game.js';
+
+// 能力注册表
+export {
+  validateAllCards,
+  ensureRegistered,
+  getCardById,
+  getSkillById,
+  getAllCharacters,
+  getCardsByCategory,
+} from './cards/abilityRegistry.js';
+export type { ValidationError } from './cards/abilityRegistry.js';
