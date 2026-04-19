@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src/",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "assets:sync": "tsx scripts/sync-assets.ts",
+    "assets:check": "tsx scripts/sync-assets.ts --check",
+    "assets:clean": "tsx scripts/sync-assets.ts --clean"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

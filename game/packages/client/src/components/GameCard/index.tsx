@@ -1,16 +1,19 @@
 // 游戏卡牌组件 - 正面/背面/高亮/不可用/多尺寸
-// 对照：plans/design/06-frontend-design.md §6.4.2 / §6.4.3
+// 对照：plans/design/06-frontend-design.md §6.4.2 / §6.4.3 / §6.17.8（ADR-042 失败降级）
 
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils.js';
 import { cardFlip } from '../../styles/animations.js';
+import { isPlaceholderMode } from '../../lib/assetsMode.js';
 
 export type GameCardSize = 'sm' | 'md' | 'lg';
 
 export interface GameCardProps {
   /** 卡牌 ID，用于确定卡面内容；null 或 '__back__' 显示背面 */
   cardId: string | null;
+  /** 卡图 URL（若未提供或加载失败会走占位） */
+  imageUrl?: string;
   /** 是否可打出（合法操作） */
   playable?: boolean;
   /** 是否选中态 */
@@ -44,6 +47,7 @@ const LONG_PRESS_MS = 500;
 
 export function GameCard({
   cardId,
+  imageUrl,
   playable = true,
   selected = false,
   size = 'md',
@@ -56,6 +60,10 @@ export function GameCard({
 
   // 长按检测
   const [pressTimer, setPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  // 图片加载失败 → 降级占位（ADR-042 §6.17.8）
+  const [imageFailed, setImageFailed] = useState(false);
+  const handleImageError = useCallback(() => setImageFailed(true), []);
+  const shouldShowImage = !isBack && imageUrl && !imageFailed && !isPlaceholderMode();
 
   const handlePointerDown = useCallback(() => {
     const timer = setTimeout(() => {
@@ -108,12 +116,20 @@ export function GameCard({
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-800 to-indigo-950">
           <span className="text-indigo-400/60 text-lg font-bold">ICO</span>
         </div>
+      ) : shouldShowImage ? (
+        <img
+          src={imageUrl}
+          alt={rest['aria-label'] ?? cardId}
+          onError={handleImageError}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 p-1">
           <span
             className={cn('text-center font-medium text-slate-200 leading-tight', SIZE_TEXT[size])}
           >
-            {cardId.replace(/^action_/, '').replace(/_/g, ' ')}
+            {cardId!.replace(/^action_/, '').replace(/_/g, ' ')}
           </span>
         </div>
       )}
