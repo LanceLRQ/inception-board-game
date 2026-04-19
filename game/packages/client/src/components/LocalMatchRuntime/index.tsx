@@ -8,7 +8,7 @@ import { ArrowRight, RotateCcw, Skull, Trophy } from 'lucide-react';
 import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
-import { actionMoveFor, getCardName } from '../../lib/cards';
+import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
 import { LayerMap } from '../LayerMap';
 
 export type BGIOState = {
@@ -24,6 +24,23 @@ interface LocalMatchRuntimeProps {
   readonly topRight?: React.ReactNode;
   /** 结束/重开回调；未传则显示内置"再来一局"按钮 */
   readonly onRestart?: () => void;
+}
+
+function CharacterSummary({ characterId }: { characterId: string }) {
+  const summary = getCharacterSkillSummary(characterId);
+  if (!summary) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-xs text-primary"
+      title={summary.skills.map((s) => `${s.name}：${s.description}`).join('\n')}
+      data-testid="human-character"
+    >
+      <span className="font-medium">{summary.name}</span>
+      {summary.skills[0] && (
+        <span className="text-muted-foreground">· {summary.skills[0].name}</span>
+      )}
+    </span>
+  );
 }
 
 export function LocalMatchRuntime({
@@ -272,7 +289,12 @@ export function LocalMatchRuntime({
 
       {humanPlayer && (
         <div className="mb-4 rounded-lg border border-border bg-card p-4">
-          <div className="mb-2 text-sm font-medium">{t('localMatch.yourInfo')}</div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">{t('localMatch.yourInfo')}</span>
+            {typeof humanPlayer.characterId === 'string' && humanPlayer.characterId && (
+              <CharacterSummary characterId={humanPlayer.characterId as string} />
+            )}
+          </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <span>
               {t('localMatch.faction')}：{String(humanPlayer.faction)}

@@ -27,6 +27,7 @@ import {
   applyUnlockCancel,
 } from './moves.js';
 import { resolveShoot } from './dice.js';
+import { applyPointmanAssault, applyInterpreterForeshadow } from './engine/skills.js';
 import type { CardID, Faction } from '@icgame/shared';
 
 export type { SetupState } from './setup.js';
@@ -102,14 +103,43 @@ export const InceptionCityGame = {
           move: ({ G, random }: MoveCtx) => {
             const masterIdx = random.Die(G.playerOrder.length) - 1;
             const masterID = G.playerOrder[masterIdx]!;
+
+            // MVP：给玩家随机分配角色
+            // 梦主从 MASTER_CHAR_POOL 选，盗梦者从 THIEF_CHAR_POOL 选（不重）
+            const masterPool: CardID[] = ['dm_fortress', 'dm_chess'];
+            const thiefPool: CardID[] = [
+              'thief_pointman',
+              'thief_dream_interpreter',
+              'thief_space_queen',
+              'thief_joker',
+            ];
+            const masterChar = masterPool[random.Die(masterPool.length) - 1]!;
+            const shuffledThieves = random.Shuffle([...thiefPool]);
+
+            const nextPlayers: typeof G.players = { ...G.players };
+            let thiefCursor = 0;
+            for (const pid of G.playerOrder) {
+              if (pid === masterID) {
+                nextPlayers[pid] = {
+                  ...nextPlayers[pid]!,
+                  faction: 'master' as Faction,
+                  characterId: masterChar,
+                };
+              } else {
+                const ch = shuffledThieves[thiefCursor % shuffledThieves.length]!;
+                thiefCursor++;
+                nextPlayers[pid] = {
+                  ...nextPlayers[pid]!,
+                  characterId: ch,
+                };
+              }
+            }
+
             return {
               ...G,
               phase: 'playing' as const,
               dreamMasterID: masterID,
-              players: {
-                ...G.players,
-                [masterID]: { ...G.players[masterID]!, faction: 'master' as Faction },
-              },
+              players: nextPlayers,
             };
           },
           client: false,
@@ -143,7 +173,13 @@ export const InceptionCityGame = {
         doDraw: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
+            // 抽牌前后对比推出 drawnCards（用于先锋技能触发）
+            const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
             let s = drawCards(G, G.currentPlayerID);
+            const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
+            const drawn = afterHand.slice(beforeHand.length);
+            // 先锋技能：抽到 action_dream_transit 则额外抽 2 张
+            s = applyPointmanAssault(s, G.currentPlayerID, drawn);
             s = setTurnPhase(s, 'action');
             return s;
           },
@@ -251,7 +287,11 @@ export const InceptionCityGame = {
         resolveUnlock: {
           move: ({ G }: MoveCtx) => {
             if (!G.pendingUnlock) return INVALID_MOVE;
-            return applyUnlockSuccess(G);
+            const unlockerId = G.pendingUnlock.playerID;
+            let s = applyUnlockSuccess(G);
+            // 译梦师技能：成功解封后抽 2 张
+            s = applyInterpreterForeshadow(s, unlockerId);
+            return s;
           },
           client: false,
         },

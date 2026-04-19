@@ -22,6 +22,20 @@ export function getCardName(id: string): string {
   return getCardById(id)?.name ?? id;
 }
 
+/** 拿角色技能摘要（首个 skill 的 name + description） */
+export function getCharacterSkillSummary(
+  characterId: string,
+): { name: string; skills: Array<{ name: string; description: string }> } | null {
+  const card = getCardById(characterId);
+  if (!card) return null;
+  if (card.category !== 'thief_char' && card.category !== 'master_char') return null;
+  const ch = card as import('@icgame/shared').CharacterDefinition;
+  return {
+    name: ch.name,
+    skills: ch.front.skills.map((s) => ({ name: s.name, description: s.description })),
+  };
+}
+
 export function isActionCard(id: string): boolean {
   return getCardById(id)?.category === 'action';
 }
