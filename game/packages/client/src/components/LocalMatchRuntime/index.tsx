@@ -103,6 +103,34 @@ export function LocalMatchRuntime({
   const players = G?.players as Record<string, Record<string, unknown>> | undefined;
   const humanPlayer = players?.['0'];
 
+  // 人类弃牌交互：超过手牌上限（5）时必须选择要弃的牌
+  const HAND_LIMIT = 5;
+  const humanHand = (humanPlayer?.hand as string[]) ?? [];
+  const overHand = Math.max(0, humanHand.length - HAND_LIMIT);
+  const [selectedDiscard, setSelectedDiscard] = useState<string[]>([]);
+
+  // 仅保留仍在手牌 + 当前确实在 discard 阶段的选中，避免 stale 残留
+  const effectiveSelected =
+    turnPhase === 'discard' && isHumanTurn
+      ? selectedDiscard.filter((c) => humanHand.includes(c))
+      : [];
+
+  const toggleDiscard = useCallback(
+    (card: string) => {
+      setSelectedDiscard((prev) => {
+        const idx = prev.indexOf(card);
+        if (idx >= 0) {
+          const next = [...prev];
+          next.splice(idx, 1);
+          return next;
+        }
+        if (prev.length >= overHand) return prev; // 不能超过要弃数量
+        return [...prev, card];
+      });
+    },
+    [overHand],
+  );
+
   return (
     <div className="min-h-screen bg-background p-4 text-foreground" data-testid="local-runtime">
       <div className="mb-4 flex items-center justify-between rounded-lg bg-card px-4 py-2 shadow-sm">
@@ -162,16 +190,38 @@ export function LocalMatchRuntime({
             </span>
           </div>
           {Array.isArray(humanPlayer.hand) && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {(humanPlayer.hand as string[]).map((card, i) => (
-                <span
-                  key={`${card}-${i}`}
-                  className="rounded border border-border bg-muted px-2 py-0.5 text-xs"
-                >
-                  {card}
-                </span>
-              ))}
-            </div>
+            <>
+              {turnPhase === 'discard' && overHand > 0 && isHumanTurn && (
+                <div className="mt-2 text-xs text-amber-500">
+                  {t('localMatch.mustDiscard', { n: overHand })}
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap gap-1" data-testid="human-hand">
+                {(humanPlayer.hand as string[]).map((card, i) => {
+                  const selectable =
+                    turnPhase === 'discard' && overHand > 0 && isHumanTurn && !winner;
+                  const selected = effectiveSelected.includes(card);
+                  return (
+                    <button
+                      key={`${card}-${i}`}
+                      type="button"
+                      disabled={!selectable}
+                      onClick={() => selectable && toggleDiscard(card)}
+                      className={cn(
+                        'rounded border px-2 py-0.5 text-xs transition-colors',
+                        selected
+                          ? 'border-destructive bg-destructive/20 text-destructive'
+                          : 'border-border bg-muted',
+                        selectable && !selected && 'hover:border-primary/60',
+                      )}
+                      data-testid={`card-${i}`}
+                    >
+                      {card}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -199,7 +249,7 @@ export function LocalMatchRuntime({
               {t('localMatch.endAction')}
             </button>
           )}
-          {turnPhase === 'discard' && (
+          {turnPhase === 'discard' && overHand === 0 && (
             <button
               type="button"
               onClick={() => void makeMove('skipDiscard')}
@@ -207,6 +257,23 @@ export function LocalMatchRuntime({
               data-testid="action-skip-discard"
             >
               {t('localMatch.skipDiscard')}
+            </button>
+          )}
+          {turnPhase === 'discard' && overHand > 0 && (
+            <button
+              type="button"
+              disabled={effectiveSelected.length !== overHand}
+              onClick={() => {
+                void makeMove('doDiscard', [effectiveSelected]);
+                setSelectedDiscard([]);
+              }}
+              className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
+              data-testid="action-confirm-discard"
+            >
+              {t('localMatch.confirmDiscard', {
+                selected: effectiveSelected.length,
+                required: overHand,
+              })}
             </button>
           )}
         </div>

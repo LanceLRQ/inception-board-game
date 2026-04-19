@@ -71,9 +71,21 @@ function legalMovesFor(ctxPhase: string | undefined, turnPhase: string | undefin
   return MOVES_BY_PHASE[turnPhase] ?? [];
 }
 
-/** 为 Bot 选择一个合法 move 名 */
-function pickBotMove(legalMoves: string[]): string | null {
+const HAND_LIMIT = 5;
+
+/** 为 Bot 选择一个合法 move 名（需要 state 以做上下文决策） */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): string | null {
   if (legalMoves.length === 0) return null;
+
+  // discard 阶段：手牌超限必须走 doDiscard；否则 skipDiscard
+  // 对照：game-engine skipDiscard guard（hand.length > HAND_LIMIT → INVALID_MOVE）
+  const handLen = (state?.G?.players?.[botPlayerID]?.hand?.length as number) ?? 0;
+  if (legalMoves.includes('doDiscard') || legalMoves.includes('skipDiscard')) {
+    if (handLen > HAND_LIMIT && legalMoves.includes('doDiscard')) return 'doDiscard';
+    if (handLen <= HAND_LIMIT && legalMoves.includes('skipDiscard')) return 'skipDiscard';
+  }
+
   const sorted = [...legalMoves].sort(
     (a, b) => (MOVE_PRIORITY[a] ?? 99) - (MOVE_PRIORITY[b] ?? 99),
   );
@@ -87,8 +99,12 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
   if (!G) return [];
   const self = G.players?.[botPlayerID];
   switch (move) {
-    case 'doDiscard':
-      return [[]]; // 空数组 = 无需弃牌
+    case 'doDiscard': {
+      // 手牌超限则弃掉前 N 张（N = 超出数量）；没超限也返回 [[]]
+      const hand = (self?.hand as string[]) ?? [];
+      const overflow = Math.max(0, hand.length - HAND_LIMIT);
+      return [hand.slice(0, overflow)];
+    }
     case 'dreamMasterMove': {
       const cur = self?.currentLayer ?? 1;
       return [Math.max(1, Math.min(4, cur + 1))];
@@ -147,7 +163,7 @@ function autoPlayBots(): void {
 
     const turnPhase = state.G.turnPhase as string | undefined;
     const legal = legalMovesFor(ctxPhase, turnPhase);
-    const chosen = pickBotMove(legal);
+    const chosen = pickBotMove(legal, state, currentPlayer);
 
     if (!chosen) {
       logAI(`bot ${currentPlayer} has no legal move`, { turnPhase, legal });

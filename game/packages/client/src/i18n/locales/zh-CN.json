@@ -82,6 +82,8 @@
     "draw": "抽牌",
     "endAction": "结束行动",
     "skipDiscard": "跳过弃牌",
+    "confirmDiscard": "确认弃牌（{{selected}}/{{required}}）",
+    "mustDiscard": "手牌超限，必须弃掉 {{n}} 张",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
     "loading": "加载中..."
