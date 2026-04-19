@@ -84,6 +84,9 @@
     "skipDiscard": "跳过弃牌",
     "confirmDiscard": "确认弃牌（{{selected}}/{{required}}）",
     "mustDiscard": "手牌超限，必须弃掉 {{n}} 张",
+    "confirmPlay": "确认打出「{{card}}」",
+    "pickPlayerTarget": "打出「{{card}}」——请选择目标玩家",
+    "pickLayerTarget": "打出「{{card}}」——请选择目标层",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
     "loading": "加载中..."

@@ -8,6 +8,7 @@ import { ArrowRight, RotateCcw, Skull, Trophy } from 'lucide-react';
 import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
+import { actionMoveFor, getCardName } from '../../lib/cards';
 
 export type BGIOState = {
   G: Record<string, unknown>;
@@ -115,6 +116,58 @@ export function LocalMatchRuntime({
       ? selectedDiscard.filter((c) => humanHand.includes(c))
       : [];
 
+  // 出牌意图：action 阶段选中一张需要目标的牌后进入选目标模式
+  const [pendingPlay, setPendingPlay] = useState<{
+    card: string;
+    move: string;
+    needsTarget: 'player' | 'layer' | 'none';
+  } | null>(null);
+
+  // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
+  const effectivePending =
+    pendingPlay && turnPhase === 'action' && isHumanTurn && humanHand.includes(pendingPlay.card)
+      ? pendingPlay
+      : null;
+
+  const startPlay = useCallback((card: string) => {
+    const action = actionMoveFor(card);
+    if (!action) return;
+    if (action.needsTarget === 'none') {
+      setPendingPlay({ card, move: action.move, needsTarget: 'none' });
+    } else {
+      setPendingPlay({ card, move: action.move, needsTarget: action.needsTarget });
+    }
+  }, []);
+
+  const confirmPlayNoTarget = useCallback(async () => {
+    if (!effectivePending || effectivePending.needsTarget !== 'none') return;
+    // playUnlock / playCreation 需要 cardId 参数
+    await makeMove(effectivePending.move, [effectivePending.card]);
+    setPendingPlay(null);
+  }, [effectivePending, makeMove]);
+
+  const confirmPlayTargetPlayer = useCallback(
+    async (targetPlayerID: string) => {
+      if (!effectivePending || effectivePending.needsTarget !== 'player') return;
+      // playShoot(targetPlayerID, cardId)
+      await makeMove(effectivePending.move, [targetPlayerID, effectivePending.card]);
+      setPendingPlay(null);
+    },
+    [effectivePending, makeMove],
+  );
+
+  const confirmPlayTargetLayer = useCallback(
+    async (targetLayer: number) => {
+      if (!effectivePending || effectivePending.needsTarget !== 'layer') return;
+      // playDreamTransit(cardId, targetLayer)
+      await makeMove(effectivePending.move, [effectivePending.card, targetLayer]);
+      setPendingPlay(null);
+    },
+    [effectivePending, makeMove],
+  );
+
+  const cancelPlay = useCallback(() => setPendingPlay(null), []);
+
   const toggleDiscard = useCallback(
     (card: string) => {
       setSelectedDiscard((prev) => {
@@ -198,25 +251,36 @@ export function LocalMatchRuntime({
               )}
               <div className="mt-2 flex flex-wrap gap-1" data-testid="human-hand">
                 {(humanPlayer.hand as string[]).map((card, i) => {
-                  const selectable =
+                  const isDiscardSelect =
                     turnPhase === 'discard' && overHand > 0 && isHumanTurn && !winner;
-                  const selected = effectiveSelected.includes(card);
+                  const isActionPlayable =
+                    turnPhase === 'action' && isHumanTurn && !winner && !!actionMoveFor(card);
+                  const selected = isDiscardSelect && effectiveSelected.includes(card);
+                  const isPending = effectivePending?.card === card;
+                  const onClickHand = () => {
+                    if (isDiscardSelect) toggleDiscard(card);
+                    else if (isActionPlayable) startPlay(card);
+                  };
                   return (
                     <button
                       key={`${card}-${i}`}
                       type="button"
-                      disabled={!selectable}
-                      onClick={() => selectable && toggleDiscard(card)}
+                      disabled={!isDiscardSelect && !isActionPlayable}
+                      onClick={onClickHand}
                       className={cn(
                         'rounded border px-2 py-0.5 text-xs transition-colors',
-                        selected
-                          ? 'border-destructive bg-destructive/20 text-destructive'
-                          : 'border-border bg-muted',
-                        selectable && !selected && 'hover:border-primary/60',
+                        selected && 'border-destructive bg-destructive/20 text-destructive',
+                        isPending && 'border-primary bg-primary/20 text-primary',
+                        !selected && !isPending && 'border-border bg-muted',
+                        (isDiscardSelect || isActionPlayable) &&
+                          !selected &&
+                          !isPending &&
+                          'hover:border-primary/60',
                       )}
                       data-testid={`card-${i}`}
+                      title={card}
                     >
-                      {card}
+                      {getCardName(card)}
                     </button>
                   );
                 })}
@@ -238,7 +302,7 @@ export function LocalMatchRuntime({
               {t('localMatch.draw')}
             </button>
           )}
-          {turnPhase === 'action' && (
+          {turnPhase === 'action' && !effectivePending && (
             <button
               type="button"
               onClick={() => void makeMove('endActionPhase')}
@@ -248,6 +312,92 @@ export function LocalMatchRuntime({
               <ArrowRight className="h-4 w-4" />
               {t('localMatch.endAction')}
             </button>
+          )}
+
+          {/* 无目标出牌（解封 / 造物）：显示确认按钮 */}
+          {turnPhase === 'action' && effectivePending?.needsTarget === 'none' && (
+            <>
+              <button
+                type="button"
+                onClick={() => void confirmPlayNoTarget()}
+                className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground"
+                data-testid="action-confirm-play"
+              >
+                {t('localMatch.confirmPlay', { card: getCardName(effectivePending.card) })}
+              </button>
+              <button
+                type="button"
+                onClick={cancelPlay}
+                className="flex items-center gap-1 rounded-full border border-muted px-4 py-2 text-sm text-muted-foreground"
+                data-testid="action-cancel-play"
+              >
+                {t('common.cancel')}
+              </button>
+            </>
+          )}
+
+          {/* 需选目标玩家：SHOOT 等 */}
+          {turnPhase === 'action' && effectivePending?.needsTarget === 'player' && (
+            <div className="w-full rounded-md border border-primary/40 bg-primary/10 p-3">
+              <div className="mb-2 text-sm text-primary">
+                {t('localMatch.pickPlayerTarget', {
+                  card: getCardName(effectivePending.card),
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(players ?? {})
+                  .filter(([id, p]) => id !== '0' && (p.isAlive as boolean))
+                  .map(([id]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => void confirmPlayTargetPlayer(id)}
+                      className="rounded-full bg-destructive px-3 py-1 text-xs text-destructive-foreground"
+                      data-testid={`target-player-${id}`}
+                    >
+                      AI {id}
+                    </button>
+                  ))}
+                <button
+                  type="button"
+                  onClick={cancelPlay}
+                  className="rounded-full border border-muted px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 需选目标层：穿梭剂 */}
+          {turnPhase === 'action' && effectivePending?.needsTarget === 'layer' && (
+            <div className="w-full rounded-md border border-primary/40 bg-primary/10 p-3">
+              <div className="mb-2 text-sm text-primary">
+                {t('localMatch.pickLayerTarget', {
+                  card: getCardName(effectivePending.card),
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[1, 2, 3, 4].map((layer) => (
+                  <button
+                    key={layer}
+                    type="button"
+                    onClick={() => void confirmPlayTargetLayer(layer)}
+                    className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground"
+                    data-testid={`target-layer-${layer}`}
+                  >
+                    L{layer}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={cancelPlay}
+                  className="rounded-full border border-muted px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
           )}
           {turnPhase === 'discard' && overHand === 0 && (
             <button
