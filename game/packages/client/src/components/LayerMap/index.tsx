@@ -5,7 +5,7 @@
 // 对照：plans/design/02-game-rules-spec.md §2.3 梦境层
 
 import { useTranslation } from 'react-i18next';
-import { Crown, Heart, Lock, Skull, User } from 'lucide-react';
+import { Coins, Crown, Gem, Heart, Lock, Skull, Unlock, User } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface PlayerView {
@@ -20,6 +20,8 @@ interface LayerView {
   layer: number;
   heartLockValue: number;
   vaultCount: number;
+  /** 已打开且可见的金库内容（秘密/金币/空） */
+  openedVaults: Array<{ contentType: 'secret' | 'coin' | 'empty' }>;
   nightmareRevealed: boolean;
   playerIds: string[];
 }
@@ -112,11 +114,27 @@ function LayerRow({
         <span>{layer.heartLockValue}</span>
       </div>
       {layer.vaultCount > 0 && (
-        <div className="flex items-center gap-1 text-muted-foreground">
+        <div className="flex items-center gap-1 text-muted-foreground" title="未打开金库数">
           <Lock className="h-3 w-3 text-amber-400" />
           <span>{layer.vaultCount}</span>
         </div>
       )}
+      {layer.openedVaults.map((v, i) => (
+        <span
+          key={`opened-${i}`}
+          className={cn(
+            'inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px]',
+            v.contentType === 'secret' && 'bg-rose-500/20 text-rose-300',
+            v.contentType === 'coin' && 'bg-yellow-500/20 text-yellow-300',
+            v.contentType === 'empty' && 'bg-muted text-muted-foreground',
+          )}
+          title={v.contentType === 'secret' ? '秘密' : v.contentType === 'coin' ? '金币' : '空'}
+        >
+          <Unlock className="h-2.5 w-2.5" />
+          {v.contentType === 'secret' && <Gem className="h-2.5 w-2.5" />}
+          {v.contentType === 'coin' && <Coins className="h-2.5 w-2.5" />}
+        </span>
+      ))}
       {layer.nightmareRevealed && (
         <span className="rounded bg-destructive/20 px-1.5 py-0.5 text-[10px] text-destructive">
           梦魇

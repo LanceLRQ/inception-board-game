@@ -134,6 +134,12 @@ export function LocalMatchRuntime({
           vaultsRaw?.filter(
             (v) => (v.layer as number) === (l.layer as number) && !(v.isOpened as boolean),
           ).length ?? 0,
+        openedVaults:
+          vaultsRaw
+            ?.filter((v) => (v.layer as number) === (l.layer as number) && (v.isOpened as boolean))
+            .map((v) => ({
+              contentType: v.contentType as 'secret' | 'coin' | 'empty',
+            })) ?? [],
         nightmareRevealed: !!(l.nightmareRevealed as boolean),
         playerIds: (l.playersInLayer as string[]) ?? [],
       }))
@@ -285,6 +291,13 @@ export function LocalMatchRuntime({
           <h2 className="text-xl font-bold">
             {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')}
           </h2>
+          {typeof G?.winReason === 'string' && G.winReason && (
+            <p className="mt-1 text-xs text-muted-foreground" data-testid="win-reason">
+              {t(`localMatch.winReason.${G.winReason as string}`, {
+                defaultValue: G.winReason as string,
+              })}
+            </p>
+          )}
           <button
             type="button"
             onClick={handleRestart}
