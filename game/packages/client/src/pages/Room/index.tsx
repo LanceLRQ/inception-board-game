@@ -94,17 +94,23 @@ export default function Room() {
   }, [code]);
 
   const handleStart = useCallback(async () => {
-    if (!code) return;
+    if (!code || !room) return;
     setBusy(true);
     try {
       const res = await api.post<{ matchId: string }>(`/rooms/${code}/start`);
-      navigate(`/game/${res.matchId}`);
+      // 目前好友房=本地对局（客户端跑局），带上玩家数 + 房间码便于 Game 页初始化
+      const params = new URLSearchParams({
+        friend: '1',
+        players: String(room.players.length),
+        code: room.code,
+      });
+      navigate(`/game/${res.matchId}?${params.toString()}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
       setError(msg);
       setBusy(false);
     }
-  }, [code, navigate]);
+  }, [code, navigate, room]);
 
   const handleLeave = useCallback(async () => {
     if (!code) return;

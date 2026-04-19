@@ -186,5 +186,14 @@ test.describe('好友房 Lobby / Room 流程', () => {
 
     // 7. Start 应可点
     await expect(page.getByTestId('room-start')).toBeEnabled();
+
+    // 8. 点 Start → 跳 Game 页（friend 模式）→ LocalMatchRuntime 挂载
+    await page.getByTestId('room-start').click();
+    await page.waitForURL(/\/game\/.*friend=1/, { timeout: 5_000 });
+
+    // Runtime 挂载 + 顶部房间码 + 回合指示
+    await expect(page.getByTestId('local-runtime')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByTestId('turn-indicator')).toBeVisible();
+    await expect(page.getByText(FAKE_CODE)).toBeVisible();
   });
 });

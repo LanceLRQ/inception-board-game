@@ -8,7 +8,7 @@ import { Local } from 'boardgame.io/multiplayer';
 import { InceptionCityGame } from '@icgame/game-engine';
 
 export interface LocalMatchWorker {
-  createLocalMatch: (playerCount: number) => Promise<void>;
+  createLocalMatch: (playerCount: number, matchID?: string) => Promise<void>;
   getState: () => Promise<unknown>;
   makeMove: (move: string, args: unknown[]) => Promise<void>;
   getPlayerId: () => Promise<string>;
@@ -156,11 +156,11 @@ function scheduleNext(): void {
 }
 
 const workerApi: LocalMatchWorker = {
-  async createLocalMatch(playerCount: number) {
+  async createLocalMatch(playerCount: number, matchID?: string) {
     clients.forEach((c) => c.stop());
     clients = [];
 
-    const matchID = `local-${Date.now()}`;
+    const effectiveMatchID = matchID ?? `local-${Date.now()}`;
     const multi = Local();
 
     for (let i = 0; i < playerCount; i++) {
@@ -170,7 +170,7 @@ const workerApi: LocalMatchWorker = {
         numPlayers: playerCount,
         multiplayer: multi,
         playerID: pid,
-        matchID,
+        matchID: effectiveMatchID,
       });
       client.start();
       clients.push(client);
