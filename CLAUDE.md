@@ -71,6 +71,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **规则引用**：凡是直接复刻原版规则的逻辑，必须在注释中引用 `docs/manual/NN-xxx.md` 行号
 - **命名**：禁止使用 `optimize` / `fix` / `improved` / 版本号等后缀；禁止 AI 标识或 Co-Authored-By
 - **服务端优先**：所有涉及隐藏信息的判定一律服务端执行，客户端只做展示
+- **UI 图标规范**：UI 层**禁止**使用 emoji 字符作为图标，所有图标必须使用 `lucide-react` 组件；注释/文档/测试中的 emoji 标记（如 `🤖` 徽章）不受此限制
 
 ## 目录结构
 

@@ -13,6 +13,7 @@ import {
 } from '@icgame/shared';
 import { useChatCooldown } from '../../hooks/useChatCooldown';
 import { cn } from '../../lib/utils';
+import { MessageCircle } from 'lucide-react';
 
 export interface ChatPanelProps {
   /** 当前玩家阵营（控制可见预设） */
@@ -70,7 +71,7 @@ export function ChatPanel({ faction, open, onToggle, onSend, cooldownMs = 3_000 
         aria-label={t('chat.toggle', { defaultValue: '聊天' })}
         aria-expanded={open}
       >
-        💬
+        <MessageCircle className="h-5 w-5" />
       </button>
 
       <AnimatePresence>

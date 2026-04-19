@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../../stores/useThemeStore';
 import { cycleTheme } from '../../lib/theme';
 import { cn } from '../../lib/utils';
+import { Sun, Moon, Monitor } from 'lucide-react';
 
-const ICONS: Record<'light' | 'dark' | 'system', string> = {
-  light: '☀️',
-  dark: '🌙',
-  system: '🖥️',
+const ICONS: Record<'light' | 'dark' | 'system', React.ReactNode> = {
+  light: <Sun className="h-4 w-4" />,
+  dark: <Moon className="h-4 w-4" />,
+  system: <Monitor className="h-4 w-4" />,
 };
 
 export interface ThemeToggleProps {

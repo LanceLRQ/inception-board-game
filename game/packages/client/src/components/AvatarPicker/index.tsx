@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { generateRandomAvatarSeed } from '@icgame/shared';
 import { PixelAvatar } from '../PixelAvatar';
 import { cn } from '../../lib/utils';
+import { Dice1 } from 'lucide-react';
 
 export interface AvatarPickerProps {
   readonly initialSeed: string;
@@ -75,7 +76,7 @@ export function AvatarPicker({
           className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
           aria-label={t('avatar.roll', { defaultValue: '摇骰换头像' })}
         >
-          🎲 {t('avatar.roll', { defaultValue: '摇一摇' })}
+          <Dice1 className="h-4 w-4" /> {t('avatar.roll', { defaultValue: '摇一摇' })}
         </button>
         {hasChanged ? (
           <button
