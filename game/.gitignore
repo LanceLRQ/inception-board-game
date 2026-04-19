@@ -5,3 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Perf baseline outputs (not versioned)
+perf-baseline.json
+perf-web-vitals.json

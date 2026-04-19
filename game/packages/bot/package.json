@@ -11,7 +11,8 @@
     "test": "vitest run",
     "lint": "eslint src/",
     "clean": "rm -rf dist *.tsbuildinfo",
-    "regression": "tsx scripts/bot-regression.ts"
+    "regression": "tsx scripts/bot-regression.ts",
+    "perf": "tsx scripts/perf-baseline.ts"
   },
   "dependencies": {
     "@icgame/game-engine": "workspace:*",
