@@ -159,4 +159,42 @@
   html {
     @apply font-sans;
   }
+
+  /* 基础无障碍：键盘聚焦可见（鼠标点击不出现 outline） */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Skip link：键盘用户首个 Tab 时跳到主内容 */
+  .skip-to-main {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-radius: 0 0 0.5rem 0;
+    text-decoration: none;
+  }
+  .skip-to-main:focus {
+    left: 0;
+  }
+}
+
+/*
+ * prefers-reduced-motion: 尊重用户系统级动效偏好
+ * - 将所有 animation/transition 压缩到 1ms（近似瞬时但保留状态切换）
+ * - framer-motion 侧通过 <MotionConfig reducedMotion="user"> 配合
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -6,6 +6,9 @@
     "retry": "重试",
     "close": "关闭"
   },
+  "a11y": {
+    "skip_to_main": "跳到主内容"
+  },
   "landing": {
     "title": "盗梦都市",
     "subtitle": "Inception City Online",
