@@ -8,7 +8,7 @@ export type ClientMessage =
   | { type: 'icg:heartbeat'; at: number }
   | { type: 'icg:reconnect'; lastEventSeq: number }
   | { type: 'icg:ackIntent'; intentID: string }
-  | { type: 'icg:spectateStart'; matchID: string }
+  | { type: 'icg:spectateStart'; matchID: string } // 观战（ADR-008 v1.2 已撤销，MVP 不实装；预留类型供后续复用）
   | { type: 'icg:chatBroadcast'; scope: ChatScope; message: string };
 
 // --- Server → Client ---
@@ -26,7 +26,7 @@ export type ServerMessage =
   | { type: 'icg:error'; code: string; message: string };
 
 // --- 子类型 ---
-export type ChatScope = 'lobby' | 'room' | 'match' | 'spectator';
+export type ChatScope = 'lobby' | 'room' | 'match' | 'spectator'; // 'spectator' 预留，观战未实装
 export type LeaveReason = 'disconnect' | 'voluntary' | 'kick' | 'timeout';
 
 export interface ChatPayload {
