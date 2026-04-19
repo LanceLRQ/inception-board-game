@@ -9,6 +9,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../lib/utils.js';
+import { useSoundEffect } from '../../hooks/useSoundEffect.js';
 
 export type DiceColor = 'red' | 'blue';
 
@@ -63,6 +64,7 @@ export function Dice3D({
   className,
 }: Dice3DProps) {
   const prefersReduced = useReducedMotion();
+  const playSound = useSoundEffect();
 
   // 掷骰动画：只在 rolling 时快速切换面值
   const [rollingValue, setRollingValue] = useState(1);
@@ -70,6 +72,8 @@ export function Dice3D({
 
   useEffect(() => {
     if (!rolling) return;
+    // 掷骰开始：播放哗啦声
+    playSound('dice-start');
 
     let count = 0;
     const interval = setInterval(() => {
@@ -79,12 +83,14 @@ export function Dice3D({
       } else {
         clearInterval(interval);
         setRollingValue(value ?? 1);
+        // 掷骰结束：落定声
+        playSound('dice-land');
         onRollComplete?.();
       }
     }, 80);
 
     return () => clearInterval(interval);
-  }, [rolling, value, onRollComplete]);
+  }, [rolling, value, onRollComplete, playSound]);
 
   const rotation = useMemo(() => FACE_ROTATION[displayValue] ?? { x: 0, y: 0 }, [displayValue]);
 
