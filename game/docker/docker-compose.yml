@@ -1,31 +1,97 @@
+# 盗梦都市 · 一键部署编排
+# 对照：plans/design/10-roadmap-risk.md W8.5-9 / plans/design/04-system-architecture.md §4.6
+#
+# 使用：
+#   1. 复制 .env.example 为 .env：cp .env.example .env
+#   2. 调整密钥：JWT_SECRET 必须改（prod 32+ 字节随机串）
+#   3. docker compose -f docker/docker-compose.yml up -d
+#   4. 首次启动自动跑 prisma migrate deploy
+#
+# 验证：curl http://localhost/ （前端）  curl http://localhost:3001/health （后端）
+
 services:
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: icgame
-      POSTGRES_USER: icgame
-      POSTGRES_PASSWORD: icgame_dev
+      POSTGRES_DB: ${POSTGRES_DB:-icgame}
+      POSTGRES_USER: ${POSTGRES_USER:-icgame}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-icgame_dev}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U icgame"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-icgame}"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     volumes:
       - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-icgame}:${POSTGRES_PASSWORD:-icgame_dev}@postgres:5432/${POSTGRES_DB:-icgame}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-*}
+      WS_PATH: ${WS_PATH:-/ws}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # 首次启动：跑 migrate deploy → 启动服务
+    command: >
+      sh -c "cd /app/packages/server &&
+             pnpm exec prisma migrate deploy &&
+             pnpm exec tsx src/index.ts"
+
+  client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.client
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-/api}
+        VITE_WS_URL: ${VITE_WS_URL:-/ws}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${CLIENT_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
 volumes:
   pgdata:

@@ -22,19 +22,42 @@ export interface SocketRegistry {
   socketsOf(matchId: string, playerId: string): string[];
 }
 
+/** 持久化钩子：在广播完成后（不阻塞分发）将权威事件归档到 match_events */
+export type EventPersistHook = (event: BroadcastEvent) => void | Promise<void>;
+
+export interface EventBroadcasterOptions {
+  readonly redisPub?: Redis;
+  /** 可选回放归档回调；失败仅记 warn，不影响广播 */
+  readonly onPersist?: EventPersistHook;
+}
+
 export class EventBroadcaster {
+  private readonly redisPub: Redis | undefined;
+  private readonly onPersist: EventPersistHook | undefined;
+
   constructor(
     private readonly io: SocketEmitter,
     private readonly registry: SocketRegistry,
-    private readonly redisPub?: Redis,
-  ) {}
+    optsOrRedis?: EventBroadcasterOptions | Redis,
+  ) {
+    if (optsOrRedis && 'publish' in (optsOrRedis as Redis)) {
+      this.redisPub = optsOrRedis as Redis;
+      this.onPersist = undefined;
+    } else {
+      const opts = (optsOrRedis as EventBroadcasterOptions | undefined) ?? {};
+      this.redisPub = opts.redisPub;
+      this.onPersist = opts.onPersist;
+    }
+  }
 
   /**
    * 将一个游戏事件广播给合法接收者。
    * - 直连 socket：通过 io.to(socketId).emit
    * - 跨实例：通过 Redis Pub/Sub 广播到其他 pod（由 SocketRegistry 或 adapter 兜底）
+   * - 同时触发 onPersist 钩子将权威事件归档（失败不阻塞广播）
    */
   publish(event: BroadcastEvent, ctx: BroadcastContext): void {
+    this.persistAsync(event);
     const copies = distribute(event, ctx);
 
     if (copies.length === 0) {
@@ -70,6 +93,27 @@ export class EventBroadcaster {
       },
       'broadcast filtered',
     );
+  }
+
+  /** 归档钩子调用：异步、不阻塞、错误仅 warn */
+  private persistAsync(event: BroadcastEvent): void {
+    if (!this.onPersist) return;
+    try {
+      const r = this.onPersist(event);
+      if (r && typeof (r as Promise<void>).then === 'function') {
+        (r as Promise<void>).catch((err: unknown) =>
+          logger.warn(
+            { err, eventKind: event.eventKind, matchId: event.matchId },
+            'persist failed',
+          ),
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        { err, eventKind: event.eventKind, matchId: event.matchId },
+        'persist failed sync',
+      );
+    }
   }
 
   /** 离线玩家：事件挂起到 Redis 队列，重连时拉取 */

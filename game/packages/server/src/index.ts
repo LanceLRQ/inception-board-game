@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { logger } from './infra/logger.js';
+import { prisma } from './infra/postgres.js';
 import { ConnectionRegistry } from './ws/connectionRegistry.js';
 import { HeartbeatManager } from './ws/heartbeat.js';
 import { ReconnectManager } from './ws/reconnect.js';
@@ -8,11 +9,35 @@ import { WSMessageRouter } from './ws/messageRouter.js';
 import { SocketGateway } from './ws/gateway.js';
 import { BotManager } from './services/BotManager.js';
 import { ChatService } from './services/ChatService.js';
+import { MatchEventService, broadcastEventToAppendInput } from './services/MatchEventService.js';
+import { PrismaMatchEventStore } from './services/PrismaMatchEventStore.js';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
 const app = createApp();
 const httpServer = createServer(app.callback());
+
+// 事件归档（回放持久化 - MVP）
+const matchEventService = new MatchEventService(new PrismaMatchEventStore(prisma), {
+  onAppended: (record) =>
+    logger.debug(
+      { matchId: record.matchID, seq: record.moveCounter, eventKind: record.eventKind },
+      'match_event archived',
+    ),
+});
+
+// 便捷持久化钩子：供 EventBroadcaster.onPersist 使用
+export const persistBroadcastEvent = async (event: {
+  matchId: string;
+  seq: number;
+  eventKind: string;
+  payload: Record<string, unknown>;
+}): Promise<void> => {
+  const r = await matchEventService.append(broadcastEventToAppendInput(event));
+  if (!r.ok && r.code === 'DUPLICATE') {
+    logger.debug({ matchId: event.matchId, seq: event.seq }, 'match_event duplicate (idempotent)');
+  }
+};
 
 // WS 基础组件
 const registry = new ConnectionRegistry();
