@@ -283,6 +283,45 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 打出 KICK - 与目标玩家交换梦境层
+        // 对照：docs/manual/04-action-cards.md KICK
+        playKick: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            const target = G.players[targetPlayerID];
+            if (!self || !target) return INVALID_MOVE;
+            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            const selfLayer = self.currentLayer;
+            const targetLayer = target.currentLayer;
+            s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
+            s = movePlayerToLayer(s, targetPlayerID, selfLayer);
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+        // 打出念力牵引 - 把目标玩家拉到自己所在层
+        // 对照：docs/manual/04-action-cards.md 念力牵引
+        playTelekinesis: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            const target = G.players[targetPlayerID];
+            if (!self || !target) return INVALID_MOVE;
+            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            s = movePlayerToLayer(s, targetPlayerID, self.currentLayer);
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
         // 打出凭空造物 - 从牌库顶抽2张牌
         // 对照：docs/manual/04-action-cards.md 凭空造物
         playCreation: {

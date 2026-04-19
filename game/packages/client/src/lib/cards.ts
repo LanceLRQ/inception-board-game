@@ -47,6 +47,12 @@ export function actionMoveFor(
   if (action.id === 'action_creation') {
     return { move: 'playCreation', needsTarget: 'none' };
   }
+  if (action.id === 'action_kick') {
+    return { move: 'playKick', needsTarget: 'player' };
+  }
+  if (action.id === 'action_telekinesis') {
+    return { move: 'playTelekinesis', needsTarget: 'player' };
+  }
   // 其他 SHOOT 变种（刺客之王 / 爆甲螺旋 / 炸裂弹头等）暂走通用 playShoot
   if (action.subType?.startsWith('shoot_')) {
     return { move: 'playShoot', needsTarget: 'player' };

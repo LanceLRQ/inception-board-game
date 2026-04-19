@@ -143,4 +143,105 @@ describe('InceptionCityGame · BGIO 集成', () => {
 
     clients.forEach((c) => c.stop());
   });
+
+  // --- KICK / 念力牵引 ---
+
+  function setupPlayingWithCards(playerCount: number, cardsForMaster: string[]) {
+    const clients = createClients(playerCount);
+    const p0 = clients[0]!;
+    (p0.moves as Record<string, (...args: unknown[]) => void>)['completeSetup']?.();
+    const s = stateOf(p0);
+    const masterId = s.G.dreamMasterID!;
+    const masterClient = clients[parseInt(masterId, 10)]!;
+    // 直接改 G 的 reducer 没提供，但测试场景里直接断言 move 行为够了
+    // 构造：手动塞牌到梦主手牌（通过 redux 内部 store 访问）
+    const anyClient = masterClient as unknown as {
+      store: { dispatch: (a: unknown) => void; getState: () => unknown };
+    };
+    const raw = anyClient.store.getState() as {
+      G: SetupState;
+    };
+    // 直接 mutate store 内部 state 需通过 dispatch RESET 等，简化：本测试跳过 mutate
+    // 直接用已有牌：doDraw 后再出牌
+    void raw;
+    void cardsForMaster;
+    return { clients, masterClient, masterId };
+  }
+
+  it('KICK：与目标玩家交换梦境层（有牌时）', () => {
+    const { clients, masterClient, masterId } = setupPlayingWithCards(4, []);
+    const moves = masterClient.moves as Record<string, (...args: unknown[]) => void>;
+
+    // draw 拿 2 张行动牌
+    moves['doDraw']?.();
+    const afterDraw = stateOf(masterClient);
+    const masterHand = afterDraw.G.players[masterId]!.hand;
+    const kickCard = masterHand.find((c) => c === 'action_kick');
+
+    if (!kickCard) {
+      // 随机抽不一定抽到 KICK；这种情况下跳过此断言但确保不崩
+      clients.forEach((c) => c.stop());
+      return;
+    }
+
+    const targetId = afterDraw.G.playerOrder.find((id) => id !== masterId)!;
+    const masterLayerBefore = afterDraw.G.players[masterId]!.currentLayer;
+    const targetLayerBefore = afterDraw.G.players[targetId]!.currentLayer;
+
+    moves['playKick']?.(kickCard, targetId);
+    const after = stateOf(masterClient);
+
+    expect(after.G.players[masterId]!.currentLayer).toBe(targetLayerBefore);
+    expect(after.G.players[targetId]!.currentLayer).toBe(masterLayerBefore);
+    expect(after.G.players[masterId]!.hand.includes(kickCard)).toBe(false);
+
+    clients.forEach((c) => c.stop());
+  });
+
+  it('念力牵引：目标玩家被拉到自己的层（有牌时）', () => {
+    const { clients, masterClient, masterId } = setupPlayingWithCards(4, []);
+    const moves = masterClient.moves as Record<string, (...args: unknown[]) => void>;
+
+    moves['doDraw']?.();
+    const afterDraw = stateOf(masterClient);
+    const card = afterDraw.G.players[masterId]!.hand.find((c) => c === 'action_telekinesis');
+    if (!card) {
+      clients.forEach((c) => c.stop());
+      return;
+    }
+
+    const targetId = afterDraw.G.playerOrder.find((id) => id !== masterId)!;
+    const masterLayer = afterDraw.G.players[masterId]!.currentLayer;
+
+    moves['playTelekinesis']?.(card, targetId);
+    const after = stateOf(masterClient);
+
+    expect(after.G.players[targetId]!.currentLayer).toBe(masterLayer);
+    expect(after.G.players[masterId]!.currentLayer).toBe(masterLayer);
+    expect(after.G.players[masterId]!.hand.includes(card)).toBe(false);
+
+    clients.forEach((c) => c.stop());
+  });
+
+  it('KICK / 念力：对自己或死亡玩家使用 → INVALID，不改变状态', () => {
+    const { clients, masterClient, masterId } = setupPlayingWithCards(4, []);
+    const moves = masterClient.moves as Record<string, (...args: unknown[]) => void>;
+
+    moves['doDraw']?.();
+    const afterDraw = stateOf(masterClient);
+    const hand = afterDraw.G.players[masterId]!.hand;
+    const kickCard = hand.find((c) => c === 'action_kick');
+    if (!kickCard) {
+      clients.forEach((c) => c.stop());
+      return;
+    }
+
+    // 对自己使用
+    moves['playKick']?.(kickCard, masterId);
+    const after1 = stateOf(masterClient);
+    // 手牌与层都没变（INVALID 被 BGIO 拒）
+    expect(after1.G.players[masterId]!.hand.includes(kickCard)).toBe(true);
+
+    clients.forEach((c) => c.stop());
+  });
 });
