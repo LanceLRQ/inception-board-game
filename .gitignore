@@ -146,3 +146,7 @@ CLAUDE.local.md
 .opencode
 .DS_Store
 .playwright-mcp
+
+# Playwright
+**/playwright-report/
+**/test-results/
