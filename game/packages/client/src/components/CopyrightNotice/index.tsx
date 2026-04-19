@@ -54,6 +54,9 @@ export function CopyrightNotice({ variant, className }: CopyrightNoticeProps) {
         </p>
         <p>
           {t('copyright.original_publisher', {
+            title: COPYRIGHT.originalGameTitle,
+            publisher: COPYRIGHT.originalPublisher,
+            website: COPYRIGHT.originalPublisherWebsite,
             defaultValue: `原版 ${COPYRIGHT.originalGameTitle} 版权归 ${COPYRIGHT.originalPublisher}（${COPYRIGHT.originalPublisherWebsite}）所有。`,
           })}
         </p>

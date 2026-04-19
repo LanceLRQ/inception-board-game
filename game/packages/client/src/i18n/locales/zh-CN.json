@@ -33,13 +33,102 @@
     "deck": "牌库",
     "layers": "梦境层"
   },
+  "localMatch": {
+    "title": "人机对战",
+    "playerCount": "玩家人数",
+    "humanPlusBot": "你 + {{count}} 个 AI",
+    "start": "开始游戏",
+    "restart": "再来一局",
+    "turn": "回合",
+    "phase": {
+      "draw": "抽牌",
+      "action": "出牌",
+      "discard": "弃牌",
+      "turnStart": "回合开始",
+      "turnEnd": "回合结束"
+    },
+    "yourTurn": "你的回合",
+    "botTurn": "AI {{id}} 回合",
+    "yourInfo": "你的状态",
+    "faction": "阵营",
+    "layer": "层",
+    "alive": "存活",
+    "you": "你",
+    "cards": "牌",
+    "draw": "抽牌",
+    "endAction": "结束行动",
+    "skipDiscard": "跳过弃牌",
+    "thiefWins": "盗梦者获胜！",
+    "masterWins": "梦主获胜！",
+    "loading": "加载中..."
+  },
   "settings": {
     "title": "设置",
+    "appearance": "外观",
+    "theme": "主题",
     "nickname": "昵称",
     "avatar": "头像",
     "language": "语言",
     "sound": "音效",
-    "animation": "动画"
+    "animation": "动画",
+    "audio": {
+      "heading": "音效",
+      "volume": "音量",
+      "muted": "静音",
+      "on": "已静音",
+      "off": "开启音效"
+    }
+  },
+  "theme": {
+    "toggle": "切换主题",
+    "toggle_hint": "点击循环：浅色 → 深色 → 跟随系统",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "avatar": {
+    "roll": "摇骰换头像",
+    "rolls": "已摇骰 {{count}} 次",
+    "save": "保存",
+    "saving": "保存中...",
+    "undo": "撤销"
+  },
+  "chat": {
+    "toggle": "聊天",
+    "panel_title": "预设短语",
+    "no_presets": "当前分类无可用短语",
+    "cooldown": "冷却中...{{seconds}}s"
+  },
+  "copyright": {
+    "short": "本项目为爱好者非商业复刻，原版版权归发行商所有。",
+    "heading": "版权声明",
+    "aria_label": "版权声明",
+    "modal_title": "版权与使用声明",
+    "ack": "我已阅读并同意",
+    "original_publisher": "原版 {{title}} 版权归 {{publisher}}（{{website}}）所有。"
+  },
+  "loading": {
+    "title": "正在准备梦境...",
+    "waiting": "等待资源清单...",
+    "failed": "{{count}} 张卡图加载失败，将使用占位"
+  },
+  "network": {
+    "back_to_lobby": "返回大厅"
+  },
+  "report": {
+    "button": "举报",
+    "button_aria": "举报玩家",
+    "dialog_title": "举报玩家",
+    "target_label": "举报目标：{{name}}",
+    "description_label": "详细描述（可选，最多 500 字）",
+    "submit": "提交举报",
+    "submitting": "提交中..."
+  },
+  "tutorial": {
+    "step_count": "第 {{current}} / {{total}} 步",
+    "next": "继续",
+    "skip": "跳过教学",
+    "finish": "完成"
   },
   "about": {
     "title": "关于",
