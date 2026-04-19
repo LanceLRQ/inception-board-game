@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import {
-  applyUnlockSuccess,
-  applyUnlockCancel,
-  discardCard,
-  drawCards,
-  movePlayerToLayer,
-} from './moves.js';
+import { applyUnlockSuccess, applyUnlockCancel, drawCards, movePlayerToLayer } from './moves.js';
 import type { SetupState } from './setup.js';
-import type { CardID, Faction } from '@icgame/shared';
+import type { CardID } from '@icgame/shared';
 
 // 构建最小可用状态
 function makeState(overrides: Partial<SetupState> = {}): SetupState {

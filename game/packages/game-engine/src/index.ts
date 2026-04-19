@@ -50,3 +50,39 @@ export { rollDice, resolveShoot } from './dice.js';
 export type { DiceResult, DiceModifier, ShootOutcome } from './dice.js';
 export * from './config.js';
 export { migrateGameState, getSchemaVersion } from './migrations.js';
+
+// 服务端权威 · 零信任过滤（Phase 2 B5）
+export {
+  validateMove,
+  validateSchema,
+  validateAuth,
+  validatePhase,
+  validateResource,
+  validateTarget,
+  validateRule,
+  validateRate,
+} from './engine/validator.js';
+export type {
+  ValidationCode,
+  ValidationOk,
+  ValidationFail,
+  ValidationResult,
+  MoveName,
+  MoveContext,
+  MovePayload,
+  RateGuard,
+} from './engine/validator.js';
+
+export { filterFor, filterEventLog, assertNoLeakage } from './engine/playerView.js';
+export type {
+  FilteredPlayer,
+  FilteredVault,
+  FilteredBribe,
+  FilteredDeck,
+  FilteredState,
+  FilterOptions,
+  EventLogEntry,
+} from './engine/playerView.js';
+
+export { resolveRecipients, rewriteForViewer, distribute, Events } from './engine/broadcaster.js';
+export type { EventVisibility, BroadcastEvent, BroadcastContext } from './engine/broadcaster.js';
