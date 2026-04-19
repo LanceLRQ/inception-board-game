@@ -202,3 +202,35 @@ docker compose -f docker/docker-compose.yml down -v
 ---
 
 > 更多运维细节参考 `docs/ops/`（后续版本将持续补全 Runbook / 告警 SOP / 备份策略）。
+
+---
+
+## 自动化 Dry Run
+
+在本机或 CI 上一键验证部署链路：
+
+```bash
+cd game
+pnpm deploy:dry-run
+```
+
+脚本动作：
+1. 生成临时 `.env.dry-run`（随机 JWT_SECRET、独立端口 8080/3001/5432/6379）
+2. `docker compose build`
+3. `docker compose up -d`
+4. 逐项探活（最长 180s）：
+   - postgres `pg_isready`
+   - redis `PING`
+   - api `/health` + `/ready`
+   - client `/`
+5. 默认 dry-run 结束后 `docker compose down -v` 清理
+
+常用参数：
+
+```bash
+pnpm deploy:dry-run -- --keep            # 探活后保留容器（方便调试）
+pnpm deploy:dry-run -- --timeout 300     # 自定义探活超时 300s
+pnpm deploy:dry-run -- --env-file .env   # 指定自定义 env（用于复现生产配置）
+```
+
+验收标准：所有探活项均返回 ✅。

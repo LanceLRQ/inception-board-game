@@ -11,7 +11,8 @@
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean",
     "prepare": "cd .. && husky game/.husky",
-    "copyright:check": "tsx scripts/copyright-check.ts"
+    "copyright:check": "tsx scripts/copyright-check.ts",
+    "deploy:dry-run": "bash scripts/deploy-dry-run.sh"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
