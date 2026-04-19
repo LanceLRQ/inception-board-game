@@ -1,0 +1,1236 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: default / first-thief 1`] = `
+{
+  "_filteredFor": "p1",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p3": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p4": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "turnStart",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: default / master 1`] = `
+{
+  "_filteredFor": "pM",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p3": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p4": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "turnStart",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: default / spectator 1`] = `
+{
+  "_filteredFor": "__spectator__",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p3": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p4": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "turnStart",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: master-win / first-thief 1`] = `
+{
+  "_filteredFor": "p1",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "endgame",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": false,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": false,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "turnEnd",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": "master",
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: master-win / master 1`] = `
+{
+  "_filteredFor": "pM",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "endgame",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": false,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": false,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "turnEnd",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": "master",
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: master-win / spectator 1`] = `
+{
+  "_filteredFor": "__spectator__",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "endgame",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": false,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": false,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "turnEnd",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": "master",
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: mid-game-thief-at-l3 / first-thief 1`] = `
+{
+  "_filteredFor": "p1",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 3,
+      "faction": "thief",
+      "hand": [
+        "action_shoot_default",
+        "action_kick",
+      ],
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "action",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: mid-game-thief-at-l3 / master 1`] = `
+{
+  "_filteredFor": "pM",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 3,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "action",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: mid-game-thief-at-l3 / spectator 1`] = `
+{
+  "_filteredFor": "__spectator__",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 3,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "action",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: rich / first-thief 1`] = `
+{
+  "_filteredFor": "p1",
+  "bribePool": [
+    {
+      "heldBy": null,
+      "id": "bp-1",
+      "originalOwnerId": null,
+      "status": "hidden",
+    },
+    {
+      "heldBy": "p1",
+      "id": "bp-2",
+      "originalOwnerId": "pM",
+      "status": "dealt",
+    },
+    {
+      "heldBy": "p2",
+      "id": "bp-3",
+      "originalOwnerId": null,
+      "status": "dealt",
+    },
+  ],
+  "deck": {
+    "cardCount": 3,
+    "cards": null,
+    "discardPile": [
+      "x1",
+    ],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": [
+        "c_a",
+        "c_b",
+      ],
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 1,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "draw",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": true,
+      "layer": 2,
+      "openedBy": "p1",
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: rich / master 1`] = `
+{
+  "_filteredFor": "pM",
+  "bribePool": [
+    {
+      "heldBy": null,
+      "id": "bp-1",
+      "originalOwnerId": null,
+      "status": "inPool",
+    },
+    {
+      "heldBy": "p1",
+      "id": "bp-2",
+      "originalOwnerId": "pM",
+      "status": "dealt",
+    },
+    {
+      "heldBy": "p2",
+      "id": "bp-3",
+      "originalOwnerId": "pM",
+      "status": "deal",
+    },
+  ],
+  "deck": {
+    "cardCount": 3,
+    "cards": null,
+    "discardPile": [
+      "x1",
+    ],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": [
+        "c_m1",
+      ],
+      "handCount": 1,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "draw",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": true,
+      "layer": 2,
+      "openedBy": "p1",
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: rich / spectator 1`] = `
+{
+  "_filteredFor": "__spectator__",
+  "bribePool": [
+    {
+      "heldBy": null,
+      "id": "bp-1",
+      "originalOwnerId": null,
+      "status": "hidden",
+    },
+    {
+      "heldBy": "p1",
+      "id": "bp-2",
+      "originalOwnerId": null,
+      "status": "dealt",
+    },
+    {
+      "heldBy": "p2",
+      "id": "bp-3",
+      "originalOwnerId": null,
+      "status": "dealt",
+    },
+  ],
+  "deck": {
+    "cardCount": 3,
+    "cards": null,
+    "discardPile": [
+      "x1",
+    ],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 2,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": null,
+      "handCount": 1,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "draw",
+  "vaults": [
+    {
+      "contentType": "hidden",
+      "id": "v-secret",
+      "isOpened": false,
+      "layer": 1,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": true,
+      "layer": 2,
+      "openedBy": "p1",
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: thief-near-win / first-thief 1`] = `
+{
+  "_filteredFor": "p1",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "action",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": true,
+      "layer": 1,
+      "openedBy": "p1",
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: thief-near-win / master 1`] = `
+{
+  "_filteredFor": "pM",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": [],
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "action",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": true,
+      "layer": 1,
+      "openedBy": "p1",
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "coin",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
+
+exports[`PlayerView 矩阵 · snapshot 回归 > snapshot: thief-near-win / spectator 1`] = `
+{
+  "_filteredFor": "__spectator__",
+  "bribePool": [],
+  "deck": {
+    "cardCount": 0,
+    "cards": null,
+    "discardPile": [],
+  },
+  "phase": "playing",
+  "players": {
+    "p1": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "p2": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "thief",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+    "pM": {
+      "characterId": "",
+      "currentLayer": 1,
+      "faction": "master",
+      "hand": null,
+      "handCount": 0,
+      "isAlive": true,
+      "isRevealed": false,
+    },
+  },
+  "turnPhase": "action",
+  "vaults": [
+    {
+      "contentType": "secret",
+      "id": "v-secret",
+      "isOpened": true,
+      "layer": 1,
+      "openedBy": "p1",
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-1",
+      "isOpened": false,
+      "layer": 2,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-2",
+      "isOpened": false,
+      "layer": 3,
+      "openedBy": null,
+    },
+    {
+      "contentType": "hidden",
+      "id": "v-coin-3",
+      "isOpened": false,
+      "layer": 4,
+      "openedBy": null,
+    },
+  ],
+  "winner": null,
+}
+`;
