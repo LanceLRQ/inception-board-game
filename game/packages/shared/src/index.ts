@@ -57,6 +57,18 @@ export {
 } from './cards/abilityRegistry.js';
 export type { ValidationError } from './cards/abilityRegistry.js';
 
+// 卡牌数据
+export {
+  THIEF_CHARACTERS,
+  MASTER_CHARACTERS,
+  ACTION_CARDS,
+  NIGHTMARE_CARDS,
+  DREAM_CARDS,
+  VAULT_CARDS,
+  BRIBE_CARDS,
+  ALL_CARD_COUNT,
+} from './cards/generated/cards.js';
+
 // 聊天预设短语
 export {
   CHAT_PRESETS,

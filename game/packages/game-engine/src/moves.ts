@@ -5,6 +5,7 @@ import { HAND_LIMIT, BASE_DRAW_COUNT } from './config.js';
 import type { SetupState, PlayerSetup } from './setup.js';
 
 // === 抽牌阶段 ===
+// 纯函数：不 mutate 入参，以免与 BGIO/immer draft 行为冲突
 export function drawCards(
   state: SetupState,
   playerID: string,
@@ -13,8 +14,10 @@ export function drawCards(
   const player = state.players[playerID];
   if (!player) return state;
 
-  const drawn = state.deck.cards.splice(0, drawCount);
+  const drawn = state.deck.cards.slice(0, drawCount);
   if (drawn.length === 0) return state;
+
+  const remaining = state.deck.cards.slice(drawCount);
 
   return {
     ...state,
@@ -27,7 +30,7 @@ export function drawCards(
     },
     deck: {
       ...state.deck,
-      cards: [...state.deck.cards],
+      cards: remaining,
     },
   };
 }

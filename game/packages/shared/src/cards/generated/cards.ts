@@ -1057,7 +1057,18 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '棋局',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_chess.skill_0',
+          name: '易位',
+          description:
+            '当金库要被打开时，你可以把该金库与任意一层未翻开的金库交换。此技能仅可使用两次。',
+          trigger: 'onUnlock',
+          usageScope: 'perGameLimitN',
+          limitN: 2,
+          isActive: true,
+        },
+      ],
     },
     imagePath: '',
     isExpansion: false,
@@ -1096,7 +1107,17 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '要塞',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_fortress.skill_0',
+          name: '冷酷',
+          description:
+            '你的出牌阶段，当你移动到另一层梦境里，可以视为对任一盗梦者使用1张【SHOOT】。',
+          trigger: 'onLayerChange',
+          usageScope: 'ownTurnOncePerTurn',
+          isActive: true,
+        },
+      ],
     },
     imagePath: '',
     isExpansion: false,

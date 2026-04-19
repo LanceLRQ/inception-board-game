@@ -112,6 +112,24 @@ export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
 export { checkInvariants, assertInvariants } from './invariants.js';
 export type { InvariantViolation } from './invariants.js';
 
+// 角色技能执行器（MVP 2+2）
+export {
+  canUseSkill,
+  markSkillUsed,
+  applyPointmanAssault,
+  pointmanCheckDrawnCards,
+  applyInterpreterForeshadow,
+  applyFortressColdness,
+  applyFortressDiceModifier,
+  applyChessTranspose,
+  applyChessWorldViewPeek,
+  getChessUsesLeft,
+  POINTMAN_SKILL_ID,
+  INTERPRETER_SKILL_ID,
+  FORTRESS_SKILL_ID,
+  CHESS_SKILL_ID,
+} from './engine/skills.js';
+
 // 测试 fixtures（B12）
 export {
   createTestState,

@@ -180,7 +180,7 @@ describe('setup', () => {
       expect(s.expansionEnabled).toBe(true);
     });
 
-    it('initializes empty bribe pool and deck', () => {
+    it('initializes empty bribe pool and deck with action cards', () => {
       const s = createInitialState({
         playerCount: 4,
         playerIds: ['P1', 'P2', 'P3', 'P4'],
@@ -188,8 +188,26 @@ describe('setup', () => {
         rngSeed: 'seed',
       });
       expect(s.bribePool).toEqual([]);
-      expect(s.deck.cards).toEqual([]);
+      // 牌库被初始化为已洗牌的行动牌（不含 action_back 占位牌）
+      expect(s.deck.cards.length).toBeGreaterThan(0);
+      expect(s.deck.cards).not.toContain('action_back');
       expect(s.deck.discardPile).toEqual([]);
+    });
+
+    it('deck shuffle is deterministic per seed', () => {
+      const a = createInitialState({
+        playerCount: 4,
+        playerIds: ['P1', 'P2', 'P3', 'P4'],
+        nicknames: ['A', 'B', 'C', 'D'],
+        rngSeed: 'seed-x',
+      });
+      const b = createInitialState({
+        playerCount: 4,
+        playerIds: ['P1', 'P2', 'P3', 'P4'],
+        nicknames: ['A', 'B', 'C', 'D'],
+        rngSeed: 'seed-x',
+      });
+      expect(b.deck.cards).toEqual(a.deck.cards);
     });
 
     it('works for max player count (10)', () => {

@@ -2,12 +2,55 @@
 // 对照：plans/design/02-game-rules-spec.md §2.2
 
 import type { Layer, CardID, Faction } from '@icgame/shared';
+import { ACTION_CARDS } from '@icgame/shared';
 import {
   PLAYER_COUNT_CONFIGS,
   VAULT_SECRET_COUNT,
   VAULT_COIN_COUNT,
   LAYER_COUNT,
 } from './config.js';
+
+/**
+ * 构建行动牌牌库
+ * 对照：plans/design/02-game-rules-spec.md §2.2 / docs/manual/04-action-cards.md
+ * 按每张牌 quantity 字段展开，跳过扩展牌与占位的 "action_back"（背面）
+ */
+function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] {
+  const cards: CardID[] = [];
+  for (const def of ACTION_CARDS) {
+    if (def.id === 'action_back') continue;
+    if (def.isExpansion && !expansionEnabled) continue;
+    const qty = Math.max(1, def.quantity ?? 1);
+    for (let i = 0; i < qty; i++) cards.push(def.id as CardID);
+  }
+  return seededShuffle(cards, rngSeed);
+}
+
+/**
+ * 带种子的洗牌（Fisher-Yates + mulberry32）
+ * 与 bot/matchRunner 使用同款 PRNG，保证可复现性
+ */
+function seededShuffle<T>(input: readonly T[], seed: string): T[] {
+  const out = [...input];
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let t = h >>> 0;
+  const rand = (): number => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let x = t;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
 
 export interface SetupState {
   matchId: string;
@@ -183,7 +226,10 @@ export function createInitialState(options: {
     layers,
     vaults,
     bribePool: [],
-    deck: { cards: [], discardPile: [] },
+    deck: {
+      cards: buildInitialDeck(options.expansionEnabled ?? false, rngSeed),
+      discardPile: [],
+    },
     unlockThisTurn: 0,
     maxUnlockPerTurn: 1,
     usedNightmareIds: [],
