@@ -44,6 +44,9 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playShootBurst',
     'playShootDreamTransit',
     'playShift',
+    'masterRevealNightmare',
+    'masterDiscardNightmare',
+    'masterActivateNightmare',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -75,6 +78,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   playShootBurst: 106,
   playShootDreamTransit: 107,
   playShift: 108,
+  masterRevealNightmare: 200, // 梦主低优先：Bot L0 默认不主动触发
+  masterDiscardNightmare: 201,
+  masterActivateNightmare: 202,
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,

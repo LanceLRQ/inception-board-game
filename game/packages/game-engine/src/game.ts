@@ -292,6 +292,76 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // --- 梦魇系统（梦主限定）---
+        // 对照：docs/manual/07-nightmare-cards.md
+        // 梦主行动阶段翻开指定层的梦魇牌（面朝下 → 面朝上）
+        masterRevealNightmare: {
+          move: ({ G, ctx }: MoveCtx, layer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const ls = G.layers[layer];
+            if (!ls || !ls.nightmareId) return INVALID_MOVE;
+            if (ls.nightmareRevealed) return INVALID_MOVE;
+            return {
+              ...G,
+              layers: { ...G.layers, [layer]: { ...ls, nightmareRevealed: true } },
+            };
+          },
+          client: false,
+        },
+        // 梦主弃掉已翻开的梦魇（不发动效果）
+        masterDiscardNightmare: {
+          move: ({ G, ctx }: MoveCtx, layer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const ls = G.layers[layer];
+            if (!ls || !ls.nightmareId || !ls.nightmareRevealed) return INVALID_MOVE;
+            const discardedId = ls.nightmareId;
+            return {
+              ...G,
+              layers: {
+                ...G.layers,
+                [layer]: {
+                  ...ls,
+                  nightmareId: null,
+                  nightmareRevealed: false,
+                  nightmareTriggered: true,
+                },
+              },
+              usedNightmareIds: [...G.usedNightmareIds, discardedId],
+            };
+          },
+          client: false,
+        },
+        // 梦主发动已翻开的梦魇效果（目前仅实现 饥饿撕咬）
+        // 对照：docs/manual/07-nightmare-cards.md 饥饿撕咬
+        masterActivateNightmare: {
+          move: ({ G, ctx }: MoveCtx, layer: number, params?: Record<string, unknown>) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const ls = G.layers[layer];
+            if (!ls || !ls.nightmareId || !ls.nightmareRevealed) return INVALID_MOVE;
+            const nid = ls.nightmareId;
+            const next = applyNightmareEffect(G, layer, nid, params);
+            if (next === INVALID_MOVE) return INVALID_MOVE;
+            // 清除梦魇并计入已发动
+            return {
+              ...next,
+              layers: {
+                ...next.layers,
+                [layer]: {
+                  ...next.layers[layer]!,
+                  nightmareId: null,
+                  nightmareRevealed: false,
+                  nightmareTriggered: true,
+                },
+              },
+              usedNightmareIds: [...next.usedNightmareIds, nid],
+            };
+          },
+          client: false,
+        },
+
         // 移形换影（EX）：与另一位玩家交换角色牌；回合末自动还原
         // 对照：docs/manual/04-action-cards.md 移形换影
         // 约束：盗梦者不得对梦主使用；梦主对盗梦者可用；不能对自己
@@ -953,6 +1023,49 @@ export const InceptionCityGame = {
 
 function isAdjacent(from: number, to: number): boolean {
   return Math.abs(from - to) === 1 && from >= 1 && from <= 4 && to >= 1 && to <= 4;
+}
+
+/**
+ * 梦魇效果分发
+ * 对照：docs/manual/07-nightmare-cards.md
+ * 当前实现：饥饿撕咬（其他梦魇待后续）
+ */
+function applyNightmareEffect(
+  G: SetupState,
+  layer: number,
+  nid: CardID,
+  _params?: Record<string, unknown>,
+): SetupState | typeof INVALID_MOVE {
+  const ls = G.layers[layer];
+  if (!ls) return INVALID_MOVE;
+
+  if (nid === 'nightmare_hunger_bite') {
+    // 该层所有玩家弃 3 张手牌；不足 3 张 → 进入迷失层（保留手牌）
+    // 包含梦主
+    let s = G;
+    const allOnLayer = [...ls.playersInLayer];
+    for (const pid of allOnLayer) {
+      const p = s.players[pid];
+      if (!p || !p.isAlive) continue;
+      if (p.hand.length >= 3) {
+        // 弃前 3 张（MVP 策略；真实应让玩家选）
+        const drop = p.hand.slice(0, 3);
+        const keep = p.hand.slice(3);
+        s = {
+          ...s,
+          players: { ...s.players, [pid]: { ...p, hand: keep } },
+          deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...drop] },
+        };
+      } else {
+        // 不足 3 张 → 入迷失层（保留手牌，不视为被梦主击杀）
+        s = movePlayerToLayer(s, pid, 0);
+      }
+    }
+    return s;
+  }
+
+  // 其他梦魇待后续实现
+  return INVALID_MOVE;
 }
 
 interface ShootVariantOpts {

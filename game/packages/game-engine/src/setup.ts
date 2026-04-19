@@ -229,13 +229,25 @@ export function createInitialState(options: {
     playerOrder.push(id);
   }
 
-  // 初始化梦境层
+  // 初始化梦境层 + 梦魇派发
+  // 对照：docs/manual/07-nightmare-cards.md / docs/manual/02-game-setup.md
+  // MVP：按种子洗牌 6 张梦魇，前 4 张面朝下放到 L1-L4
+  const nightmarePool: CardID[] = [
+    'nightmare_space_fall',
+    'nightmare_despair_storm',
+    'nightmare_hunger_bite',
+    'nightmare_echo',
+    'nightmare_plague',
+    'nightmare_vortex',
+  ];
+  const shuffledNightmares = seededShuffle(nightmarePool, rngSeed + ':nightmare');
+
   const layers: Record<number, LayerSetup> = {};
   for (let l = 1; l <= LAYER_COUNT; l++) {
     layers[l] = {
       layer: l as Layer,
       dreamCardId: null,
-      nightmareId: null,
+      nightmareId: shuffledNightmares[l - 1] ?? null,
       nightmareRevealed: false,
       nightmareTriggered: false,
       playersInLayer: [],
