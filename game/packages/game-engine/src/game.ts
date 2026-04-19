@@ -249,7 +249,12 @@ export const InceptionCityGame = {
           client: false,
         },
         playShoot: {
-          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            targetPlayerID: string,
+            cardId: CardID,
+            decreeId?: CardID,
+          ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const shooter = G.players[ctx.currentPlayer];
             const target = G.players[targetPlayerID];
@@ -257,8 +262,13 @@ export const InceptionCityGame = {
             if (!target.isAlive) return INVALID_MOVE;
             if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
 
+            // 死亡宣言校验
+            const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
+            if (decreeCheck === 'INVALID') return INVALID_MOVE;
+
             const roll = random.D6();
-            const result = resolveShoot(roll);
+            const deathFaces = decreeCheck !== null ? [1, decreeCheck] : [1];
+            const result = resolveShoot(roll, deathFaces);
             let s = discardCard(G, ctx.currentPlayer, cardId);
 
             if (result === 'kill') {
@@ -444,6 +454,7 @@ export const InceptionCityGame = {
             cardId: CardID,
             mode: 'shoot' | 'transit',
             targetOrLayer: string | number,
+            decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
@@ -461,8 +472,12 @@ export const InceptionCityGame = {
               // 原版 SHOOT 要求同层
               if (self.currentLayer !== target.currentLayer) return INVALID_MOVE;
 
+              // 死亡宣言
+              const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
+              if (decreeCheck === 'INVALID') return INVALID_MOVE;
+              const deathFaces = decreeCheck !== null ? [1, decreeCheck] : [1];
               const roll = random.D6();
-              const result = resolveShoot(roll);
+              const result = resolveShoot(roll, deathFaces);
               let s = discardCard(G, ctx.currentPlayer, cardId);
               if (result === 'kill') {
                 const tp = s.players[targetOrLayer]!;
@@ -508,7 +523,12 @@ export const InceptionCityGame = {
         // SHOOT·刺客之王：目标任意层；[1/2] 死亡 [3/4/5] 移动相邻层
         // 对照：docs/manual/04-action-cards.md SHOOT·刺客之王
         playShootKing: {
-          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            targetPlayerID: string,
+            cardId: CardID,
+            decreeId?: CardID,
+          ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             if (cardId !== 'action_shoot_king') return INVALID_MOVE;
@@ -517,13 +537,19 @@ export const InceptionCityGame = {
               deathFaces: [1, 2],
               moveFaces: [3, 4, 5],
               extraOnMove: null,
+              decreeId,
             });
           },
           client: false,
         },
         // SHOOT·爆甲螺旋：同层；[1/2] 死 [3/4/5] 弃 target 所有解封 + 移动
         playShootArmor: {
-          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            targetPlayerID: string,
+            cardId: CardID,
+            decreeId?: CardID,
+          ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             if (cardId !== 'action_shoot_armor') return INVALID_MOVE;
@@ -532,13 +558,19 @@ export const InceptionCityGame = {
               deathFaces: [1, 2],
               moveFaces: [3, 4, 5],
               extraOnMove: 'discard_unlocks',
+              decreeId,
             });
           },
           client: false,
         },
         // SHOOT·炸裂弹头：同层；[1/2] 死 [3/4/5] 弃 target 所有 SHOOT 类 + 移动
         playShootBurst: {
-          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            targetPlayerID: string,
+            cardId: CardID,
+            decreeId?: CardID,
+          ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             if (cardId !== 'action_shoot_burst') return INVALID_MOVE;
@@ -547,6 +579,7 @@ export const InceptionCityGame = {
               deathFaces: [1, 2],
               moveFaces: [3, 4, 5],
               extraOnMove: 'discard_shoots',
+              decreeId,
             });
           },
           client: false,
@@ -1229,15 +1262,44 @@ function applyNightmareEffect(
   return INVALID_MOVE;
 }
 
+/**
+ * 死亡宣言卡 → 附加死亡骰面
+ * 对照：docs/manual/04-action-cards.md 死亡宣言
+ * 展示式使用（不弃掉），每次 SHOOT 最多 1 张
+ */
+function deathFaceFromDecree(cardId: CardID | undefined): number | null {
+  if (!cardId) return null;
+  if (cardId === 'action_death_decree_3') return 3;
+  if (cardId === 'action_death_decree_4') return 4;
+  if (cardId === 'action_death_decree_5') return 5;
+  return null;
+}
+
+/** 校验死亡宣言：在手中 + 是合法 decree；合法时返回骰面 */
+function validateDecree(
+  G: SetupState,
+  shooterID: string,
+  decreeId: CardID | undefined,
+): number | null | 'INVALID' {
+  if (!decreeId) return null; // 无宣言 OK
+  const shooter = G.players[shooterID];
+  if (!shooter) return 'INVALID';
+  const face = deathFaceFromDecree(decreeId);
+  if (face === null) return 'INVALID';
+  if (!shooter.hand.includes(decreeId)) return 'INVALID';
+  return face;
+}
+
 interface ShootVariantOpts {
   sameLayerRequired: boolean;
   deathFaces: number[];
   moveFaces: number[];
   extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
+  decreeId?: CardID; // 死亡宣言展示（不弃，附加死亡骰面）
 }
 
-/** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用
- *  对照：docs/manual/04-action-cards.md SHOOT·刺客之王 / 爆甲螺旋 / 炸裂弹头
+/** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用 + 死亡宣言
+ *  对照：docs/manual/04-action-cards.md SHOOT 变体 + 死亡宣言
  */
 function applyShootVariant(
   G: SetupState,
@@ -1257,8 +1319,12 @@ function applyShootVariant(
     return INVALID_MOVE;
   }
 
+  // 死亡宣言校验 + 附加死亡面
+  const decreeCheck = validateDecree(G, ctx.currentPlayer, opts.decreeId);
+  if (decreeCheck === 'INVALID') return INVALID_MOVE;
+  const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
   const roll = random.D6();
-  const result = resolveShootCustom(roll, opts.deathFaces, opts.moveFaces);
+  const result = resolveShootCustom(roll, deathFaces, opts.moveFaces);
   let s = discardCard(G, ctx.currentPlayer, cardId);
 
   if (result === 'kill') {
