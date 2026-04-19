@@ -137,7 +137,10 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
     if (handLen <= HAND_LIMIT && legalMoves.includes('skipDiscard')) return 'skipDiscard';
   }
 
-  const sorted = [...legalMoves].sort(
+  // 排除 pending-only 的 move（上面已处理有 pending 状态的情况）
+  const pendingOnly = new Set(['resolveGraft', 'resolveGravityPick']);
+  const candidates = legalMoves.filter((m) => !pendingOnly.has(m));
+  const sorted = [...candidates].sort(
     (a, b) => (MOVE_PRIORITY[a] ?? 99) - (MOVE_PRIORITY[b] ?? 99),
   );
   return sorted[0] ?? null;
