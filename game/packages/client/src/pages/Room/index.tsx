@@ -6,31 +6,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bot, Copy, LogOut, Play, Users } from 'lucide-react';
-import { api, ApiRequestError } from '../../lib/api';
+import { ApiRequestError } from '../../lib/api';
+import { roomApi, type RoomState } from '../../lib/roomApi';
 import { useAuth } from '../../hooks/useAuth';
-
-interface RoomPlayer {
-  playerId: string;
-  nickname: string;
-  avatarSeed: string;
-  seat: number;
-  isBot: boolean;
-  joinedAt: number;
-}
-
-interface RoomState {
-  id: string;
-  code: string;
-  ownerPlayerId: string;
-  maxPlayers: number;
-  ruleVariant: string;
-  status: 'waiting' | 'playing' | 'finished';
-  players: RoomPlayer[];
-}
-
-interface RoomResponse {
-  room: RoomState;
-}
+import { useIdentityStore } from '../../stores/useIdentityStore';
 
 const POLL_INTERVAL_MS = 3_000;
 const MIN_PLAYERS = 3;
@@ -39,7 +18,8 @@ export default function Room() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
-  const { isAuthenticated, isInitialized, playerId } = useAuth();
+  const { isAuthenticated, isInitialized, playerId, nickname } = useAuth();
+  const avatarSeed = useIdentityStore((s) => s.avatarSeed);
 
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,17 +28,20 @@ export default function Room() {
 
   // 房间详情靠轮询（下一轮接入 WS 后切推送）
   const fetchRoom = useCallback(async () => {
-    if (!code) return;
+    if (!code || !playerId) return;
     try {
-      // 后端用 code 作为 room key
-      const res = await api.post<RoomResponse>(`/rooms/${code}/join`);
-      setRoom(res.room);
+      const next = await roomApi.joinRoom(code, {
+        playerId,
+        nickname,
+        avatarSeed: String(avatarSeed),
+      });
+      setRoom(next);
       setError(null);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
       setError(msg);
     }
-  }, [code]);
+  }, [code, playerId, nickname, avatarSeed]);
 
   useEffect(() => {
     if (!isInitialized || !isAuthenticated || !code) return;
@@ -83,8 +66,8 @@ export default function Room() {
     if (!code) return;
     setBusy(true);
     try {
-      const res = await api.post<RoomResponse>(`/rooms/${code}/fill-ai`);
-      setRoom(res.room);
+      const next = await roomApi.fillAI(code);
+      setRoom(next);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
       setError(msg);
@@ -97,8 +80,7 @@ export default function Room() {
     if (!code || !room) return;
     setBusy(true);
     try {
-      const res = await api.post<{ matchId: string }>(`/rooms/${code}/start`);
-      // 目前好友房=本地对局（客户端跑局），带上玩家数 + 房间码便于 Game 页初始化
+      const res = await roomApi.startGame(code);
       const params = new URLSearchParams({
         friend: '1',
         players: String(room.players.length),
@@ -113,13 +95,13 @@ export default function Room() {
   }, [code, navigate, room]);
 
   const handleLeave = useCallback(async () => {
-    if (!code) return;
+    if (!code || !playerId) return;
     try {
-      await api.post(`/rooms/${code}/leave`);
+      await roomApi.leaveRoom(code, playerId);
     } finally {
       navigate('/lobby');
     }
-  }, [code, navigate]);
+  }, [code, playerId, navigate]);
 
   const handleCopy = useCallback(async () => {
     if (!code) return;

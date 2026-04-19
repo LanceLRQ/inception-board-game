@@ -1,28 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { identityApi } from '../lib/identityApi';
 import { useIdentityStore } from '../stores/useIdentityStore';
-
-interface InitResponse {
-  playerId: string;
-  nickname: string;
-  token: string;
-  expiresAt: number;
-  recoveryCode: string;
-  recoveryCodeWarning: string;
-}
 
 interface RecoverResponse {
   playerId: string;
   nickname: string;
   token: string;
   expiresAt: number;
-}
-
-interface MeResponse {
-  playerId: string;
-  nickname: string;
-  avatarSeed: string;
-  locale: string;
 }
 
 export function useAuth() {
@@ -38,8 +23,8 @@ export function useAuth() {
 
     if (!token) return;
 
-    api
-      .get<MeResponse>('/identity/me')
+    identityApi
+      .me()
       .then((me) => {
         setNickname(me.nickname);
       })
@@ -55,7 +40,7 @@ export function useAuth() {
     async (inputNickname: string) => {
       setIsLoading(true);
       try {
-        const res = await api.post<InitResponse>('/identity/init', { nickname: inputNickname });
+        const res = await identityApi.init(inputNickname);
         localStorage.setItem('icgame-token', res.token);
         setIdentity(res.playerId, res.token, res.nickname);
         return { recoveryCode: res.recoveryCode, warning: res.recoveryCodeWarning };

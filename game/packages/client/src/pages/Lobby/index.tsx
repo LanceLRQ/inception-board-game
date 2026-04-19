@@ -6,22 +6,16 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, Plus } from 'lucide-react';
-import { api, ApiRequestError } from '../../lib/api';
+import { ApiRequestError } from '../../lib/api';
+import { roomApi } from '../../lib/roomApi';
 import { useAuth } from '../../hooks/useAuth';
-
-interface CreateRoomResponse {
-  id: string;
-  code: string;
-  ownerPlayerId: string;
-  maxPlayers: number;
-  currentPlayers: number;
-  status: 'waiting' | 'playing' | 'finished';
-}
+import { useIdentityStore } from '../../stores/useIdentityStore';
 
 export default function Lobby() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { isAuthenticated, isInitialized, initIdentity, nickname } = useAuth();
+  const { isAuthenticated, isInitialized, initIdentity, nickname, playerId } = useAuth();
+  const avatarSeed = useIdentityStore((s) => s.avatarSeed);
 
   // 昵称初始化
   const [inputNickname, setInputNickname] = useState('');
@@ -49,10 +43,14 @@ export default function Lobby() {
   }, [inputNickname, initIdentity, t]);
 
   const handleCreateRoom = useCallback(async () => {
+    if (!playerId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post<CreateRoomResponse>('/rooms', { maxPlayers });
+      const res = await roomApi.createRoom(
+        { playerId, nickname, avatarSeed: String(avatarSeed) },
+        { maxPlayers },
+      );
       navigate(`/room/${res.code}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
@@ -60,7 +58,7 @@ export default function Lobby() {
     } finally {
       setLoading(false);
     }
-  }, [maxPlayers, navigate, t]);
+  }, [playerId, nickname, avatarSeed, maxPlayers, navigate, t]);
 
   const handleJoinRoom = useCallback(async () => {
     const code = joinCode.trim().toUpperCase();
@@ -68,11 +66,11 @@ export default function Lobby() {
       setError(t('lobby.codeInvalid'));
       return;
     }
+    if (!playerId) return;
     setLoading(true);
     setError(null);
     try {
-      // 后端 :id 实际是 code（参见 api/rooms.ts）
-      await api.post(`/rooms/${code}/join`);
+      await roomApi.joinRoom(code, { playerId, nickname, avatarSeed: String(avatarSeed) });
       navigate(`/room/${code}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
@@ -80,7 +78,7 @@ export default function Lobby() {
     } finally {
       setLoading(false);
     }
-  }, [joinCode, navigate, t]);
+  }, [joinCode, playerId, nickname, avatarSeed, navigate, t]);
 
   if (!isInitialized) {
     return (
