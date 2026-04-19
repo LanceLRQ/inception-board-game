@@ -154,6 +154,46 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
+  // ---------- 12. pending 状态引用完整性 ----------
+  if (state.pendingGraft) {
+    if (!state.players[state.pendingGraft.playerID]) {
+      push(
+        'pending_graft_ref',
+        `pendingGraft.playerID=${state.pendingGraft.playerID} not in players`,
+      );
+    }
+  }
+  if (state.pendingResonance) {
+    const { bonderPlayerID, targetPlayerID } = state.pendingResonance;
+    if (!state.players[bonderPlayerID]) {
+      push('pending_resonance_bonder', `bonderPlayerID=${bonderPlayerID} not in players`);
+    }
+    if (!state.players[targetPlayerID]) {
+      push('pending_resonance_target', `targetPlayerID=${targetPlayerID} not in players`);
+    }
+  }
+  if (state.pendingGravity) {
+    const pg = state.pendingGravity;
+    if (!state.players[pg.bonderPlayerID]) {
+      push('pending_gravity_bonder', `bonderPlayerID=${pg.bonderPlayerID} not in players`);
+    }
+    for (const pid of pg.pickOrder) {
+      if (!state.players[pid]) {
+        push('pending_gravity_pickorder', `pickOrder has non-existent player ${pid}`);
+      }
+    }
+    if (pg.pickCursor < 0 || pg.pickCursor > pg.pickOrder.length * 100) {
+      push('pending_gravity_cursor', `pickCursor=${pg.pickCursor} out of sane range`);
+    }
+  }
+  if (state.shiftSnapshot) {
+    for (const pid of Object.keys(state.shiftSnapshot)) {
+      if (!state.players[pid]) {
+        push('shift_snapshot_ref', `shiftSnapshot has non-existent player ${pid}`);
+      }
+    }
+  }
+
   return out;
 }
 
