@@ -176,6 +176,7 @@ export function LocalMatchRuntime({
     card: string;
     move: string;
     needsTarget: 'player' | 'layer' | 'none';
+    argOrder?: 'target_first' | 'card_first';
   } | null>(null);
 
   // 棋局·易位：选中的 2 个金库索引
@@ -222,11 +223,12 @@ export function LocalMatchRuntime({
   const startPlay = useCallback((card: string) => {
     const action = actionMoveFor(card);
     if (!action) return;
-    if (action.needsTarget === 'none') {
-      setPendingPlay({ card, move: action.move, needsTarget: 'none' });
-    } else {
-      setPendingPlay({ card, move: action.move, needsTarget: action.needsTarget });
-    }
+    setPendingPlay({
+      card,
+      move: action.move,
+      needsTarget: action.needsTarget,
+      argOrder: action.argOrder,
+    });
   }, []);
 
   const confirmPlayNoTarget = useCallback(async () => {
@@ -239,8 +241,11 @@ export function LocalMatchRuntime({
   const confirmPlayTargetPlayer = useCallback(
     async (targetPlayerID: string) => {
       if (!effectivePending || effectivePending.needsTarget !== 'player') return;
-      // playShoot(targetPlayerID, cardId)
-      await makeMove(effectivePending.move, [targetPlayerID, effectivePending.card]);
+      const args =
+        effectivePending.argOrder === 'card_first'
+          ? [effectivePending.card, targetPlayerID]
+          : [targetPlayerID, effectivePending.card];
+      await makeMove(effectivePending.move, args);
       setPendingPlay(null);
     },
     [effectivePending, makeMove],
@@ -249,7 +254,7 @@ export function LocalMatchRuntime({
   const confirmPlayTargetLayer = useCallback(
     async (targetLayer: number) => {
       if (!effectivePending || effectivePending.needsTarget !== 'layer') return;
-      // playDreamTransit(cardId, targetLayer)
+      // layer 系列一律 [cardId, layer]
       await makeMove(effectivePending.move, [effectivePending.card, targetLayer]);
       setPendingPlay(null);
     },
