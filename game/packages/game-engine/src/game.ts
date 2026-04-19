@@ -27,7 +27,7 @@ import {
   applyUnlockSuccess,
   applyUnlockCancel,
 } from './moves.js';
-import { resolveShoot, resolveShootCustom } from './dice.js';
+import { resolveShootCustom } from './dice.js';
 import {
   applyPointmanAssault,
   applyInterpreterForeshadow,
@@ -257,53 +257,13 @@ export const InceptionCityGame = {
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
-            const shooter = G.players[ctx.currentPlayer];
-            const target = G.players[targetPlayerID];
-            if (!shooter || !target) return INVALID_MOVE;
-            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
-            if (!target.isAlive) return INVALID_MOVE;
-            if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
-            // 对照：docs/manual/04-action-cards.md SHOOT（同层限制）
-            if (shooter.currentLayer !== target.currentLayer) return INVALID_MOVE;
-
-            // 死亡宣言校验
-            const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
-            if (decreeCheck === 'INVALID') return INVALID_MOVE;
-
-            const roll = random.D6();
-            const deathFaces = decreeCheck !== null ? [1, decreeCheck] : [1];
-            const result = resolveShoot(roll, deathFaces);
-            let s = discardCard(G, ctx.currentPlayer, cardId);
-
-            if (result === 'kill') {
-              const targetPlayer = s.players[targetPlayerID]!;
-              const handover = targetPlayer.hand.slice(0, 2);
-              s = {
-                ...s,
-                players: {
-                  ...s.players,
-                  [targetPlayerID]: {
-                    ...targetPlayer,
-                    isAlive: false,
-                    deathTurn: s.turnNumber,
-                    hand: targetPlayer.hand.slice(2),
-                  },
-                  [ctx.currentPlayer]: {
-                    ...s.players[ctx.currentPlayer]!,
-                    hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
-                    shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
-                  },
-                },
-              };
-              s = movePlayerToLayer(s, targetPlayerID, 0);
-            } else if (result === 'move') {
-              const currentLayer = target.currentLayer;
-              const direction = currentLayer >= 4 ? -1 : 1;
-              const newLayer = Math.max(1, Math.min(4, currentLayer + direction));
-              s = movePlayerToLayer(s, targetPlayerID, newLayer);
-            }
-
-            return incrementMoveCounter(s);
+            return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
+              sameLayerRequired: true,
+              deathFaces: [1],
+              moveFaces: [2, 3, 4, 5],
+              extraOnMove: null,
+              decreeId,
+            });
           },
           client: false,
         },
@@ -470,47 +430,13 @@ export const InceptionCityGame = {
             if (mode === 'shoot') {
               // 目标为玩家 ID
               if (typeof targetOrLayer !== 'string') return INVALID_MOVE;
-              const target = G.players[targetOrLayer];
-              if (!target || !target.isAlive) return INVALID_MOVE;
-              if (targetOrLayer === ctx.currentPlayer) return INVALID_MOVE;
-              // 原版 SHOOT 要求同层
-              if (self.currentLayer !== target.currentLayer) return INVALID_MOVE;
-
-              // 死亡宣言
-              const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
-              if (decreeCheck === 'INVALID') return INVALID_MOVE;
-              const deathFaces = decreeCheck !== null ? [1, decreeCheck] : [1];
-              const roll = random.D6();
-              const result = resolveShoot(roll, deathFaces);
-              let s = discardCard(G, ctx.currentPlayer, cardId);
-              if (result === 'kill') {
-                const tp = s.players[targetOrLayer]!;
-                const handover = tp.hand.slice(0, 2);
-                s = {
-                  ...s,
-                  players: {
-                    ...s.players,
-                    [targetOrLayer]: {
-                      ...tp,
-                      isAlive: false,
-                      deathTurn: s.turnNumber,
-                      hand: tp.hand.slice(2),
-                    },
-                    [ctx.currentPlayer]: {
-                      ...s.players[ctx.currentPlayer]!,
-                      hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
-                      shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
-                    },
-                  },
-                };
-                s = movePlayerToLayer(s, targetOrLayer, 0);
-              } else if (result === 'move') {
-                const cur = target.currentLayer;
-                const dir = cur >= 4 ? -1 : 1;
-                const nl = Math.max(1, Math.min(4, cur + dir));
-                s = movePlayerToLayer(s, targetOrLayer, nl);
-              }
-              return incrementMoveCounter(s);
+              return applyShootVariant(G, ctx, random, targetOrLayer, cardId, {
+                sameLayerRequired: true,
+                deathFaces: [1],
+                moveFaces: [2, 3, 4, 5],
+                extraOnMove: null,
+                decreeId,
+              });
             } else if (mode === 'transit') {
               // 自己移动到相邻层
               if (typeof targetOrLayer !== 'number') return INVALID_MOVE;
