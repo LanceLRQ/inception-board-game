@@ -210,6 +210,9 @@ importers:
       rate-limiter-flexible:
         specifier: ^11.0.1
         version: 11.0.1
+      socket.io:
+        specifier: ^4.8.3
+        version: 4.8.3
       zod:
         specifier: ^4.3.6
         version: 4.3.6
