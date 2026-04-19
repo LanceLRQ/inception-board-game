@@ -514,6 +514,12 @@ export const InceptionCityGame = {
       return { winner: 'master' as Faction, reason: 'all_thieves_dead' };
     }
 
+    // 牌库耗尽 + 秘密金库未开 → 梦主胜
+    // 对照：docs/manual/03-game-flow.md 第 20 行
+    if (G.deck && G.deck.cards.length === 0 && G.phase === 'playing') {
+      return { winner: 'master' as Faction, reason: 'deck_exhausted' };
+    }
+
     return undefined;
   },
 };

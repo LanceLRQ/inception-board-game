@@ -92,7 +92,8 @@
     "chessConfirm": "确认交换",
     "winReason": {
       "secret_vault_opened": "盗梦者打开了秘密金库",
-      "all_thieves_dead": "所有盗梦者阵亡"
+      "all_thieves_dead": "所有盗梦者阵亡",
+      "deck_exhausted": "牌库耗尽，秘密金库未被打开"
     },
     "bribeTitle": "派发贿赂牌",
     "bribeRemaining": "池剩 {{n}} 张",
