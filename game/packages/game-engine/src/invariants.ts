@@ -194,6 +194,17 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
+  // ---------- 13. pendingUnlock 引用完整性 ----------
+  if (state.pendingUnlock) {
+    const { playerID, layer } = state.pendingUnlock;
+    if (!state.players[playerID]) {
+      push('pending_unlock_ref', `pendingUnlock.playerID=${playerID} not in players`);
+    }
+    if (!state.layers[layer]) {
+      push('pending_unlock_layer', `pendingUnlock.layer=${layer} not a valid layer`);
+    }
+  }
+
   return out;
 }
 

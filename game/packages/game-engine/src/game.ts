@@ -256,11 +256,15 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             const shooter = G.players[ctx.currentPlayer];
             const target = G.players[targetPlayerID];
             if (!shooter || !target) return INVALID_MOVE;
+            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
             if (!target.isAlive) return INVALID_MOVE;
             if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
+            // 对照：docs/manual/04-action-cards.md SHOOT（同层限制）
+            if (shooter.currentLayer !== target.currentLayer) return INVALID_MOVE;
 
             // 死亡宣言校验
             const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
@@ -934,7 +938,7 @@ export const InceptionCityGame = {
         playResonance: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             // 每回合限 1 张
             if (G.pendingResonance) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
@@ -975,7 +979,7 @@ export const InceptionCityGame = {
         playTimeStorm: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (cardId !== 'action_time_storm') return INVALID_MOVE;
