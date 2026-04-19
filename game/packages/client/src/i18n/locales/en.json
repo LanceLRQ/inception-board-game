@@ -1,0 +1,188 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "close": "Close"
+  },
+  "a11y": {
+    "skip_to_main": "Skip to main content"
+  },
+  "landing": {
+    "title": "Inception City",
+    "subtitle": "Inception City Online",
+    "localMatch": "Practice",
+    "multiplayer": "Multiplayer"
+  },
+  "lobby": {
+    "title": "Friend Lobby",
+    "createRoom": "Create Room",
+    "joinRoom": "Join Room",
+    "roomCode": "Room Code",
+    "players": "Players",
+    "nicknameLabel": "Pick a nickname",
+    "nicknamePlaceholder": "3–12 characters",
+    "continue": "Continue",
+    "maxPlayers": "Max Players",
+    "codeHint": "Enter a 6-digit room code",
+    "codeInvalid": "Invalid room code",
+    "errorGeneric": "Error: {{message}}",
+    "loading": "Connecting to server..."
+  },
+  "room": {
+    "title": "Room {{code}}",
+    "waiting": "Waiting for players...",
+    "start": "Start Game",
+    "share": "Share Room Code",
+    "copy": "Copy Code",
+    "copied": "Copied",
+    "fillAi": "Fill with AI",
+    "leave": "Leave Room",
+    "owner": "Host",
+    "you": "You",
+    "bot": "AI",
+    "seat": "Seat {{n}}",
+    "empty": "Empty Seat",
+    "needPlayers": "Need at least {{n}} players to start",
+    "currentPlayers": "{{current}} / {{max}}",
+    "notOwner": "Waiting for host to start"
+  },
+  "game": {
+    "yourTurn": "Your Turn",
+    "drawPhase": "Draw Phase",
+    "actionPhase": "Action Phase",
+    "discardPhase": "Discard Phase",
+    "hand": "Hand",
+    "deck": "Deck",
+    "layers": "Dream Layers"
+  },
+  "localMatch": {
+    "title": "Practice Match",
+    "playerCount": "Players",
+    "humanPlusBot": "You + {{count}} AI",
+    "start": "Start Game",
+    "restart": "Play Again",
+    "turn": "Turn",
+    "phase": {
+      "draw": "Draw",
+      "action": "Action",
+      "discard": "Discard",
+      "turnStart": "Turn Start",
+      "turnEnd": "Turn End"
+    },
+    "yourTurn": "Your Turn",
+    "botTurn": "AI {{id}} Turn",
+    "yourInfo": "Your Status",
+    "faction": "Faction",
+    "layer": "Layer",
+    "alive": "Alive",
+    "you": "You",
+    "cards": "Cards",
+    "draw": "Draw",
+    "endAction": "End Action",
+    "skipDiscard": "Skip Discard",
+    "confirmDiscard": "Confirm Discard ({{selected}}/{{required}})",
+    "mustDiscard": "Hand limit exceeded, discard {{n}} cards",
+    "confirmPlay": "Confirm playing \"{{card}}\"",
+    "pickPlayerTarget": "Play \"{{card}}\" — choose a target player",
+    "pickLayerTarget": "Play \"{{card}}\" — choose a target layer",
+    "lostLayer": "Lost Layer",
+    "chessTranspose": "Chess Transpose: pick 2 vaults to swap (2 uses per game)",
+    "chessConfirm": "Confirm Swap",
+    "graftTitle": "Graft: pick 2 cards to return to deck top",
+    "graftConfirm": "Confirm Return",
+    "dreamTransitPick": "SHOOT·Dream Transit: choose resolution mode",
+    "dreamModeShoot": "Resolve as SHOOT",
+    "dreamModeTransit": "Resolve as Transit",
+    "gravityPickTargets": "Gravity: pick 1–2 players (not yourself)",
+    "gravityConfirm": "Confirm",
+    "gravityPoolPick": "Gravity: current pick",
+    "decreeLabel": "Attach Death Decree:",
+    "decreeClear": "Clear Decree",
+    "winReason": {
+      "secret_vault_opened": "Thieves opened the secret vault",
+      "all_thieves_dead": "All thieves eliminated",
+      "deck_exhausted": "Deck exhausted, secret vault unopened"
+    },
+    "bribeTitle": "Deal Bribe Cards",
+    "bribeRemaining": "{{n}} left in pool",
+    "bribePickTarget": "Choose a thief target",
+    "bribeReceived": "Bribes received: {{n}}",
+    "thiefWins": "Thieves Win!",
+    "masterWins": "Dream Master Wins!",
+    "loading": "Loading..."
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "nickname": "Nickname",
+    "avatar": "Avatar",
+    "language": "Language",
+    "sound": "Sound",
+    "animation": "Animation",
+    "audio": {
+      "heading": "Audio",
+      "volume": "Volume",
+      "muted": "Muted",
+      "on": "Muted",
+      "off": "Sound On"
+    }
+  },
+  "theme": {
+    "toggle": "Toggle Theme",
+    "toggle_hint": "Click to cycle: Light → Dark → System",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "avatar": {
+    "roll": "Roll Avatar",
+    "rolls": "Rolled {{count}} times",
+    "save": "Save",
+    "saving": "Saving...",
+    "undo": "Undo"
+  },
+  "chat": {
+    "toggle": "Chat",
+    "panel_title": "Quick Phrases",
+    "no_presets": "No phrases in this category",
+    "cooldown": "Cooldown... {{seconds}}s"
+  },
+  "copyright": {
+    "short": "Fan-made non-commercial recreation. Original game © publisher.",
+    "heading": "Copyright Notice",
+    "aria_label": "Copyright Notice",
+    "modal_title": "Copyright & Usage Notice",
+    "ack": "I have read and agree",
+    "original_publisher": "Original {{title}} © {{publisher}} ({{website}})."
+  },
+  "loading": {
+    "title": "Preparing dream...",
+    "waiting": "Waiting for resources...",
+    "failed": "{{count}} card images failed to load, using placeholders"
+  },
+  "network": {
+    "back_to_lobby": "Back to Lobby"
+  },
+  "report": {
+    "button": "Report",
+    "button_aria": "Report Player",
+    "dialog_title": "Report Player",
+    "target_label": "Reporting: {{name}}",
+    "description_label": "Description (optional, max 500 chars)",
+    "submit": "Submit Report",
+    "submitting": "Submitting..."
+  },
+  "tutorial": {
+    "step_count": "Step {{current}} / {{total}}",
+    "next": "Next",
+    "skip": "Skip Tutorial",
+    "finish": "Finish"
+  },
+  "about": {
+    "title": "About",
+    "copyright": "Original board game Inception City © publisher"
+  }
+}
