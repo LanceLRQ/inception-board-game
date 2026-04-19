@@ -1,3 +1,5 @@
+import { CopyrightNotice } from '../../components/CopyrightNotice';
+
 export default function About() {
   return (
     <div className="min-h-screen bg-bg-primary p-4 text-white">
@@ -5,9 +7,9 @@ export default function About() {
       <p className="text-gray-400">
         盗梦都市（Inception City Online）是一款爱好者复刻的在线多人桌游。
       </p>
-      <p className="mt-2 text-sm text-gray-500">
-        原版桌游《盗梦都市》版权归发行商所有。本项目仅作爱好者研究用途。
-      </p>
+
+      {/* 第 2 处版权展示：关于页完整声明 */}
+      <CopyrightNotice variant="full" className="mt-6" />
     </div>
   );
 }

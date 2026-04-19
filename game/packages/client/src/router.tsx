@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import App from './App';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Lobby = lazy(() => import('./pages/Lobby'));
@@ -20,67 +21,72 @@ function PageLoader() {
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Landing />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/lobby',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Lobby />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/room/:code',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Room />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/game/:matchId',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Game />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/local',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <LocalMatch />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/replay/:matchId',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Replay />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/settings',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Settings />
-      </Suspense>
-    ),
-  },
-  {
-    path: '/about',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <About />
-      </Suspense>
-    ),
+    element: <App />,
+    children: [
+      {
+        path: '/',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Landing />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/lobby',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Lobby />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/room/:code',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Room />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/game/:matchId',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Game />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/local',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <LocalMatch />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/replay/:matchId',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Replay />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/settings',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Settings />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/about',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <About />
+          </Suspense>
+        ),
+      },
+    ],
   },
 ]);

@@ -8,6 +8,7 @@ import { ThiefBoard } from './ThiefBoard/index.js';
 import { MasterBoard } from './MasterBoard/index.js';
 import { useMockMatch } from '../../hooks/useMockMatch.js';
 import type { PlayIntent } from '../../hooks/useGameActions.js';
+import { CopyrightNotice } from '../../components/CopyrightNotice/index.js';
 
 export default function Game() {
   // 开发期 URL 参数驱动视角切换：?as=master 体验梦主视角；?pending=1 打开响应窗口
@@ -42,6 +43,11 @@ export default function Game() {
           {lastIntent.targetLayer !== -1 && ` @ 层${lastIntent.targetLayer}`}
         </div>
       )}
+
+      {/* 第 4 处版权展示：对局底部小字（结算视角长驻） */}
+      <div className="fixed inset-x-0 bottom-0 z-10 pb-safe">
+        <CopyrightNotice variant="footer" className="bg-background/70 py-1 backdrop-blur-sm" />
+      </div>
     </>
   );
 }
