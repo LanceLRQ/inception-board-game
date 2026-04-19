@@ -85,9 +85,12 @@ export function actionMoveFor(
   if (action.id === 'action_shoot_burst') {
     return { move: 'playShootBurst', needsTarget: 'player' };
   }
-  // 嫁接 / 共鸣 / 万有引力 / 移形换影 / SHOOT·梦境穿梭剂 / 死亡宣言 需特殊 UI 交互
+  // 嫁接：playGraft 不需目标；二阶段 pendingGraft 由 LocalMatchRuntime 处理
+  if (action.id === 'action_graft') {
+    return { move: 'playGraft', needsTarget: 'none' };
+  }
+  // 共鸣 / 万有引力 / 移形换影 / SHOOT·梦境穿梭剂 / 死亡宣言 需特殊 UI 交互
   // 当前 LocalMatchRuntime 尚未接入，从手牌暂不可点选；Bot 可正常触发
-  if (action.id === 'action_graft') return null;
   if (action.id === 'action_resonance') return null;
   if (action.id === 'action_gravity') return null;
   if (action.id === 'action_shift') return null;

@@ -258,6 +258,32 @@ export function LocalMatchRuntime({
 
   const cancelPlay = useCallback(() => setPendingPlay(null), []);
 
+  // 嫁接 pending resolver：抽 3 后选 2 张返牌库顶
+  const pendingGraft = G?.pendingGraft as { playerID: string } | null | undefined;
+  const isHumanGraftPending = pendingGraft?.playerID === '0' && isHumanTurn;
+  const [graftPick, setGraftPick] = useState<string[]>([]);
+  const toggleGraftPick = useCallback((card: string) => {
+    setGraftPick((prev) => {
+      const idx = prev.indexOf(card);
+      if (idx >= 0) {
+        const next = [...prev];
+        next.splice(idx, 1);
+        return next;
+      }
+      if (prev.length >= 2) return [prev[1]!, card];
+      return [...prev, card];
+    });
+  }, []);
+  // 派生：只保留仍在手牌中且处于 pending 时的选择
+  const effectiveGraftPick = isHumanGraftPending
+    ? graftPick.filter((c) => humanHand.includes(c))
+    : [];
+  const confirmGraft = useCallback(async () => {
+    if (effectiveGraftPick.length !== 2) return;
+    await makeMove('resolveGraft', [[...effectiveGraftPick]]);
+    setGraftPick([]);
+  }, [effectiveGraftPick, makeMove]);
+
   const toggleDiscard = useCallback(
     (card: string) => {
       setSelectedDiscard((prev) => {
@@ -649,6 +675,52 @@ export function LocalMatchRuntime({
             data-testid="chess-confirm"
           >
             {t('localMatch.chessConfirm', { defaultValue: '确认交换' })}
+          </button>
+        </div>
+      )}
+
+      {/* 嫁接结算：选 2 张返牌库顶 */}
+      {isHumanGraftPending && (
+        <div
+          className="mb-4 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-xs"
+          data-testid="graft-resolver"
+        >
+          <div className="mb-2 font-medium text-emerald-400">
+            {t('localMatch.graftTitle', {
+              defaultValue: '嫁接：选 2 张手牌放回牌库顶（第 1 张位于最顶）',
+            })}
+          </div>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {humanHand.map((card, idx) => {
+              const picked = effectiveGraftPick.includes(card);
+              const order = effectiveGraftPick.indexOf(card) + 1;
+              return (
+                <button
+                  key={`graft-pick-${idx}-${card}`}
+                  type="button"
+                  onClick={() => toggleGraftPick(card)}
+                  className={cn(
+                    'rounded-full border px-2 py-0.5 text-[11px]',
+                    picked
+                      ? 'border-emerald-400 bg-emerald-500/30 text-emerald-400'
+                      : 'border-border bg-card hover:border-emerald-400/60',
+                  )}
+                  data-testid={`graft-card-${idx}`}
+                >
+                  {picked && <span className="mr-1 text-[10px]">#{order}</span>}
+                  {getCardName(card)}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            disabled={effectiveGraftPick.length !== 2}
+            onClick={() => void confirmGraft()}
+            className="rounded-full bg-emerald-500 px-3 py-1 text-[11px] text-black disabled:opacity-50"
+            data-testid="graft-confirm"
+          >
+            {t('localMatch.graftConfirm', { defaultValue: '确认放回' })}
           </button>
         </div>
       )}

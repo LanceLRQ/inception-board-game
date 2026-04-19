@@ -90,6 +90,8 @@
     "lostLayer": "迷失层",
     "chessTranspose": "棋局·易位：选择 2 个金库交换（全局限 2 次）",
     "chessConfirm": "确认交换",
+    "graftTitle": "嫁接：选 2 张手牌放回牌库顶（第 1 张位于最顶）",
+    "graftConfirm": "确认放回",
     "winReason": {
       "secret_vault_opened": "盗梦者打开了秘密金库",
       "all_thieves_dead": "所有盗梦者阵亡",
