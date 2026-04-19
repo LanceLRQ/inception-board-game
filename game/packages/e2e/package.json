@@ -6,7 +6,8 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "lint": "eslint tests/",
+    "test:offline": "playwright test --config=playwright.offline.config.ts",
+    "lint": "eslint tests/ tests-offline/",
     "clean": "rm -rf test-results playwright-report"
   },
   "devDependencies": {
