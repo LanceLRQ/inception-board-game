@@ -1,7 +1,9 @@
 import Router from '@koa/router';
+import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
+import { AVATAR_PALETTES, generatePixelAvatar } from '@icgame/shared';
 
 const router = new Router();
 
@@ -18,6 +20,45 @@ router.get('/players/me', authMiddleware, async (ctx) => {
     avatarPalette: player.avatarPalette,
     locale: player.locale,
     createdAt: player.createdAt,
+  };
+});
+
+// PATCH /players/me - 更新头像 seed / 昵称
+const updateMeSchema = z.object({
+  avatarSeed: z.string().min(1).max(128).optional(),
+  nickname: z.string().min(1).max(50).optional(),
+});
+
+router.patch('/players/me', authMiddleware, async (ctx) => {
+  const { playerId } = ctx.state.player;
+  const body = updateMeSchema.parse(ctx.request.body);
+
+  const data: { avatarSeed?: string; avatarPalette?: string; nickname?: string } = {};
+  if (body.avatarSeed !== undefined) {
+    // 服务端再算一次 palette 用于持久化展示优化（可选）
+    const avatar = generatePixelAvatar(body.avatarSeed);
+    data.avatarSeed = body.avatarSeed;
+    data.avatarPalette = avatar.paletteId;
+  }
+  if (body.nickname !== undefined) {
+    data.nickname = body.nickname;
+  }
+
+  if (Object.keys(data).length === 0) {
+    throw new AppError('VALIDATION_ERROR', 'No fields to update');
+  }
+
+  const player = await prisma.player.update({
+    where: { id: playerId },
+    data,
+  });
+
+  ctx.body = {
+    playerId: player.id,
+    nickname: player.nickname,
+    avatarSeed: player.avatarSeed,
+    avatarPalette: player.avatarPalette,
+    availablePalettes: AVATAR_PALETTES.map((p) => p.id),
   };
 });
 

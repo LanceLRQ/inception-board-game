@@ -66,3 +66,15 @@ export {
   getChatPresetsByCategory,
 } from './chat/presets.js';
 export type { ChatPresetPhrase, ChatPresetCategory, ChatPresetFaction } from './chat/presets.js';
+
+// 像素头像
+export {
+  AVATAR_GRID_SIZE,
+  AVATAR_PALETTES,
+  cyrb53,
+  mulberry32,
+  generatePixelAvatar,
+  avatarToSVG,
+  generateRandomAvatarSeed,
+} from './avatar/pixelAvatar.js';
+export type { PixelAvatar } from './avatar/pixelAvatar.js';

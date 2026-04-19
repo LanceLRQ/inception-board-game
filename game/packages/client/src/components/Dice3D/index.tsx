@@ -1,5 +1,10 @@
-// 3D 骰子组件 - CSS 3D 变换 + reduced-motion 降级
-// 对照：plans/design/06-frontend-design.md §6.6 Dice3D
+// 3D 骰子组件 - SVG 底图 + CSS 3D 变换 + reduced-motion 降级
+// 对照：plans/design/06-frontend-design.md §6.6 Dice3D / Spike: experimental_demo/dice-svg-css3d
+//
+// 变更（B8.2）：
+//   - 骰子面从 CSS Grid 点阵升级为预渲染 SVG 图（/dice/dice-{color}-{face}.svg）
+//   - 保留 3D rotate + rolling 动画
+//   - reduced-motion 降级：直接展示终值 SVG
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -32,31 +37,20 @@ const FACE_ROTATION: Record<number, { x: number; y: number }> = {
   6: { x: 90, y: 0 },
 };
 
-// 骰子面上的点阵
-const DOT_PATTERNS: Record<number, number[]> = {
-  1: [0, 0, 0, 1, 0, 0, 0],
-  2: [0, 0, 1, 0, 1, 0, 0],
-  3: [0, 0, 1, 1, 1, 0, 0],
-  4: [1, 0, 1, 0, 1, 0, 1],
-  5: [1, 0, 1, 1, 1, 0, 1],
-  6: [1, 1, 1, 0, 1, 1, 1],
-};
+export function diceSvgPath(color: DiceColor, face: number): string {
+  return `/dice/dice-${color}-${face}.svg`;
+}
 
-function DiceFace({ value, color }: { value: number; color: DiceColor }) {
-  const dots = DOT_PATTERNS[value] ?? [];
+function DiceFace({ value, color, size }: { value: number; color: DiceColor; size: number }) {
   return (
-    <div
-      className={cn(
-        'grid grid-cols-3 grid-rows-3 gap-0.5 p-1',
-        color === 'red' ? 'bg-red-600' : 'bg-blue-600',
-      )}
-    >
-      {dots.map((has, i) => (
-        <div key={i} className="flex h-2 w-2 items-center justify-center">
-          {has ? <div className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
-        </div>
-      ))}
-    </div>
+    <img
+      src={diceSvgPath(color, value)}
+      alt=""
+      aria-hidden="true"
+      className="h-full w-full select-none"
+      draggable={false}
+      style={{ width: size, height: size }}
+    />
   );
 }
 
@@ -70,7 +64,7 @@ export function Dice3D({
 }: Dice3DProps) {
   const prefersReduced = useReducedMotion();
 
-  // 掷骰动画：只在 rolling 时快速切换面值（全部在 interval 回调内 setState）
+  // 掷骰动画：只在 rolling 时快速切换面值
   const [rollingValue, setRollingValue] = useState(1);
   const displayValue = rolling ? rollingValue : (value ?? 1);
 
@@ -94,19 +88,15 @@ export function Dice3D({
 
   const rotation = useMemo(() => FACE_ROTATION[displayValue] ?? { x: 0, y: 0 }, [displayValue]);
 
-  // reduced-motion 降级
+  // reduced-motion 降级：直接展示 SVG 终值
   if (prefersReduced) {
     return (
       <div
-        className={cn(
-          'flex items-center justify-center rounded-lg font-bold text-white',
-          color === 'red' ? 'bg-red-600' : 'bg-blue-600',
-          className,
-        )}
+        className={cn('inline-block', className)}
         style={{ width: size, height: size }}
         aria-label={`骰子 ${displayValue}`}
       >
-        {displayValue}
+        <DiceFace value={displayValue} color={color} size={size} />
       </div>
     );
   }
@@ -136,13 +126,13 @@ export function Dice3D({
         {[1, 2, 3, 4, 5, 6].map((face) => (
           <div
             key={face}
-            className="absolute inset-0 rounded-lg shadow-md"
+            className="absolute inset-0"
             style={{
               transform: `translateZ(${size / 2}px) ${face !== 1 ? `rotateX(${FACE_ROTATION[face]?.x ?? 0}deg) rotateY(${FACE_ROTATION[face]?.y ?? 0}deg) translateZ(${size / 2}px)` : ''}`,
               backfaceVisibility: 'hidden',
             }}
           >
-            <DiceFace value={face} color={color} />
+            <DiceFace value={face} color={color} size={size} />
           </div>
         ))}
       </motion.div>
