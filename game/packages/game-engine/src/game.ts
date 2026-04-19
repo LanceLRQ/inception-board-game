@@ -26,7 +26,7 @@ import {
   applyUnlockSuccess,
   applyUnlockCancel,
 } from './moves.js';
-import { resolveShoot } from './dice.js';
+import { resolveShoot, resolveShootCustom } from './dice.js';
 import {
   applyPointmanAssault,
   applyInterpreterForeshadow,
@@ -279,6 +279,53 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // SHOOT·刺客之王：目标任意层；[1/2] 死亡 [3/4/5] 移动相邻层
+        // 对照：docs/manual/04-action-cards.md SHOOT·刺客之王
+        playShootKing: {
+          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (cardId !== 'action_shoot_king') return INVALID_MOVE;
+            return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
+              sameLayerRequired: false,
+              deathFaces: [1, 2],
+              moveFaces: [3, 4, 5],
+              extraOnMove: null,
+            });
+          },
+          client: false,
+        },
+        // SHOOT·爆甲螺旋：同层；[1/2] 死 [3/4/5] 弃 target 所有解封 + 移动
+        playShootArmor: {
+          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (cardId !== 'action_shoot_armor') return INVALID_MOVE;
+            return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
+              sameLayerRequired: true,
+              deathFaces: [1, 2],
+              moveFaces: [3, 4, 5],
+              extraOnMove: 'discard_unlocks',
+            });
+          },
+          client: false,
+        },
+        // SHOOT·炸裂弹头：同层；[1/2] 死 [3/4/5] 弃 target 所有 SHOOT 类 + 移动
+        playShootBurst: {
+          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string, cardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (cardId !== 'action_shoot_burst') return INVALID_MOVE;
+            return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
+              sameLayerRequired: true,
+              deathFaces: [1, 2],
+              moveFaces: [3, 4, 5],
+              extraOnMove: 'discard_shoots',
+            });
+          },
+          client: false,
+        },
+
         dreamMasterMove: {
           move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -775,4 +822,92 @@ export const InceptionCityGame = {
 
 function isAdjacent(from: number, to: number): boolean {
   return Math.abs(from - to) === 1 && from >= 1 && from <= 4 && to >= 1 && to <= 4;
+}
+
+interface ShootVariantOpts {
+  sameLayerRequired: boolean;
+  deathFaces: number[];
+  moveFaces: number[];
+  extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
+}
+
+/** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用
+ *  对照：docs/manual/04-action-cards.md SHOOT·刺客之王 / 爆甲螺旋 / 炸裂弹头
+ */
+function applyShootVariant(
+  G: SetupState,
+  ctx: BGIOCtx,
+  random: BGIORandom,
+  targetPlayerID: string,
+  cardId: CardID,
+  opts: ShootVariantOpts,
+): SetupState | typeof INVALID_MOVE {
+  const shooter = G.players[ctx.currentPlayer];
+  const target = G.players[targetPlayerID];
+  if (!shooter || !target) return INVALID_MOVE;
+  if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+  if (!target.isAlive) return INVALID_MOVE;
+  if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
+  if (opts.sameLayerRequired && shooter.currentLayer !== target.currentLayer) {
+    return INVALID_MOVE;
+  }
+
+  const roll = random.D6();
+  const result = resolveShootCustom(roll, opts.deathFaces, opts.moveFaces);
+  let s = discardCard(G, ctx.currentPlayer, cardId);
+
+  if (result === 'kill') {
+    const tp = s.players[targetPlayerID]!;
+    const handover = tp.hand.slice(0, 2);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [targetPlayerID]: {
+          ...tp,
+          isAlive: false,
+          deathTurn: s.turnNumber,
+          hand: tp.hand.slice(2),
+        },
+        [ctx.currentPlayer]: {
+          ...s.players[ctx.currentPlayer]!,
+          hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
+          shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
+        },
+      },
+    };
+    s = movePlayerToLayer(s, targetPlayerID, 0);
+  } else if (result === 'move') {
+    // on-move 副作用：弃目标特定手牌
+    if (opts.extraOnMove) {
+      const tp = s.players[targetPlayerID]!;
+      const keep: CardID[] = [];
+      const dropped: CardID[] = [];
+      for (const id of tp.hand) {
+        const shouldDrop =
+          opts.extraOnMove === 'discard_unlocks'
+            ? id === 'action_unlock'
+            : id === 'action_shoot' ||
+              id === 'action_shoot_king' ||
+              id === 'action_shoot_armor' ||
+              id === 'action_shoot_burst' ||
+              id === 'action_shoot_dream_transit';
+        (shouldDrop ? dropped : keep).push(id);
+      }
+      if (dropped.length > 0) {
+        s = {
+          ...s,
+          players: { ...s.players, [targetPlayerID]: { ...tp, hand: keep } },
+          deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...dropped] },
+        };
+      }
+    }
+    // 相邻层移动（1<->2, 2<->3, 3<->4；4 向下，1 向上）
+    const cur = target.currentLayer;
+    const dir = cur >= 4 ? -1 : 1;
+    const nl = Math.max(1, Math.min(4, cur + dir));
+    s = movePlayerToLayer(s, targetPlayerID, nl);
+  }
+
+  return incrementMoveCounter(s);
 }

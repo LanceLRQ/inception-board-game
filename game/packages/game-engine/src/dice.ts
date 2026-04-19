@@ -42,3 +42,17 @@ export function resolveShoot(roll: number, deathFaces: readonly number[] = [1]):
   if (roll >= 2 && roll <= 5) return 'move';
   return 'miss';
 }
+
+/**
+ * 可配置版骰子结算（SHOOT 变体专用）
+ * 对照：docs/manual/04-action-cards.md SHOOT·刺客之王 / 爆甲螺旋 / 炸裂弹头
+ */
+export function resolveShootCustom(
+  roll: number,
+  deathFaces: readonly number[],
+  moveFaces: readonly number[],
+): ShootOutcome {
+  if (deathFaces.includes(roll)) return 'kill';
+  if (moveFaces.includes(roll)) return 'move';
+  return 'miss';
+}

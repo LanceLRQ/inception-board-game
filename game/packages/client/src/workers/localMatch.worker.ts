@@ -39,6 +39,9 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playResonance',
     'playGravity',
     'resolveGravityPick',
+    'playShootKing',
+    'playShootArmor',
+    'playShootBurst',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -65,6 +68,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   playResonance: 102,
   playGravity: 103,
   resolveGravityPick: 0, // 必须优先结算进行中的挑选
+  playShootKing: 104,
+  playShootArmor: 105,
+  playShootBurst: 106,
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,
