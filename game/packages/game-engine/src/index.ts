@@ -86,3 +86,24 @@ export type {
 
 export { resolveRecipients, rewriteForViewer, distribute, Events } from './engine/broadcaster.js';
 export type { EventVisibility, BroadcastEvent, BroadcastContext } from './engine/broadcaster.js';
+
+// 健壮性 · 死亡/迷失层/超时（Phase 2 B7）
+export {
+  LOST_LAYER,
+  canAct,
+  applyDeath,
+  allThievesDead,
+  getAlivePlayers,
+  getAliveInLayer,
+} from './engine/death.js';
+export type { DeathCause, DeathEvent } from './engine/death.js';
+
+export {
+  RESPONSE_WINDOW_MS,
+  AI_TAKEOVER_MS,
+  DISCONNECT_FORCE_MS,
+  applyResponseTimeout,
+  shouldTakeover,
+  shouldForceDisconnect,
+} from './engine/timeout.js';
+export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
