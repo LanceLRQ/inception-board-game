@@ -11,6 +11,8 @@ import {
   setTurnPhase,
   movePlayerToLayer,
   incrementMoveCounter,
+  applyUnlockSuccess,
+  applyUnlockCancel,
 } from './moves.js';
 import { resolveShoot } from './dice.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -201,6 +203,92 @@ export const InceptionCityGame = {
                 },
                 client: false,
               },
+              // 打出解封（效果①）- 盗梦者解锁同层心锁
+              // 对照：docs/manual/04-action-cards.md 解封 + plans/design/02-game-rules-spec.md §2.4
+              playUnlock: {
+                move: (
+                  G: SetupState,
+                  ctx: {
+                    currentPlayer: string;
+                    random: { Die: (n: number) => number; D6: () => number };
+                  },
+                  cardId: CardID,
+                ) => {
+                  const player = G.players[ctx.currentPlayer];
+                  if (!player || !player.isAlive) return INVALID_MOVE;
+                  if (player.faction !== 'thief') return INVALID_MOVE;
+                  if (!player.hand.includes(cardId)) return INVALID_MOVE;
+                  if (player.successfulUnlocksThisTurn >= G.maxUnlockPerTurn) return INVALID_MOVE;
+
+                  const currentLayer = player.currentLayer;
+                  const layerState = G.layers[currentLayer];
+                  if (!layerState || layerState.heartLockValue <= 0) return INVALID_MOVE;
+
+                  const s = discardCard(G, ctx.currentPlayer, cardId);
+                  return {
+                    ...s,
+                    pendingUnlock: {
+                      playerID: ctx.currentPlayer,
+                      layer: currentLayer,
+                      cardId,
+                    },
+                  };
+                },
+                client: false,
+              },
+              // 确认解封成功（响应窗口无取消时调用）
+              resolveUnlock: {
+                move: (G: SetupState) => {
+                  if (!G.pendingUnlock) return INVALID_MOVE;
+                  return applyUnlockSuccess(G);
+                },
+                client: false,
+              },
+              // 打出梦境穿梭剂 - 移动到相邻层
+              // 对照：docs/manual/04-action-cards.md 梦境穿梭剂
+              playDreamTransit: {
+                move: (
+                  G: SetupState,
+                  ctx: {
+                    currentPlayer: string;
+                    random: { Die: (n: number) => number; D6: () => number };
+                  },
+                  cardId: CardID,
+                  targetLayer: number,
+                ) => {
+                  const player = G.players[ctx.currentPlayer];
+                  if (!player || !player.isAlive) return INVALID_MOVE;
+                  if (!player.hand.includes(cardId)) return INVALID_MOVE;
+                  if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
+                  if (!isAdjacent(player.currentLayer, targetLayer)) return INVALID_MOVE;
+
+                  let s = discardCard(G, ctx.currentPlayer, cardId);
+                  s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
+                  return incrementMoveCounter(s);
+                },
+                client: false,
+              },
+              // 打出凭空造物 - 从牌库顶抽2张牌
+              // 对照：docs/manual/04-action-cards.md 凭空造物
+              playCreation: {
+                move: (
+                  G: SetupState,
+                  ctx: {
+                    currentPlayer: string;
+                    random: { Die: (n: number) => number; D6: () => number };
+                  },
+                  cardId: CardID,
+                ) => {
+                  const player = G.players[ctx.currentPlayer];
+                  if (!player || !player.isAlive) return INVALID_MOVE;
+                  if (!player.hand.includes(cardId)) return INVALID_MOVE;
+
+                  let s = discardCard(G, ctx.currentPlayer, cardId);
+                  s = drawCards(s, ctx.currentPlayer, 2);
+                  return incrementMoveCounter(s);
+                },
+                client: false,
+              },
             },
           },
           discard: {
@@ -228,9 +316,17 @@ export const InceptionCityGame = {
           },
           respondWindow: {
             moves: {
-              // 响应取消解封
+              // 响应取消解封（使用解封效果②）
               respondCancelUnlock: {
-                move: (G: SetupState) => G,
+                move: (G: SetupState) => applyUnlockCancel(G),
+                client: false,
+              },
+              // 确认解封成功（respondWindow 内也可调用）
+              resolveUnlock: {
+                move: (G: SetupState) => {
+                  if (!G.pendingUnlock) return INVALID_MOVE;
+                  return applyUnlockSuccess(G);
+                },
                 client: false,
               },
               // 不响应

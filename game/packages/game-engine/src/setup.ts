@@ -32,6 +32,11 @@ export interface SetupState {
   usedNightmareIds: CardID[];
   moveCounter: number;
   activeWorldViews: CardID[];
+  pendingUnlock: {
+    playerID: string;
+    layer: number;
+    cardId: CardID;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -184,6 +189,7 @@ export function createInitialState(options: {
     usedNightmareIds: [],
     moveCounter: 0,
     activeWorldViews: [],
+    pendingUnlock: null,
     winner: null,
     winReason: null,
     endTurn: null,

@@ -167,5 +167,60 @@ export function incrementMoveCounter(state: SetupState): SetupState {
   return { ...state, moveCounter: state.moveCounter + 1 };
 }
 
+// === 解封成功结算 ===
+// 对照：docs/manual/04-action-cards.md 解封 + plans/design/02-game-rules-spec.md §2.4
+export function applyUnlockSuccess(state: SetupState): SetupState {
+  const pending = state.pendingUnlock;
+  if (!pending) return state;
+
+  const { playerID, layer } = pending;
+  const layerState = state.layers[layer];
+  if (!layerState) return state;
+
+  const newHeartLock = Math.max(0, layerState.heartLockValue - 1);
+
+  // 心锁归零 → 打开该层第一个未开金库
+  let updatedVaults = state.vaults;
+  if (newHeartLock === 0) {
+    const vaultIdx = state.vaults.findIndex((v) => v.layer === layer && !v.isOpened);
+    if (vaultIdx !== -1) {
+      updatedVaults = state.vaults.map((v, i) =>
+        i === vaultIdx ? { ...v, isOpened: true, openedBy: playerID } : v,
+      );
+    }
+  }
+
+  const player = state.players[playerID]!;
+
+  return {
+    ...state,
+    pendingUnlock: null,
+    layers: {
+      ...state.layers,
+      [layer]: {
+        ...layerState,
+        heartLockValue: newHeartLock,
+      },
+    },
+    vaults: updatedVaults,
+    players: {
+      ...state.players,
+      [playerID]: {
+        ...player,
+        successfulUnlocksThisTurn: player.successfulUnlocksThisTurn + 1,
+        unlockCount: player.unlockCount + 1,
+      },
+    },
+  };
+}
+
+// === 取消解封 ===
+export function applyUnlockCancel(state: SetupState): SetupState {
+  return {
+    ...state,
+    pendingUnlock: null,
+  };
+}
+
 // 导入 CardID 类型
 import type { CardID } from '@icgame/shared';
