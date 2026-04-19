@@ -177,7 +177,12 @@ export function LocalMatchRuntime({
     move: string;
     needsTarget: 'player' | 'layer' | 'none';
     argOrder?: 'target_first' | 'card_first';
+    // SHOOT·梦境穿梭剂 专用：shoot | transit 模式（非空时 move 签名为 (cardId, mode, target)）
+    dreamMode?: 'shoot' | 'transit';
   } | null>(null);
+
+  // SHOOT·梦境穿梭剂：选 mode 的中间态
+  const [dreamTransitPicker, setDreamTransitPicker] = useState<string | null>(null);
 
   // 棋局·易位：选中的 2 个金库索引
   const [chessPick, setChessPick] = useState<number[]>([]);
@@ -220,16 +225,39 @@ export function LocalMatchRuntime({
       ? pendingPlay
       : null;
 
-  const startPlay = useCallback((card: string) => {
-    const action = actionMoveFor(card);
-    if (!action) return;
-    setPendingPlay({
-      card,
-      move: action.move,
-      needsTarget: action.needsTarget,
-      argOrder: action.argOrder,
-    });
-  }, []);
+  const startPlay = useCallback(
+    (card: string) => {
+      // SHOOT·梦境穿梭剂：进入 mode 选择
+      if (card === 'action_shoot_dream_transit') {
+        setDreamTransitPicker(card);
+        return;
+      }
+      const action = actionMoveFor(card);
+      if (!action) return;
+      setPendingPlay({
+        card,
+        move: action.move,
+        needsTarget: action.needsTarget,
+        argOrder: action.argOrder,
+      });
+    },
+    [setDreamTransitPicker, setPendingPlay],
+  );
+
+  const chooseDreamMode = useCallback(
+    (mode: 'shoot' | 'transit') => {
+      if (!dreamTransitPicker) return;
+      setPendingPlay({
+        card: dreamTransitPicker,
+        move: 'playShootDreamTransit',
+        needsTarget: mode === 'shoot' ? 'player' : 'layer',
+        argOrder: 'card_first',
+        dreamMode: mode,
+      });
+      setDreamTransitPicker(null);
+    },
+    [dreamTransitPicker, setDreamTransitPicker, setPendingPlay],
+  );
 
   const confirmPlayNoTarget = useCallback(async () => {
     if (!effectivePending || effectivePending.needsTarget !== 'none') return;
@@ -241,10 +269,15 @@ export function LocalMatchRuntime({
   const confirmPlayTargetPlayer = useCallback(
     async (targetPlayerID: string) => {
       if (!effectivePending || effectivePending.needsTarget !== 'player') return;
-      const args =
-        effectivePending.argOrder === 'card_first'
-          ? [effectivePending.card, targetPlayerID]
-          : [targetPlayerID, effectivePending.card];
+      let args: unknown[];
+      if (effectivePending.dreamMode) {
+        // playShootDreamTransit(cardId, mode, target)
+        args = [effectivePending.card, effectivePending.dreamMode, targetPlayerID];
+      } else if (effectivePending.argOrder === 'card_first') {
+        args = [effectivePending.card, targetPlayerID];
+      } else {
+        args = [targetPlayerID, effectivePending.card];
+      }
       await makeMove(effectivePending.move, args);
       setPendingPlay(null);
     },
@@ -254,8 +287,10 @@ export function LocalMatchRuntime({
   const confirmPlayTargetLayer = useCallback(
     async (targetLayer: number) => {
       if (!effectivePending || effectivePending.needsTarget !== 'layer') return;
-      // layer 系列一律 [cardId, layer]
-      await makeMove(effectivePending.move, [effectivePending.card, targetLayer]);
+      const args = effectivePending.dreamMode
+        ? [effectivePending.card, effectivePending.dreamMode, targetLayer]
+        : [effectivePending.card, targetLayer];
+      await makeMove(effectivePending.move, args);
       setPendingPlay(null);
     },
     [effectivePending, makeMove],
@@ -681,6 +716,45 @@ export function LocalMatchRuntime({
           >
             {t('localMatch.chessConfirm', { defaultValue: '确认交换' })}
           </button>
+        </div>
+      )}
+
+      {/* SHOOT·梦境穿梭剂 mode 选择 */}
+      {dreamTransitPicker && (
+        <div
+          className="mb-4 rounded-md border border-indigo-500/40 bg-indigo-500/5 p-3 text-xs"
+          data-testid="dream-transit-mode-picker"
+        >
+          <div className="mb-2 font-medium text-indigo-400">
+            {t('localMatch.dreamTransitPick', {
+              defaultValue: 'SHOOT·梦境穿梭剂：选择结算方式',
+            })}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => chooseDreamMode('shoot')}
+              className="rounded-full bg-indigo-500 px-3 py-1 text-[11px] text-white"
+              data-testid="dream-mode-shoot"
+            >
+              {t('localMatch.dreamModeShoot', { defaultValue: '以 SHOOT 结算' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => chooseDreamMode('transit')}
+              className="rounded-full bg-indigo-400 px-3 py-1 text-[11px] text-white"
+              data-testid="dream-mode-transit"
+            >
+              {t('localMatch.dreamModeTransit', { defaultValue: '以 穿梭剂 结算' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDreamTransitPicker(null)}
+              className="rounded-full border border-muted px-3 py-1 text-[11px] text-muted-foreground"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
         </div>
       )}
 

@@ -95,9 +95,12 @@ export function actionMoveFor(id: string): ActionMoveSpec | null {
   if (action.id === 'action_shift') {
     return { move: 'playShift', needsTarget: 'player', argOrder: 'card_first' };
   }
-  // 万有引力 / SHOOT·梦境穿梭剂 / 死亡宣言 仍需专属 UI
+  // 万有引力 / 死亡宣言 仍需专属 UI
   if (action.id === 'action_gravity') return null;
-  if (action.id === 'action_shoot_dream_transit') return null;
+  // SHOOT·梦境穿梭剂：LocalMatchRuntime 拦截进入 mode picker
+  if (action.id === 'action_shoot_dream_transit') {
+    return { move: 'playShootDreamTransit', needsTarget: 'none' };
+  }
   if (action.id === 'action_death_decree_3') return null;
   if (action.id === 'action_death_decree_4') return null;
   if (action.id === 'action_death_decree_5') return null;
