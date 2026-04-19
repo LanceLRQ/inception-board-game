@@ -333,16 +333,16 @@ export const InceptionCityGame = {
           },
           client: false,
         },
-        // 梦主发动已翻开的梦魇效果（目前仅实现 饥饿撕咬）
-        // 对照：docs/manual/07-nightmare-cards.md 饥饿撕咬
+        // 梦主发动已翻开的梦魇效果
+        // 对照：docs/manual/07-nightmare-cards.md
         masterActivateNightmare: {
-          move: ({ G, ctx }: MoveCtx, layer: number, params?: Record<string, unknown>) => {
+          move: ({ G, ctx, random }: MoveCtx, layer: number, params?: Record<string, unknown>) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const ls = G.layers[layer];
             if (!ls || !ls.nightmareId || !ls.nightmareRevealed) return INVALID_MOVE;
             const nid = ls.nightmareId;
-            const next = applyNightmareEffect(G, layer, nid, params);
+            const next = applyNightmareEffect(G, layer, nid, random, params);
             if (next === INVALID_MOVE) return INVALID_MOVE;
             // 清除梦魇并计入已发动
             return {
@@ -1028,16 +1028,77 @@ function isAdjacent(from: number, to: number): boolean {
 /**
  * 梦魇效果分发
  * 对照：docs/manual/07-nightmare-cards.md
- * 当前实现：饥饿撕咬（其他梦魇待后续）
+ * 已实现：饥饿撕咬 / 绝望风暴 / 深空坠落 / 致命漩涡
+ * 待后续：回音萦绕 / 邪念瘟疫
  */
 function applyNightmareEffect(
   G: SetupState,
   layer: number,
   nid: CardID,
+  random: BGIORandom,
   _params?: Record<string, unknown>,
 ): SetupState | typeof INVALID_MOVE {
   const ls = G.layers[layer];
   if (!ls) return INVALID_MOVE;
+
+  if (nid === 'nightmare_despair_storm') {
+    // 从牌库顶弃 10 张；+5 × 其他已开金库数
+    const openedOther = G.vaults.filter((v) => v.isOpened && v.layer !== layer).length;
+    const target = 10 + openedOther * 5;
+    const eff = Math.min(target, G.deck.cards.length);
+    const dropped = G.deck.cards.slice(0, eff);
+    return {
+      ...G,
+      deck: {
+        cards: G.deck.cards.slice(eff),
+        discardPile: [...G.deck.discardPile, ...dropped],
+      },
+    };
+  }
+
+  if (nid === 'nightmare_space_fall') {
+    // 该层所有盗梦者掷 1 骰：5/6 或当前层数 → 迷失层；否则移到结果数字对应层
+    let s = G;
+    const thieves = [...ls.playersInLayer].filter((pid) => {
+      const p = s.players[pid];
+      return p && p.faction === 'thief' && p.isAlive;
+    });
+    for (const pid of thieves) {
+      const roll = random.D6();
+      if (roll === 5 || roll === 6 || roll === layer) {
+        s = movePlayerToLayer(s, pid, 0);
+      } else if (roll >= 1 && roll <= 4) {
+        s = movePlayerToLayer(s, pid, roll);
+      }
+    }
+    return s;
+  }
+
+  if (nid === 'nightmare_vortex') {
+    // 当层玩家 → 迷失层（保留手牌）；其余玩家移到当层 + 弃所有手牌
+    let s = G;
+    const onLayer = [...ls.playersInLayer];
+    for (const pid of onLayer) {
+      const p = s.players[pid];
+      if (!p || !p.isAlive) continue;
+      s = movePlayerToLayer(s, pid, 0);
+    }
+    // 再处理其他层玩家
+    for (const pid of G.playerOrder) {
+      const p = s.players[pid];
+      if (!p || !p.isAlive) continue;
+      if (p.currentLayer === 0) continue;
+      if (p.currentLayer === layer) continue;
+      const hand = p.hand;
+      s = {
+        ...s,
+        players: { ...s.players, [pid]: { ...p, hand: [] } },
+        deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...hand] },
+      };
+      s = movePlayerToLayer(s, pid, layer);
+    }
+    return s;
+  }
 
   if (nid === 'nightmare_hunger_bite') {
     // 该层所有玩家弃 3 张手牌；不足 3 张 → 进入迷失层（保留手牌）

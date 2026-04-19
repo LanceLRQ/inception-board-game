@@ -91,6 +91,15 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
 const moves = (InceptionCityGame as any).phases.playing.moves;
 
 function call(name: string, G: SetupState, ...args: unknown[]) {
+  return callWith(name, G, { D6: () => 1, Die: () => 1, Shuffle: <T>(a: T[]) => a }, ...args);
+}
+
+function callWith(
+  name: string,
+  G: SetupState,
+  random: Record<string, unknown>,
+  ...args: unknown[]
+) {
   return moves[name].move(
     {
       G,
@@ -101,7 +110,7 @@ function call(name: string, G: SetupState, ...args: unknown[]) {
         playOrderPos: 0,
       },
       playerID: G.currentPlayerID,
-      random: {},
+      random,
       events: {},
     },
     ...args,
@@ -198,11 +207,156 @@ describe('masterActivateNightmare · 饥饿撕咬', () => {
 
   it('未实现的梦魇 → 拒绝', () => {
     const s = makeState();
-    s.layers[2]!.nightmareRevealed = true; // space_fall 尚未实现
-    expect(call('masterActivateNightmare', s, 2)).toBe('INVALID_MOVE');
+    s.layers[3]!.nightmareId = 'nightmare_echo' as CardID; // echo 尚未实现
+    s.layers[3]!.nightmareRevealed = true;
+    expect(call('masterActivateNightmare', s, 3)).toBe('INVALID_MOVE');
   });
 
   it('未翻开 → 拒绝', () => {
     expect(call('masterActivateNightmare', makeState(), 1)).toBe('INVALID_MOVE');
+  });
+});
+
+describe('masterActivateNightmare · 绝望风暴', () => {
+  it('从牌库顶弃 10 张（无其他已开金库时）', () => {
+    const s = makeState({
+      deck: {
+        cards: Array.from({ length: 15 }, (_, i) => `c${i}` as CardID),
+        discardPile: [] as CardID[],
+      },
+      layers: {
+        ...makeState().layers,
+        1: { ...makeState().layers[1]!, nightmareId: 'nightmare_despair_storm' as CardID },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = call('masterActivateNightmare', s, 1);
+    expect(r.deck.cards).toHaveLength(5);
+    expect(r.deck.discardPile).toHaveLength(10);
+    expect(r.deck.discardPile[0]).toBe('c0');
+  });
+
+  it('+5 × 其他已开金库（同层金库不计）', () => {
+    const s = makeState({
+      deck: {
+        cards: Array.from({ length: 30 }, (_, i) => `c${i}` as CardID),
+        discardPile: [] as CardID[],
+      },
+      vaults: [
+        { id: 'v1', layer: 2, contentType: 'coin', isOpened: true, openedBy: '0' },
+        { id: 'v2', layer: 3, contentType: 'coin', isOpened: true, openedBy: '0' },
+        { id: 'v3', layer: 1, contentType: 'coin', isOpened: true, openedBy: '0' }, // 同层不计
+        { id: 'v4', layer: 4, contentType: 'secret', isOpened: false, openedBy: null },
+      ],
+      layers: {
+        ...makeState().layers,
+        1: { ...makeState().layers[1]!, nightmareId: 'nightmare_despair_storm' as CardID },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = call('masterActivateNightmare', s, 1);
+    // 10 + 5*2 = 20 张
+    expect(r.deck.discardPile).toHaveLength(20);
+    expect(r.deck.cards).toHaveLength(10);
+  });
+});
+
+describe('masterActivateNightmare · 深空坠落', () => {
+  it('同层盗梦者：骰 5/6/layer → 迷失层；否则移到骰子对应层', () => {
+    const s = makeState({
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_space_fall' as CardID,
+          playersInLayer: ['0', '1'],
+        },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    // 玩家 0 骰 3 → 移到层 3；玩家 1 骰 2 → 移到层 2
+    let cnt = 0;
+    const rolls = [3, 2];
+    const r = callWith(
+      'masterActivateNightmare',
+      s,
+      { D6: () => rolls[cnt++]!, Die: () => 1, Shuffle: <T>(a: T[]) => a },
+      1,
+    );
+    expect(r.players['0']!.currentLayer).toBe(3);
+    expect(r.players['1']!.currentLayer).toBe(2);
+  });
+
+  it('骰 5 → 迷失层', () => {
+    const s = makeState({
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_space_fall' as CardID,
+          playersInLayer: ['0'],
+        },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = callWith(
+      'masterActivateNightmare',
+      s,
+      { D6: () => 5, Die: () => 1, Shuffle: <T>(a: T[]) => a },
+      1,
+    );
+    expect(r.players['0']!.currentLayer).toBe(0);
+  });
+
+  it('骰 = 当前层数（1） → 迷失层', () => {
+    const s = makeState({
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_space_fall' as CardID,
+          playersInLayer: ['0'],
+        },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = callWith(
+      'masterActivateNightmare',
+      s,
+      { D6: () => 1, Die: () => 1, Shuffle: <T>(a: T[]) => a },
+      1,
+    );
+    // roll=1 == layer=1 → lost
+    expect(r.players['0']!.currentLayer).toBe(0);
+  });
+});
+
+describe('masterActivateNightmare · 致命漩涡', () => {
+  it('当层玩家入迷失层（保留手牌）；其他玩家移到当层 + 弃所有手牌', () => {
+    const s = makeState({
+      players: {
+        '0': makePlayer('0', ['a', 'b'], 1), // 当层
+        '1': makePlayer('1', ['x', 'y'], 2), // 其他层
+        '2': makePlayer('2', ['dm1'], 1, 'master'), // 当层
+      } as SetupState['players'],
+      layers: {
+        ...makeState().layers,
+        1: {
+          ...makeState().layers[1]!,
+          nightmareId: 'nightmare_vortex' as CardID,
+          playersInLayer: ['0', '2'],
+        },
+        2: { ...makeState().layers[2]!, playersInLayer: ['1'] },
+      } as SetupState['layers'],
+    });
+    s.layers[1]!.nightmareRevealed = true;
+    const r = call('masterActivateNightmare', s, 1);
+    expect(r.players['0']!.currentLayer).toBe(0);
+    expect(r.players['0']!.hand).toEqual(['a', 'b']); // 保留
+    expect(r.players['2']!.currentLayer).toBe(0);
+    expect(r.players['1']!.currentLayer).toBe(1); // 移到 layer 1
+    expect(r.players['1']!.hand).toEqual([]); // 手牌弃掉
+    expect(r.deck.discardPile).toContain('x');
+    expect(r.deck.discardPile).toContain('y');
   });
 });
