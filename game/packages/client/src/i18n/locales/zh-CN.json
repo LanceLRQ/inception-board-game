@@ -88,6 +88,8 @@
     "pickPlayerTarget": "打出「{{card}}」——请选择目标玩家",
     "pickLayerTarget": "打出「{{card}}」——请选择目标层",
     "lostLayer": "迷失层",
+    "chessTranspose": "棋局·易位：选择 2 个金库交换（全局限 2 次）",
+    "chessConfirm": "确认交换",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
     "loading": "加载中..."

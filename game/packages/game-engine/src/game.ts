@@ -27,7 +27,11 @@ import {
   applyUnlockCancel,
 } from './moves.js';
 import { resolveShoot } from './dice.js';
-import { applyPointmanAssault, applyInterpreterForeshadow } from './engine/skills.js';
+import {
+  applyPointmanAssault,
+  applyInterpreterForeshadow,
+  applyChessTranspose,
+} from './engine/skills.js';
 import type { CardID, Faction } from '@icgame/shared';
 
 export type { SetupState } from './setup.js';
@@ -362,6 +366,21 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // --- 主动技能 ---
+        // 棋局·易位（梦主限定）：交换两个未打开的金库位置，perGame 最多 2 次
+        // 对照：packages/game-engine/src/engine/skills.ts applyChessTranspose
+        useChessTranspose: {
+          move: ({ G, ctx }: MoveCtx, vaultIdx1: number, vaultIdx2: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const next = applyChessTranspose(G, ctx.currentPlayer, vaultIdx1, vaultIdx2);
+            // applyChessTranspose 拒绝时返回原 state（无变化）
+            if (next === G) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
         // 打出凭空造物 - 从牌库顶抽2张牌
         // 对照：docs/manual/04-action-cards.md 凭空造物
         playCreation: {

@@ -172,6 +172,26 @@ export function LocalMatchRuntime({
     needsTarget: 'player' | 'layer' | 'none';
   } | null>(null);
 
+  // 棋局·易位：选中的 2 个金库索引
+  const [chessPick, setChessPick] = useState<number[]>([]);
+  const humanCharacterId = (humanPlayer?.characterId as string) ?? '';
+  const isChessMaster =
+    humanCharacterId === 'dm_chess' && currentPlayerID === '0' && turnPhase === 'action';
+
+  const toggleChessPick = useCallback((idx: number) => {
+    setChessPick((prev) => {
+      if (prev.includes(idx)) return prev.filter((i) => i !== idx);
+      if (prev.length >= 2) return [prev[1]!, idx]; // 保留最后 2 个
+      return [...prev, idx];
+    });
+  }, []);
+
+  const confirmChessTranspose = useCallback(async () => {
+    if (chessPick.length !== 2) return;
+    await makeMove('useChessTranspose', [chessPick[0], chessPick[1]]);
+    setChessPick([]);
+  }, [chessPick, makeMove]);
+
   // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
   const effectivePending =
     pendingPlay && turnPhase === 'action' && isHumanTurn && humanHand.includes(pendingPlay.card)
@@ -490,6 +510,53 @@ export function LocalMatchRuntime({
               })}
             </button>
           )}
+        </div>
+      )}
+
+      {/* 棋局·易位：梦主专属主动技能 */}
+      {isChessMaster && !effectivePending && vaultsRaw && (
+        <div
+          className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs"
+          data-testid="chess-transpose-panel"
+        >
+          <div className="mb-2 font-medium text-amber-400">
+            {t('localMatch.chessTranspose', { defaultValue: '棋局·易位：选择 2 个金库交换' })}
+          </div>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {vaultsRaw.map((v, idx) => {
+              const opened = v.isOpened as boolean;
+              const layer = v.layer as number;
+              const picked = chessPick.includes(idx);
+              return (
+                <button
+                  key={`${v.id as string}`}
+                  type="button"
+                  disabled={opened}
+                  onClick={() => toggleChessPick(idx)}
+                  className={cn(
+                    'rounded-full border px-2 py-0.5 text-[11px]',
+                    opened
+                      ? 'border-muted bg-muted text-muted-foreground opacity-50'
+                      : picked
+                        ? 'border-amber-400 bg-amber-500/30 text-amber-400'
+                        : 'border-border bg-card hover:border-amber-400/60',
+                  )}
+                  data-testid={`vault-${idx}`}
+                >
+                  {opened ? '已开' : `金库 L${layer}`}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            disabled={chessPick.length !== 2}
+            onClick={() => void confirmChessTranspose()}
+            className="rounded-full bg-amber-500 px-3 py-1 text-[11px] text-black disabled:opacity-50"
+            data-testid="chess-confirm"
+          >
+            {t('localMatch.chessConfirm', { defaultValue: '确认交换' })}
+          </button>
         </div>
       )}
 
