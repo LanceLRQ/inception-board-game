@@ -87,6 +87,7 @@
     "confirmPlay": "确认打出「{{card}}」",
     "pickPlayerTarget": "打出「{{card}}」——请选择目标玩家",
     "pickLayerTarget": "打出「{{card}}」——请选择目标层",
+    "lostLayer": "迷失层",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
     "loading": "加载中..."

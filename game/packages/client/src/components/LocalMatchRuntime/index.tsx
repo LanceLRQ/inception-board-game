@@ -9,6 +9,7 @@ import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName } from '../../lib/cards';
+import { LayerMap } from '../LayerMap';
 
 export type BGIOState = {
   G: Record<string, unknown>;
@@ -103,6 +104,37 @@ export function LocalMatchRuntime({
   const isHumanTurn = currentPlayerID === '0';
   const players = G?.players as Record<string, Record<string, unknown>> | undefined;
   const humanPlayer = players?.['0'];
+  const layersRaw = G?.layers as Record<number, Record<string, unknown>> | undefined;
+  const vaultsRaw = G?.vaults as Array<Record<string, unknown>> | undefined;
+  const dreamMasterID = (G?.dreamMasterID as string) ?? '';
+
+  // 衍生 LayerMap 所需视图
+  const layerViews = layersRaw
+    ? Object.values(layersRaw).map((l) => ({
+        layer: l.layer as number,
+        heartLockValue: (l.heartLockValue as number) ?? 0,
+        vaultCount:
+          vaultsRaw?.filter(
+            (v) => (v.layer as number) === (l.layer as number) && !(v.isOpened as boolean),
+          ).length ?? 0,
+        nightmareRevealed: !!(l.nightmareRevealed as boolean),
+        playerIds: (l.playersInLayer as string[]) ?? [],
+      }))
+    : [];
+  const playerViews = players
+    ? Object.fromEntries(
+        Object.entries(players).map(([id, p]) => [
+          id,
+          {
+            id,
+            nickname: (p.nickname as string) ?? id,
+            faction: (p.faction as string) ?? 'thief',
+            currentLayer: (p.currentLayer as number) ?? 1,
+            isAlive: !!p.isAlive,
+          },
+        ]),
+      )
+    : {};
 
   // 人类弃牌交互：超过手牌上限（5）时必须选择要弃的牌
   const HAND_LIMIT = 5;
@@ -226,6 +258,16 @@ export function LocalMatchRuntime({
             {t('localMatch.restart')}
           </button>
         </div>
+      )}
+
+      {layerViews.length > 0 && (
+        <LayerMap
+          layers={layerViews}
+          players={playerViews}
+          humanPlayerId="0"
+          dreamMasterId={dreamMasterID}
+          currentPlayerId={currentPlayerID}
+        />
       )}
 
       {humanPlayer && (
