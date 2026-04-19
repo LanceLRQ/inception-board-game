@@ -10,7 +10,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean",
-    "prepare": "cd .. && husky game/.husky"
+    "prepare": "cd .. && husky game/.husky",
+    "copyright:check": "tsx scripts/copyright-check.ts"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

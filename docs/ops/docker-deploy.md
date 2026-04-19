@@ -181,7 +181,7 @@ docker compose -f docker/docker-compose.yml down -v
 | **密钥管理** | `JWT_SECRET` / `POSTGRES_PASSWORD` 使用 Docker Secret，不要直接写 `.env` |
 | **数据备份** | `docker compose exec postgres pg_dump -U icgame icgame > backup.sql` 定期备份 |
 | **日志收集** | 把 `docker compose logs` 接入 Loki / CloudWatch / 云监控 |
-| **监控告警** | 后续 Grafana 面板（Phase 6 规划）；当前可用 `/health` + `/ready` 简单探活 |
+| **监控告警** | 后续版本将落地 Grafana 面板；当前可用 `/health` + `/ready` 简单探活 |
 | **CORS 收敛** | `WS_CORS_ORIGIN` 禁用 `*`，改为具体前端域名 |
 | **资源限制** | 在 `docker-compose.yml` 里加 `deploy.resources.limits` 防止单服务吞内存 |
 | **Postgres 参数** | 对 4 GB+ 机器建议调 `shared_buffers` / `work_mem`，默认值足够 MVP |
@@ -201,4 +201,4 @@ docker compose -f docker/docker-compose.yml down -v
 
 ---
 
-> 更多运维细节参考 `docs/ops/`（Phase 6 会持续补全 Runbook / 告警 SOP / 备份策略）。
+> 更多运维细节参考 `docs/ops/`（后续版本将持续补全 Runbook / 告警 SOP / 备份策略）。
