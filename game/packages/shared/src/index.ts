@@ -78,3 +78,15 @@ export {
   generateRandomAvatarSeed,
 } from './avatar/pixelAvatar.js';
 export type { PixelAvatar } from './avatar/pixelAvatar.js';
+
+// Base58 短链
+export {
+  BASE58_ALPHABET,
+  DEFAULT_SHORTLINK_LENGTH,
+  encodeBase58,
+  isValidBase58Code,
+  generateShortCode,
+  generateUniqueShortCode,
+  defaultRandomBytes,
+} from './shortlink/base58.js';
+export type { RandomBytesFn } from './shortlink/base58.js';
