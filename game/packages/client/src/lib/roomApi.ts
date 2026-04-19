@@ -6,6 +6,7 @@
 // 对照：plans/design/07-backend-network.md §7.3.2.3
 
 import { api, ApiRequestError } from './api';
+import { logger } from './logger';
 
 export interface RoomPlayer {
   playerId: string;
@@ -97,6 +98,7 @@ const mockRoomApi = {
     };
     rooms[code] = room;
     saveMockRooms(rooms);
+    logger.flow('room', 'mock createRoom', { code, owner: owner.playerId });
     return {
       id,
       code,
@@ -146,6 +148,7 @@ const mockRoomApi = {
     }
     rooms[room.code] = room;
     saveMockRooms(rooms);
+    logger.flow('room', 'mock fillAI', { code, filled: slots });
     return room;
   },
 
@@ -156,6 +159,7 @@ const mockRoomApi = {
     if (room.players.length < 3) throw new ApiRequestError(409, 'CONFLICT', '至少需要 3 名玩家');
     room.status = 'playing';
     saveMockRooms(rooms);
+    logger.flow('room', 'mock startGame', { code, players: room.players.length });
     return { matchId: room.id };
   },
 
@@ -213,10 +217,11 @@ async function withFallback<T>(real: () => Promise<T>, mock: () => Promise<T>): 
   } catch (err) {
     if (isNetworkOrServerDown(err)) {
       // 后端不可达 → 一次性切到 mock 模式（后续调用全走 localStorage）
-      console.warn('[roomApi] Backend unavailable, fallback to LocalStorage mock');
+      logger.warn('room', 'backend unavailable, fallback to mock');
       fallbackToMock = true;
       return mock();
     }
+    logger.error('room', 'api error', err);
     throw err;
   }
 }

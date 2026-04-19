@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, Plus } from 'lucide-react';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi } from '../../lib/roomApi';
+import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 
@@ -51,9 +52,11 @@ export default function Lobby() {
         { playerId, nickname, avatarSeed: String(avatarSeed) },
         { maxPlayers },
       );
+      logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers });
       navigate(`/room/${res.code}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
+      logger.error('lobby', 'createRoom failed', e);
       setError(t('lobby.errorGeneric', { message: msg }));
     } finally {
       setLoading(false);
@@ -71,9 +74,11 @@ export default function Lobby() {
     setError(null);
     try {
       await roomApi.joinRoom(code, { playerId, nickname, avatarSeed: String(avatarSeed) });
+      logger.flow('lobby', 'joinRoom ok', { code });
       navigate(`/room/${code}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
+      logger.warn('lobby', 'joinRoom failed', e);
       setError(t('lobby.errorGeneric', { message: msg }));
     } finally {
       setLoading(false);

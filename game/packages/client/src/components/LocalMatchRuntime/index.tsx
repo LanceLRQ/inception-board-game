@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowRight, RotateCcw, Skull, Trophy } from 'lucide-react';
 import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
+import { logger } from '../../lib/logger';
 
 export type BGIOState = {
   G: Record<string, unknown>;
@@ -56,10 +57,14 @@ export function LocalMatchRuntime({
     const api = Comlink.wrap<LocalMatchWorker>(worker);
     apiRef.current = api;
 
+    logger.flow('game', 'runtime mount', { playerCount, matchId });
     void api
       .createLocalMatch(playerCount, matchId)
       .then(() => refreshState())
-      .catch((e) => setError((e as Error).message));
+      .catch((e) => {
+        logger.error('game', 'createLocalMatch failed', e);
+        setError((e as Error).message);
+      });
 
     pollRef.current = setInterval(() => void refreshState(), 500);
 
@@ -86,6 +91,11 @@ export function LocalMatchRuntime({
   const G = gameState?.G as Record<string, unknown> | undefined;
   const ctx = gameState?.ctx as Record<string, unknown> | undefined;
   const winner = G?.winner as string | null;
+
+  // 胜负一旦产生，打一次 INFO
+  useEffect(() => {
+    if (winner) logger.flow('game', 'match ended', { winner });
+  }, [winner]);
   const turnNumber = (G?.turnNumber as number) ?? 0;
   const turnPhase = (G?.turnPhase as string) ?? '';
   const currentPlayerID = (ctx?.currentPlayer as string) ?? '';

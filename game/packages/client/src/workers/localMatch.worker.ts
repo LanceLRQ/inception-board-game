@@ -98,6 +98,17 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
   }
 }
 
+// Worker 内不共享 client 的 logger；改用受控 console.debug 模仿 DEBUG 等级
+// 约定：AI 打点走 console.debug（dev 工具默认显示）
+function logAI(msg: string, ctx?: unknown): void {
+  if (ctx !== undefined) console.debug(`[ai/worker] ${msg}`, ctx);
+  else console.debug(`[ai/worker] ${msg}`);
+}
+function logFlow(msg: string, ctx?: unknown): void {
+  if (ctx !== undefined) console.info(`[game/worker] ${msg}`, ctx);
+  else console.info(`[game/worker] ${msg}`);
+}
+
 /** Bot 自动循环：当轮到 Bot 时自动执行 move */
 function autoPlayBots(): void {
   if (!autoPlayEnabled || autoPlayScheduled) return;
@@ -109,13 +120,17 @@ function autoPlayBots(): void {
     if (!state) return;
 
     // 游戏结束
-    if (state.ctx.gameover) return;
+    if (state.ctx.gameover) {
+      logFlow('gameover', state.ctx.gameover);
+      return;
+    }
 
     const ctxPhase = state.ctx.phase as string | undefined;
     const currentPlayer = state.ctx.currentPlayer as string;
 
     // setup 阶段：让玩家 0 调用 completeSetup（一次性）
     if (ctxPhase === 'setup') {
+      logFlow('setup complete → playing');
       const moves = getMoves(humanClient);
       moves['completeSetup']?.();
       scheduleNext();
@@ -134,7 +149,10 @@ function autoPlayBots(): void {
     const legal = legalMovesFor(ctxPhase, turnPhase);
     const chosen = pickBotMove(legal);
 
-    if (!chosen) return;
+    if (!chosen) {
+      logAI(`bot ${currentPlayer} has no legal move`, { turnPhase, legal });
+      return;
+    }
 
     const moves = getMoves(client);
     const moveFn = moves[chosen];
@@ -142,9 +160,10 @@ function autoPlayBots(): void {
 
     try {
       const args = defaultArgsFor(chosen, state, currentPlayer);
+      logAI(`bot ${currentPlayer} plays ${chosen}`, { turnPhase, args });
       moveFn(...args);
-    } catch {
-      // 忽略单次执行失败
+    } catch (err) {
+      console.warn(`[ai/worker] bot ${currentPlayer} move ${chosen} failed`, err);
     }
 
     scheduleNext();
@@ -161,6 +180,7 @@ const workerApi: LocalMatchWorker = {
     clients = [];
 
     const effectiveMatchID = matchID ?? `local-${Date.now()}`;
+    logFlow('createLocalMatch', { playerCount, matchID: effectiveMatchID });
     const multi = Local();
 
     for (let i = 0; i < playerCount; i++) {
@@ -190,7 +210,10 @@ const workerApi: LocalMatchWorker = {
     if (!humanClient) return;
     const moves = getMoves(humanClient);
     const fn = moves[move];
-    if (fn) fn(...args);
+    if (fn) {
+      logFlow(`human plays ${move}`, { args });
+      fn(...args);
+    }
     scheduleNext();
   },
 

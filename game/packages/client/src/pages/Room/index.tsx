@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Bot, Copy, LogOut, Play, Users } from 'lucide-react';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi, type RoomState } from '../../lib/roomApi';
+import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 
@@ -67,6 +68,7 @@ export default function Room() {
     setBusy(true);
     try {
       const next = await roomApi.fillAI(code);
+      logger.flow('room', 'fillAI ok', { code, players: next.players.length });
       setRoom(next);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
@@ -81,6 +83,10 @@ export default function Room() {
     setBusy(true);
     try {
       const res = await roomApi.startGame(code);
+      logger.flow('room', 'startGame ok', {
+        matchId: res.matchId,
+        players: room.players.length,
+      });
       const params = new URLSearchParams({
         friend: '1',
         players: String(room.players.length),
@@ -89,6 +95,7 @@ export default function Room() {
       navigate(`/game/${res.matchId}?${params.toString()}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
+      logger.error('room', 'startGame failed', e);
       setError(msg);
       setBusy(false);
     }

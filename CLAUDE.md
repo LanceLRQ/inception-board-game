@@ -73,6 +73,70 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **服务端优先**：所有涉及隐藏信息的判定一律服务端执行，客户端只做展示
 - **UI 图标规范**：UI 层**禁止**使用 emoji 字符作为图标，所有图标必须使用 `lucide-react` 组件；注释/文档/测试中的 emoji 标记（如 `🤖` 徽章）不受此限制
 
+## 日志规范
+
+**所有日志必须走统一 logger，禁止散落 `console.*`（降级 / 第三方透传除外）：**
+
+- **客户端**：`packages/client/src/lib/logger.ts`
+- **服务端**：`packages/server/src/infra/logger.ts`（pino）
+
+### 等级约定
+
+| 等级 | 何时用 | dev 模式 | prod 模式 |
+|------|-------|---------|----------|
+| **ERROR** | 异常 / 请求失败 / 不可恢复错误 | 显示 | 显示（必须） |
+| **WARN** | 降级 / 业务拒绝 / 非致命异常 | 显示 | 显示 |
+| **INFO（= logger.flow）** | **游戏流程关键点位**（对局创建、回合切换、玩家 move、胜负、房间创建/加入/Start） | **详尽**输出 | 静默 |
+| **DEBUG（= logger.ai）** | **AI 决策 / Bot move 选择** / 状态刷新 / 内部调度 | 输出 | 静默 |
+| **TRACE** | 帧级调试 | 需手动开启 | 不输出 |
+
+### Channel 命名
+
+约定形式：`<domain>/<subsystem>`，例：
+- `game/worker`（对局 worker 流程）
+- `game/move`（玩家 move）
+- `ai/worker`（Worker 内 Bot 决策，走 DEBUG）
+- `lobby`、`room`、`identity`
+- `net/ws`（WebSocket 网关）
+
+### 客户端用法
+
+```ts
+import { logger } from '@/lib/logger';
+
+logger.flow('game/turn', 'turn begin', { turn: 3, currentPlayer: '0' });
+logger.ai('ai/worker', 'bot 2 plays endActionPhase', { legalMoves });
+logger.warn('room', 'backend unavailable, fallback to mock');
+logger.error('room', 'createRoom failed', err);
+```
+
+**控制输出等级**：
+- dev 模式默认 DEBUG（INFO + DEBUG 全显示）
+- prod 模式默认 WARN（仅 WARN + ERROR）
+- 运行时覆盖：`localStorage.setItem('icgame-log-level', 'trace')`
+
+### 服务端用法
+
+pino 结构化日志 + pino-pretty（dev）。
+
+```ts
+import { logger } from './infra/logger.js';
+
+logger.info({ matchId, playerId }, 'move accepted');
+logger.debug({ botId, move }, 'bot decided');  // AI 走 debug
+logger.warn({ err }, 'rate limit exceeded');
+logger.error({ err, matchId }, 'state corruption');
+```
+
+### 强制打点清单
+
+任何涉及以下事件的代码**必须**有 INFO/FLOW 级别日志：
+
+- 身份：init / recover / logout
+- 房间：createRoom / joinRoom / leaveRoom / fillAI / startGame
+- 对局：runtime 挂载 / 对局开始 / 回合开始 / 玩家 move / 胜负产生
+- AI 决策（DEBUG）：Bot 选中 move / 参数构造失败
+
 ## 目录结构
 
 ```

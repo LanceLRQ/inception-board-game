@@ -5,6 +5,7 @@
 // 用途：保证 VITE_USE_MOCK_API=1 或后端不可达时，pnpm dev 也能走完好友房流程
 
 import { api, ApiRequestError } from './api';
+import { logger } from './logger';
 
 export interface InitResponse {
   playerId: string;
@@ -65,6 +66,7 @@ async function mockInit(nickname: string): Promise<InitResponse> {
     locale: 'zh-CN',
   };
   saveMockIdentity(me);
+  logger.flow('identity', 'mock init', { playerId, nickname });
   return {
     playerId,
     nickname,
@@ -85,13 +87,16 @@ export const identityApi = {
   async init(nickname: string): Promise<InitResponse> {
     if (fallbackToMock) return mockInit(nickname);
     try {
-      return await api.post<InitResponse>('/identity/init', { nickname });
+      const res = await api.post<InitResponse>('/identity/init', { nickname });
+      logger.flow('identity', 'real init ok', { playerId: res.playerId });
+      return res;
     } catch (err) {
       if (isNetworkDown(err)) {
-        console.warn('[identityApi] Backend unavailable, fallback to LocalStorage mock');
+        logger.warn('identity', 'backend unavailable, fallback to mock');
         fallbackToMock = true;
         return mockInit(nickname);
       }
+      logger.error('identity', 'init failed', err);
       throw err;
     }
   },
