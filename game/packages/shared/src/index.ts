@@ -56,3 +56,13 @@ export {
   getCardsByCategory,
 } from './cards/abilityRegistry.js';
 export type { ValidationError } from './cards/abilityRegistry.js';
+
+// 聊天预设短语
+export {
+  CHAT_PRESETS,
+  findChatPreset,
+  isValidChatPresetId,
+  isPresetAvailableForFaction,
+  getChatPresetsByCategory,
+} from './chat/presets.js';
+export type { ChatPresetPhrase, ChatPresetCategory, ChatPresetFaction } from './chat/presets.js';

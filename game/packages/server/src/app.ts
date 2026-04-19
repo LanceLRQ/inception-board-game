@@ -10,6 +10,7 @@ import { playersRouter } from './api/players.js';
 import { matchesRouter } from './api/matches.js';
 import { replaysRouter } from './api/replays.js';
 import { reportsRouter } from './api/reports.js';
+import { chatRouter } from './api/chat.js';
 import { shortLinkRouter } from './api/shortLink.js';
 
 export function createApp(): Koa {
@@ -46,6 +47,9 @@ export function createApp(): Koa {
 
   app.use(replaysRouter.routes());
   app.use(replaysRouter.allowedMethods());
+
+  app.use(chatRouter.routes());
+  app.use(chatRouter.allowedMethods());
 
   // 健康检查
   app.use(healthRouter.routes());

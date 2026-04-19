@@ -10,17 +10,20 @@ import type { ClientMessage, ServerMessage } from './types.js';
 import type { HeartbeatManager } from './heartbeat.js';
 import type { ReconnectManager } from './reconnect.js';
 import type { BotManager } from '../services/BotManager.js';
+import type { ChatService } from '../services/ChatService.js';
 import { logger } from '../infra/logger.js';
 
 export interface MessageContext {
   readonly matchID: string;
   readonly playerID: string;
+  readonly faction?: string;
 }
 
 export interface MessageRouterDeps {
   readonly heartbeat: HeartbeatManager;
   readonly reconnect: ReconnectManager;
   readonly bot: BotManager;
+  readonly chat?: ChatService;
 }
 
 export interface RouteResult {
@@ -45,8 +48,7 @@ export class WSMessageRouter {
         return this.handleAckIntent(ctx, msg.intentID);
 
       case 'icg:chatBroadcast':
-        // 预设短语广播留 W8.5-9 实装，此处仅占位
-        return {};
+        return this.handleChatBroadcast(ctx, msg.message);
 
       case 'icg:spectateStart':
         return {
@@ -106,6 +108,40 @@ export class WSMessageRouter {
 
   private async handleAckIntent(ctx: MessageContext, intentID: string): Promise<RouteResult> {
     await this.deps.reconnect.markIntentProcessed(ctx.matchID, ctx.playerID, intentID);
+    return {};
+  }
+
+  private handleChatBroadcast(ctx: MessageContext, message: string): RouteResult {
+    if (!this.deps.chat) {
+      return {
+        reply: {
+          type: 'icg:error',
+          code: 'CHAT_UNAVAILABLE',
+          message: 'Chat service not configured',
+        },
+      };
+    }
+    const result = this.deps.chat.send({
+      matchID: ctx.matchID,
+      senderID: ctx.playerID,
+      senderFaction: ctx.faction ?? 'all',
+      presetId: message,
+    });
+    if (!result.ok) {
+      return {
+        reply: {
+          type: 'icg:error',
+          code: result.code,
+          message:
+            result.code === 'COOLDOWN'
+              ? `Cooldown: retry in ${result.retryAfterMs}ms`
+              : result.code === 'UNKNOWN_PRESET'
+                ? 'Unknown chat preset'
+                : 'Preset not available for your faction',
+        },
+      };
+    }
+    // 广播已由 ChatService 内部通过 broadcaster 回调完成
     return {};
   }
 }

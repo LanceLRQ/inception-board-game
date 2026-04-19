@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WSMessageRouter } from './messageRouter.js';
 import { BotManager } from '../services/BotManager.js';
+import { ChatService } from '../services/ChatService.js';
 
 describe('WSMessageRouter', () => {
   let heartbeat: { recordHeartbeat: ReturnType<typeof vi.fn> };
@@ -97,14 +98,52 @@ describe('WSMessageRouter', () => {
     });
   });
 
-  describe('icg:chatBroadcast (placeholder)', () => {
-    it('returns empty in MVP', async () => {
+  describe('icg:chatBroadcast', () => {
+    it('returns empty (broadcast handled by ChatService) for valid preset', async () => {
+      const broadcaster = vi.fn();
+      const chat = new ChatService(broadcaster as never, { cooldownMs: 3_000 });
+      const withChatRouter = new WSMessageRouter({
+        heartbeat: heartbeat as never,
+        reconnect: reconnect as never,
+        bot,
+        chat,
+      });
+      const res = await withChatRouter.route(
+        { ...ctx, faction: 'thief' },
+        { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' },
+      );
+      expect(res).toEqual({});
+      expect(broadcaster).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns icg:error with UNKNOWN_PRESET for invalid preset', async () => {
+      const chat = new ChatService(vi.fn() as never, { cooldownMs: 3_000 });
+      const withChatRouter = new WSMessageRouter({
+        heartbeat: heartbeat as never,
+        reconnect: reconnect as never,
+        bot,
+        chat,
+      });
+      const res = await withChatRouter.route(
+        { ...ctx, faction: 'thief' },
+        { type: 'icg:chatBroadcast', scope: 'match', message: 'not_exists' },
+      );
+      expect(res.reply?.type).toBe('icg:error');
+      if (res.reply?.type === 'icg:error') {
+        expect(res.reply.code).toBe('UNKNOWN_PRESET');
+      }
+    });
+
+    it('returns CHAT_UNAVAILABLE when chat service not configured', async () => {
       const res = await router.route(ctx, {
         type: 'icg:chatBroadcast',
         scope: 'match',
-        message: 'hi',
+        message: 'greet_hi',
       });
-      expect(res).toEqual({});
+      expect(res.reply?.type).toBe('icg:error');
+      if (res.reply?.type === 'icg:error') {
+        expect(res.reply.code).toBe('CHAT_UNAVAILABLE');
+      }
     });
   });
 });
