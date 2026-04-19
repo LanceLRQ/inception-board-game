@@ -98,6 +98,8 @@
     "gravityPickTargets": "万有引力：选 1-2 名玩家（不含自己）",
     "gravityConfirm": "确认打出",
     "gravityPoolPick": "万有引力：当前挑选",
+    "decreeLabel": "附加死亡宣言：",
+    "decreeClear": "取消宣言",
     "winReason": {
       "secret_vault_opened": "盗梦者打开了秘密金库",
       "all_thieves_dead": "所有盗梦者阵亡",

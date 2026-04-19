@@ -184,6 +184,13 @@ export function LocalMatchRuntime({
   // SHOOT·梦境穿梭剂：选 mode 的中间态
   const [dreamTransitPicker, setDreamTransitPicker] = useState<string | null>(null);
 
+  // 死亡宣言可选展示（SHOOT 目标选择前切换）
+  const [decreePick, setDecreePick] = useState<string | null>(null);
+  const toggleDecree = useCallback(
+    (cardId: string) => setDecreePick((prev) => (prev === cardId ? null : cardId)),
+    [setDecreePick],
+  );
+
   // 万有引力：1-2 目标的选择中间态
   const [gravityPicker, setGravityPicker] = useState<{
     card: string;
@@ -303,17 +310,26 @@ export function LocalMatchRuntime({
       if (!effectivePending || effectivePending.needsTarget !== 'player') return;
       let args: unknown[];
       if (effectivePending.dreamMode) {
-        // playShootDreamTransit(cardId, mode, target)
+        // playShootDreamTransit(cardId, mode, target, decree?)
         args = [effectivePending.card, effectivePending.dreamMode, targetPlayerID];
+        if (decreePick && effectivePending.dreamMode === 'shoot') args = [...args, decreePick];
       } else if (effectivePending.argOrder === 'card_first') {
         args = [effectivePending.card, targetPlayerID];
       } else {
+        // SHOOT 系列：末位可附 decree
         args = [targetPlayerID, effectivePending.card];
+        const isShootMove =
+          effectivePending.move === 'playShoot' ||
+          effectivePending.move === 'playShootKing' ||
+          effectivePending.move === 'playShootArmor' ||
+          effectivePending.move === 'playShootBurst';
+        if (decreePick && isShootMove) args = [...args, decreePick];
       }
       await makeMove(effectivePending.move, args);
       setPendingPlay(null);
+      setDecreePick(null);
     },
-    [effectivePending, makeMove],
+    [effectivePending, makeMove, decreePick, setDecreePick],
   );
 
   const confirmPlayTargetLayer = useCallback(
@@ -576,6 +592,55 @@ export function LocalMatchRuntime({
                   card: getCardName(effectivePending.card),
                 })}
               </div>
+
+              {/* 死亡宣言可选展示（仅 SHOOT 系列）*/}
+              {(() => {
+                const isShoot =
+                  effectivePending.move === 'playShoot' ||
+                  effectivePending.move === 'playShootKing' ||
+                  effectivePending.move === 'playShootArmor' ||
+                  effectivePending.move === 'playShootBurst' ||
+                  (effectivePending.dreamMode === 'shoot' &&
+                    effectivePending.move === 'playShootDreamTransit');
+                const decrees = humanHand.filter((c) => c.startsWith('action_death_decree_'));
+                if (!isShoot || decrees.length === 0) return null;
+                return (
+                  <div
+                    className="mb-2 flex flex-wrap items-center gap-2 text-[11px]"
+                    data-testid="decree-picker"
+                  >
+                    <span className="text-muted-foreground">
+                      {t('localMatch.decreeLabel', { defaultValue: '附加死亡宣言：' })}
+                    </span>
+                    {decrees.map((c) => (
+                      <button
+                        key={`decree-${c}`}
+                        type="button"
+                        onClick={() => toggleDecree(c)}
+                        className={cn(
+                          'rounded-full border px-2 py-0.5',
+                          decreePick === c
+                            ? 'border-amber-400 bg-amber-500/30 text-amber-400'
+                            : 'border-border bg-card hover:border-amber-400/60',
+                        )}
+                        data-testid={`decree-${c}`}
+                      >
+                        {getCardName(c)}
+                      </button>
+                    ))}
+                    {decreePick && (
+                      <button
+                        type="button"
+                        onClick={() => setDecreePick(null)}
+                        className="rounded-full border border-muted px-2 py-0.5 text-muted-foreground"
+                      >
+                        {t('localMatch.decreeClear', { defaultValue: '取消宣言' })}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="flex flex-wrap gap-2">
                 {Object.entries(players ?? {})
                   .filter(([id, p]) => id !== '0' && (p.isAlive as boolean))
@@ -592,7 +657,10 @@ export function LocalMatchRuntime({
                   ))}
                 <button
                   type="button"
-                  onClick={cancelPlay}
+                  onClick={() => {
+                    cancelPlay();
+                    setDecreePick(null);
+                  }}
                   className="rounded-full border border-muted px-3 py-1 text-xs text-muted-foreground"
                 >
                   {t('common.cancel')}
