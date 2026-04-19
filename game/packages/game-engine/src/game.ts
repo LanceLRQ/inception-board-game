@@ -279,6 +279,77 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // SHOOT·梦境穿梭剂：同时视为 SHOOT 和 梦境穿梭剂；使用者选择结算方式
+        // 对照：docs/manual/04-action-cards.md SHOOT·梦境穿梭剂
+        // mode='shoot'  → 同 playShoot（base 骰面 [1] 死 [2-4] 移）
+        // mode='transit' → 自己移动到相邻层（同 playDreamTransit）
+        playShootDreamTransit: {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            cardId: CardID,
+            mode: 'shoot' | 'transit',
+            targetOrLayer: string | number,
+          ) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (cardId !== 'action_shoot_dream_transit') return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            if (!self || !self.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+
+            if (mode === 'shoot') {
+              // 目标为玩家 ID
+              if (typeof targetOrLayer !== 'string') return INVALID_MOVE;
+              const target = G.players[targetOrLayer];
+              if (!target || !target.isAlive) return INVALID_MOVE;
+              if (targetOrLayer === ctx.currentPlayer) return INVALID_MOVE;
+              // 原版 SHOOT 要求同层
+              if (self.currentLayer !== target.currentLayer) return INVALID_MOVE;
+
+              const roll = random.D6();
+              const result = resolveShoot(roll);
+              let s = discardCard(G, ctx.currentPlayer, cardId);
+              if (result === 'kill') {
+                const tp = s.players[targetOrLayer]!;
+                const handover = tp.hand.slice(0, 2);
+                s = {
+                  ...s,
+                  players: {
+                    ...s.players,
+                    [targetOrLayer]: {
+                      ...tp,
+                      isAlive: false,
+                      deathTurn: s.turnNumber,
+                      hand: tp.hand.slice(2),
+                    },
+                    [ctx.currentPlayer]: {
+                      ...s.players[ctx.currentPlayer]!,
+                      hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
+                      shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
+                    },
+                  },
+                };
+                s = movePlayerToLayer(s, targetOrLayer, 0);
+              } else if (result === 'move') {
+                const cur = target.currentLayer;
+                const dir = cur >= 4 ? -1 : 1;
+                const nl = Math.max(1, Math.min(4, cur + dir));
+                s = movePlayerToLayer(s, targetOrLayer, nl);
+              }
+              return incrementMoveCounter(s);
+            } else if (mode === 'transit') {
+              // 自己移动到相邻层
+              if (typeof targetOrLayer !== 'number') return INVALID_MOVE;
+              if (!isAdjacent(self.currentLayer, targetOrLayer)) return INVALID_MOVE;
+              let s = discardCard(G, ctx.currentPlayer, cardId);
+              s = movePlayerToLayer(s, ctx.currentPlayer, targetOrLayer);
+              return incrementMoveCounter(s);
+            }
+            return INVALID_MOVE;
+          },
+          client: false,
+        },
+
         // SHOOT·刺客之王：目标任意层；[1/2] 死亡 [3/4/5] 移动相邻层
         // 对照：docs/manual/04-action-cards.md SHOOT·刺客之王
         playShootKing: {

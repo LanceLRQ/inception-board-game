@@ -42,6 +42,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playShootKing',
     'playShootArmor',
     'playShootBurst',
+    'playShootDreamTransit',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -71,6 +72,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   playShootKing: 104,
   playShootArmor: 105,
   playShootBurst: 106,
+  playShootDreamTransit: 107,
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,
