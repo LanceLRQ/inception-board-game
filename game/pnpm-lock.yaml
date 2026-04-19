@@ -156,6 +156,9 @@ importers:
       '@icgame/shared':
         specifier: workspace:*
         version: link:../shared
+      boardgame.io:
+        specifier: ^0.50.2
+        version: 0.50.2
 
   packages/server:
     dependencies:

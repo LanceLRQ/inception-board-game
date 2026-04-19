@@ -1,7 +1,7 @@
 // Schema 版本化与迁移框架
 // 确保旧版 GameState 可以平滑升级到新版
 
-import type { GameState } from './index.js';
+import type { SetupState } from './setup.js';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -21,7 +21,7 @@ const MIGRATIONS: Map<number, Migration> = new Map([
 ]);
 
 // 将任意 GameState 迁移到当前版本
-export function migrateGameState(raw: Record<string, unknown>): GameState {
+export function migrateGameState(raw: Record<string, unknown>): SetupState {
   let state = { ...raw };
   let version = (state.schemaVersion as number) ?? 0;
 
@@ -40,7 +40,7 @@ export function migrateGameState(raw: Record<string, unknown>): GameState {
   }
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
 
-  return state as unknown as GameState;
+  return state as unknown as import('./setup.js').SetupState;
 }
 
 // 获取当前 schema 版本
