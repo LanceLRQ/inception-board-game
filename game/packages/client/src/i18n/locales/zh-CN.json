@@ -20,12 +20,33 @@
     "createRoom": "创建房间",
     "joinRoom": "加入房间",
     "roomCode": "房间码",
-    "players": "玩家"
+    "players": "玩家",
+    "nicknameLabel": "先给自己起个名字",
+    "nicknamePlaceholder": "3-12 个字符",
+    "continue": "继续",
+    "maxPlayers": "最多玩家数",
+    "codeHint": "请输入 6 位房间码",
+    "codeInvalid": "房间码格式不对",
+    "errorGeneric": "出错啦：{{message}}",
+    "loading": "正在联系服务器..."
   },
   "room": {
+    "title": "房间 {{code}}",
     "waiting": "等待玩家加入...",
     "start": "开始游戏",
-    "share": "分享房间码"
+    "share": "分享房间码",
+    "copy": "复制房间码",
+    "copied": "已复制",
+    "fillAi": "补 AI 到开局",
+    "leave": "离开房间",
+    "owner": "房主",
+    "you": "你",
+    "bot": "AI",
+    "seat": "座位 {{n}}",
+    "empty": "空座位",
+    "needPlayers": "至少需要 {{n}} 名玩家才能开始",
+    "currentPlayers": "{{current}} / {{max}}",
+    "notOwner": "等待房主开始游戏"
   },
   "game": {
     "yourTurn": "你的回合",
