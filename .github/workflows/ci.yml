@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: game/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo lint typecheck
+
+  unit-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: game/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo test -- --coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: game/coverage/
+          retention-days: 7
+
+  e2e-desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game/packages/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: game/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: game
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: game
+      - run: pnpm test --project=desktop-chrome
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-desktop-traces
+          path: game/packages/e2e/test-results/
+          retention-days: 3
+
+  e2e-mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game/packages/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: game/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: game
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: game
+      - run: pnpm test --project=mobile-ios --project=mobile-android
+
+  security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: game/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level moderate || true

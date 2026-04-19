@@ -32,6 +32,8 @@ model Player {
   matchPlayers       MatchPlayer[]
   tutorialProgress   TutorialProgress?
   chatLogs           MatchChatLog[]
+  reputation         Reputation?
+  achievements       PlayerAchievement[]
 
   @@index([lastSeenAt], map: "idx_players_last_seen")
   @@index([isBanned], map: "idx_players_banned")
@@ -203,4 +205,64 @@ model TutorialProgress {
 
   @@index([playerId], map: "idx_tutorial_never_completed")
   @@map("tutorial_progress")
+}
+
+// === P1 表（Phase 5/6 激活） ===
+
+/// 信誉分
+model Reputation {
+  playerId    String   @id @map("player_id") @db.Uuid
+  score       Int      @default(1000) @db.SmallInt
+  level       String   @default("normal") @db.VarChar(20)
+  decayedAt   DateTime @default(now()) @map("decayed_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("reputation")
+}
+
+/// 成就定义
+model Achievement {
+  id          String   @id @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String   @db.VarChar(500)
+  category    String   @db.VarChar(30)
+  iconKey     String?  @map("icon_key") @db.VarChar(50)
+  isHidden    Boolean  @default(false) @map("is_hidden")
+  sort        Int      @default(0) @db.SmallInt
+
+  playerAchievements PlayerAchievement[]
+
+  @@map("achievements")
+}
+
+/// 玩家成就
+model PlayerAchievement {
+  playerId     String   @map("player_id") @db.Uuid
+  achievementId String @map("achievement_id") @db.VarChar(50)
+  unlockedAt   DateTime @default(now()) @map("unlocked_at") @db.Timestamptz
+
+  player     Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, achievementId])
+  @@index([playerId], map: "idx_player_achievements_player")
+  @@map("player_achievements")
+}
+
+/// 系列赛
+model Series {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String    @db.VarChar(100)
+  description String?   @db.VarChar(500)
+  format      String    @db.VarChar(30)
+  maxPlayers  Int       @map("max_players") @db.SmallInt
+  startedAt   DateTime? @map("started_at") @db.Timestamptz
+  endedAt     DateTime? @map("ended_at") @db.Timestamptz
+  status      String    @default("upcoming") @db.VarChar(20)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([status], map: "idx_series_status")
+  @@map("series")
 }

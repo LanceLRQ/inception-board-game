@@ -1,5 +1,4 @@
-// @icgame/bot - AI Bot
+// @icgame/bot - 导出
 
-export interface Bot {
-  play(state: unknown, legalMoves: string[]): string;
-}
+export { RandomBot } from './randomBot.js';
+export type { Bot } from './randomBot.js';
