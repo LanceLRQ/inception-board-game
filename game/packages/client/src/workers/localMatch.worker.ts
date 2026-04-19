@@ -32,6 +32,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playTelekinesis',
     'useChessTranspose',
     'masterDealBribe',
+    'playPeek',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -52,6 +53,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   playTelekinesis: 96,
   useChessTranspose: 97,
   masterDealBribe: 98,
+  playPeek: 99,
   skipDiscard: 1,
   doDiscard: 2,
 };

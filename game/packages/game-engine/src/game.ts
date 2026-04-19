@@ -366,6 +366,25 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 打出梦境窥视 - 查看任意一层金库内容（MVP 简化：仅弃牌；UI 端从 state 自显示）
+        // 对照：docs/manual/04-action-cards.md 梦境窥视
+        playPeek: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetLayer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const player = G.players[ctx.currentPlayer];
+            if (!player || !player.isAlive) return INVALID_MOVE;
+            if (!player.hand.includes(cardId)) return INVALID_MOVE;
+            if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
+            // 该层必须有未开金库才值得窥视（否则拒绝）
+            const hasVault = G.vaults.some((v) => v.layer === targetLayer);
+            if (!hasVault) return INVALID_MOVE;
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            s = incrementMoveCounter(s);
+            return s;
+          },
+          client: false,
+        },
+
         // --- 贿赂（MVP：梦主派发 + 即刻结算） ---
         // 对照：docs/manual/03-game-flow.md 贿赂&背叛者
         masterDealBribe: {

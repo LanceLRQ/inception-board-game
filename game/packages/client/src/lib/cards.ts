@@ -67,6 +67,9 @@ export function actionMoveFor(
   if (action.id === 'action_telekinesis') {
     return { move: 'playTelekinesis', needsTarget: 'player' };
   }
+  if (action.id === 'action_dream_peek') {
+    return { move: 'playPeek', needsTarget: 'layer' };
+  }
   // 其他 SHOOT 变种（刺客之王 / 爆甲螺旋 / 炸裂弹头等）暂走通用 playShoot
   if (action.subType?.startsWith('shoot_')) {
     return { move: 'playShoot', needsTarget: 'player' };
