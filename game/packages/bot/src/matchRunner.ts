@@ -13,6 +13,7 @@ import { createInitialState, type SetupState } from '@icgame/game-engine/setup';
 import { checkInvariants, type InvariantViolation } from '@icgame/game-engine/invariants';
 import { HAND_LIMIT } from '@icgame/game-engine/config';
 import type { CardID } from '@icgame/shared';
+import { generateBatch } from '@icgame/shared';
 
 export interface MatchRunResult {
   readonly matchId: string;
@@ -59,18 +60,33 @@ export function mulberry32FromSeed(seed: string): () => number {
   };
 }
 
-/** 纯函数：根据 playerCount 构建 setup 输入 */
+/**
+ * 纯函数：根据 playerCount 构建 setup 输入。
+ *
+ * 昵称策略：
+ *   - 最后一个玩家作为梦主（master 阵营），其余为盗梦者
+ *   - 使用 NicknameGenerator 批量生成唯一昵称，落地到 setup
+ *   - rand 可注入，seed 相同时可复现
+ */
 export function buildMatchSetupInput(opts: {
   readonly matchId: string;
   readonly seed: string;
   readonly playerCount: number;
+  readonly rand?: () => number;
 }): Parameters<typeof createInitialState>[0] {
+  const rand = opts.rand ?? mulberry32FromSeed(`nick-${opts.seed}`);
   const playerIds: string[] = [];
-  const nicknames: string[] = [];
   for (let i = 0; i < opts.playerCount; i++) {
     playerIds.push(`p${i}`);
-    nicknames.push(`Bot-${i}`);
   }
+  // 最后一位为梦主，前面为盗梦者
+  const thiefCount = Math.max(0, opts.playerCount - 1);
+  const thiefNames = generateBatch(thiefCount, { faction: 'thief', rand });
+  const masterName = generateBatch(1, { faction: 'master', rand })[0];
+  const nicknames: string[] = [
+    ...thiefNames.map((n) => n.display),
+    masterName ? masterName.display : 'Bot',
+  ];
   return {
     playerCount: opts.playerCount,
     playerIds,

@@ -41,8 +41,28 @@ describe('buildMatchSetupInput', () => {
   it('creates ordered playerIds p0..pN', () => {
     const input = buildMatchSetupInput({ matchId: 'm', seed: 's', playerCount: 4 });
     expect(input.playerIds).toEqual(['p0', 'p1', 'p2', 'p3']);
-    expect(input.nicknames).toEqual(['Bot-0', 'Bot-1', 'Bot-2', 'Bot-3']);
     expect(input.rngSeed).toBe('s');
+  });
+
+  it('produces 4 unique nicknames with 🤖 badge', () => {
+    const input = buildMatchSetupInput({ matchId: 'm', seed: 's', playerCount: 4 });
+    expect(input.nicknames.length).toBe(4);
+    for (const n of input.nicknames) expect(n).toContain('🤖');
+    const set = new Set(input.nicknames);
+    expect(set.size).toBe(4);
+  });
+
+  it('is deterministic for the same seed', () => {
+    const a = buildMatchSetupInput({ matchId: 'm', seed: 'stable', playerCount: 5 });
+    const b = buildMatchSetupInput({ matchId: 'm', seed: 'stable', playerCount: 5 });
+    expect(a.nicknames).toEqual(b.nicknames);
+  });
+
+  it('produces different nicknames across different seeds (usually)', () => {
+    const a = buildMatchSetupInput({ matchId: 'm', seed: 'seed-a', playerCount: 5 });
+    const b = buildMatchSetupInput({ matchId: 'm', seed: 'seed-b', playerCount: 5 });
+    // 不要求必然完全不同，但至少有一项不同
+    expect(a.nicknames.join('/')).not.toEqual(b.nicknames.join('/'));
   });
 });
 
