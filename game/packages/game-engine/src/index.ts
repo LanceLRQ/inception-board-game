@@ -107,3 +107,26 @@ export {
   shouldForceDisconnect,
 } from './engine/timeout.js';
 export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
+
+// 规则不变量（B12）
+export { checkInvariants, assertInvariants } from './invariants.js';
+export type { InvariantViolation } from './invariants.js';
+
+// 测试 fixtures（B12）
+export {
+  createTestState,
+  makePlayer,
+  makeLayer,
+  makeDefaultLayers,
+  makeDefaultVaults,
+  cloneState,
+  withBribes,
+  withHand,
+} from './testing/fixtures.js';
+export {
+  scenarioStartOfGame3p,
+  scenarioMidGameThiefAtL3,
+  scenarioThiefNearWin,
+  scenarioMasterWin,
+  scenarioEmptyState,
+} from './testing/scenarios.js';

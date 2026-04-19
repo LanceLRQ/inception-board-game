@@ -53,6 +53,9 @@ importers:
 
   packages/bot:
     dependencies:
+      '@icgame/game-engine':
+        specifier: workspace:*
+        version: link:../game-engine
       '@icgame/shared':
         specifier: workspace:*
         version: link:../shared

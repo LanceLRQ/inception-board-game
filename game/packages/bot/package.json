@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src/",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "regression": "tsx scripts/bot-regression.ts"
   },
   "dependencies": {
+    "@icgame/game-engine": "workspace:*",
     "@icgame/shared": "workspace:*"
   }
 }
