@@ -126,6 +126,9 @@ export interface SetupState {
     pickOrder: string[]; // 从 bonder 起按 playOrder 顺序
     pickCursor: number;
   } | null;
+  // 移形换影（EX）：当回合开始时快照；回合末强制还原
+  // 对照：docs/manual/04-action-cards.md 移形换影
+  shiftSnapshot: Record<string, CardID> | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -285,6 +288,7 @@ export function createInitialState(options: {
     pendingGraft: null,
     pendingResonance: null,
     pendingGravity: null,
+    shiftSnapshot: null,
     winner: null,
     winReason: null,
     endTurn: null,

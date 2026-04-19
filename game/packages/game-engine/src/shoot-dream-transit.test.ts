@@ -74,6 +74,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     pendingGraft: null,
     pendingResonance: null,
     pendingGravity: null,
+    shiftSnapshot: null,
     winner: null,
     winReason: null,
     endTurn: null,

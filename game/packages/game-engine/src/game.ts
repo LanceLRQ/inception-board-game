@@ -170,6 +170,19 @@ export const InceptionCityGame = {
         onBegin: ({ G, ctx }: { G: SetupState; ctx: BGIOCtx }) => {
           return beginTurn(G, ctx.currentPlayer);
         },
+        // 回合末：还原移形换影快照（对照 docs/manual/04-action-cards.md 移形换影 解析）
+        onEnd: ({ G }: { G: SetupState; ctx: BGIOCtx }) => {
+          if (!G.shiftSnapshot) return G;
+          const snap = G.shiftSnapshot;
+          const nextPlayers = { ...G.players };
+          for (const pid of Object.keys(snap)) {
+            const original = snap[pid];
+            if (nextPlayers[pid] && original !== undefined) {
+              nextPlayers[pid] = { ...nextPlayers[pid]!, characterId: original };
+            }
+          }
+          return { ...G, players: nextPlayers, shiftSnapshot: null };
+        },
       },
       // 所有 move 扁平化（不用 BGIO stages）
       moves: {
@@ -279,6 +292,53 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 移形换影（EX）：与另一位玩家交换角色牌；回合末自动还原
+        // 对照：docs/manual/04-action-cards.md 移形换影
+        // 约束：盗梦者不得对梦主使用；梦主对盗梦者可用；不能对自己
+        playShift: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
+            // 允许任意阶段使用（manual: 你的任意阶段）
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (cardId !== 'action_shift') return INVALID_MOVE;
+            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            const target = G.players[targetPlayerID];
+            if (!self || !target) return INVALID_MOVE;
+            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+            // 盗梦者不能对梦主使用（但梦主对盗梦者可）
+            if (self.faction === 'thief' && target.faction === 'master') {
+              return INVALID_MOVE;
+            }
+
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            // 首次 shift 前先快照全员角色
+            const snapshot: Record<string, CardID> = s.shiftSnapshot ?? {};
+            if (!s.shiftSnapshot) {
+              for (const pid of s.playerOrder) {
+                const p = s.players[pid];
+                if (p) snapshot[pid] = p.characterId;
+              }
+            }
+            // 交换 characterId
+            const selfAfter = s.players[ctx.currentPlayer]!;
+            const targetAfter = s.players[targetPlayerID]!;
+            s = {
+              ...s,
+              shiftSnapshot: snapshot,
+              players: {
+                ...s.players,
+                [ctx.currentPlayer]: { ...selfAfter, characterId: targetAfter.characterId },
+                [targetPlayerID]: { ...targetAfter, characterId: selfAfter.characterId },
+              },
+            };
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
         // SHOOT·梦境穿梭剂：同时视为 SHOOT 和 梦境穿梭剂；使用者选择结算方式
         // 对照：docs/manual/04-action-cards.md SHOOT·梦境穿梭剂
         // mode='shoot'  → 同 playShoot（base 骰面 [1] 死 [2-4] 移）
