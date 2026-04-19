@@ -198,6 +198,21 @@ export function LocalMatchRuntime({
     setChessPick([]);
   }, [chessPick, makeMove]);
 
+  // 贿赂派发：梦主行动阶段可选目标
+  const bribePool = G?.bribePool as Array<Record<string, unknown>> | undefined;
+  const bribePoolRemaining = bribePool?.filter((b) => b.status === 'inPool').length ?? 0;
+  const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
+  const canDealBribe =
+    isHumanTurn && turnPhase === 'action' && humanFaction === 'master' && bribePoolRemaining > 0;
+  const [bribeTargetOpen, setBribeTargetOpen] = useState(false);
+  const dealBribeTo = useCallback(
+    async (targetId: string) => {
+      await makeMove('masterDealBribe', [targetId]);
+      setBribeTargetOpen(false);
+    },
+    [makeMove],
+  );
+
   // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
   const effectivePending =
     pendingPlay && turnPhase === 'action' && isHumanTurn && humanHand.includes(pendingPlay.card)
@@ -338,6 +353,15 @@ export function LocalMatchRuntime({
             <span>
               {t('localMatch.alive')}：{humanPlayer.isAlive ? 'Yes' : 'No'}
             </span>
+            {typeof humanPlayer.bribeReceived === 'number' &&
+              (humanPlayer.bribeReceived as number) > 0 && (
+                <span
+                  className="rounded bg-purple-500/20 px-1.5 py-0.5 text-purple-300"
+                  data-testid="human-bribe-received"
+                >
+                  {t('localMatch.bribeReceived', { n: humanPlayer.bribeReceived })}
+                </span>
+              )}
           </div>
           {Array.isArray(humanPlayer.hand) && (
             <>
@@ -522,6 +546,62 @@ export function LocalMatchRuntime({
                 required: overHand,
               })}
             </button>
+          )}
+        </div>
+      )}
+
+      {/* 贿赂派发：梦主限定 */}
+      {canDealBribe && (
+        <div
+          className="mb-4 rounded-md border border-purple-500/40 bg-purple-500/5 p-3 text-xs"
+          data-testid="bribe-panel"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-medium text-purple-400">
+              {t('localMatch.bribeTitle', { defaultValue: '派发贿赂牌' })}
+            </span>
+            <span className="text-muted-foreground">
+              {t('localMatch.bribeRemaining', {
+                n: bribePoolRemaining,
+                defaultValue: `池剩 ${bribePoolRemaining}`,
+              })}
+            </span>
+          </div>
+          {!bribeTargetOpen ? (
+            <button
+              type="button"
+              onClick={() => setBribeTargetOpen(true)}
+              className="rounded-full bg-purple-500 px-3 py-1 text-[11px] text-white"
+              data-testid="bribe-open"
+            >
+              {t('localMatch.bribePickTarget', { defaultValue: '选择盗梦者' })}
+            </button>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(players ?? {})
+                .filter(
+                  ([id, p]) =>
+                    (p.isAlive as boolean) && (p.faction as string) === 'thief' && id !== '0',
+                )
+                .map(([id]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => void dealBribeTo(id)}
+                    className="rounded-full bg-purple-500 px-3 py-1 text-[11px] text-white"
+                    data-testid={`bribe-target-${id}`}
+                  >
+                    AI {id}
+                  </button>
+                ))}
+              <button
+                type="button"
+                onClick={() => setBribeTargetOpen(false)}
+                className="rounded-full border border-muted px-3 py-1 text-[11px] text-muted-foreground"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
           )}
         </div>
       )}

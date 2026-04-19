@@ -15,6 +15,32 @@ import {
  * 对照：plans/design/02-game-rules-spec.md §2.2 / docs/manual/04-action-cards.md
  * 按每张牌 quantity 字段展开，跳过扩展牌与占位的 "action_back"（背面）
  */
+/**
+ * 构建初始贿赂池
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者
+ * MVP 固定 3 DEAL + 3 fail；洗牌由派发时用 BGIO random.Shuffle 处理
+ */
+function buildInitialBribePool(): BribeSetup[] {
+  const out: BribeSetup[] = [];
+  for (let i = 0; i < 3; i++) {
+    out.push({
+      id: `bribe-deal-${i}`,
+      status: 'inPool',
+      heldBy: null,
+      originalOwnerId: null,
+    });
+  }
+  for (let i = 0; i < 3; i++) {
+    out.push({
+      id: `bribe-fail-${i}`,
+      status: 'inPool',
+      heldBy: null,
+      originalOwnerId: null,
+    });
+  }
+  return out;
+}
+
 function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] {
   const cards: CardID[] = [];
   for (const def of ACTION_CARDS) {
@@ -225,7 +251,7 @@ export function createInitialState(options: {
     expansionEnabled: options.expansionEnabled ?? false,
     layers,
     vaults,
-    bribePool: [],
+    bribePool: buildInitialBribePool(),
     deck: {
       cards: buildInitialDeck(options.expansionEnabled ?? false, rngSeed),
       discardPile: [],

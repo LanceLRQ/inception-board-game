@@ -180,14 +180,18 @@ describe('setup', () => {
       expect(s.expansionEnabled).toBe(true);
     });
 
-    it('initializes empty bribe pool and deck with action cards', () => {
+    it('initializes bribe pool and deck with action cards', () => {
       const s = createInitialState({
         playerCount: 4,
         playerIds: ['P1', 'P2', 'P3', 'P4'],
         nicknames: ['A', 'B', 'C', 'D'],
         rngSeed: 'seed',
       });
-      expect(s.bribePool).toEqual([]);
+      // 贿赂池：3 DEAL + 3 fail = 6 张，初始都在 inPool
+      expect(s.bribePool.length).toBe(6);
+      expect(s.bribePool.every((b) => b.status === 'inPool')).toBe(true);
+      expect(s.bribePool.filter((b) => b.id.startsWith('bribe-deal-')).length).toBe(3);
+      expect(s.bribePool.filter((b) => b.id.startsWith('bribe-fail-')).length).toBe(3);
       // 牌库被初始化为已洗牌的行动牌（不含 action_back 占位牌）
       expect(s.deck.cards.length).toBeGreaterThan(0);
       expect(s.deck.cards).not.toContain('action_back');

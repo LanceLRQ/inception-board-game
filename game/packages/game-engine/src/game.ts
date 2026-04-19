@@ -14,7 +14,7 @@
 //   4. 弃牌阶段完成后，move 内调 events.endTurn() 让 BGIO 推进回合
 
 import { INVALID_MOVE } from 'boardgame.io/core';
-import { createInitialState, type SetupState } from './setup.js';
+import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
 import {
   drawCards,
   discardCard,
@@ -366,6 +366,58 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // --- 贿赂（MVP：梦主派发 + 即刻结算） ---
+        // 对照：docs/manual/03-game-flow.md 贿赂&背叛者
+        masterDealBribe: {
+          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const target = G.players[targetPlayerID];
+            if (!target) return INVALID_MOVE;
+            if (!target.isAlive) return INVALID_MOVE;
+            if (target.faction !== 'thief') return INVALID_MOVE;
+
+            // 从 pool 随机抽 1 张
+            const poolIdxs = G.bribePool
+              .map((b, i) => ({ b, i }))
+              .filter(({ b }) => b.status === 'inPool');
+            if (poolIdxs.length === 0) return INVALID_MOVE;
+            const shuffled = random.Shuffle(poolIdxs);
+            const pick = shuffled[0]!;
+            const bribe = pick.b;
+            const isDeal = bribe.id.startsWith('bribe-deal-');
+
+            // 更新贿赂状态：派出 → dealt（命中 DEAL 转 deal）
+            const nextPool = G.bribePool.map((b, i) =>
+              i === pick.i
+                ? {
+                    ...b,
+                    status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
+                    heldBy: targetPlayerID,
+                    originalOwnerId: targetPlayerID,
+                  }
+                : b,
+            );
+
+            let s: SetupState = {
+              ...G,
+              bribePool: nextPool,
+              players: {
+                ...G.players,
+                [targetPlayerID]: {
+                  ...target,
+                  bribeReceived: target.bribeReceived + 1,
+                  // DEAL 立即转阵营为梦主
+                  faction: isDeal ? ('master' as Faction) : target.faction,
+                },
+              },
+            };
+            s = incrementMoveCounter(s);
+            return s;
+          },
+          client: false,
+        },
+
         // --- 主动技能 ---
         // 棋局·易位（梦主限定）：交换两个未打开的金库位置，perGame 最多 2 次
         // 对照：packages/game-engine/src/engine/skills.ts applyChessTranspose

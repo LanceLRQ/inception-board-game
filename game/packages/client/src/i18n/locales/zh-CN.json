@@ -94,6 +94,10 @@
       "secret_vault_opened": "盗梦者打开了秘密金库",
       "all_thieves_dead": "所有盗梦者阵亡"
     },
+    "bribeTitle": "派发贿赂牌",
+    "bribeRemaining": "池剩 {{n}} 张",
+    "bribePickTarget": "选择盗梦者目标",
+    "bribeReceived": "已收贿赂：{{n}}",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
     "loading": "加载中..."
