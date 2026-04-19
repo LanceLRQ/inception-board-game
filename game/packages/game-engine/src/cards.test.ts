@@ -59,6 +59,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     moveCounter: 0,
     activeWorldViews: [],
     pendingUnlock: null,
+    pendingGraft: null,
     winner: null,
     winReason: null,
     endTurn: null,

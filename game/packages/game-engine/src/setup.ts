@@ -106,6 +106,11 @@ export interface SetupState {
     layer: number;
     cardId: CardID;
   } | null;
+  // 嫁接两阶段：playGraft 后记录，resolveGraft 消费
+  // 对照：docs/manual/04-action-cards.md 嫁接（抽 3 返 2）
+  pendingGraft: {
+    playerID: string;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -262,6 +267,7 @@ export function createInitialState(options: {
     moveCounter: 0,
     activeWorldViews: [],
     pendingUnlock: null,
+    pendingGraft: null,
     winner: null,
     winReason: null,
     endTurn: null,

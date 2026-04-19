@@ -33,6 +33,8 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'useChessTranspose',
     'masterDealBribe',
     'playPeek',
+    'playGraft',
+    'resolveGraft',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -54,6 +56,8 @@ const MOVE_PRIORITY: Record<string, number> = {
   useChessTranspose: 97,
   masterDealBribe: 98,
   playPeek: 99,
+  playGraft: 100,
+  resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,
   doDiscard: 2,
 };
@@ -88,6 +92,11 @@ const HAND_LIMIT = 5;
 function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): string | null {
   if (legalMoves.length === 0) return null;
 
+  // pendingGraft 必须优先结算
+  if (state?.G?.pendingGraft?.playerID === botPlayerID && legalMoves.includes('resolveGraft')) {
+    return 'resolveGraft';
+  }
+
   // discard 阶段：手牌超限必须走 doDiscard；否则 skipDiscard
   // 对照：game-engine skipDiscard guard（hand.length > HAND_LIMIT → INVALID_MOVE）
   const handLen = (state?.G?.players?.[botPlayerID]?.hand?.length as number) ?? 0;
@@ -118,6 +127,11 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
     case 'dreamMasterMove': {
       const cur = self?.currentLayer ?? 1;
       return [Math.max(1, Math.min(4, cur + 1))];
+    }
+    case 'resolveGraft': {
+      // Bot 简单策略：取手牌前 2 张放回牌库顶
+      const hand = (self?.hand as string[]) ?? [];
+      return [hand.slice(0, 2)];
     }
     default:
       return [];

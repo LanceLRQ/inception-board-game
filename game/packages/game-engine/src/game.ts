@@ -201,6 +201,8 @@ export const InceptionCityGame = {
         endActionPhase: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            // 嫁接未结算不得结束行动阶段
+            if (G.pendingGraft) return INVALID_MOVE;
             return setTurnPhase(G, 'discard');
           },
           client: false,
@@ -448,6 +450,56 @@ export const InceptionCityGame = {
             // applyChessTranspose 拒绝时返回原 state（无变化）
             if (next === G) return INVALID_MOVE;
             return next;
+          },
+          client: false,
+        },
+
+        // 打出嫁接 - 抽 3 张 → 从手中选 2 张放回牌库顶（两阶段）
+        // 对照：docs/manual/04-action-cards.md 嫁接
+        playGraft: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft) return INVALID_MOVE;
+            const player = G.players[ctx.currentPlayer];
+            if (!player || !player.isAlive) return INVALID_MOVE;
+            if (!player.hand.includes(cardId)) return INVALID_MOVE;
+
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            s = drawCards(s, ctx.currentPlayer, 3);
+            s = { ...s, pendingGraft: { playerID: ctx.currentPlayer } };
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+        resolveGraft: {
+          move: ({ G, ctx }: MoveCtx, cardsToReturn: CardID[]) => {
+            if (!G.pendingGraft) return INVALID_MOVE;
+            if (G.pendingGraft.playerID !== ctx.currentPlayer) return INVALID_MOVE;
+            if (!Array.isArray(cardsToReturn) || cardsToReturn.length !== 2) return INVALID_MOVE;
+            const player = G.players[ctx.currentPlayer];
+            if (!player) return INVALID_MOVE;
+
+            // 两张必须都在手中（允许重复卡面，但两个 index 不同）
+            const newHand = [...player.hand];
+            for (const cardId of cardsToReturn) {
+              const idx = newHand.indexOf(cardId);
+              if (idx === -1) return INVALID_MOVE;
+              newHand.splice(idx, 1);
+            }
+
+            return {
+              ...G,
+              players: {
+                ...G.players,
+                [ctx.currentPlayer]: { ...player, hand: newHand },
+              },
+              deck: {
+                ...G.deck,
+                // 按指定顺序放回牌库顶：cardsToReturn[0] 在最顶
+                cards: [...cardsToReturn, ...G.deck.cards],
+              },
+              pendingGraft: null,
+            };
           },
           client: false,
         },
