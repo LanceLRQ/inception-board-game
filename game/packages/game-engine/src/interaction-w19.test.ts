@@ -56,6 +56,10 @@ import {
   getUranusPowerUsesLeft,
   applyPlutoBurning,
   isUranusFirmamentWorldActive,
+  applyAthenaWit,
+  applyShadeFollow,
+  applySaturnFreeMove,
+  canUseSaturnFreeMoveThisTurn,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -1574,5 +1578,155 @@ describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
     };
     const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
     expect(r).toBeNull();
+  });
+});
+
+// ============================================================================
+// R37 · W19-A 交互矩阵扩充（第十批 · 雅典娜/影子/土星世界观）
+// ============================================================================
+describe('W19-A · 雅典娜·急智 apply 分支（R37）', () => {
+  it('非雅典娜 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_unlock' as CardID] } };
+    const r = applyAthenaWit(s, 'p1');
+    expect(r).toBeNull();
+  });
+
+  it('雅典娜 + 弃牌堆空 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_athena');
+    s = { ...s, deck: { ...s.deck, discardPile: [] } };
+    const r = applyAthenaWit(s, 'p1');
+    expect(r).toBeNull();
+  });
+
+  it('雅典娜 + 弃牌堆有牌 → 取顶 1 张到手', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_athena');
+    s = setHand(s, 'p1', []);
+    s = {
+      ...s,
+      deck: {
+        ...s.deck,
+        discardPile: ['action_unlock' as CardID, 'action_shoot' as CardID],
+      },
+    };
+    const r = applyAthenaWit(s, 'p1');
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toEqual(['action_shoot']);
+    expect(r!.deck.discardPile).toEqual(['action_unlock']);
+  });
+
+  it('雅典娜 + 死亡 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_athena');
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } },
+      deck: { ...s.deck, discardPile: ['action_unlock' as CardID] },
+    };
+    const r = applyAthenaWit(s, 'p1');
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 影子·潜伏 apply 分支（R37）', () => {
+  it('非影子 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyShadeFollow(s, 'p1');
+    expect(r).toBeNull();
+  });
+
+  it('影子 + 存活 → 移到梦主所在层', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_shade');
+    s = setLayer(s, 'pM', 3 as Layer);
+    const r = applyShadeFollow(s, 'p1');
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.currentLayer).toBe(3);
+  });
+
+  it('影子 + 死亡 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_shade');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } } };
+    const r = applyShadeFollow(s, 'p1');
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 土星世界观免费移动 apply 分支（R37）', () => {
+  it('非土星梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
+    const r = applySaturnFreeMove(s, 'p1', 2 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('土星 + 盗梦者无贿赂 → null', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    const r = applySaturnFreeMove(s, 'p1', 2 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('土星 + 盗梦者持贿赂 + 相邻层 → 移动成功', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
+    const r = applySaturnFreeMove(s, 'p1', 2 as Layer);
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.currentLayer).toBe(2);
+  });
+
+  it('土星 + 非相邻层（跨 2 层）→ null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
+    const r = applySaturnFreeMove(s, 'p1', 3 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('土星 + 目标迷失层 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
+    const r = applySaturnFreeMove(s, 'p1', 0 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('土星 + 已用过一次 → null（限 1 次/回合）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          bribeReceived: 1,
+          skillUsedThisTurn: { 'dm_saturn_territory.world.skill': 1 },
+        },
+      },
+    };
+    const r = applySaturnFreeMove(s, 'p1', 2 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('canUseSaturnFreeMoveThisTurn：未用 + 持贿赂 → true', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
+    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(true);
+  });
+
+  it('canUseSaturnFreeMoveThisTurn：已用过 → false', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          bribeReceived: 1,
+          skillUsedThisTurn: { 'dm_saturn_territory.world.skill': 1 },
+        },
+      },
+    };
+    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(false);
   });
 });
