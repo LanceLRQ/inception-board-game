@@ -162,14 +162,61 @@ export const InceptionCityGame = {
             const masterIdx = random.Die(G.playerOrder.length) - 1;
             const masterID = G.playerOrder[masterIdx]!;
 
-            // MVP：给玩家随机分配角色
-            // 梦主从 MASTER_CHAR_POOL 选，盗梦者从 THIEF_CHAR_POOL 选（不重）
-            const masterPool: CardID[] = ['dm_fortress', 'dm_chess'];
+            // 给玩家随机分配角色 —— 涵盖 Phase 3 所有已实装角色
+            // 梦主 13 个 · 盗梦者 37 个（对照 plans/tasks.md W11-W16）
+            const masterPool: CardID[] = [
+              'dm_fortress',
+              'dm_chess',
+              'dm_harbor',
+              'dm_midsummer',
+              'dm_black_hole',
+              'dm_neptune_ocean',
+              'dm_jupiter_peak',
+              'dm_saturn_territory',
+              'dm_imperial_city',
+              'dm_secret_passage',
+              'dm_uranus_firmament',
+              'dm_pluto_hell',
+              'dm_mars_battlefield',
+            ];
             const thiefPool: CardID[] = [
               'thief_pointman',
               'thief_dream_interpreter',
               'thief_space_queen',
               'thief_joker',
+              'thief_leo',
+              'thief_tourist',
+              'thief_capricornus',
+              'thief_chemist',
+              'thief_paprik',
+              'thief_lord_of_war',
+              'thief_libra',
+              'thief_sudger_of_mind',
+              'thief_scorpius',
+              'thief_taurus',
+              'thief_apollo',
+              'thief_athena',
+              'thief_architect',
+              'thief_virgo',
+              'thief_haley',
+              'thief_martyr',
+              'thief_soul_sculptor',
+              'thief_shade',
+              'thief_hlnino',
+              'thief_extractor',
+              'thief_forger',
+              'thief_terrorist',
+              'thief_black_hole',
+              'thief_black_swan',
+              'thief_gemini',
+              'thief_pisces',
+              'thief_luna',
+              'thief_aries',
+              'thief_gaia',
+              'thief_sagittarius',
+              'thief_aquarius',
+              'thief_green_ray',
+              'thief_darwin',
             ];
             const masterChar = masterPool[random.Die(masterPool.length) - 1]!;
             const shuffledThieves = random.Shuffle([...thiefPool]);
