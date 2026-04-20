@@ -55,6 +55,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'useMarsKill',
     'useSaturnFreeMove',
     'useMarsBattlefield',
+    'masterDiscardHiddenNightmare',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -97,6 +98,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   useMarsKill: 214,
   useSaturnFreeMove: 115, // 盗梦者主动技能（中优先级）
   useMarsBattlefield: 116,
+  masterDiscardHiddenNightmare: 215, // 梦主低优先：Bot L0 默认不主动触发
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,

@@ -1953,6 +1953,53 @@ export function isMarsBattlefieldWorldActive(state: SetupState): boolean {
   return getMasterCharacterID(state) === 'dm_mars_battlefield';
 }
 
+// ============================================================================
+// W18-A 梦魇触发时机辅助（auto-detect + un-revealed discard）
+// ============================================================================
+// 对照：docs/manual/03-game-flow.md 第 94-102 行 / 07-nightmare-cards.md
+// 触发：盗梦者打开放有金币的金库 → 同层有未翻开梦魇 → 梦主 3 选 1
+//   1. 派发贿赂牌然后弃掉梦魇（masterDealBribe + masterDiscardHiddenNightmare）
+//   2. 翻开梦魇并发动效果（masterRevealNightmare + masterActivateNightmare）
+//   3. 弃掉梦魇且不派发贿赂（masterDiscardHiddenNightmare）
+
+/** 找出所有「金币金库已开 + 同层有未翻开梦魇」的层（待梦主决策） */
+export function findCoinVaultsWithHiddenNightmare(state: SetupState): number[] {
+  const result: number[] = [];
+  for (const v of state.vaults) {
+    if (!v.isOpened) continue;
+    if (v.contentType !== 'coin') continue;
+    const ls = state.layers[v.layer];
+    if (!ls) continue;
+    if (!ls.nightmareId) continue;
+    if (ls.nightmareRevealed) continue;
+    if (ls.nightmareTriggered) continue;
+    result.push(v.layer);
+  }
+  return result;
+}
+
+/** 弃掉指定层的未翻开梦魇（用于梦主选择"不发动"流程） */
+export function applyDiscardHiddenNightmare(state: SetupState, layer: number): SetupState | null {
+  const ls = state.layers[layer];
+  if (!ls) return null;
+  if (!ls.nightmareId) return null;
+  if (ls.nightmareRevealed) return null; // 已翻开走 masterDiscardNightmare
+  const discardedId = ls.nightmareId;
+  return {
+    ...state,
+    layers: {
+      ...state.layers,
+      [layer]: {
+        ...ls,
+        nightmareId: null,
+        nightmareRevealed: false,
+        nightmareTriggered: true,
+      },
+    },
+    usedNightmareIds: [...state.usedNightmareIds, discardedId],
+  };
+}
+
 /** 火星·战场世界观：弃 2 非 SHOOT 换 1 SHOOT */
 export function applyMarsBattlefieldExchange(
   state: SetupState,

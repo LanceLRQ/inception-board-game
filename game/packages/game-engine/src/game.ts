@@ -82,6 +82,7 @@ import {
   applySaturnFreeMove,
   applyUranusFirmamentMoveDiscard,
   applyMarsBattlefieldExchange,
+  applyDiscardHiddenNightmare,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction, Layer } from '@icgame/shared';
@@ -371,6 +372,18 @@ export const InceptionCityGame = {
           client: false,
         },
         // 梦主弃掉已翻开的梦魇（不发动效果）
+        // 梦主弃掉未翻开的梦魇（W18-A：玩家打开金币金库后，梦主选择不发动）
+        // 对照：docs/manual/03-game-flow.md 第 96-101 行
+        masterDiscardHiddenNightmare: {
+          move: ({ G, ctx }: MoveCtx, layer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const result = applyDiscardHiddenNightmare(G, layer);
+            if (result === null) return INVALID_MOVE;
+            return result;
+          },
+          client: false,
+        },
         masterDiscardNightmare: {
           move: ({ G, ctx }: MoveCtx, layer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
