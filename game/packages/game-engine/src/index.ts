@@ -176,6 +176,7 @@ export {
   jokerDrawCount,
   applyBlackHoleLevy,
   applyBlackSwanTour,
+  applyMercuryRouteExtraFailBribe,
   applySpaceQueenObserve,
   applySpaceQueenStashTop,
   SHADE_SKILL_ID,

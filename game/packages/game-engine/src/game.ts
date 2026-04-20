@@ -84,6 +84,9 @@ import {
   applyUranusFirmamentMoveDiscard,
   applyMarsBattlefieldExchange,
   applyDiscardHiddenNightmare,
+  applyMercuryRouteExtraFailBribe,
+  applyBlackSwanTour,
+  jokerDrawCount,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
@@ -246,12 +249,15 @@ export const InceptionCityGame = {
               }
             }
 
-            return {
+            // 水星·航路世界观：梦主翻开时 bribePool 追加 1 张 fail
+            // 对照：docs/manual/06-dream-master.md 水星·航路
+            const baseState: SetupState = {
               ...G,
               phase: 'playing' as const,
               dreamMasterID: masterID,
               players: nextPlayers,
             };
+            return applyMercuryRouteExtraFailBribe(baseState, masterChar);
           },
           client: false,
         },
@@ -334,6 +340,40 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             return setTurnPhase(G, 'action');
+          },
+          client: false,
+        },
+
+        // 小丑·赌博（略过抽牌阶段 → 掷骰 → 抽 D6 张）
+        // 对照：docs/manual/05-dream-thieves.md 小丑
+        // MVP：下回合强制全弃的惩罚尚未实装（需 forcedDiscardAllNextTurn 字段；预留）
+        playJokerGamble: {
+          move: ({ G, ctx, random }: MoveCtx) => {
+            if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
+            const player = G.players[G.currentPlayerID];
+            if (!player || !player.isAlive) return INVALID_MOVE;
+            if (player.characterId !== 'thief_joker') return INVALID_MOVE;
+            const roll = random.D6();
+            const count = jokerDrawCount(roll);
+            let s = drawCards(G, G.currentPlayerID, count);
+            s = setTurnPhase(s, 'action');
+            // 进入行动阶段 → 触发 onActionPhase passive
+            s = dispatchPassives(s, 'onActionPhase').state;
+            return s;
+          },
+          client: false,
+        },
+
+        // 黑天鹅·巡演（略过抽牌阶段 → 分发所有手牌 → 抽 4）
+        // 对照：docs/manual/05-dream-thieves.md 黑天鹅
+        playBlackSwanTour: {
+          move: ({ G, ctx }: MoveCtx, distribution: Record<string, CardID[]>) => {
+            if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
+            const applied = applyBlackSwanTour(G, G.currentPlayerID, distribution);
+            if (applied === null) return INVALID_MOVE;
+            let s = setTurnPhase(applied, 'action');
+            s = dispatchPassives(s, 'onActionPhase').state;
+            return s;
           },
           client: false,
         },

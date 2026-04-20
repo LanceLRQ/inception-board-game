@@ -2047,3 +2047,42 @@ export function applyMarsBattlefieldExchange(
     deck: { ...state.deck, discardPile: newDiscard },
   };
 }
+
+// ============================================================================
+// 水星·航路 世界观：梦主翻开时 bribePool 额外 +1 张失败贿赂
+// 对照：docs/manual/06-dream-master.md 水星·航路
+// 接入时机：startGame move 分配梦主角色后立即调用（此时 bribePool 仍为初始 3+3）
+// ============================================================================
+
+/**
+ * 水星·航路世界观：若梦主为水星，bribePool 追加 1 张 fail 状态的贿赂。
+ * 对非水星梦主直接返回原 state。
+ */
+export function applyMercuryRouteExtraFailBribe(
+  state: SetupState,
+  masterCharacterID: CardID | null,
+): SetupState {
+  if (masterCharacterID !== 'dm_mercury_route') return state;
+  // 新 fail 贿赂的编号需要避开既有 `bribe-fail-0..2`
+  const existingFailIds = new Set(
+    state.bribePool.filter((b) => b.id.startsWith('bribe-fail-')).map((b) => b.id),
+  );
+  let newId = 'bribe-fail-mercury';
+  let suffix = 0;
+  while (existingFailIds.has(newId)) {
+    suffix += 1;
+    newId = `bribe-fail-mercury-${suffix}`;
+  }
+  return {
+    ...state,
+    bribePool: [
+      ...state.bribePool,
+      {
+        id: newId,
+        status: 'inPool',
+        heldBy: null,
+        originalOwnerId: null,
+      },
+    ],
+  };
+}
