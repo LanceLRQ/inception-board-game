@@ -9,6 +9,7 @@ import {
   type ActiveSkillContext,
   type ActiveSkillDescriptor,
 } from '../../lib/activeSkills';
+import { getCardName } from '../../lib/cards';
 import { cn } from '../../lib/utils';
 
 interface ActiveSkillPanelProps {
@@ -422,7 +423,7 @@ export function ActiveSkillPanel({
                 className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
                 data-testid={`active-skill-card-${idx}`}
               >
-                {cardId}
+                {getCardName(cardId)}
               </button>
             ))}
             <button
@@ -461,7 +462,7 @@ export function ActiveSkillPanel({
                   className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
                   data-testid={`active-skill-cp-card-${idx}`}
                 >
-                  {cardId}
+                  {getCardName(cardId)}
                 </button>
               ))}
             {pendingCardPlayerSkill.card &&
@@ -515,7 +516,7 @@ export function ActiveSkillPanel({
                   )}
                   data-testid={`active-skill-mc-card-${idx}`}
                 >
-                  {cardId}
+                  {getCardName(cardId)}
                 </button>
               );
             })}
@@ -574,7 +575,7 @@ export function ActiveSkillPanel({
                     )}
                     data-testid={`active-skill-mcp-card-${idx}`}
                   >
-                    {cardId}
+                    {getCardName(cardId)}
                   </button>
                 );
               })}
@@ -718,7 +719,7 @@ export function ActiveSkillPanel({
                     )}
                     data-testid={`active-skill-mcd-card-${idx}`}
                   >
-                    {cardId}
+                    {getCardName(cardId)}
                   </button>
                 );
               })}
@@ -742,7 +743,7 @@ export function ActiveSkillPanel({
                   className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
                   data-testid={`active-skill-mcd-disc-${idx}`}
                 >
-                  {cardId}
+                  {getCardName(cardId)}
                 </button>
               ))}
             <button
@@ -847,7 +848,7 @@ export function ActiveSkillPanel({
                     )}
                     data-testid={`active-skill-tcs-card-${idx}`}
                   >
-                    {cardId}
+                    {getCardName(cardId)}
                   </button>
                 );
               })}
@@ -871,7 +872,7 @@ export function ActiveSkillPanel({
                   className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
                   data-testid={`active-skill-tcs-shoot-${idx}`}
                 >
-                  {cardId}
+                  {getCardName(cardId)}
                 </button>
               ))}
             <button
@@ -922,7 +923,7 @@ export function ActiveSkillPanel({
                   className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
                   data-testid={`active-skill-pc-card-${idx}`}
                 >
-                  {cardId}
+                  {getCardName(cardId)}
                 </button>
               ))}
             <button
