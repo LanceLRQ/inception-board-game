@@ -17,7 +17,8 @@ export type ActiveSkillArgKind =
   | 'handCard'
   | 'cardAndPlayer'
   | 'targetLayer'
-  | 'playerAndLayer';
+  | 'playerAndLayer'
+  | 'playerAndCard';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -134,6 +135,20 @@ export const URANUS_POWER: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master',
 };
 
+export const SECRET_PASSAGE_TELEPORT: ActiveSkillDescriptor = {
+  id: '__any_master__.secret_passage_teleport',
+  characterId: '__any__',
+  move: 'playSecretPassageTeleport',
+  nameKey: 'skill.master.secret_passage_teleport.name',
+  descKey: 'skill.master.secret_passage_teleport.desc',
+  argKind: 'playerAndCard',
+  extraCheck: (ctx) =>
+    ctx.faction === 'master' &&
+    ctx.hand.length > 0 &&
+    // 传送剂使用限 2/回合
+    (ctx.skillUsedThisTurn['secret_passage_teleport'] ?? 0) < 2,
+};
+
 export const MASTER_DISCARD_HIDDEN_NIGHTMARE: ActiveSkillDescriptor = {
   id: '__any_master__.discard_hidden_nightmare',
   characterId: '__any__',
@@ -231,6 +246,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   URANUS_POWER,
   MASTER_DISCARD_HIDDEN_NIGHTMARE,
   MASTER_ACTIVATE_NIGHTMARE,
+  SECRET_PASSAGE_TELEPORT,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

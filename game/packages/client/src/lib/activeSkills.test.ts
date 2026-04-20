@@ -247,6 +247,42 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
   });
 });
 
+describe('getAvailableActiveSkills · 密道·传送（playerAndCard）', () => {
+  it('梦主 + 手牌 + 未用满 → 含', async () => {
+    const { SECRET_PASSAGE_TELEPORT } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({ faction: 'master', characterId: 'dm_x', hand: ['action_unlock'] }),
+    );
+    expect(list).toContain(SECRET_PASSAGE_TELEPORT);
+  });
+
+  it('已用 2 次 → 不含（回合限 2）', async () => {
+    const { SECRET_PASSAGE_TELEPORT } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        faction: 'master',
+        characterId: 'dm_x',
+        hand: ['action_unlock'],
+        skillUsedThisTurn: { secret_passage_teleport: 2 },
+      }),
+    );
+    expect(list).not.toContain(SECRET_PASSAGE_TELEPORT);
+  });
+
+  it('盗梦者 → 不含', async () => {
+    const { SECRET_PASSAGE_TELEPORT } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({ faction: 'thief', characterId: 'thief_any', hand: ['action_unlock'] }),
+    );
+    expect(list).not.toContain(SECRET_PASSAGE_TELEPORT);
+  });
+
+  it('argKind = playerAndCard', async () => {
+    const { SECRET_PASSAGE_TELEPORT } = await import('./activeSkills.js');
+    expect(SECRET_PASSAGE_TELEPORT.argKind).toBe('playerAndCard');
+  });
+});
+
 describe('getAvailableActiveSkills · 灵魂牧师·拯救 & 天王星·权力', () => {
   it('灵魂牧师 + 手牌 → 含 PAPRIK', async () => {
     const { PAPRIK_SALVATION } = await import('./activeSkills.js');
