@@ -89,6 +89,7 @@ import {
   SUDGER_SKILL_ID,
   applySagittariusHeartLock,
   SAGITTARIUS_HEART_LOCK_SKILL_ID,
+  applySpaceQueenStashTop,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -990,7 +991,7 @@ export const InceptionCityGame = {
             s = applyInterpreterForeshadow(s, unlockerId);
             // 梦境猎手·满载：成功解封后抽 = 当层心锁数
             s = applyExtractorBounty(s, unlockerId);
-            // abilities registry：运行 onUnlock passive（空间女王·监察 等）
+            // abilities registry：运行 onUnlock passive（空间女王·交错 等）
             s = dispatchPassives(s, 'onUnlock').state;
             return s;
           },
@@ -2050,6 +2051,18 @@ export const InceptionCityGame = {
             }
             events.endTurn();
             return G;
+          },
+          client: false,
+        },
+        // 空间女王·造物：弃牌阶段放 1 手牌到牌库顶
+        // 对照：docs/manual/05-dream-thieves.md 空间女王
+        useSpaceQueenStashTop: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+            if (G.turnPhase !== 'discard') return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
+            const result = applySpaceQueenStashTop(G, ctx.currentPlayer, cardId);
+            if (result === null) return INVALID_MOVE;
+            return result;
           },
           client: false,
         },

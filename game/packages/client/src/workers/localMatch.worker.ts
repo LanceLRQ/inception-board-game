@@ -65,8 +65,9 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'resolveLibraSplit',
     'resolveLibraPick',
     'playForgerExchangeSingle',
+    'useSpaceQueenStashTop',
   ],
-  discard: ['doDiscard', 'skipDiscard'],
+  discard: ['doDiscard', 'skipDiscard', 'useSpaceQueenStashTop'],
 };
 
 // move 优先级：数字小 = 更优先
@@ -121,6 +122,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   resolveLibraPick: 0, // pendingLibra step 3：优先处理
   playLibraBalance: 117, // 天秤入口（盗梦者主动技能，中优先级）
   playForgerExchangeSingle: 118, // 欺诈师入口（同上）
+  useSpaceQueenStashTop: 220, // 空间女王·造物（Bot L0 不主动选）
   skipDiscard: 1,
   doDiscard: 2,
 };
