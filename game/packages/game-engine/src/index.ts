@@ -124,10 +124,17 @@ export {
   applyChessTranspose,
   applyChessWorldViewPeek,
   getChessUsesLeft,
+  applyTouristAssist,
+  canUseTouristAssist,
+  applyLeoKingdom,
+  isCapricornusRhythmActive,
   POINTMAN_SKILL_ID,
   INTERPRETER_SKILL_ID,
   FORTRESS_SKILL_ID,
   CHESS_SKILL_ID,
+  TOURIST_SKILL_ID,
+  LEO_SKILL_ID,
+  CAPRICORNUS_SKILL_ID,
 } from './engine/skills.js';
 
 // 测试 fixtures（B12）

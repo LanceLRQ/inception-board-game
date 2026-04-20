@@ -32,6 +32,9 @@ import {
   applyPointmanAssault,
   applyInterpreterForeshadow,
   applyChessTranspose,
+  applyTouristAssist,
+  applyLeoKingdom,
+  isCapricornusRhythmActive,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -190,6 +193,8 @@ export const InceptionCityGame = {
             const drawn = afterHand.slice(beforeHand.length);
             // 先锋技能：抽到 action_dream_transit 则额外抽 2 张
             s = applyPointmanAssault(s, G.currentPlayerID, drawn);
+            // 狮子王道：抽完后从牌库顶额外抽 = 梦主手牌数
+            s = applyLeoKingdom(s, G.currentPlayerID);
             s = setTurnPhase(s, 'action');
             return s;
           },
@@ -527,7 +532,13 @@ export const InceptionCityGame = {
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (player.faction !== 'thief') return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
-            if (player.successfulUnlocksThisTurn >= G.maxUnlockPerTurn) return INVALID_MOVE;
+            // 摩羯·节奏：手牌数 >= 所在层数字时，解封次数不受限制
+            if (
+              player.successfulUnlocksThisTurn >= G.maxUnlockPerTurn &&
+              !isCapricornusRhythmActive(player)
+            ) {
+              return INVALID_MOVE;
+            }
 
             const currentLayer = player.currentLayer;
             const layerState = G.layers[currentLayer];
@@ -945,6 +956,19 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 穿行者·支助：将所有手牌（≥1）给目标，自己移到目标层
+        // 对照：docs/manual/05-dream-thieves.md 穿行者
+        playTouristAssist: {
+          move: ({ G, ctx }: MoveCtx, targetPlayerID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const next = applyTouristAssist(G, ctx.currentPlayer, targetPlayerID);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
         // --- 弃牌阶段 ---
         doDiscard: {
           move: ({ G, ctx, events }: MoveCtx, cardIds: CardID[]) => {
@@ -1238,7 +1262,8 @@ function applyShootVariant(
   if (!target.isAlive) return INVALID_MOVE;
   if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
   if (opts.sameLayerRequired && shooter.currentLayer !== target.currentLayer) {
-    return INVALID_MOVE;
+    // 摩羯·节奏：手牌数 >= 所在层数字时，SHOOT 类不受层数限制
+    if (!isCapricornusRhythmActive(shooter)) return INVALID_MOVE;
   }
 
   // 死亡宣言校验 + 附加死亡面

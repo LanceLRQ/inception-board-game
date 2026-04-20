@@ -81,6 +81,113 @@ export function applyPointmanAssault(
   return s;
 }
 
+// === 穿行者 · 支助 ===
+// 对照：docs/manual/05-dream-thieves.md 穿行者
+// 出牌阶段：可将所有手牌（最少 1 张）给另一位玩家，然后移动到该玩家所在层
+// 限制：本回合 1 次
+
+export const TOURIST_SKILL_ID = 'thief_tourist.skill_0';
+
+/** 校验穿行者支助技能是否可用 */
+export function canUseTouristAssist(state: SetupState, selfID: string, targetID: string): boolean {
+  if (selfID === targetID) return false;
+  const self = state.players[selfID];
+  const target = state.players[targetID];
+  if (!self || !target) return false;
+  if (self.characterId !== 'thief_tourist') return false;
+  if (!self.isAlive || !target.isAlive) return false;
+  if (self.hand.length < 1) return false;
+  if (!canUseSkill(self, TOURIST_SKILL_ID, 'ownTurnOncePerTurn')) return false;
+  return true;
+}
+
+/** 穿行者技能：手牌全转给 target + 自己移到 target 所在层 */
+export function applyTouristAssist(
+  state: SetupState,
+  selfID: string,
+  targetID: string,
+): SetupState | null {
+  if (!canUseTouristAssist(state, selfID, targetID)) return null;
+  const self = state.players[selfID]!;
+  const target = state.players[targetID]!;
+
+  let s = markSkillUsed(state, selfID, TOURIST_SKILL_ID);
+  // 转移手牌
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: { ...s.players[selfID]!, hand: [] },
+      [targetID]: {
+        ...s.players[targetID]!,
+        hand: [...s.players[targetID]!.hand, ...self.hand],
+      },
+    },
+  };
+  // 自己移动到 target 层
+  s = movePlayerToLayer(s, selfID, target.currentLayer);
+  return incrementMoveCounter(s);
+}
+
+// === 狮子 · 王道 ===
+// 对照：docs/manual/05-dream-thieves.md 狮子
+// 抽牌阶段：从牌库顶额外抽 = 梦主手牌数；梦主无手牌则从弃牌堆中额外选取 1 张
+// 限制：本回合 1 次
+//
+// MVP 简化：弃牌堆挑选自动取顶 1 张（不进入 pending 中间态）
+
+export const LEO_SKILL_ID = 'thief_leo.skill_0';
+
+/** 狮子技能：抽牌后触发 */
+export function applyLeoKingdom(state: SetupState, playerID: string): SetupState {
+  const player = state.players[playerID];
+  if (!player || player.characterId !== 'thief_leo') return state;
+  if (!canUseSkill(player, LEO_SKILL_ID, 'ownTurnOncePerTurn')) return state;
+
+  const masterID = state.dreamMasterID;
+  const master = state.players[masterID];
+  if (!master) return state;
+
+  let s = markSkillUsed(state, playerID, LEO_SKILL_ID);
+  const masterHandCount = master.hand.length;
+
+  if (masterHandCount > 0) {
+    // 从牌库顶额外抽 = 梦主手牌数
+    s = drawCards(s, playerID, masterHandCount);
+  } else if (s.deck.discardPile.length > 0) {
+    // 梦主无手牌：从弃牌堆顶取 1 张（MVP 简化）
+    const discardTop = s.deck.discardPile[s.deck.discardPile.length - 1]!;
+    const newDiscard = s.deck.discardPile.slice(0, -1);
+    const self = s.players[playerID]!;
+    s = {
+      ...s,
+      deck: { ...s.deck, discardPile: newDiscard },
+      players: {
+        ...s.players,
+        [playerID]: { ...self, hand: [...self.hand, discardTop] },
+      },
+    };
+  }
+  // 弃牌堆也无 → 无效果，但技能算已使用
+  return s;
+}
+
+// === 摩羯 · 节奏 ===
+// 对照：docs/manual/05-dream-thieves.md 摩羯
+// 被动：若手牌数 >= 所在层数字，则使用的 SHOOT 类不受层数限制 + 解封次数不受限制
+// 注意：摩羯效果是被动的，不进入 skillUsedThisTurn 计数
+
+export const CAPRICORNUS_SKILL_ID = 'thief_capricornus.skill_0';
+
+/** 摩羯节奏判定：玩家是否处于"节奏"激活状态 */
+export function isCapricornusRhythmActive(player: PlayerSetup): boolean {
+  if (player.characterId !== 'thief_capricornus') return false;
+  if (!player.isAlive) return false;
+  // 迷失层（0 层）不激活
+  if (player.currentLayer < 1) return false;
+  return player.hand.length >= player.currentLayer;
+}
+
 // === 译梦师 · 伏笔 ===
 // 对照：docs/manual/05-dream-thieves.md 译梦师
 // 使用【解封】时，从牌库顶抽 2 张牌
