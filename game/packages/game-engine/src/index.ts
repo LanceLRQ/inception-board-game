@@ -188,6 +188,9 @@ export {
   BLACK_SWAN_SKILL_ID,
   SPACE_QUEEN_OBSERVE_SKILL_ID,
   SPACE_QUEEN_TOP_SKILL_ID,
+  findCoinVaultsWithHiddenNightmare,
+  findMasterID,
+  applyDiscardHiddenNightmare,
 } from './engine/skills.js';
 
 // 测试 fixtures（B12）

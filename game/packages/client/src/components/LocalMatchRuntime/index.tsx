@@ -14,6 +14,7 @@ import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import { CardDetailModal } from '../CardDetailModal';
 import { CopyrightNotice } from '../CopyrightNotice';
+import { MasterNightmareDecisionBanner } from '../MasterNightmareDecisionBanner';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
@@ -1288,6 +1289,14 @@ export function LocalMatchRuntime({
       )}
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+      {/* 梦魇决策提示 · 盗梦者开金币金库后梦主 3 选 1（对照 docs/manual/03-game-flow.md:94-102） */}
+      <MasterNightmareDecisionBanner
+        G={G as never}
+        currentPlayerID={currentPlayerID}
+        dreamMasterID={dreamMasterID}
+        makeMove={makeMove}
+      />
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
       <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />
