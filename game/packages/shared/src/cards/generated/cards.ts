@@ -1023,7 +1023,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '背面',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_背面.webp',
     isExpansion: false,
   },
   {
@@ -1036,7 +1036,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '港口',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_港口.webp',
     isExpansion: false,
   },
   {
@@ -1049,7 +1049,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '皇城',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_皇城.webp',
     isExpansion: false,
   },
   {
@@ -1062,7 +1062,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '棋局',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_棋局.webp',
     isExpansion: false,
   },
   {
@@ -1075,7 +1075,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '黑洞',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_黑洞.webp',
     isExpansion: false,
   },
   {
@@ -1088,7 +1088,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '盛夏',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_盛夏.webp',
     isExpansion: false,
   },
   {
@@ -1101,7 +1101,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '要塞',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_要塞.webp',
     isExpansion: false,
   },
   {
@@ -1114,7 +1114,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '土星·领地',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_土星·领地.webp',
     isExpansion: false,
   },
   {
@@ -1127,7 +1127,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '天王星·苍穹',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_天王星·苍穹.webp',
     isExpansion: false,
   },
   {
@@ -1140,7 +1140,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '水星·航路',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_水星·航路.webp',
     isExpansion: false,
   },
   {
@@ -1153,7 +1153,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '木星·巅峰',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_木星·巅峰.webp',
     isExpansion: false,
   },
   {
@@ -1166,7 +1166,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '冥王星·地狱',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_冥王星·地狱.webp',
     isExpansion: false,
   },
   {
@@ -1179,7 +1179,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '密道',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_密道.webp',
     isExpansion: false,
   },
   {
@@ -1192,7 +1192,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '火星·战场',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_火星·战场.webp',
     isExpansion: false,
   },
   {
@@ -1205,7 +1205,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '海王星·泓洋',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_海王星·泓洋.webp',
     isExpansion: false,
   },
   {
@@ -1218,7 +1218,7 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '金星·镜界',
       skills: [],
     },
-    imagePath: '',
+    imagePath: 'dream-master/盗梦都市_角色牌_梦主_金星·镜界.webp',
     isExpansion: false,
   },
 ] as const;
