@@ -59,6 +59,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playLibraBalance',
     'resolveLibraSplit',
     'resolveLibraPick',
+    'playForgerExchangeSingle',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -107,6 +108,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   resolveLibraSplit: 0, // pendingLibra step 2：优先处理
   resolveLibraPick: 0, // pendingLibra step 3：优先处理
   playLibraBalance: 117, // 天秤入口（盗梦者主动技能，中优先级）
+  playForgerExchangeSingle: 118, // 欺诈师入口（同上）
   skipDiscard: 1,
   doDiscard: 2,
 };

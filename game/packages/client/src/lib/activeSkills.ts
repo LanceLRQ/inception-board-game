@@ -312,6 +312,22 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
+// R24：欺诈师·盗心（单机盲抽版）—— 选 target + 选 1 张手牌还回
+// 对照：docs/manual/05-dream-thieves.md 欺诈师 + engine/game.ts playForgerExchangeSingle
+// 从 target 抽取的卡由服务端 Random.Die 随机挑，保护隐藏信息；回合限 1 次。
+export const FORGER_EXCHANGE: ActiveSkillDescriptor = {
+  id: 'thief_forger.skill_0',
+  characterId: 'thief_forger',
+  move: 'playForgerExchangeSingle',
+  nameKey: 'skill.thief_forger.skill_0.name',
+  descKey: 'skill.thief_forger.skill_0.desc',
+  argKind: 'playerAndCard',
+  extraCheck: (ctx) => {
+    const used = ctx.skillUsedThisTurn['thief_forger.skill_0'] ?? 0;
+    return used < 1 && ctx.hand.length > 0;
+  },
+};
+
 // R23：天秤·平衡 step 1 —— bonder 选 target；后续 split + pick 由 worker 自动补完
 // 对照：docs/manual/05-dream-thieves.md 天秤 + engine/game.ts playLibraBalance
 // 单机模式简化：engine 放宽 ctx.currentPlayer guard，worker 自动代 target 对半分
@@ -420,6 +436,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   IMPERIAL_DEAL_BRIBE,
   MARS_BATTLEFIELD_EXCHANGE,
   LIBRA_BALANCE,
+  FORGER_EXCHANGE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

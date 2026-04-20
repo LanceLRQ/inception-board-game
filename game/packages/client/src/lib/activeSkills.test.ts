@@ -6,6 +6,7 @@ import {
   ARCHITECT_MAZE,
   ATHENA_AWE,
   CHEMIST_REFINE,
+  FORGER_EXCHANGE,
   GAIA_SHIFT,
   GEMINI_SYNC,
   getAvailableActiveSkills,
@@ -826,5 +827,37 @@ describe('getAvailableActiveSkills · R23 天秤·平衡', () => {
 
   it('argKind = targetPlayer', () => {
     expect(LIBRA_BALANCE.argKind).toBe('targetPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · R24 欺诈师·盗心（盲抽）', () => {
+  it('欺诈师 + 手牌>0 + 未用 → 含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_forger', hand: ['a'] }));
+    expect(list).toContain(FORGER_EXCHANGE);
+  });
+
+  it('欺诈师 + 手牌空 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_forger', hand: [] }));
+    expect(list).not.toContain(FORGER_EXCHANGE);
+  });
+
+  it('欺诈师 + 已用 1 次 → 不含（回合限 1）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_forger',
+        hand: ['a'],
+        skillUsedThisTurn: { 'thief_forger.skill_0': 1 },
+      }),
+    );
+    expect(list).not.toContain(FORGER_EXCHANGE);
+  });
+
+  it('非欺诈师角色 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_shade', hand: ['a'] }));
+    expect(list).not.toContain(FORGER_EXCHANGE);
+  });
+
+  it('argKind = playerAndCard', () => {
+    expect(FORGER_EXCHANGE.argKind).toBe('playerAndCard');
   });
 });

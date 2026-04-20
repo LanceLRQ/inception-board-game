@@ -1416,6 +1416,30 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // R24：欺诈师·盗心（单机盲抽版）—— 固定抽 1 张，用 BGIO Random 在服务端
+        // 随机挑选，避免客户端能看到 target 手牌即违反隐藏信息原则。
+        // 对照：docs/manual/05-dream-thieves.md 欺诈师 · applyForgerExchange
+        playForgerExchangeSingle: {
+          move: ({ G, ctx, random }: MoveCtx, targetID: string, returnedCardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const target = G.players[targetID];
+            if (!target || !target.isAlive) return INVALID_MOVE;
+            if (target.hand.length === 0) return INVALID_MOVE;
+            // 用 Random.Die 在服务端挑 1 张（隐藏信息保护）
+            const pickIdx = random.Die(target.hand.length) - 1;
+            const taken = target.hand[pickIdx]!;
+            const next = applyForgerExchange(G, ctx.currentPlayer, {
+              targetID,
+              takenFromTarget: [taken],
+              returnedToTarget: [returnedCardId],
+            });
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
         // 天秤·平衡 step 1：bonder 把所有手牌交给 target，进入 pendingLibra
         // 对照：docs/manual/05-dream-thieves.md 天秤
         playLibraBalance: {

@@ -227,6 +227,34 @@ describe('欺诈师 · 盗心（thief_forger）', () => {
     expect(r.players.p1!.hand).toContain('action_creation');
     expect(r.players.p2!.hand).toContain('action_kick');
   });
+
+  // R24：单机盲抽版 —— UI 调用入口，RNG 在服务端挑 1 张
+  it('R24 move 接入：playForgerExchangeSingle 盲抽 1 张', () => {
+    const s = setupForgerScenario();
+    const r = callMove(s, 'playForgerExchangeSingle', ['p2', 'action_kick'], { rolls: [1] });
+    expectMoveOk(r);
+    // target.hand 原本 [action_creation, action_peek]；rolls=[1] → Die(2)=1 → pickIdx=0
+    // → taken=action_creation；self 还 action_kick
+    expect(r.players.p1!.hand).toContain('action_creation');
+    expect(r.players.p2!.hand).toContain('action_kick');
+    expect(r.players.p1!.hand).not.toContain('action_kick');
+    expect(r.players.p2!.hand).not.toContain('action_creation');
+    // skillUsed 由 applyForgerExchange 内部标记
+    expect(r.players.p1!.skillUsedThisTurn[FORGER_SKILL_ID]).toBe(1);
+  });
+
+  it('R24 拒绝：target 手牌空', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_forger' as CardID);
+    s = setHand(s, 'p1', ['action_kick'] as CardID[]);
+    s = setHand(s, 'p2', [] as CardID[]);
+    expect(callMove(s, 'playForgerExchangeSingle', ['p2', 'action_kick'])).toBe('INVALID_MOVE');
+  });
+
+  it('R24 拒绝：还的牌不在 self 手中', () => {
+    const s = setupForgerScenario();
+    expect(callMove(s, 'playForgerExchangeSingle', ['p2', 'action_shoot'])).toBe('INVALID_MOVE');
+  });
 });
 
 // ============================================================================
