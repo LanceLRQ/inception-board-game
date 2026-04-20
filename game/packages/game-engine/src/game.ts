@@ -38,6 +38,11 @@ import {
   applyChemistRefine,
   applyLordOfWarBlackMarket,
   applyPaprikSalvation,
+  applyScorpiusPoison,
+  applyTaurusHorn,
+  canUseSkill,
+  markSkillUsed,
+  SCORPIUS_SKILL_ID,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -1318,9 +1323,36 @@ function applyShootVariant(
   const decreeCheck = validateDecree(G, ctx.currentPlayer, opts.decreeId);
   if (decreeCheck === 'INVALID') return INVALID_MOVE;
   const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
-  const roll = random.D6();
-  const result = resolveShootCustom(roll, deathFaces, opts.moveFaces);
-  let s = discardCard(G, ctx.currentPlayer, cardId);
+  const baseRoll = random.D6();
+
+  // === 角色 SHOOT 修饰链（W12 Tier B 接入） ===
+  // 天蝎·毒针：双骰差值，0 视为 1（回合限 1 次）
+  // 金牛·号角：target 掷骰后 self 再掷 1，self > target 强制 kill
+  let result: 'kill' | 'move' | 'miss';
+  let preState: SetupState = G;
+
+  if (
+    shooter.characterId === 'thief_scorpius' &&
+    canUseSkill(shooter, SCORPIUS_SKILL_ID, 'ownTurnOncePerTurn')
+  ) {
+    const roll2 = random.D6();
+    const finalRoll = applyScorpiusPoison(baseRoll, roll2);
+    result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
+    preState = markSkillUsed(preState, ctx.currentPlayer, SCORPIUS_SKILL_ID);
+  } else if (shooter.characterId === 'thief_taurus') {
+    // 金牛：先按 target 骰算 base result；若非 kill 再掷 self 骰看是否 override 为 kill
+    const baseResult = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
+    if (baseResult !== 'kill') {
+      const selfRoll = random.D6();
+      result = applyTaurusHorn(baseRoll, selfRoll) === 'kill' ? 'kill' : baseResult;
+    } else {
+      result = baseResult;
+    }
+  } else {
+    result = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
+  }
+
+  let s = discardCard(preState, ctx.currentPlayer, cardId);
 
   if (result === 'kill') {
     const tp = s.players[targetPlayerID]!;
