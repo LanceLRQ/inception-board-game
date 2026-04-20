@@ -10,7 +10,13 @@
 //   - 药剂师·调剂 (thief_chemist → playChemistRefine, 1 handCard)
 //   - 双子·协同 (thief_gemini → playGeminiSync, 无参，弃牌阶段)
 
-export type ActiveSkillArgKind = 'none' | 'targetPlayer' | 'choiceIncDec' | 'handCard';
+export type ActiveSkillArgKind =
+  | 'none'
+  | 'targetPlayer'
+  | 'choiceIncDec'
+  | 'handCard'
+  | 'cardAndPlayer'
+  | 'targetLayer';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -37,6 +43,7 @@ export interface ActiveSkillContext {
   readonly hasPending: boolean; // pendingUnlock / pendingGraft 等
   readonly skillUsedThisTurn: Record<string, number>;
   readonly hand: readonly string[];
+  readonly faction: 'thief' | 'master';
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -104,6 +111,26 @@ export const GEMINI_SYNC: ActiveSkillDescriptor = {
     ctx.masterLayer > ctx.humanLayer,
 };
 
+export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
+  id: 'thief_architect.skill_0',
+  characterId: 'thief_architect',
+  move: 'playArchitectMaze',
+  nameKey: 'skill.thief_architect.skill_0.name',
+  descKey: 'skill.thief_architect.skill_0.desc',
+  argKind: 'cardAndPlayer',
+  extraCheck: (ctx) => ctx.hand.length > 0,
+};
+
+export const PLUTO_BURNING: ActiveSkillDescriptor = {
+  id: 'dm_pluto_hell.skill_0',
+  characterId: 'dm_pluto_hell',
+  move: 'usePlutoBurning',
+  nameKey: 'skill.dm_pluto_hell.skill_0.name',
+  descKey: 'skill.dm_pluto_hell.skill_0.desc',
+  argKind: 'handCard',
+  extraCheck: (ctx) => ctx.faction === 'master' && ctx.hand.length > 0,
+};
+
 const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   SHADE_FOLLOW,
   APOLLO_WORSHIP,
@@ -111,6 +138,8 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   MARTYR_SACRIFICE,
   CHEMIST_REFINE,
   GEMINI_SYNC,
+  ARCHITECT_MAZE,
+  PLUTO_BURNING,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

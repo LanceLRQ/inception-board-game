@@ -564,6 +564,7 @@ export function LocalMatchRuntime({
           hasPending,
           skillUsedThisTurn: (humanPlayer?.skillUsedThisTurn as Record<string, number>) ?? {},
           hand: humanHand,
+          faction: humanFaction === 'master' ? 'master' : 'thief',
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players

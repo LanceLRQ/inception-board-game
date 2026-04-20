@@ -3,10 +3,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   APOLLO_WORSHIP,
+  ARCHITECT_MAZE,
   CHEMIST_REFINE,
   GEMINI_SYNC,
   getAvailableActiveSkills,
   MARTYR_SACRIFICE,
+  PLUTO_BURNING,
   SHADE_FOLLOW,
   TOURIST_ASSIST,
   type ActiveSkillContext,
@@ -23,6 +25,7 @@ function baseCtx(overrides: Partial<ActiveSkillContext> = {}): ActiveSkillContex
     hasPending: false,
     skillUsedThisTurn: {},
     hand: [],
+    faction: 'thief',
     ...overrides,
   };
 }
@@ -147,6 +150,51 @@ describe('getAvailableActiveSkills · 药剂师·调剂（handCard）', () => {
 
   it('argKind = handCard', () => {
     expect(CHEMIST_REFINE.argKind).toBe('handCard');
+  });
+});
+
+describe('getAvailableActiveSkills · 筑梦师·迷宫（cardAndPlayer）', () => {
+  it('筑梦师 + 有手牌 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_architect', hand: ['action_unlock'] }),
+    );
+    expect(list).toContain(ARCHITECT_MAZE);
+  });
+
+  it('筑梦师 + 手牌空 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_architect', hand: [] }));
+    expect(list).not.toContain(ARCHITECT_MAZE);
+  });
+
+  it('argKind = cardAndPlayer', () => {
+    expect(ARCHITECT_MAZE.argKind).toBe('cardAndPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · 冥王星·业火（梦主技能）', () => {
+  it('梦主 + 冥王星 + 有手牌 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_pluto_hell',
+        faction: 'master',
+        hand: ['action_unlock'],
+      }),
+    );
+    expect(list).toContain(PLUTO_BURNING);
+  });
+
+  it('非梦主身份 → 不含（faction=thief 守卫）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_pluto_hell', faction: 'thief', hand: ['action_unlock'] }),
+    );
+    expect(list).not.toContain(PLUTO_BURNING);
+  });
+
+  it('梦主 + 手牌空 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_pluto_hell', faction: 'master', hand: [] }),
+    );
+    expect(list).not.toContain(PLUTO_BURNING);
   });
 });
 
