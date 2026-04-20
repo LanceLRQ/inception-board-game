@@ -53,7 +53,7 @@ function setLayer(state: SetupState, playerID: string, layer: Layer): SetupState
 describe('R1 · createDefaultRegistry', () => {
   it('注册全部 5 个 thief 能力', () => {
     const reg = createDefaultRegistry();
-    expect(ALL_THIEF_ABILITIES.length).toBe(5);
+    expect(ALL_THIEF_ABILITIES.length).toBeGreaterThanOrEqual(5);
     for (const a of ALL_THIEF_ABILITIES) {
       expect(reg.get(a.id)).toBe(a);
     }

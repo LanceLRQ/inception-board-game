@@ -14,6 +14,9 @@ import { athenaWit } from './thief/athena-wit.js';
 import { aquariusUnlimited } from './thief/aquarius.js';
 import { sudgerVerdict } from './thief/sudger.js';
 import { piscesEvade } from './thief/pisces.js';
+import { jokerGamble } from './thief/joker.js';
+import { blackSwanTour } from './thief/black-swan.js';
+import { ariesExtraDraw } from './thief/aries.js';
 
 export const ALL_THIEF_ABILITIES: readonly AbilityDefinition[] = [
   virgoPerfect,
@@ -21,6 +24,9 @@ export const ALL_THIEF_ABILITIES: readonly AbilityDefinition[] = [
   aquariusUnlimited,
   sudgerVerdict,
   piscesEvade,
+  jokerGamble,
+  blackSwanTour,
+  ariesExtraDraw,
 ];
 
 export const ALL_MASTER_ABILITIES: readonly AbilityDefinition[] = [];
@@ -33,4 +39,13 @@ export function createDefaultRegistry(): InMemoryAbilityRegistry {
   return reg;
 }
 
-export { virgoPerfect, athenaWit, aquariusUnlimited, sudgerVerdict, piscesEvade };
+export {
+  virgoPerfect,
+  athenaWit,
+  aquariusUnlimited,
+  sudgerVerdict,
+  piscesEvade,
+  jokerGamble,
+  blackSwanTour,
+  ariesExtraDraw,
+};
