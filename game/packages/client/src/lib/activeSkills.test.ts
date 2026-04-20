@@ -13,6 +13,7 @@ import {
   IMPERIAL_DEAL_BRIBE,
   LORD_OF_WAR_BLACK_MARKET,
   LUNA_ECLIPSE,
+  MARS_BATTLEFIELD_EXCHANGE,
   MARS_KILL,
   MARTYR_SACRIFICE,
   MASTER_DEAL_BRIBE,
@@ -727,5 +728,70 @@ describe('getAvailableActiveSkills · R20 皇城·重金', () => {
 
   it('argKind = playerAndBribeIndex', () => {
     expect(IMPERIAL_DEAL_BRIBE.argKind).toBe('playerAndBribeIndex');
+  });
+});
+
+describe('getAvailableActiveSkills · R21 火星·战场世界观', () => {
+  it('世界观激活 + 手牌≥2 + 弃牌堆非空 → 含（任意阵营）', () => {
+    const list1 = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_shade',
+        faction: 'thief',
+        hand: ['a', 'b'],
+        discardPile: ['action_shoot'],
+        marsBattlefieldActive: true,
+      }),
+    );
+    const list2 = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_mars_battlefield',
+        faction: 'master',
+        hand: ['a', 'b'],
+        discardPile: ['action_shoot'],
+        marsBattlefieldActive: true,
+      }),
+    );
+    expect(list1).toContain(MARS_BATTLEFIELD_EXCHANGE);
+    expect(list2).toContain(MARS_BATTLEFIELD_EXCHANGE);
+  });
+
+  it('世界观未激活 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_shade',
+        hand: ['a', 'b'],
+        discardPile: ['action_shoot'],
+        marsBattlefieldActive: false,
+      }),
+    );
+    expect(list).not.toContain(MARS_BATTLEFIELD_EXCHANGE);
+  });
+
+  it('世界观激活 + 手牌 1 张 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_shade',
+        hand: ['a'],
+        discardPile: ['action_shoot'],
+        marsBattlefieldActive: true,
+      }),
+    );
+    expect(list).not.toContain(MARS_BATTLEFIELD_EXCHANGE);
+  });
+
+  it('世界观激活 + 弃牌堆空 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_shade',
+        hand: ['a', 'b'],
+        discardPile: [],
+        marsBattlefieldActive: true,
+      }),
+    );
+    expect(list).not.toContain(MARS_BATTLEFIELD_EXCHANGE);
+  });
+
+  it('argKind = twoCardsAndShoot', () => {
+    expect(MARS_BATTLEFIELD_EXCHANGE.argKind).toBe('twoCardsAndShoot');
   });
 });

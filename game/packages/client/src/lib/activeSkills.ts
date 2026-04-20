@@ -23,7 +23,8 @@ export type ActiveSkillArgKind =
   | 'multiCardAndPlayer'
   | 'layerShiftPicks'
   | 'multiCardAndDiscardCard'
-  | 'playerAndBribeIndex';
+  | 'playerAndBribeIndex'
+  | 'twoCardsAndShoot';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -63,6 +64,8 @@ export interface ActiveSkillContext {
   readonly discardPile?: readonly string[];
   /** 贿赂池中仍 inPool 的项（皇城·重金用）：{ index, id } 对，id 带 deal/fail 标识 */
   readonly bribePoolItems?: readonly { readonly index: number; readonly id: string }[];
+  /** 火星·战场世界观是否激活（= 当前梦主 = dm_mars_battlefield） */
+  readonly marsBattlefieldActive?: boolean;
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -309,6 +312,22 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
+// R21：火星·战场世界观 —— 弃 2 张非 SHOOT 手牌 → 从弃牌堆取 1 张 SHOOT
+// 对照：cards-data.json dm_mars_battlefield 世界观 + engine/game.ts useMarsBattlefield
+// 世界观激活时对所有存活玩家可用，SHOOT 类筛选交由 engine 精校
+export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
+  id: '__any__.mars_battlefield_exchange',
+  characterId: '__any__',
+  move: 'useMarsBattlefield',
+  nameKey: 'skill.dm_mars_battlefield.world.name',
+  descKey: 'skill.dm_mars_battlefield.world.desc',
+  argKind: 'twoCardsAndShoot',
+  extraCheck: (ctx) =>
+    ctx.marsBattlefieldActive === true &&
+    ctx.hand.length >= 2 &&
+    (ctx.discardPile?.length ?? 0) > 0,
+};
+
 // R20：皇城·重金 —— 梦主指定池中 1 张贿赂派给盗梦者（替代随机抽）
 // 对照：cards-data.json dm_imperial_city + engine/game.ts masterDealBribeImperial
 export const IMPERIAL_DEAL_BRIBE: ActiveSkillDescriptor = {
@@ -381,6 +400,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   GAIA_SHIFT,
   LORD_OF_WAR_BLACK_MARKET,
   IMPERIAL_DEAL_BRIBE,
+  MARS_BATTLEFIELD_EXCHANGE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

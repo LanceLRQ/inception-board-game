@@ -595,6 +595,10 @@ export function LocalMatchRuntime({
                 .filter((b) => b.status === 'inPool')
                 .map(({ index, id }) => ({ index, id }))
             : [],
+          marsBattlefieldActive:
+            !!players &&
+            !!dreamMasterID &&
+            (players[dreamMasterID]?.characterId as string) === 'dm_mars_battlefield',
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players

@@ -71,6 +71,12 @@ export function ActiveSkillPanel({
     skill: ActiveSkillDescriptor;
     targetId: string | null;
   } | null>(null);
+  // twoCardsAndShoot: 选 2 张手牌 → 选弃牌堆 SHOOT 1 张（火星·战场世界观）
+  const [pendingTwoCardsShootSkill, setPendingTwoCardsShootSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    selected: string[];
+    phase: 'cards' | 'shoot';
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -86,7 +92,8 @@ export function ActiveSkillPanel({
     !pendingMultiCardPlayerSkill &&
     !pendingLayerShiftSkill &&
     !pendingMultiCardDiscardSkill &&
-    !pendingPlayerBribeSkill
+    !pendingPlayerBribeSkill &&
+    !pendingTwoCardsShootSkill
   )
     return null;
 
@@ -141,6 +148,10 @@ export function ActiveSkillPanel({
     }
     if (skill.argKind === 'playerAndBribeIndex') {
       setPendingPlayerBribeSkill({ skill, targetId: null });
+      return;
+    }
+    if (skill.argKind === 'twoCardsAndShoot') {
+      setPendingTwoCardsShootSkill({ skill, selected: [], phase: 'cards' });
       return;
     }
   };
@@ -244,6 +255,35 @@ export function ActiveSkillPanel({
     setPendingPlayerBribeSkill(null);
   };
 
+  const toggleTwoCardsShoot = (cardId: string) => {
+    setPendingTwoCardsShootSkill((prev) => {
+      if (!prev || prev.phase !== 'cards') return prev;
+      const idx = prev.selected.indexOf(cardId);
+      if (idx >= 0) {
+        const next = [...prev.selected];
+        next.splice(idx, 1);
+        return { ...prev, selected: next };
+      }
+      // 最多 2 张
+      if (prev.selected.length >= 2) return prev;
+      return { ...prev, selected: [...prev.selected, cardId] };
+    });
+  };
+
+  const advanceTwoCardsShoot = () => {
+    setPendingTwoCardsShootSkill((prev) =>
+      prev && prev.selected.length === 2 ? { ...prev, phase: 'shoot' } : prev,
+    );
+  };
+
+  const confirmTwoCardsShoot = (shootCardId: string) => {
+    if (!pendingTwoCardsShootSkill || pendingTwoCardsShootSkill.selected.length !== 2) return;
+    const [c1, c2] = pendingTwoCardsShootSkill.selected;
+    // useMarsBattlefield 签名：discardCard1, discardCard2, targetShootCardId（三独立参数）
+    onInvoke(pendingTwoCardsShootSkill.skill, [c1, c2, shootCardId]);
+    setPendingTwoCardsShootSkill(null);
+  };
+
   const confirmPlayerCard = (cardId: string) => {
     if (!pendingPlayerCardSkill || !pendingPlayerCardSkill.targetId) return;
     onInvoke(pendingPlayerCardSkill.skill, [pendingPlayerCardSkill.targetId, cardId]);
@@ -307,7 +347,8 @@ export function ActiveSkillPanel({
         !pendingMultiCardPlayerSkill &&
         !pendingLayerShiftSkill &&
         !pendingMultiCardDiscardSkill &&
-        !pendingPlayerBribeSkill && (
+        !pendingPlayerBribeSkill &&
+        !pendingTwoCardsShootSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -761,6 +802,83 @@ export function ActiveSkillPanel({
               onClick={() => setPendingPlayerBribeSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-pb"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingTwoCardsShootSkill && (
+        <div className="space-y-2" data-testid="active-skill-two-cards-shoot-picker">
+          <div className="text-xs text-muted-foreground">
+            {pendingTwoCardsShootSkill.phase === 'cards'
+              ? t('skill.chooseTwoNonShoot', {
+                  defaultValue: '选 2 张非 SHOOT 手牌弃掉：',
+                })
+              : t('skill.chooseDiscardShoot', {
+                  defaultValue: '从弃牌堆选 1 张 SHOOT：',
+                })}
+            <span className="ml-1 text-foreground">
+              {t(pendingTwoCardsShootSkill.skill.nameKey, {
+                defaultValue: pendingTwoCardsShootSkill.skill.id,
+              })}
+            </span>
+            {pendingTwoCardsShootSkill.phase === 'cards' && (
+              <span className="ml-2 text-muted-foreground">
+                ({pendingTwoCardsShootSkill.selected.length}/2)
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {pendingTwoCardsShootSkill.phase === 'cards' &&
+              context.hand.map((cardId, idx) => {
+                const active = pendingTwoCardsShootSkill.selected.includes(cardId);
+                return (
+                  <button
+                    key={`${cardId}-${idx}`}
+                    type="button"
+                    onClick={() => toggleTwoCardsShoot(cardId)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs hover:border-primary',
+                      active
+                        ? 'border-primary bg-primary/20 text-primary'
+                        : 'border-border bg-muted',
+                    )}
+                    data-testid={`active-skill-tcs-card-${idx}`}
+                  >
+                    {cardId}
+                  </button>
+                );
+              })}
+            {pendingTwoCardsShootSkill.phase === 'cards' && (
+              <button
+                type="button"
+                onClick={advanceTwoCardsShoot}
+                className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/80"
+                data-testid="active-skill-next-tcs"
+                disabled={pendingTwoCardsShootSkill.selected.length !== 2}
+              >
+                {t('common.next', { defaultValue: '下一步' })}
+              </button>
+            )}
+            {pendingTwoCardsShootSkill.phase === 'shoot' &&
+              (context.discardPile ?? []).map((cardId, idx) => (
+                <button
+                  key={`shoot-${cardId}-${idx}`}
+                  type="button"
+                  onClick={() => confirmTwoCardsShoot(cardId)}
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-tcs-shoot-${idx}`}
+                >
+                  {cardId}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setPendingTwoCardsShootSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-tcs"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>
