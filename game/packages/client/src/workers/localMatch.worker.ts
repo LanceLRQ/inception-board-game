@@ -48,6 +48,10 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'masterDiscardNightmare',
     'masterActivateNightmare',
     'playNightmareUnlock',
+    'masterDealBribeImperial',
+    'playSecretPassageTeleport',
+    'useUranusPower',
+    'usePlutoBurning',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -83,6 +87,10 @@ const MOVE_PRIORITY: Record<string, number> = {
   masterDiscardNightmare: 201,
   masterActivateNightmare: 202,
   playNightmareUnlock: 110,
+  masterDealBribeImperial: 210,
+  playSecretPassageTeleport: 211,
+  useUranusPower: 212,
+  usePlutoBurning: 213,
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   skipDiscard: 1,

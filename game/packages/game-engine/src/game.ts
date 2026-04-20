@@ -71,9 +71,13 @@ import {
   isJupiterPeakWorldActive,
   isJupiterPeakLayerOK,
   shouldJupiterThunderKill,
+  canImperialPickBribe,
+  applySecretPassageTeleport,
+  applyUranusPower,
+  applyPlutoBurning,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
-import type { CardID, Faction } from '@icgame/shared';
+import type { CardID, Faction, Layer } from '@icgame/shared';
 
 export type { SetupState } from './setup.js';
 
@@ -807,6 +811,97 @@ export const InceptionCityGame = {
             };
             s = incrementMoveCounter(s);
             return s;
+          },
+          client: false,
+        },
+
+        // 皇城·重金（W16-B）：派发贿赂时可指定 1 张牌（替代随机抽取）
+        // 对照：cards-data.json dm_imperial_city
+        masterDealBribeImperial: {
+          move: ({ G, ctx }: MoveCtx, targetPlayerID: string, poolIndex: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            if (!canImperialPickBribe(G, ctx.currentPlayer, targetPlayerID, poolIndex))
+              return INVALID_MOVE;
+
+            const target = G.players[targetPlayerID]!;
+            const bribe = G.bribePool[poolIndex]!;
+            const isDeal = bribe.id.startsWith('bribe-deal-');
+
+            const nextPool = G.bribePool.map((b, i) =>
+              i === poolIndex
+                ? {
+                    ...b,
+                    status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
+                    heldBy: targetPlayerID,
+                    originalOwnerId: targetPlayerID,
+                  }
+                : b,
+            );
+
+            let s: SetupState = {
+              ...G,
+              bribePool: nextPool,
+              players: {
+                ...G.players,
+                [targetPlayerID]: {
+                  ...target,
+                  bribeReceived: target.bribeReceived + 1,
+                  faction: isDeal ? ('master' as Faction) : target.faction,
+                },
+              },
+            };
+            s = incrementMoveCounter(s);
+            return s;
+          },
+          client: false,
+        },
+
+        // 密道·传送（W16-B）：弃 1 穿梭剂送任一盗梦者到迷失层。回合限 2 次。
+        // 对照：cards-data.json dm_secret_passage
+        playSecretPassageTeleport: {
+          move: ({ G, ctx }: MoveCtx, targetPlayerID: string, transitCardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const result = applySecretPassageTeleport(
+              G,
+              ctx.currentPlayer,
+              targetPlayerID,
+              transitCardId,
+            );
+            if (result === null) return INVALID_MOVE;
+            return incrementMoveCounter(result);
+          },
+          client: false,
+        },
+
+        // 天王星·权力（W16-B）：每未派发贿赂可移动 1 个盗梦者到指定层（非迷失层）
+        // 对照：cards-data.json dm_uranus_firmament
+        useUranusPower: {
+          move: ({ G, ctx }: MoveCtx, targetPlayerID: string, targetLayer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const result = applyUranusPower(
+              G,
+              ctx.currentPlayer,
+              targetPlayerID,
+              targetLayer as Layer,
+            );
+            if (result === null) return INVALID_MOVE;
+            return incrementMoveCounter(result);
+          },
+          client: false,
+        },
+
+        // 冥王星·业火（W16-B）：弃 1 → 所有手牌<2 的盗梦者抽 2
+        // 对照：cards-data.json dm_pluto_hell
+        usePlutoBurning: {
+          move: ({ G, ctx }: MoveCtx, discardCardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const result = applyPlutoBurning(G, ctx.currentPlayer, discardCardId);
+            if (result === null) return INVALID_MOVE;
+            return incrementMoveCounter(result);
           },
           client: false,
         },

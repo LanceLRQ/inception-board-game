@@ -1636,3 +1636,179 @@ export function canSaturnFreeMove(state: SetupState, playerID: string): boolean 
   if (!p || p.faction !== 'thief' || !p.isAlive) return false;
   return p.bribeReceived > 0;
 }
+
+// ============================================================================
+// W16-B 梦主主动技能（4 角色 · engine 接入）
+// ============================================================================
+// 皇城·重金 / 密道·传送 / 天王星·权力 / 冥王星·业火
+// 对照：cards-data.json + docs/manual/06-dream-master.md
+
+// === 皇城 · 重金 ===
+// 派发贿赂时，可以选取 1 张给予该盗梦者（替代随机抽取）
+// 对照：cards-data.json dm_imperial_city
+
+export const IMPERIAL_BRIBE_SKILL_ID = 'dm_imperial_city.skill_0';
+
+/** 皇城·重金：是否可以使用（梦主为皇城且目标合法） */
+export function canImperialPickBribe(
+  state: SetupState,
+  masterID: string,
+  targetID: string,
+  poolIndex: number,
+): boolean {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_imperial_city') return false;
+  if (!master.isAlive) return false;
+  const target = state.players[targetID];
+  if (!target || !target.isAlive || target.faction !== 'thief') return false;
+  const pool = state.bribePool;
+  if (poolIndex < 0 || poolIndex >= pool.length) return false;
+  return pool[poolIndex]!.status === 'inPool';
+}
+
+// === 密道 · 传送 ===
+// 你的梦境穿梭剂可以将任一盗梦者移动至迷失层。回合限 2 次。
+// 被送至迷失层的盗梦者不需要给予手牌（跳过击杀状态）
+// 对照：cards-data.json dm_secret_passage
+
+export const SECRET_PASSAGE_SKILL_ID = 'dm_secret_passage.skill_0';
+const SECRET_PASSAGE_MAX_USES_PER_TURN = 2;
+
+/** 密道·传送：把任一盗梦者送到迷失层 */
+export function applySecretPassageTeleport(
+  state: SetupState,
+  masterID: string,
+  targetID: string,
+  transitCardId: CardID,
+): SetupState | null {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_secret_passage') return null;
+  if (!master.isAlive) return null;
+  const target = state.players[targetID];
+  if (!target || !target.isAlive || target.faction !== 'thief') return null;
+  if (transitCardId !== 'action_dream_transit') return null;
+  if (!master.hand.includes(transitCardId)) return null;
+  if (
+    !canUseSkill(master, SECRET_PASSAGE_SKILL_ID, 'ownTurnLimitN', SECRET_PASSAGE_MAX_USES_PER_TURN)
+  )
+    return null;
+
+  // 弃掉穿梭剂
+  const idx = master.hand.indexOf(transitCardId);
+  const newHand = [...master.hand];
+  newHand.splice(idx, 1);
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [masterID]: { ...master, hand: newHand },
+    },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, transitCardId],
+    },
+  };
+  s = markSkillUsed(s, masterID, SECRET_PASSAGE_SKILL_ID);
+  // 直接送到迷失层（跳过击杀状态，保留手牌）
+  s = movePlayerToLayer(s, targetID, 0);
+  return s;
+}
+
+/** 检查密道·传送剩余次数 */
+export function getSecretPassageUsesLeft(player: PlayerSetup): number {
+  if (player.characterId !== 'dm_secret_passage') return 0;
+  const used = player.skillUsedThisTurn[SECRET_PASSAGE_SKILL_ID] ?? 0;
+  return Math.max(0, SECRET_PASSAGE_MAX_USES_PER_TURN - used);
+}
+
+// === 天王星·苍穹 · 权力 ===
+// 出牌阶段，每拥有 1 张未派发贿赂 → 可令一位盗梦者移动到除迷失层外指定层数
+// 必须移动到不同层；可重复对同一人
+// 对照：cards-data.json dm_uranus_firmament
+
+export const URANUS_POWER_SKILL_ID = 'dm_uranus_firmament.skill_0';
+
+/** 天王星·权力：移动指定盗梦者到指定层（非迷失层） */
+export function applyUranusPower(
+  state: SetupState,
+  masterID: string,
+  targetID: string,
+  targetLayer: Layer,
+): SetupState | null {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_uranus_firmament') return null;
+  if (!master.isAlive) return null;
+  const target = state.players[targetID];
+  if (!target || !target.isAlive || target.faction !== 'thief') return null;
+  // 必须移动到不同层
+  if (target.currentLayer === targetLayer) return null;
+  // 不能送迷失层
+  if (targetLayer < 1 || targetLayer > 4) return null;
+
+  // 上限 = 未派发贿赂数
+  const inPoolCount = state.bribePool.filter((b) => b.status === 'inPool').length;
+  if (inPoolCount === 0) return null;
+  const usedThisTurn = master.skillUsedThisTurn[URANUS_POWER_SKILL_ID] ?? 0;
+  if (usedThisTurn >= inPoolCount) return null;
+
+  let s = markSkillUsed(state, masterID, URANUS_POWER_SKILL_ID);
+  s = movePlayerToLayer(s, targetID, targetLayer);
+  return s;
+}
+
+/** 天王星·权力剩余次数 */
+export function getUranusPowerUsesLeft(state: SetupState, player: PlayerSetup): number {
+  if (player.characterId !== 'dm_uranus_firmament') return 0;
+  const inPoolCount = state.bribePool.filter((b) => b.status === 'inPool').length;
+  const usedThisTurn = player.skillUsedThisTurn[URANUS_POWER_SKILL_ID] ?? 0;
+  return Math.max(0, inPoolCount - usedThisTurn);
+}
+
+// === 冥王星·地狱 · 业火 ===
+// 弃 1 张手牌 → 让所有手牌不足 2 张的盗梦者从牌库顶各抽 2 张
+// 回合限 1 次（以技能定义为准；规则未明确次数，保守 ownTurnOncePerTurn）
+// 对照：cards-data.json dm_pluto_hell
+
+export const PLUTO_BURNING_SKILL_ID = 'dm_pluto_hell.skill_0';
+const PLUTO_DRAW_THRESHOLD = 2;
+const PLUTO_DRAW_AMOUNT = 2;
+
+/** 冥王星·业火：弃 1 → 所有手牌<2 的盗梦者抽 2 */
+export function applyPlutoBurning(
+  state: SetupState,
+  masterID: string,
+  discardCardId: CardID,
+): SetupState | null {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_pluto_hell') return null;
+  if (!master.isAlive) return null;
+  if (!canUseSkill(master, PLUTO_BURNING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  const idx = master.hand.indexOf(discardCardId);
+  if (idx === -1) return null;
+
+  // 弃 1
+  const newHand = [...master.hand];
+  newHand.splice(idx, 1);
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [masterID]: { ...master, hand: newHand },
+    },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, discardCardId],
+    },
+  };
+  s = markSkillUsed(s, masterID, PLUTO_BURNING_SKILL_ID);
+
+  // 所有手牌<2 的存活盗梦者抽 2
+  const targets = s.playerOrder.filter((pid) => {
+    const p = s.players[pid];
+    return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;
+  });
+  for (const pid of targets) {
+    s = drawCards(s, pid, PLUTO_DRAW_AMOUNT);
+  }
+  return s;
+}
