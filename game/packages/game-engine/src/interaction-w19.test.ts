@@ -60,6 +60,10 @@ import {
   applyShadeFollow,
   applySaturnFreeMove,
   canUseSaturnFreeMoveThisTurn,
+  applyUranusFirmamentMoveDiscard,
+  applyMarsBattlefieldExchange,
+  applyMarsKillDiscardUnlock,
+  applySaturnDecree,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -1728,5 +1732,232 @@ describe('W19-A · 土星世界观免费移动 apply 分支（R37）', () => {
       },
     };
     expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(false);
+  });
+});
+
+// ============================================================================
+// R38 · W19-A 交互矩阵扩充（第十一批 · 天王星世界观 / 火星战场 / 土星律令）
+// ============================================================================
+describe('W19-A · 天王星·苍穹世界观弃牌堆顶（R38）', () => {
+  it('非天王星梦主 → state 不变', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const before = s.deck.cards.length;
+    s = applyUranusFirmamentMoveDiscard(s, 'p1');
+    expect(s.deck.cards.length).toBe(before);
+  });
+
+  it('天王星 + inPool>0 + thief 层变 → 弃 1 张牌库顶', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    s = {
+      ...s,
+      deck: {
+        cards: ['a' as CardID, 'b' as CardID, 'c' as CardID],
+        discardPile: [],
+      },
+    };
+    const r = applyUranusFirmamentMoveDiscard(s, 'p1');
+    expect(r.deck.cards.length).toBe(2);
+    expect(r.deck.discardPile).toEqual(['a']);
+  });
+
+  it('天王星 + inPool=0 → 弃 2 张牌库顶（梦主派发完毕加码）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    // bribePool 默认空（inPool=0）
+    s = {
+      ...s,
+      deck: {
+        cards: ['a' as CardID, 'b' as CardID, 'c' as CardID],
+        discardPile: [],
+      },
+    };
+    const r = applyUranusFirmamentMoveDiscard(s, 'p1');
+    expect(r.deck.cards.length).toBe(1);
+    expect(r.deck.discardPile).toEqual(['a', 'b']);
+  });
+
+  it('天王星 + thief 层变 + 牌库空 → state 不变', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    s = { ...s, deck: { cards: [], discardPile: [] } };
+    const r = applyUranusFirmamentMoveDiscard(s, 'p1');
+    expect(r.deck.cards.length).toBe(0);
+    expect(r.deck.discardPile.length).toBe(0);
+  });
+
+  it('天王星 + master 层变（非 thief）→ 不触发', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    s = {
+      ...s,
+      deck: { cards: ['a' as CardID, 'b' as CardID], discardPile: [] },
+    };
+    const mid = findMasterID(s)!;
+    const r = applyUranusFirmamentMoveDiscard(s, mid);
+    expect(r.deck.cards.length).toBe(2); // master 触发不弃
+  });
+});
+
+describe('W19-A · 火星·战场世界观交换（R38）', () => {
+  it('非火星梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_shift' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot' as CardID] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_unlock' as CardID, 'action_shift' as CardID],
+      'action_shoot' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+
+  it('火星 + 弃 2 非 SHOOT + 弃堆有 SHOOT → 交换成功', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_shift' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot' as CardID] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_unlock' as CardID, 'action_shift' as CardID],
+      'action_shoot' as CardID,
+    );
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toEqual(['action_shoot']);
+    // 弃堆中 shoot 被取走，新增 2 张非 shoot
+    expect(r!.deck.discardPile.sort()).toEqual(['action_shift', 'action_unlock']);
+  });
+
+  it('火星 + 弃的任一张是 SHOOT → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, 'p1', ['action_shoot' as CardID, 'action_shift' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot_king' as CardID] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_shoot' as CardID, 'action_shift' as CardID],
+      'action_shoot_king' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+
+  it('火星 + 目标非 SHOOT → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_shift' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_kick' as CardID] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_unlock' as CardID, 'action_shift' as CardID],
+      'action_kick' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+
+  it('火星 + 目标 SHOOT 不在弃堆 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_shift' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: [] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_unlock' as CardID, 'action_shift' as CardID],
+      'action_shoot' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+
+  it('火星 + 同名双弃（2 张 unlock）+ 手牌含 2 张 → 成功', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_unlock' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot' as CardID] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_unlock' as CardID, 'action_unlock' as CardID],
+      'action_shoot' as CardID,
+    );
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toEqual(['action_shoot']);
+  });
+
+  it('火星 + 同名双弃但手牌只有 1 张 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot' as CardID] } };
+    const r = applyMarsBattlefieldExchange(
+      s,
+      'p1',
+      ['action_unlock' as CardID, 'action_unlock' as CardID],
+      'action_shoot' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 土星·领地律令（R38）', () => {
+  it('非土星梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    s = { ...s, deck: { cards: ['a' as CardID], discardPile: [] } };
+    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('土星 + 手牌有指定弃牌 → 弃 1 抽 1', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    s = { ...s, deck: { cards: ['action_shoot' as CardID], discardPile: [] } };
+    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
+    expect(r).not.toBeNull();
+    // 弃 unlock + 抽 shoot
+    expect(r!.players[mid]!.hand).toEqual(['action_shoot']);
+    expect(r!.deck.discardPile).toEqual(['action_unlock']);
+  });
+
+  it('土星 + 手牌无指定弃牌 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_shoot' as CardID]);
+    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('土星梦主 + 死亡 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    s = { ...s, players: { ...s.players, [mid]: { ...s.players[mid]!, isAlive: false } } };
+    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 火星·杀戮弃解封（R38）', () => {
+  it('非火星梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    const r = applyMarsKillDiscardUnlock(s, mid);
+    expect(r).toBeNull();
+  });
+
+  it('火星 + 手牌有 unlock → 成功弃 1', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID, 'action_shoot' as CardID]);
+    const r = applyMarsKillDiscardUnlock(s, mid);
+    expect(r).not.toBeNull();
+    expect(r!.players[mid]!.hand).toEqual(['action_shoot']);
+  });
+
+  it('火星 + 手牌无 unlock → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_shoot' as CardID]);
+    const r = applyMarsKillDiscardUnlock(s, mid);
+    expect(r).toBeNull();
   });
 });
