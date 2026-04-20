@@ -69,6 +69,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'useBlackHoleAbsorb',
     'useImperialCityWorldShoot',
     'playRevive',
+    'useVenusMirrorWorld',
   ],
   discard: ['doDiscard', 'skipDiscard', 'useSpaceQueenStashTop'],
 };
@@ -130,6 +131,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   useBlackHoleAbsorb: 119, // 黑洞·吸纳（盗梦者主动技能，中优先级）
   useImperialCityWorldShoot: 120, // 皇城世界观（中优先级）
   playRevive: 50, // 复活（高优先级，推进游戏流程）
+  useVenusMirrorWorld: 130, // 金星·镜界世界观（中低优先级）
   skipDiscard: 1,
   doDiscard: 2,
 };

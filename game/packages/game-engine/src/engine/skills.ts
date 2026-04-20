@@ -2389,3 +2389,110 @@ export function applyRevive(
   s = movePlayerToLayer(s, effectiveTarget, reviveLayer as Layer);
   return s;
 }
+
+// === 金星·镜界世界观 · 复制效果 ===
+// 对照：docs/manual/06-dream-master.md 金星·镜界
+// 弃 2 张牌，重复执行本回合内之前用过的 SHOOT/KICK 效果
+export const VENUS_MIRROR_WORLD_SKILL_ID = 'dm_venus_mirror.world_0';
+
+// 可复制的行动牌前缀
+const MIRRORABLE_SHOOT_PREFIXES = [
+  'action_shoot',
+  'action_shoot_king',
+  'action_shoot_armor',
+  'action_shoot_burst',
+  'action_shoot_dream_transit',
+];
+const MIRRORABLE_KICK = 'action_kick';
+
+function isMirrorableCard(cardId: CardID): boolean {
+  return MIRRORABLE_SHOOT_PREFIXES.includes(cardId) || cardId === MIRRORABLE_KICK;
+}
+
+export function applyVenusMirrorWorld(
+  state: SetupState,
+  selfID: string,
+  targetID: string,
+  discardedCardIds: CardID[],
+  roll: number,
+): SetupState | null {
+  const self = state.players[selfID];
+  if (!self || !self.isAlive) return null;
+  // 梦主必须是金星·镜界
+  const master = state.players[state.dreamMasterID];
+  if (!master || master.characterId !== 'dm_venus_mirror') return null;
+  // 回合限 1
+  if ((self.skillUsedThisTurn[VENUS_MIRROR_WORLD_SKILL_ID] ?? 0) >= 1) return null;
+  // 弃 2 张牌
+  if (discardedCardIds.length !== 2) return null;
+  for (const cid of discardedCardIds) {
+    if (!self.hand.includes(cid)) return null;
+  }
+  // 必须有可复制的牌
+  const played = state.playedCardsThisTurn ?? [];
+  const mirrorable = played.filter((c) => isMirrorableCard(c));
+  if (mirrorable.length === 0) return null;
+
+  const target = state.players[targetID];
+  if (!target || !target.isAlive) return null;
+  if (selfID === targetID) return null;
+
+  // 弃牌
+  const newHand = [...self.hand];
+  for (const cid of discardedCardIds) {
+    const idx = newHand.indexOf(cid);
+    if (idx < 0) return null;
+    newHand.splice(idx, 1);
+  }
+
+  const lastCard = mirrorable[mirrorable.length - 1]!;
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [selfID]: { ...self, hand: newHand },
+    },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, ...discardedCardIds],
+    },
+  };
+  s = markSkillUsed(s, selfID, VENUS_MIRROR_WORLD_SKILL_ID);
+
+  if (lastCard === MIRRORABLE_KICK) {
+    // KICK 效果：目标击杀 + 拿 2 张手牌
+    const tp = s.players[targetID]!;
+    const handover = tp.hand.slice(0, 2);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [targetID]: { ...tp, isAlive: false, deathTurn: s.turnNumber, hand: tp.hand.slice(2) },
+        [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...handover] },
+      },
+    };
+    s = movePlayerToLayer(s, targetID, 0);
+  } else {
+    // SHOOT 效果：普通骰面 [1] 死 [2-4] 移 [5-6] miss
+    const result = resolveShootCustom(roll, [1], [2, 3, 4, 5]);
+    if (result === 'kill') {
+      const tp = s.players[targetID]!;
+      const handover = tp.hand.slice(0, 2);
+      s = {
+        ...s,
+        players: {
+          ...s.players,
+          [targetID]: { ...tp, isAlive: false, deathTurn: s.turnNumber, hand: tp.hand.slice(2) },
+          [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...handover] },
+        },
+      };
+      s = movePlayerToLayer(s, targetID, 0);
+    } else if (result === 'move') {
+      const cur = s.players[targetID]!.currentLayer;
+      const newLayer = cur >= 4 ? cur - 1 : cur + 1;
+      s = movePlayerToLayer(s, targetID, newLayer as Layer);
+    }
+    // miss: 无效果
+  }
+  return s;
+}

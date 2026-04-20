@@ -94,6 +94,7 @@ import {
   applyBlackHoleAbsorb,
   applyImperialCityWorldShoot,
   applyRevive,
+  applyVenusMirrorWorld,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -448,6 +449,25 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx, targetID: string | null, discardedCardIds: CardID[]) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const applied = applyRevive(G, ctx.currentPlayer, targetID, discardedCardIds);
+            if (applied === null) return INVALID_MOVE;
+            return incrementMoveCounter(applied);
+          },
+          client: false,
+        },
+
+        // 金星·镜界世界观：弃 2 张牌复制本回合已用的 SHOOT/KICK 效果
+        // 对照：docs/manual/06-dream-master.md 金星·镜界
+        useVenusMirrorWorld: {
+          move: ({ G, ctx, random }: MoveCtx, targetID: string, discardedCardIds: CardID[]) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const roll = random.D6();
+            const applied = applyVenusMirrorWorld(
+              G,
+              ctx.currentPlayer,
+              targetID,
+              discardedCardIds,
+              roll,
+            );
             if (applied === null) return INVALID_MOVE;
             return incrementMoveCounter(applied);
           },

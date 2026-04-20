@@ -193,6 +193,8 @@ export {
   applyImperialCityWorldShoot,
   applyRevive,
   isSecretPassageWorldActive,
+  applyVenusMirrorWorld,
+  VENUS_MIRROR_WORLD_SKILL_ID,
   BLACK_SWAN_SKILL_ID,
   SPACE_QUEEN_OBSERVE_SKILL_ID,
   SPACE_QUEEN_TOP_SKILL_ID,
