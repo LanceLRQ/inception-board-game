@@ -7,6 +7,7 @@
 import type { Layer, CardID, Faction } from '@icgame/shared';
 import type { SetupState, PlayerSetup, LayerSetup, VaultSetup, BribeSetup } from '../setup.js';
 import { LAYER_COUNT } from '../config.js';
+import { InceptionCityGame } from '../game.js';
 
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
@@ -175,3 +176,154 @@ export function withHand(state: SetupState, playerId: string, hand: CardID[]): S
 }
 
 export type { DeepPartial };
+
+// ---------------------------------------------------------------------------
+// Move 调用器 + 快照切片器（W10 行动牌快照测试基建）
+// ---------------------------------------------------------------------------
+
+/**
+ * 标准 Move 调用选项。
+ * - rolls: D6 / Die 结果序列（按调用顺序消费），不传则一律返回 4
+ * - currentPlayer: ctx.currentPlayer，默认取 state.currentPlayerID
+ * - shuffleStrategy: Shuffle 函数，默认恒等（保证快照稳定）
+ */
+export interface CallMoveOptions {
+  rolls?: readonly number[];
+  currentPlayer?: string;
+  shuffleStrategy?: <T>(arr: T[]) => T[];
+}
+
+/**
+ * 调用 phases.playing.moves 中的指定 move，统一注入 ctx / random / events。
+ * 适用于纯函数式 move 单测/快照测试，不走 BGIO Client。
+ */
+export function callMove(
+  state: SetupState,
+  moveName: string,
+  args: readonly unknown[],
+  opts: CallMoveOptions = {},
+): SetupState | 'INVALID_MOVE' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const movesMap = (InceptionCityGame as any).phases?.playing?.moves;
+  if (!movesMap || typeof movesMap[moveName]?.move !== 'function') {
+    throw new Error(`callMove: 未知 move "${moveName}"`);
+  }
+  const currentPlayer = opts.currentPlayer ?? state.currentPlayerID;
+  const rolls = [...(opts.rolls ?? [])];
+  const D6 = (): number => (rolls.length > 0 ? rolls.shift()! : 4);
+  const Die = (max?: number): number => {
+    const v = rolls.length > 0 ? rolls.shift()! : 1;
+    return max ? Math.max(1, Math.min(max, v)) : v;
+  };
+  const Shuffle = opts.shuffleStrategy ?? (<T>(arr: T[]) => arr);
+
+  const ctxArg = {
+    G: state,
+    ctx: {
+      numPlayers: state.playerOrder.length,
+      currentPlayer,
+      playOrder: state.playerOrder,
+      playOrderPos: state.playerOrder.indexOf(currentPlayer),
+    },
+    playerID: currentPlayer,
+    random: { D6, Die, Shuffle },
+    events: { endTurn: () => {}, endPhase: () => {}, endStage: () => {} },
+  };
+  return movesMap[moveName].move(ctxArg, ...args) as SetupState | 'INVALID_MOVE';
+}
+
+/** 与玩家相关的快照字段（默认） */
+export const DEFAULT_PLAYER_SNAPSHOT_FIELDS: readonly (keyof PlayerSetup)[] = [
+  'id',
+  'faction',
+  'currentLayer',
+  'hand',
+  'isAlive',
+  'characterId',
+  'shootCount',
+  'unlockCount',
+  'bribeReceived',
+];
+
+/** 与梦境层相关的快照字段（默认） */
+export const DEFAULT_LAYER_SNAPSHOT_FIELDS: readonly (keyof LayerSetup)[] = [
+  'layer',
+  'playersInLayer',
+  'heartLockValue',
+  'nightmareId',
+  'nightmareRevealed',
+];
+
+/**
+ * 快照切片：只取与行动牌效果相关的字段，避免无关 noise。
+ * - players: 仅保留 DEFAULT_PLAYER_SNAPSHOT_FIELDS
+ * - layers: 仅保留 DEFAULT_LAYER_SNAPSHOT_FIELDS
+ * - deck: 仅 cards 数量 + discardPile（discardPile 是关键变化点）
+ * - 显式列出 pendingX / shiftSnapshot / unlockThisTurn
+ *
+ * 返回的对象键序稳定（手动构造），便于 inline snapshot 比对。
+ */
+export interface ActionCardSnapshot {
+  turnPhase: SetupState['turnPhase'];
+  currentPlayerID: string;
+  unlockThisTurn: number;
+  moveCounter: number;
+  players: Record<string, Partial<PlayerSetup>>;
+  layers: Record<string, Partial<LayerSetup>>;
+  deckSize: number;
+  discardPile: readonly CardID[];
+  pendingUnlock: SetupState['pendingUnlock'];
+  pendingGraft: SetupState['pendingGraft'];
+  pendingResonance: SetupState['pendingResonance'];
+  pendingGravity: SetupState['pendingGravity'];
+  shiftSnapshot: SetupState['shiftSnapshot'];
+  pendingResponseWindow: SetupState['pendingResponseWindow'];
+}
+
+export function pickRelevantState(state: SetupState): ActionCardSnapshot {
+  const players: Record<string, Partial<PlayerSetup>> = {};
+  for (const pid of state.playerOrder) {
+    const p = state.players[pid];
+    if (!p) continue;
+    const slim: Partial<PlayerSetup> = {};
+    for (const f of DEFAULT_PLAYER_SNAPSHOT_FIELDS) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (slim as any)[f] = (p as any)[f];
+    }
+    players[pid] = slim;
+  }
+  const layers: Record<string, Partial<LayerSetup>> = {};
+  for (const k of Object.keys(state.layers)) {
+    const l = state.layers[Number(k)];
+    if (!l) continue;
+    const slim: Partial<LayerSetup> = {};
+    for (const f of DEFAULT_LAYER_SNAPSHOT_FIELDS) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (slim as any)[f] = (l as any)[f];
+    }
+    layers[k] = slim;
+  }
+  return {
+    turnPhase: state.turnPhase,
+    currentPlayerID: state.currentPlayerID,
+    unlockThisTurn: state.unlockThisTurn,
+    moveCounter: state.moveCounter,
+    players,
+    layers,
+    deckSize: state.deck.cards.length,
+    discardPile: state.deck.discardPile,
+    pendingUnlock: state.pendingUnlock,
+    pendingGraft: state.pendingGraft,
+    pendingResonance: state.pendingResonance,
+    pendingGravity: state.pendingGravity,
+    shiftSnapshot: state.shiftSnapshot,
+    pendingResponseWindow: state.pendingResponseWindow,
+  };
+}
+
+/** 断言 callMove 结果非 INVALID，并窄化类型 */
+export function expectMoveOk(result: SetupState | 'INVALID_MOVE'): asserts result is SetupState {
+  if (result === 'INVALID_MOVE') {
+    throw new Error('callMove returned INVALID_MOVE');
+  }
+}

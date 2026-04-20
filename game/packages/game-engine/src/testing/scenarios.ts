@@ -99,6 +99,52 @@ export function scenarioMasterWin(): SetupState {
   };
 }
 
+/**
+ * 行动阶段标准场景：3 名玩家（p1/p2 盗梦者 + pM 梦主），
+ * 全员位于第 1 层，p1 当前回合，turnPhase=action。
+ *
+ * 用于 W10 行动牌快照测试基线：每个 move 在该 state 上跑一遍 happy path，
+ * 然后 snapshot 切片差异。
+ */
+export function scenarioActionPhase(): SetupState {
+  const ids = ['p1', 'p2', 'pM'];
+  const players: Record<string, ReturnType<typeof makePlayer>> = {};
+  for (const id of ids) {
+    players[id] = makePlayer({
+      id,
+      nickname: id,
+      faction: id === 'pM' ? 'master' : 'thief',
+      characterId: (id === 'pM' ? 'dm_fortress' : `thief_${id}`) as CardID,
+    });
+  }
+  const base = createTestState({
+    matchId: 'scenario-action-phase',
+    rngSeed: 'snapshot-seed',
+    players,
+    playerOrder: [...ids],
+    currentPlayerID: 'p1',
+    dreamMasterID: 'pM',
+    phase: 'playing',
+    turnPhase: 'action',
+    turnNumber: 1,
+  });
+  // 同步 layer 1 占位（createTestState 默认 5 人，会留下 p3/p4 幽灵）
+  const layers = {
+    ...base.layers,
+    1: { ...base.layers[1]!, playersInLayer: [...ids] },
+  };
+  // 默认 deck 装入 20 张可识别牌，方便 graft/time storm 取样
+  const deckCards: CardID[] = [];
+  for (let i = 0; i < 20; i++) {
+    deckCards.push(`action_unlock` as CardID);
+  }
+  return {
+    ...base,
+    layers,
+    deck: { cards: deckCards, discardPile: [] },
+  };
+}
+
 /** 应急：空 setup state（用来测 invariant 的 malformed case） */
 export function scenarioEmptyState(): SetupState {
   return createTestState({

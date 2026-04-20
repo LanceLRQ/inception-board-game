@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatchTrigger } from './trigger-dispatcher.js';
 import { InMemoryAbilityRegistry } from './registry.js';
-import type { AbilityDefinition, TriggerTiming } from './types.js';
+import type { AbilityContext, AbilityDefinition, TriggerTiming } from './types.js';
 import type { SetupState } from '../../setup.js';
 import { createTestState } from '../../testing/fixtures.js';
 
