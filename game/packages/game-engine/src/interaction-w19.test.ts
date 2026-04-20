@@ -29,6 +29,9 @@ import {
   libraResolvePick,
   canSaturnFreeMove,
   canMarsKill,
+  canImperialPickBribe,
+  applySecretPassageTeleport,
+  getSecretPassageUsesLeft,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -753,5 +756,170 @@ describe('W19-A · 火星·战场杀戮守卫（R31）', () => {
       'action_shift' as CardID,
     ]);
     expect(canMarsKill(s, findMasterID(s)!)).toBe(true);
+  });
+});
+
+// ============================================================================
+// R32 · W19-A 交互矩阵扩充（第五批）
+// 聚焦子集：皇城·重金 守卫 / 密道·传送 happy path + 守卫 + 次数计量
+// ============================================================================
+// 辅助：填入一个 inPool 贿赂，用于皇城测试（scenarioStartOfGame3p 默认 bribePool=[]）
+function withInPoolBribe(state: SetupState): SetupState {
+  return {
+    ...state,
+    bribePool: [
+      {
+        id: 'bribe-test-0',
+        status: 'inPool',
+        heldBy: null,
+        originalOwnerId: null,
+      },
+    ],
+  };
+}
+
+describe('W19-A · 皇城·重金派发贿赂守卫（R32）', () => {
+  it('非 dm_imperial_city 梦主 → false', () => {
+    const s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor'));
+    expect(canImperialPickBribe(s, findMasterID(s)!, 'p1', 0)).toBe(false);
+  });
+
+  it('皇城梦主 + 合法目标 + pool[0]=inPool → true', () => {
+    const s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city'));
+    expect(canImperialPickBribe(s, findMasterID(s)!, 'p1', 0)).toBe(true);
+  });
+
+  it('皇城梦主 + 目标为梦主自己（非 thief）→ false', () => {
+    const s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city'));
+    const mid = findMasterID(s)!;
+    expect(canImperialPickBribe(s, mid, mid, 0)).toBe(false);
+  });
+
+  it('皇城梦主 + 目标死亡 → false', () => {
+    let s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city'));
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } },
+    };
+    expect(canImperialPickBribe(s, findMasterID(s)!, 'p1', 0)).toBe(false);
+  });
+
+  it('皇城梦主 + poolIndex 越界（负数 / 超大）→ false', () => {
+    const s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city'));
+    const mid = findMasterID(s)!;
+    expect(canImperialPickBribe(s, mid, 'p1', -1)).toBe(false);
+    expect(canImperialPickBribe(s, mid, 'p1', 9999)).toBe(false);
+  });
+
+  it('皇城梦主 + pool[0].status=dealt → false（不可重复派发）', () => {
+    let s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city'));
+    s = {
+      ...s,
+      bribePool: s.bribePool.map((b, i) => (i === 0 ? { ...b, status: 'dealt' as const } : b)),
+    };
+    expect(canImperialPickBribe(s, findMasterID(s)!, 'p1', 0)).toBe(false);
+  });
+});
+
+describe('W19-A · 密道·传送 happy path + 守卫（R32）', () => {
+  it('非 dm_secret_passage 梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_dream_transit' as CardID]);
+    const r = applySecretPassageTeleport(s, mid, 'p1', 'action_dream_transit' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('密道梦主 + 手牌有 action_dream_transit + 目标合法 → 成功送到迷失层', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_dream_transit' as CardID]);
+    const r = applySecretPassageTeleport(s, mid, 'p1', 'action_dream_transit' as CardID);
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.currentLayer).toBe(0);
+    // 手牌中穿梭剂被弃
+    expect(r!.players[mid]!.hand.includes('action_dream_transit' as CardID)).toBe(false);
+  });
+
+  it('密道梦主 + 手牌无穿梭剂 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_shoot' as CardID]);
+    const r = applySecretPassageTeleport(s, mid, 'p1', 'action_dream_transit' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('密道梦主 + 传错牌 ID（非 action_dream_transit）→ null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    const r = applySecretPassageTeleport(s, mid, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('密道梦主 + 目标是梦主自己（非 thief）→ null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_dream_transit' as CardID]);
+    const r = applySecretPassageTeleport(s, mid, mid, 'action_dream_transit' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('密道梦主 + 目标死亡盗梦者 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_dream_transit' as CardID]);
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } },
+    };
+    const r = applySecretPassageTeleport(s, mid, 'p1', 'action_dream_transit' as CardID);
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 密道·传送次数计量（R32）', () => {
+  it('getSecretPassageUsesLeft：非密道梦主 → 0', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const mid = findMasterID(s)!;
+    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(0);
+  });
+
+  it('getSecretPassageUsesLeft：密道梦主 0 用 → 2', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(2);
+  });
+
+  it('getSecretPassageUsesLeft：密道梦主 用 1 次 → 1', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [mid]: {
+          ...s.players[mid]!,
+          skillUsedThisTurn: { 'dm_secret_passage.skill_0': 1 },
+        },
+      },
+    };
+    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(1);
+  });
+
+  it('getSecretPassageUsesLeft：密道梦主 用 2 次 → 0（上限）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
+    const mid = findMasterID(s)!;
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [mid]: {
+          ...s.players[mid]!,
+          skillUsedThisTurn: { 'dm_secret_passage.skill_0': 2 },
+        },
+      },
+    };
+    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(0);
   });
 });
