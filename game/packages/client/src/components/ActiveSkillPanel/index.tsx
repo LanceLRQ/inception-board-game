@@ -60,6 +60,12 @@ export function ActiveSkillPanel({
     skill: ActiveSkillDescriptor;
     picks: Record<string, -1 | 1>;
   } | null>(null);
+  // multiCardAndDiscardCard: 先多选手牌再从弃牌堆选 1 张（战争之王·黑市）
+  const [pendingMultiCardDiscardSkill, setPendingMultiCardDiscardSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    selected: string[];
+    phase: 'cards' | 'discard';
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -73,7 +79,8 @@ export function ActiveSkillPanel({
     !pendingPlayerCardSkill &&
     !pendingMultiCardSkill &&
     !pendingMultiCardPlayerSkill &&
-    !pendingLayerShiftSkill
+    !pendingLayerShiftSkill &&
+    !pendingMultiCardDiscardSkill
   )
     return null;
 
@@ -120,6 +127,10 @@ export function ActiveSkillPanel({
     }
     if (skill.argKind === 'layerShiftPicks') {
       setPendingLayerShiftSkill({ skill, picks: {} });
+      return;
+    }
+    if (skill.argKind === 'multiCardAndDiscardCard') {
+      setPendingMultiCardDiscardSkill({ skill, selected: [], phase: 'cards' });
       return;
     }
   };
@@ -189,6 +200,34 @@ export function ActiveSkillPanel({
     setPendingLayerShiftSkill(null);
   };
 
+  const toggleMultiCardDiscard = (cardId: string) => {
+    setPendingMultiCardDiscardSkill((prev) => {
+      if (!prev || prev.phase !== 'cards') return prev;
+      const idx = prev.selected.indexOf(cardId);
+      if (idx >= 0) {
+        const next = [...prev.selected];
+        next.splice(idx, 1);
+        return { ...prev, selected: next };
+      }
+      return { ...prev, selected: [...prev.selected, cardId] };
+    });
+  };
+
+  const advanceMultiCardDiscard = () => {
+    setPendingMultiCardDiscardSkill((prev) =>
+      prev && prev.selected.length > 0 ? { ...prev, phase: 'discard' } : prev,
+    );
+  };
+
+  const confirmMultiCardDiscard = (discardCardId: string) => {
+    if (!pendingMultiCardDiscardSkill) return;
+    onInvoke(pendingMultiCardDiscardSkill.skill, [
+      pendingMultiCardDiscardSkill.selected,
+      discardCardId,
+    ]);
+    setPendingMultiCardDiscardSkill(null);
+  };
+
   const confirmPlayerCard = (cardId: string) => {
     if (!pendingPlayerCardSkill || !pendingPlayerCardSkill.targetId) return;
     onInvoke(pendingPlayerCardSkill.skill, [pendingPlayerCardSkill.targetId, cardId]);
@@ -250,7 +289,8 @@ export function ActiveSkillPanel({
         !pendingPlayerCardSkill &&
         !pendingMultiCardSkill &&
         !pendingMultiCardPlayerSkill &&
-        !pendingLayerShiftSkill && (
+        !pendingLayerShiftSkill &&
+        !pendingMultiCardDiscardSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -579,6 +619,79 @@ export function ActiveSkillPanel({
               onClick={() => setPendingLayerShiftSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-ls"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingMultiCardDiscardSkill && (
+        <div className="space-y-2" data-testid="active-skill-multi-card-discard-picker">
+          <div className="text-xs text-muted-foreground">
+            {pendingMultiCardDiscardSkill.phase === 'cards'
+              ? t('skill.chooseMultiCards', { defaultValue: '多选手牌：' })
+              : t('skill.chooseDiscardCard', { defaultValue: '从弃牌堆选 1 张：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingMultiCardDiscardSkill.skill.nameKey, {
+                defaultValue: pendingMultiCardDiscardSkill.skill.id,
+              })}
+            </span>
+            {pendingMultiCardDiscardSkill.phase === 'cards' && (
+              <span className="ml-2 text-muted-foreground">
+                ({pendingMultiCardDiscardSkill.selected.length})
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {pendingMultiCardDiscardSkill.phase === 'cards' &&
+              context.hand.map((cardId, idx) => {
+                const active = pendingMultiCardDiscardSkill.selected.includes(cardId);
+                return (
+                  <button
+                    key={`${cardId}-${idx}`}
+                    type="button"
+                    onClick={() => toggleMultiCardDiscard(cardId)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs hover:border-primary',
+                      active
+                        ? 'border-primary bg-primary/20 text-primary'
+                        : 'border-border bg-muted',
+                    )}
+                    data-testid={`active-skill-mcd-card-${idx}`}
+                  >
+                    {cardId}
+                  </button>
+                );
+              })}
+            {pendingMultiCardDiscardSkill.phase === 'cards' && (
+              <button
+                type="button"
+                onClick={advanceMultiCardDiscard}
+                className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/80"
+                data-testid="active-skill-next-mcd"
+                disabled={pendingMultiCardDiscardSkill.selected.length === 0}
+              >
+                {t('common.next', { defaultValue: '下一步' })}
+              </button>
+            )}
+            {pendingMultiCardDiscardSkill.phase === 'discard' &&
+              (context.discardPile ?? []).map((cardId, idx) => (
+                <button
+                  key={`disc-${cardId}-${idx}`}
+                  type="button"
+                  onClick={() => confirmMultiCardDiscard(cardId)}
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-mcd-disc-${idx}`}
+                >
+                  {cardId}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setPendingMultiCardDiscardSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-mcd"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>

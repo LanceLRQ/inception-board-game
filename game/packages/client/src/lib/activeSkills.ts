@@ -21,7 +21,8 @@ export type ActiveSkillArgKind =
   | 'playerAndCard'
   | 'multiCard'
   | 'multiCardAndPlayer'
-  | 'layerShiftPicks';
+  | 'layerShiftPicks'
+  | 'multiCardAndDiscardCard';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -57,6 +58,8 @@ export interface ActiveSkillContext {
   readonly bribePoolAvailable?: boolean;
   /** 与人类玩家同层的其他存活玩家 id 列表（盖亚·大地用） */
   readonly sameLayerPlayerIds?: readonly string[];
+  /** 弃牌堆（战争之王·黑市等选弃牌堆技能用） */
+  readonly discardPile?: readonly string[];
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -303,6 +306,23 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
+// R19：战争之王·黑市 —— 弃 2 张手牌 → 从弃牌堆取 1 张
+// 对照：docs/manual/05-dream-thieves.md 战争之王 + engine/game.ts playLordOfWarBlackMarket
+export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
+  id: 'thief_lord_of_war.skill_0',
+  characterId: 'thief_lord_of_war',
+  move: 'playLordOfWarBlackMarket',
+  nameKey: 'skill.thief_lord_of_war.skill_0.name',
+  descKey: 'skill.thief_lord_of_war.skill_0.desc',
+  argKind: 'multiCardAndDiscardCard',
+  extraCheck: (ctx) => {
+    // 回合限 1 次 + 至少 2 张手牌 + 弃牌堆非空
+    const used = ctx.skillUsedThisTurn['thief_lord_of_war.skill_0'] ?? 0;
+    const discardLen = ctx.discardPile?.length ?? 0;
+    return used < 1 && ctx.hand.length >= 2 && discardLen > 0;
+  },
+};
+
 // R18：盖亚·大地 —— 使同层其他玩家各自 +1 / -1 层（限 2 次/回合）
 // 对照：docs/manual/05-dream-thieves.md 盖亚 + engine/game.ts playGaiaShift
 export const GAIA_SHIFT: ActiveSkillDescriptor = {
@@ -344,6 +364,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   LUNA_ECLIPSE,
   ATHENA_AWE,
   GAIA_SHIFT,
+  LORD_OF_WAR_BLACK_MARKET,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

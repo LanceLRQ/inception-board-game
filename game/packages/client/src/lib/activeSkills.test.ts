@@ -10,6 +10,7 @@ import {
   GEMINI_SYNC,
   getAvailableActiveSkills,
   HALEY_IMPACT,
+  LORD_OF_WAR_BLACK_MARKET,
   LUNA_ECLIPSE,
   MARS_KILL,
   MARTYR_SACRIFICE,
@@ -613,5 +614,67 @@ describe('getAvailableActiveSkills · R18 盖亚·大地', () => {
 
   it('argKind = layerShiftPicks', () => {
     expect(GAIA_SHIFT.argKind).toBe('layerShiftPicks');
+  });
+});
+
+describe('getAvailableActiveSkills · R19 战争之王·黑市', () => {
+  it('战争之王 + 手牌≥2 + 弃牌堆非空 + 未用 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_lord_of_war',
+        hand: ['a', 'b'],
+        discardPile: ['c'],
+      }),
+    );
+    expect(list).toContain(LORD_OF_WAR_BLACK_MARKET);
+  });
+
+  it('战争之王 + 手牌 1 张 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_lord_of_war',
+        hand: ['a'],
+        discardPile: ['c'],
+      }),
+    );
+    expect(list).not.toContain(LORD_OF_WAR_BLACK_MARKET);
+  });
+
+  it('战争之王 + 弃牌堆空 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_lord_of_war',
+        hand: ['a', 'b'],
+        discardPile: [],
+      }),
+    );
+    expect(list).not.toContain(LORD_OF_WAR_BLACK_MARKET);
+  });
+
+  it('战争之王 + 已用 1 次 → 不含（回合限 1）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_lord_of_war',
+        hand: ['a', 'b'],
+        discardPile: ['c'],
+        skillUsedThisTurn: { 'thief_lord_of_war.skill_0': 1 },
+      }),
+    );
+    expect(list).not.toContain(LORD_OF_WAR_BLACK_MARKET);
+  });
+
+  it('非战争之王角色 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_shade',
+        hand: ['a', 'b'],
+        discardPile: ['c'],
+      }),
+    );
+    expect(list).not.toContain(LORD_OF_WAR_BLACK_MARKET);
+  });
+
+  it('argKind = multiCardAndDiscardCard', () => {
+    expect(LORD_OF_WAR_BLACK_MARKET.argKind).toBe('multiCardAndDiscardCard');
   });
 });

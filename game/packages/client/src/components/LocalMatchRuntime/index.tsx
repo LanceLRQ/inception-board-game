@@ -586,6 +586,9 @@ export function LocalMatchRuntime({
                 )
                 .map(([pid]) => pid)
             : [],
+          discardPile: Array.isArray((G?.deck as Record<string, unknown> | undefined)?.discardPile)
+            ? ((G!.deck as Record<string, unknown>).discardPile as string[])
+            : [],
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players
