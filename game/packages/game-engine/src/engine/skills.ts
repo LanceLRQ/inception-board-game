@@ -852,3 +852,266 @@ export function applyAthenaWit(state: SetupState, selfID: string): SetupState | 
     deck: { ...state.deck, discardPile: newDiscard },
   };
 }
+
+// ============================================================================
+// W14 混合 9 角色
+// ============================================================================
+// 完整接入：影子 / 降世神通 / 梦境猎手 / 欺诈师 / 恐怖分子（SHOOT 跨层被动）
+// 纯函数：小丑 / 黑洞 / 黑天鹅 / 空间女王（接入待 pending state / 响应窗口）
+
+// === 影子 · 潜伏 ===
+// 出牌阶段可随时移到梦主所在层
+export const SHADE_SKILL_ID = 'thief_shade.skill_0';
+
+export function applyShadeFollow(state: SetupState, selfID: string): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_shade') return null;
+  if (!player.isAlive) return null;
+  const masterID = state.dreamMasterID;
+  const master = state.players[masterID];
+  if (!master || !master.isAlive) return null;
+  if (master.currentLayer < 1) return null; // 梦主在迷失层不能跟随
+  if (player.currentLayer === master.currentLayer) return null;
+  // 不计入 skillUsed（"随时"暗示无次数限制）
+  const s = movePlayerToLayer(state, selfID, master.currentLayer);
+  return s;
+}
+
+// === 降世神通 · 顺流 ===
+// 移到数字更大的梦境时，可从牌库顶抽 2 张（被动 hook）
+export const HLNINO_SKILL_ID = 'thief_hlnino.skill_0';
+
+export function applyHlninoFlow(
+  state: SetupState,
+  playerID: string,
+  fromLayer: number,
+  toLayer: number,
+): SetupState {
+  const player = state.players[playerID];
+  if (!player || player.characterId !== 'thief_hlnino') return state;
+  if (!player.isAlive) return state;
+  if (toLayer <= fromLayer) return state;
+  // 抽 2 张（不计 skillUsed，因被动且每次移动都触发）
+  return drawCards(state, playerID, 2);
+}
+
+// === 梦境猎手 · 满载 ===
+// 成功解封后抽 = 当层现有心锁数（解封后心锁数）
+export const EXTRACTOR_SKILL_ID = 'thief_extractor.skill_0';
+
+export function applyExtractorBounty(state: SetupState, playerID: string): SetupState {
+  const player = state.players[playerID];
+  if (!player || player.characterId !== 'thief_extractor') return state;
+  if (!player.isAlive) return state;
+  const layerInfo = state.layers[player.currentLayer];
+  if (!layerInfo) return state;
+  const drawN = layerInfo.heartLockValue;
+  if (drawN <= 0) return state;
+  return drawCards(state, playerID, drawN);
+}
+
+// === 欺诈师 · 盗心（两阶段：抽 + 还）===
+// MVP 简化为一步 move：传入要抽的数量 N，自动随机选 N 张（用 D6 注入）
+// 然后立即从 self 还 N 张（玩家选）。简化为：抽 N 张 + 立即还 N 张同时进行。
+// 真实规则需"看到 target 手牌然后选择"，MVP 用：随机抽 N + self 选 N 张还
+export const FORGER_SKILL_ID = 'thief_forger.skill_0';
+
+export interface ForgerExchange {
+  targetID: string;
+  /** 从 target 抽走的牌（随机或指定 idx） */
+  takenFromTarget: CardID[];
+  /** 还给 target 的同等数量手牌 */
+  returnedToTarget: CardID[];
+}
+
+export function applyForgerExchange(
+  state: SetupState,
+  selfID: string,
+  ex: ForgerExchange,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_forger') return null;
+  if (!player.isAlive) return null;
+  if (selfID === ex.targetID) return null;
+  if (!canUseSkill(player, FORGER_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  const target = state.players[ex.targetID];
+  if (!target || !target.isAlive) return null;
+  // 抽走数量 1-2
+  const N = ex.takenFromTarget.length;
+  if (N < 1 || N > 2) return null;
+  if (ex.returnedToTarget.length !== N) return null;
+  // 检查可行性：takenFromTarget 必须都在 target 手中（multiset）
+  const targetHandCopy = [...target.hand];
+  for (const cid of ex.takenFromTarget) {
+    const idx = targetHandCopy.indexOf(cid);
+    if (idx === -1) return null;
+    targetHandCopy.splice(idx, 1);
+  }
+  // returnedToTarget 必须在 self 当前手中（含将获取的；这里 self 还在原手牌阶段，所以仅检查原手牌）
+  const selfHandCopy = [...player.hand];
+  for (const cid of ex.returnedToTarget) {
+    const idx = selfHandCopy.indexOf(cid);
+    if (idx === -1) return null;
+    selfHandCopy.splice(idx, 1);
+  }
+
+  const s = markSkillUsed(state, selfID, FORGER_SKILL_ID);
+  // self 手牌：去掉 returnedToTarget + 加入 takenFromTarget
+  const newSelfHand = [...selfHandCopy, ...ex.takenFromTarget];
+  // target 手牌：去掉 takenFromTarget + 加入 returnedToTarget
+  const newTargetHand = [...targetHandCopy, ...ex.returnedToTarget];
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: { ...s.players[selfID]!, hand: newSelfHand },
+      [ex.targetID]: { ...s.players[ex.targetID]!, hand: newTargetHand },
+    },
+  };
+}
+
+// === 恐怖分子 · 远程（SHOOT 跨层被动） ===
+// 与摩羯·节奏类似：使用的 SHOOT 类不受层数限制（被动，无激活条件）
+// 第二技能（target 弃牌否则骰-1）需响应窗口，留待批次
+
+export const TERRORIST_SKILL_ID = 'thief_terrorist.skill_0';
+
+export function isTerroristCrossLayerActive(player: PlayerSetup): boolean {
+  if (player.characterId !== 'thief_terrorist') return false;
+  if (!player.isAlive) return false;
+  return true;
+}
+
+// === 小丑 · 赌博（纯函数） ===
+// 略过抽牌阶段时可掷骰 → 抽 = 骰值；下回合 discard 必须全弃
+export const JOKER_SKILL_ID = 'thief_joker.skill_0';
+
+export function jokerDrawCount(roll: number): number {
+  return Math.max(1, Math.min(6, roll));
+}
+
+// === 黑洞 · 征收（抽牌阶段所有同层玩家给 1 张）（纯函数） ===
+export const BLACK_HOLE_LEVY_SKILL_ID = 'thief_black_hole.skill_0';
+
+export function applyBlackHoleLevy(
+  state: SetupState,
+  selfID: string,
+  giverPicks: Record<string, CardID>, // each player's chosen card to give
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_black_hole') return null;
+  if (!player.isAlive) return null;
+  if (!canUseSkill(player, BLACK_HOLE_LEVY_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  const layerInfo = state.layers[player.currentLayer];
+  if (!layerInfo) return null;
+  const otherPlayers = layerInfo.playersInLayer.filter((id) => id !== selfID);
+  if (otherPlayers.length === 0) return null;
+  // 校验所有 giverPicks 都来自同层玩家
+  for (const giverId of otherPlayers) {
+    const card = giverPicks[giverId];
+    if (!card) return null;
+    const giver = state.players[giverId];
+    if (!giver || !giver.isAlive) return null;
+    if (!giver.hand.includes(card)) return null;
+  }
+
+  const s = markSkillUsed(state, selfID, BLACK_HOLE_LEVY_SKILL_ID);
+  const newPlayers = { ...s.players };
+  const totalCollected: CardID[] = [];
+  for (const giverId of otherPlayers) {
+    const card = giverPicks[giverId]!;
+    const giver = newPlayers[giverId]!;
+    const idx = giver.hand.indexOf(card);
+    const newHand = [...giver.hand];
+    newHand.splice(idx, 1);
+    newPlayers[giverId] = { ...giver, hand: newHand };
+    totalCollected.push(card);
+  }
+  newPlayers[selfID] = {
+    ...newPlayers[selfID]!,
+    hand: [...newPlayers[selfID]!.hand, ...totalCollected],
+  };
+  return { ...s, players: newPlayers };
+}
+
+// === 黑天鹅 · 巡演（纯函数） ===
+// 略过抽牌阶段，分发所有手牌（≥1）给任意盗梦者，抽 4 张
+export const BLACK_SWAN_SKILL_ID = 'thief_black_swan.skill_0';
+
+export function applyBlackSwanTour(
+  state: SetupState,
+  selfID: string,
+  distribution: Record<string, CardID[]>,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_black_swan') return null;
+  if (!player.isAlive) return null;
+  if (player.hand.length === 0) return null;
+  if (!canUseSkill(player, BLACK_SWAN_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  // 分发总数 = 手牌总数（必须全分）
+  const totalDistributed = Object.values(distribution).reduce((sum, cs) => sum + cs.length, 0);
+  if (totalDistributed !== player.hand.length) return null;
+  // 分发的牌必须都在 self 手中（multiset）
+  const handCopy = [...player.hand];
+  for (const cards of Object.values(distribution)) {
+    for (const cid of cards) {
+      const idx = handCopy.indexOf(cid);
+      if (idx === -1) return null;
+      handCopy.splice(idx, 1);
+    }
+  }
+  // 不能分给自己；接收者必须是活着的盗梦者
+  for (const recvId of Object.keys(distribution)) {
+    if (recvId === selfID) return null;
+    const recv = state.players[recvId];
+    if (!recv || !recv.isAlive || recv.faction !== 'thief') return null;
+  }
+
+  let s = markSkillUsed(state, selfID, BLACK_SWAN_SKILL_ID);
+  const newPlayers = { ...s.players, [selfID]: { ...s.players[selfID]!, hand: [] } };
+  for (const [recvId, cards] of Object.entries(distribution)) {
+    newPlayers[recvId] = {
+      ...newPlayers[recvId]!,
+      hand: [...newPlayers[recvId]!.hand, ...cards],
+    };
+  }
+  s = { ...s, players: newPlayers };
+  // 抽 4 张
+  s = drawCards(s, selfID, 4);
+  return s;
+}
+
+// === 空间女王 · 监察（纯函数） ===
+// 技能 1：另一玩家成功解锁时，可抽 1
+// 技能 2：任意玩家弃牌阶段，可放 1 手牌到牌库顶
+export const SPACE_QUEEN_OBSERVE_SKILL_ID = 'thief_space_queen.skill_0';
+export const SPACE_QUEEN_TOP_SKILL_ID = 'thief_space_queen.skill_1';
+
+/** 空间女王技能 1：抽 1（响应他人解锁；纯函数） */
+export function applySpaceQueenObserve(state: SetupState, selfID: string): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_space_queen') return null;
+  if (!player.isAlive) return null;
+  return drawCards(state, selfID, 1);
+}
+
+/** 空间女王技能 2：放 1 手牌到牌库顶（纯函数） */
+export function applySpaceQueenStashTop(
+  state: SetupState,
+  selfID: string,
+  cardId: CardID,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_space_queen') return null;
+  if (!player.isAlive) return null;
+  const idx = player.hand.indexOf(cardId);
+  if (idx === -1) return null;
+  const newHand = [...player.hand];
+  newHand.splice(idx, 1);
+  return {
+    ...state,
+    players: { ...state.players, [selfID]: { ...player, hand: newHand } },
+    deck: { ...state.deck, cards: [cardId, ...state.deck.cards] },
+  };
+}

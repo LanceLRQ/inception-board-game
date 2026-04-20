@@ -54,6 +54,12 @@ import {
   isShootClassCard,
   LIBRA_SKILL_ID,
   ARCHITECT_SKILL_ID,
+  applyShadeFollow,
+  applyHlninoFlow,
+  applyExtractorBounty,
+  applyForgerExchange,
+  isTerroristCrossLayerActive,
+  type ForgerExchange,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -587,6 +593,8 @@ export const InceptionCityGame = {
             let s = applyUnlockSuccess(G);
             // 译梦师技能：成功解封后抽 2 张
             s = applyInterpreterForeshadow(s, unlockerId);
+            // 梦境猎手·满载：成功解封后抽 = 当层心锁数
+            s = applyExtractorBounty(s, unlockerId);
             return s;
           },
           client: false,
@@ -670,8 +678,11 @@ export const InceptionCityGame = {
             if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
             if (!isAdjacent(player.currentLayer, targetLayer)) return INVALID_MOVE;
 
+            const fromLayer = player.currentLayer;
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
+            // 降世神通·顺流：移到更大数字层时抽 2 张
+            s = applyHlninoFlow(s, ctx.currentPlayer, fromLayer, targetLayer);
             return incrementMoveCounter(s);
           },
           client: false,
@@ -1033,6 +1044,32 @@ export const InceptionCityGame = {
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = drawCards(s, ctx.currentPlayer, 2);
             return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
+        // 影子·潜伏：移到梦主所在层
+        // 对照：docs/manual/05-dream-thieves.md 影子
+        playShadeFollow: {
+          move: ({ G, ctx }: MoveCtx) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const next = applyShadeFollow(G, ctx.currentPlayer);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
+        // 欺诈师·盗心：抽 target 1-2 张 + 还回等量
+        // 对照：docs/manual/05-dream-thieves.md 欺诈师
+        playForgerExchange: {
+          move: ({ G, ctx }: MoveCtx, exchange: ForgerExchange) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const next = applyForgerExchange(G, ctx.currentPlayer, exchange);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
           },
           client: false,
         },
@@ -1567,7 +1604,10 @@ function applyShootVariant(
   if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
   if (opts.sameLayerRequired && shooter.currentLayer !== target.currentLayer) {
     // 摩羯·节奏：手牌数 >= 所在层数字时，SHOOT 类不受层数限制
-    if (!isCapricornusRhythmActive(shooter)) return INVALID_MOVE;
+    // 恐怖分子·远程：被动免除层数限制
+    if (!isCapricornusRhythmActive(shooter) && !isTerroristCrossLayerActive(shooter)) {
+      return INVALID_MOVE;
+    }
   }
 
   // 死亡宣言校验 + 附加死亡面
