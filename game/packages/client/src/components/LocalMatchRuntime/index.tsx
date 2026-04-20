@@ -13,6 +13,7 @@ import { getCardImageUrl, GENERIC_BACK_IMAGES } from '../../lib/cardImages';
 import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import { CardDetailModal } from '../CardDetailModal';
+import { CopyrightNotice } from '../CopyrightNotice';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
@@ -1236,6 +1237,12 @@ export function LocalMatchRuntime({
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
       <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />
+
+      {/* 版权 footer · 对局内常驻，满足 CC-BY-NC 四重展示约束 */}
+      <CopyrightNotice
+        variant="footer"
+        className="mt-6 border-t border-border/40 bg-background/70 py-2 backdrop-blur-sm"
+      />
     </div>
   );
 }
