@@ -312,6 +312,173 @@ describe('W19-A · 冥王星·地狱世界观（doDraw + onEnd 联动）', () =>
   });
 });
 
+// ============================================================================
+// R29 · W19-A 交互矩阵扩充（第二批）
+// 对照：plans/tasks.md Phase 3 W19
+// 聚焦子集：胜利条件更多边界 / 雷霆层差闭包 / 冥王星手牌边界 / 多梦主联动
+// ============================================================================
+describe('W19-A · 胜利优先级更多边界（R29）', () => {
+  it('秘密金库已开 + all_thieves_dead → thief 仍胜（秘密优先级最高）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const secretIdx = s.vaults.findIndex((v) => v.contentType === 'secret');
+    s = setVaultOpened(s, secretIdx, 'p1');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, isAlive: false, deathTurn: 5 },
+        p2: { ...s.players.p2!, isAlive: false, deathTurn: 5 },
+      },
+    };
+    const result = ENDIF({ G: s });
+    expect(result?.winner).toBe('thief');
+    expect(result?.reason).toBe('secret_vault_opened');
+  });
+
+  it('港口：恰好 1 个金币金库 → 不触发胜利（阈值 ≥2）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const coinIdx = s.vaults.findIndex((v) => v.contentType === 'coin');
+    s = setVaultOpened(s, coinIdx, 'p1');
+    // 填满牌库避免 deck_exhausted
+    s = { ...s, deck: { cards: Array(20).fill('action_unlock') as CardID[], discardPile: [] } };
+    const result = ENDIF({ G: s });
+    expect(result).toBeUndefined();
+  });
+
+  it('海王星：秘密已开时仍 thief 胜（秘密优先于梦主）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_neptune_ocean');
+    const secretIdx = s.vaults.findIndex((v) => v.contentType === 'secret');
+    const coinIdx = s.vaults.findIndex((v) => v.contentType === 'coin');
+    s = setVaultOpened(s, secretIdx, 'p1');
+    s = setVaultOpened(s, coinIdx, 'p1');
+    const result = ENDIF({ G: s });
+    expect(result?.winner).toBe('thief');
+    expect(result?.reason).toBe('secret_vault_opened');
+  });
+
+  it('checkHarborWin / checkNeptuneWin 单元判定与 endIf 一致', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const coinIdxs = s.vaults
+      .map((v, i) => (v.contentType === 'coin' ? i : -1))
+      .filter((i) => i >= 0);
+    s = setVaultOpened(s, coinIdxs[0]!, 'p1');
+    s = setVaultOpened(s, coinIdxs[1]!, 'p1');
+    expect(checkHarborWin(s)).toBe(true);
+    // 切到海王星
+    let s2 = setMasterCharacter(scenarioStartOfGame3p(), 'dm_neptune_ocean');
+    s2 = setVaultOpened(
+      s2,
+      s2.vaults.findIndex((v) => v.contentType === 'coin'),
+      'p1',
+    );
+    expect(checkNeptuneWin(s2)).toBe(true);
+  });
+
+  it('无角色梦主（dm_fortress）+ ≥2 金币金库开 → 不触发港口胜利（仅 dm_harbor 生效）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
+    const coinIdxs = s.vaults
+      .map((v, i) => (v.contentType === 'coin' ? i : -1))
+      .filter((i) => i >= 0);
+    s = setVaultOpened(s, coinIdxs[0]!, 'p1');
+    s = setVaultOpened(s, coinIdxs[1]!, 'p1');
+    s = { ...s, deck: { cards: Array(20).fill('action_unlock') as CardID[], discardPile: [] } };
+    const result = ENDIF({ G: s });
+    expect(result).toBeUndefined();
+  });
+});
+
+describe('W19-A · 木星雷霆层差矩阵（R29）', () => {
+  // 签名：shouldJupiterThunderKill(shooterCharacter, shooterLayer, finalRoll)
+  it('roll=层数 → 不杀（严格小于）', () => {
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 3, 3)).toBe(false);
+  });
+
+  it('roll<层数 → 杀', () => {
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 2, 1)).toBe(true);
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 4, 3)).toBe(true);
+  });
+
+  it('roll>层数 → 不杀', () => {
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 2, 5)).toBe(false);
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 4, 6)).toBe(false);
+  });
+
+  it('非木星角色 → 永远不杀（独占效果）', () => {
+    expect(shouldJupiterThunderKill('dm_harbor', 4, 1)).toBe(false);
+    expect(shouldJupiterThunderKill('dm_fortress', 4, 1)).toBe(false);
+  });
+
+  it('shooterLayer=0（迷失层）→ 永远不杀（守卫）', () => {
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 0, 1)).toBe(false);
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 0, 0)).toBe(false);
+  });
+});
+
+describe('W19-A · 冥王星·地狱手牌边界（R29）', () => {
+  // applyPlutoHellLostCheck 返回 SetupState：hand<阈值 / 无世界观 / 已在迷失 → 返回原状态
+  // hand>=阈值 且在非迷失层 → 返回新状态（currentLayer=0）
+  it('手牌 = 5（阈值-1）→ currentLayer 不变（非迷失层）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    s = setHand(s, 'p1', Array(5).fill('action_unlock') as CardID[]);
+    const beforeLayer = s.players.p1!.currentLayer;
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(beforeLayer);
+  });
+
+  it('手牌 = 6（阈值）→ currentLayer 变为 0（迷失层）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    s = setLayer(s, 'p1', 2 as Layer);
+    s = setHand(s, 'p1', Array(6).fill('action_unlock') as CardID[]);
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(0);
+  });
+
+  it('手牌 = 7（阈值+1）→ currentLayer 变为 0', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    s = setLayer(s, 'p1', 3 as Layer);
+    s = setHand(s, 'p1', Array(7).fill('action_unlock') as CardID[]);
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(0);
+  });
+
+  it('非冥王星梦主 + 手牌 8 → currentLayer 不变', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
+    s = setLayer(s, 'p1', 2 as Layer);
+    s = setHand(s, 'p1', Array(8).fill('action_unlock') as CardID[]);
+    expect(isPlutoHellWorldActive(s)).toBe(false);
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(2);
+  });
+
+  it('冥王星 + 手牌≥阈值 但已在迷失层 → currentLayer 保持 0（幂等守卫）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    // 直接设置 currentLayer=0（避开 setLayer 对 layer 0 的依赖）
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, currentLayer: 0 as Layer } },
+    };
+    s = setHand(s, 'p1', Array(6).fill('action_unlock') as CardID[]);
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(0);
+  });
+});
+
+describe('W19-A · 港口·海啸与胜利判定（R29）', () => {
+  it('海啸后所有盗梦者仍存活 + 2 金库已开 → master 胜（港口）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const coinIdxs = s.vaults
+      .map((v, i) => (v.contentType === 'coin' ? i : -1))
+      .filter((i) => i >= 0);
+    s = setVaultOpened(s, coinIdxs[0]!, 'p1');
+    s = setVaultOpened(s, coinIdxs[1]!, 'p1');
+    // 海啸：1 轮掷骰（每个盗梦者）→ 决定是否入迷失（此处 rolls 给 [1,1] 即两盗梦者都失败）
+    const tsunamid = applyHarborTsunami(s, [1, 1]);
+    const result = ENDIF({ G: tsunamid });
+    // 港口胜利条件已满足（2 金库）→ master 胜
+    expect(result?.winner).toBe('master');
+  });
+});
+
 describe('W19-A · 达尔文·进化 + 木星 SHOOT', () => {
   it('达尔文进化展示 4 张 + 木星梦主 SHOOT 雷霆击杀', () => {
     let s = scenarioStartOfGame3p();
