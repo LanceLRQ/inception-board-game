@@ -46,6 +46,9 @@ import {
   canGreenRayActivate,
   isJupiterPeakLayerOK,
   checkAthenaAweCondition,
+  canUseTouristAssist,
+  isCapricornusRhythmActive,
+  applyChemistRefine,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -1118,5 +1121,148 @@ describe('W19-A · 牌型分类 + 骰值 clamp（R33）', () => {
     expect(checkAthenaAweCondition(['a', 'b', 'c', 'd', 'e', 'f'] as unknown as CardID[])).toBe(
       false,
     );
+  });
+});
+
+// ============================================================================
+// R34 · W19-A 交互矩阵扩充（第七批 · 穿行者 / 摩羯 / 药剂师）
+// ============================================================================
+describe('W19-A · 穿行者·支助守卫（R34）', () => {
+  it('非穿行者角色 → false', () => {
+    const s = scenarioStartOfGame3p();
+    expect(canUseTouristAssist(s, 'p1', 'p2')).toBe(false);
+  });
+
+  it('穿行者 + 合法 target + 有手牌 → true', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_tourist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    expect(canUseTouristAssist(s, 'p1', 'p2')).toBe(true);
+  });
+
+  it('穿行者 + 手牌为空 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_tourist');
+    s = setHand(s, 'p1', []);
+    expect(canUseTouristAssist(s, 'p1', 'p2')).toBe(false);
+  });
+
+  it('穿行者 + target 死亡 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_tourist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = { ...s, players: { ...s.players, p2: { ...s.players.p2!, isAlive: false } } };
+    expect(canUseTouristAssist(s, 'p1', 'p2')).toBe(false);
+  });
+
+  it('穿行者 + self === target → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_tourist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    expect(canUseTouristAssist(s, 'p1', 'p1')).toBe(false);
+  });
+});
+
+describe('W19-A · 摩羯·节奏守卫（R34）', () => {
+  it('非摩羯 → false', () => {
+    const s = scenarioStartOfGame3p();
+    expect(isCapricornusRhythmActive(s.players.p1!)).toBe(false);
+  });
+
+  it('摩羯 + 手牌数 < 当前层 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_capricornus');
+    s = setLayer(s, 'p1', 3 as Layer);
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    expect(isCapricornusRhythmActive(s.players.p1!)).toBe(false);
+  });
+
+  it('摩羯 + 手牌数 == 当前层 → true', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_capricornus');
+    s = setLayer(s, 'p1', 2 as Layer);
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_shoot' as CardID]);
+    expect(isCapricornusRhythmActive(s.players.p1!)).toBe(true);
+  });
+
+  it('摩羯 + 手牌数 > 当前层 → true', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_capricornus');
+    s = setLayer(s, 'p1', 1 as Layer);
+    s = setHand(s, 'p1', ['a' as CardID, 'b' as CardID, 'c' as CardID]);
+    expect(isCapricornusRhythmActive(s.players.p1!)).toBe(true);
+  });
+
+  it('摩羯 + 当前层 0（迷失）→ false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_capricornus');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, currentLayer: 0 as Layer, hand: ['a' as CardID] },
+      },
+    };
+    expect(isCapricornusRhythmActive(s.players.p1!)).toBe(false);
+  });
+
+  it('摩羯 + 死亡 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_capricornus');
+    s = setHand(s, 'p1', ['a' as CardID, 'b' as CardID]);
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } } };
+    expect(isCapricornusRhythmActive(s.players.p1!)).toBe(false);
+  });
+});
+
+describe('W19-A · 药剂师·调剂守卫（R34）', () => {
+  it('非药剂师 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_dream_transit' as CardID] } };
+    const r = applyChemistRefine(s, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('药剂师 + 手牌有弃牌 + 弃牌堆有穿梭剂 → 成功（穿梭剂到手）', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_chemist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_dream_transit' as CardID] } };
+    const r = applyChemistRefine(s, 'p1', 'action_unlock' as CardID);
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toContain('action_dream_transit');
+    expect(r!.players.p1!.hand).not.toContain('action_unlock');
+  });
+
+  it('药剂师 + 手牌无指定弃牌 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_chemist');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_dream_transit' as CardID] } };
+    const r = applyChemistRefine(s, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('药剂师 + 弃牌堆无穿梭剂 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_chemist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot' as CardID] } };
+    const r = applyChemistRefine(s, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('药剂师 + 死亡 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_chemist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } },
+      deck: { ...s.deck, discardPile: ['action_dream_transit' as CardID] },
+    };
+    const r = applyChemistRefine(s, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
   });
 });
