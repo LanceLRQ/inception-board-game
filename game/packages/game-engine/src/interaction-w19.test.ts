@@ -32,6 +32,20 @@ import {
   canImperialPickBribe,
   applySecretPassageTeleport,
   getSecretPassageUsesLeft,
+  applySudgerVerdict,
+  applyScorpiusPoison,
+  applyTaurusHorn,
+  applySoulSculptorCarve,
+  applyHaleyImpact,
+  isVirgoPerfectTriggered,
+  isShootClassCard,
+  jokerDrawCount,
+  isTerroristCrossLayerActive,
+  canPiscesEvade,
+  isAquariusUnlimitedActive,
+  canGreenRayActivate,
+  isJupiterPeakLayerOK,
+  checkAthenaAweCondition,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -921,5 +935,188 @@ describe('W19-A · 密道·传送次数计量（R32）', () => {
       },
     };
     expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(0);
+  });
+});
+
+// ============================================================================
+// R33 · W19-A 交互矩阵扩充（第六批 · 纯函数批量）
+// 聚焦子集：SHOOT 修饰链纯函数 / 角色触发纯判定 / 骰值 clamp / 牌型分类
+// ============================================================================
+describe('W19-A · SHOOT 修饰链纯函数（R33）', () => {
+  it('applySudgerVerdict：pick=A → rollA', () => {
+    expect(applySudgerVerdict(3, 5, 'A')).toBe(3);
+  });
+
+  it('applySudgerVerdict：pick=B → rollB', () => {
+    expect(applySudgerVerdict(3, 5, 'B')).toBe(5);
+  });
+
+  it('applyScorpiusPoison：差值 > 0 → 绝对值', () => {
+    expect(applyScorpiusPoison(6, 2)).toBe(4);
+    expect(applyScorpiusPoison(2, 6)).toBe(4); // 绝对值
+  });
+
+  it('applyScorpiusPoison：差值 = 0 → 1（守卫）', () => {
+    expect(applyScorpiusPoison(3, 3)).toBe(1);
+  });
+
+  it('applyTaurusHorn：selfRoll > targetRoll → kill', () => {
+    expect(applyTaurusHorn(3, 5)).toBe('kill');
+  });
+
+  it('applyTaurusHorn：selfRoll <= targetRoll → normal', () => {
+    expect(applyTaurusHorn(5, 3)).toBe('normal');
+    expect(applyTaurusHorn(4, 4)).toBe('normal');
+  });
+
+  it('applySoulSculptorCarve：target 手牌数 clamp 到 [1,6]', () => {
+    expect(applySoulSculptorCarve(0)).toBe(1);
+    expect(applySoulSculptorCarve(3)).toBe(3);
+    expect(applySoulSculptorCarve(6)).toBe(6);
+    expect(applySoulSculptorCarve(10)).toBe(6);
+  });
+
+  it('applyHaleyImpact：raw-2 clamp 到 [1,6]', () => {
+    expect(applyHaleyImpact(6)).toBe(4);
+    expect(applyHaleyImpact(3)).toBe(1);
+    expect(applyHaleyImpact(1)).toBe(1); // 下限守卫
+  });
+});
+
+describe('W19-A · 角色被动触发守卫（R33）', () => {
+  it('isVirgoPerfectTriggered：骰 6 → true / 非 6 → false', () => {
+    expect(isVirgoPerfectTriggered(6)).toBe(true);
+    expect(isVirgoPerfectTriggered(5)).toBe(false);
+    expect(isVirgoPerfectTriggered(1)).toBe(false);
+  });
+
+  it('isTerroristCrossLayerActive：thief_terrorist 且存活 → true', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_terrorist');
+    expect(isTerroristCrossLayerActive(s.players.p1!)).toBe(true);
+  });
+
+  it('isTerroristCrossLayerActive：非恐怖分子 → false', () => {
+    const s = scenarioStartOfGame3p();
+    expect(isTerroristCrossLayerActive(s.players.p1!)).toBe(false);
+  });
+
+  it('isTerroristCrossLayerActive：死亡 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_terrorist');
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } } };
+    expect(isTerroristCrossLayerActive(s.players.p1!)).toBe(false);
+  });
+
+  it('isAquariusUnlimitedActive：水瓶 + 存活 → true / 非水瓶 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    expect(isAquariusUnlimitedActive(s.players.p1!)).toBe(true);
+    s = setCharacter(s, 'p1', 'thief_apollo');
+    expect(isAquariusUnlimitedActive(s.players.p1!)).toBe(false);
+  });
+
+  it('canPiscesEvade：双鱼 + L2+ → true（未翻面）', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_pisces');
+    s = setLayer(s, 'p1', 2 as Layer);
+    expect(canPiscesEvade(s.players.p1!)).toBe(true);
+  });
+
+  it('canPiscesEvade：双鱼 + L1 → false（无法下一层）', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_pisces');
+    // p1 默认在 L1
+    expect(canPiscesEvade(s.players.p1!)).toBe(false);
+  });
+
+  it('canPiscesEvade：非双鱼 → false', () => {
+    const s = scenarioStartOfGame3p();
+    expect(canPiscesEvade(s.players.p1!)).toBe(false);
+  });
+
+  it('canGreenRayActivate：格林射线 + 有穿梭剂 + 有 SHOOT → true', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_green_ray');
+    s = setHand(s, 'p1', ['action_dream_transit' as CardID, 'action_shoot' as CardID]);
+    expect(canGreenRayActivate(s.players.p1!)).toBe(true);
+  });
+
+  it('canGreenRayActivate：缺穿梭剂 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_green_ray');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    expect(canGreenRayActivate(s.players.p1!)).toBe(false);
+  });
+
+  it('canGreenRayActivate：缺 SHOOT 类 → false', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_green_ray');
+    s = setHand(s, 'p1', ['action_dream_transit' as CardID, 'action_unlock' as CardID]);
+    expect(canGreenRayActivate(s.players.p1!)).toBe(false);
+  });
+});
+
+describe('W19-A · 牌型分类 + 骰值 clamp（R33）', () => {
+  it('isShootClassCard：所有 shoot 变体 → true', () => {
+    expect(isShootClassCard('action_shoot' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_king' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_armor' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_burst' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_dream_transit' as CardID)).toBe(true);
+  });
+
+  it('isShootClassCard：非 shoot 牌 → false', () => {
+    expect(isShootClassCard('action_unlock' as CardID)).toBe(false);
+    expect(isShootClassCard('action_shift' as CardID)).toBe(false);
+    expect(isShootClassCard('action_dream_transit' as CardID)).toBe(false);
+  });
+
+  it('jokerDrawCount：骰 1-6 clamp', () => {
+    expect(jokerDrawCount(1)).toBe(1);
+    expect(jokerDrawCount(3)).toBe(3);
+    expect(jokerDrawCount(6)).toBe(6);
+    expect(jokerDrawCount(0)).toBe(1); // 下限
+    expect(jokerDrawCount(7)).toBe(6); // 上限
+  });
+
+  it('isJupiterPeakLayerOK：同层 OK / 相邻 OK / 跨 2 层 fail / 含迷失层 fail', () => {
+    expect(isJupiterPeakLayerOK(3, 3)).toBe(true); // 同层
+    expect(isJupiterPeakLayerOK(3, 4)).toBe(true); // 相邻
+    expect(isJupiterPeakLayerOK(4, 3)).toBe(true); // 相邻反向
+    expect(isJupiterPeakLayerOK(2, 4)).toBe(false); // 跨 2 层
+    expect(isJupiterPeakLayerOK(0, 1)).toBe(false); // 迷失层一方
+    expect(isJupiterPeakLayerOK(1, 0)).toBe(false); // 迷失层另一方
+  });
+
+  it('checkAthenaAweCondition：5 张互不相同 → true', () => {
+    const hand = [
+      'action_unlock',
+      'action_shoot',
+      'action_shift',
+      'action_kick',
+      'action_dream_transit',
+    ] as CardID[];
+    expect(checkAthenaAweCondition(hand)).toBe(true);
+  });
+
+  it('checkAthenaAweCondition：5 张含重复 → false', () => {
+    const hand = [
+      'action_unlock',
+      'action_unlock',
+      'action_shift',
+      'action_kick',
+      'action_shoot',
+    ] as CardID[];
+    expect(checkAthenaAweCondition(hand)).toBe(false);
+  });
+
+  it('checkAthenaAweCondition：非 5 张（4 / 6）→ false', () => {
+    expect(
+      checkAthenaAweCondition(['action_unlock', 'action_shoot', 'action_shift'] as CardID[]),
+    ).toBe(false);
+    expect(checkAthenaAweCondition(['a', 'b', 'c', 'd', 'e', 'f'] as unknown as CardID[])).toBe(
+      false,
+    );
   });
 });
