@@ -1812,3 +1812,100 @@ export function applyPlutoBurning(
   }
   return s;
 }
+
+// ============================================================================
+// W16-C 梦主世界观 / 部分主动技能（火星·杀戮 / 冥王星地狱世界观 / 土星领地世界观）
+// ============================================================================
+// 对照：cards-data.json + docs/manual/06-dream-master.md
+
+// === 火星·战场 · 杀戮 ===
+// 出牌阶段：弃 1 张解封 → 发动 1 张梦魇牌效果（无需翻开）
+// 弃解封 + 在指定层调用 applyNightmareEffect
+
+export const MARS_KILL_SKILL_ID = 'dm_mars_battlefield.skill_0';
+
+/** 火星·杀戮：是否可以发动（梦主为火星且手牌有解封） */
+export function canMarsKill(state: SetupState, masterID: string): boolean {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_mars_battlefield') return false;
+  if (!master.isAlive) return false;
+  return master.hand.includes('action_unlock');
+}
+
+/** 火星·杀戮：弃掉 1 张解封（不消耗 perTurn 计数；梦魇结算由 game.ts 接入） */
+export function applyMarsKillDiscardUnlock(state: SetupState, masterID: string): SetupState | null {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_mars_battlefield') return null;
+  if (!master.isAlive) return null;
+  const idx = master.hand.indexOf('action_unlock');
+  if (idx === -1) return null;
+
+  const newHand = [...master.hand];
+  newHand.splice(idx, 1);
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [masterID]: { ...master, hand: newHand },
+    },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, 'action_unlock' as CardID],
+    },
+  };
+}
+
+// === 冥王星·地狱世界观 ===
+// 盗梦者抽牌阶段抽牌数 = 1 颗骰子的掷骰结果
+// 抽牌阶段后手牌 ≥ 6 → 该盗梦者回合结束时进入迷失层
+// 对照：cards-data.json dm_pluto_hell 世界观
+
+const PLUTO_LOST_HAND_THRESHOLD = 6;
+
+/** 冥王星地狱世界观激活 */
+export function isPlutoHellWorldActive(state: SetupState): boolean {
+  return getMasterCharacterID(state) === 'dm_pluto_hell';
+}
+
+/** 冥王星世界观：本回合结束时检查盗梦者手牌≥6 → 入迷失层 */
+export function applyPlutoHellLostCheck(state: SetupState, playerID: string): SetupState {
+  if (!isPlutoHellWorldActive(state)) return state;
+  const p = state.players[playerID];
+  if (!p || !p.isAlive || p.faction !== 'thief') return state;
+  if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return state;
+  if (p.currentLayer === 0) return state;
+  return movePlayerToLayer(state, playerID, 0);
+}
+
+// === 土星·领地世界观 ===
+// 拥有贿赂的盗梦者，自己回合出牌阶段可不用行动牌移动一次到相邻层
+// 已有 canSaturnFreeMove 判定；此处加 ID + 应用函数（per-turn）
+// 对照：cards-data.json dm_saturn_territory 世界观
+
+export const SATURN_FREE_MOVE_SKILL_ID = 'dm_saturn_territory.world.skill';
+
+/** 土星·领地世界观：盗梦者免费移动到相邻层（自己回合限 1 次） */
+export function applySaturnFreeMove(
+  state: SetupState,
+  playerID: string,
+  targetLayer: Layer,
+): SetupState | null {
+  if (!canSaturnFreeMove(state, playerID)) return null;
+  const p = state.players[playerID];
+  if (!p) return null;
+  if (!canUseSkill(p, SATURN_FREE_MOVE_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  if (targetLayer < 1 || targetLayer > 4) return null;
+  if (Math.abs(p.currentLayer - targetLayer) !== 1) return null;
+
+  let s = markSkillUsed(state, playerID, SATURN_FREE_MOVE_SKILL_ID);
+  s = movePlayerToLayer(s, playerID, targetLayer);
+  return s;
+}
+
+/** 土星世界观免费移动是否本回合还可用 */
+export function canUseSaturnFreeMoveThisTurn(state: SetupState, playerID: string): boolean {
+  if (!canSaturnFreeMove(state, playerID)) return false;
+  const p = state.players[playerID];
+  if (!p) return false;
+  return canUseSkill(p, SATURN_FREE_MOVE_SKILL_ID, 'ownTurnOncePerTurn');
+}

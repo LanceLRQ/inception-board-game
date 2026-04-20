@@ -75,6 +75,11 @@ import {
   applySecretPassageTeleport,
   applyUranusPower,
   applyPlutoBurning,
+  canMarsKill,
+  applyMarsKillDiscardUnlock,
+  isPlutoHellWorldActive,
+  applyPlutoHellLostCheck,
+  applySaturnFreeMove,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction, Layer } from '@icgame/shared';
@@ -217,10 +222,15 @@ export const InceptionCityGame = {
         },
         // 回合末：还原移形换影快照（对照 docs/manual/04-action-cards.md 移形换影 解析）
         // + 检查筑梦师·迷宫是否到期（mazeState.untilTurnNumber 已被超过）
-        onEnd: ({ G }: { G: SetupState; ctx: BGIOCtx }) => {
+        onEnd: ({ G, ctx }: { G: SetupState; ctx: BGIOCtx }) => {
           let s = shiftGuardAndRestore(G);
           if (s.mazeState && G.turnNumber >= s.mazeState.untilTurnNumber) {
             s = { ...s, mazeState: null };
+          }
+          // 冥王星地狱世界观：盗梦者回合结束时手牌≥6 → 入迷失层
+          // 对照：cards-data.json dm_pluto_hell 世界观
+          if (isPlutoHellWorldActive(s)) {
+            s = applyPlutoHellLostCheck(s, ctx.currentPlayer);
           }
           return s;
         },
@@ -229,11 +239,19 @@ export const InceptionCityGame = {
       moves: {
         // --- 抽牌阶段 ---
         doDraw: {
-          move: ({ G, ctx }: MoveCtx) => {
+          move: ({ G, ctx, random }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             // 抽牌前后对比推出 drawnCards（用于先锋技能触发）
             const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
-            let s = drawCards(G, G.currentPlayerID);
+            // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果
+            // 对照：cards-data.json dm_pluto_hell 世界观
+            const currentPlayer = G.players[G.currentPlayerID];
+            const isThief = currentPlayer?.faction === 'thief';
+            const plutoOverride = isPlutoHellWorldActive(G) && isThief ? random.D6() : null;
+            let s =
+              plutoOverride !== null
+                ? drawCards(G, G.currentPlayerID, plutoOverride)
+                : drawCards(G, G.currentPlayerID);
             const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
             const drawn = afterHand.slice(beforeHand.length);
             // 先锋技能：抽到 action_dream_transit 则额外抽 2 张
@@ -900,6 +918,52 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const result = applyPlutoBurning(G, ctx.currentPlayer, discardCardId);
+            if (result === null) return INVALID_MOVE;
+            return incrementMoveCounter(result);
+          },
+          client: false,
+        },
+
+        // 火星·杀戮（W16-C）：弃 1 解封 → 发动指定层的梦魇牌效果（无需翻开）
+        // 对照：cards-data.json dm_mars_battlefield
+        useMarsKill: {
+          move: ({ G, ctx, random }: MoveCtx, layer: number, params?: Record<string, unknown>) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            if (!canMarsKill(G, ctx.currentPlayer)) return INVALID_MOVE;
+            const ls = G.layers[layer];
+            if (!ls || !ls.nightmareId) return INVALID_MOVE;
+            const nid = ls.nightmareId;
+            // 弃 1 解封
+            const afterDiscard = applyMarsKillDiscardUnlock(G, ctx.currentPlayer);
+            if (afterDiscard === null) return INVALID_MOVE;
+            // 发动梦魇效果
+            const next = applyNightmareEffect(afterDiscard, layer, nid, random, params);
+            if (next === INVALID_MOVE) return INVALID_MOVE;
+            // 清除该层梦魇并计入已发动
+            return incrementMoveCounter({
+              ...next,
+              layers: {
+                ...next.layers,
+                [layer]: {
+                  ...next.layers[layer]!,
+                  nightmareId: null,
+                  nightmareRevealed: false,
+                  nightmareTriggered: true,
+                },
+              },
+              usedNightmareIds: [...next.usedNightmareIds, nid],
+            });
+          },
+          client: false,
+        },
+
+        // 土星·领地世界观（W16-C）：持贿赂的盗梦者出牌阶段免费移动 1 次到相邻层
+        // 对照：cards-data.json dm_saturn_territory 世界观
+        useSaturnFreeMove: {
+          move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const result = applySaturnFreeMove(G, ctx.currentPlayer, targetLayer as Layer);
             if (result === null) return INVALID_MOVE;
             return incrementMoveCounter(result);
           },
