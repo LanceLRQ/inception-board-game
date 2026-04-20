@@ -191,6 +191,8 @@ export {
   BLACK_HOLE_ABSORB_SKILL_ID,
   applyBlackHoleAbsorb,
   applyImperialCityWorldShoot,
+  applyRevive,
+  isSecretPassageWorldActive,
   BLACK_SWAN_SKILL_ID,
   SPACE_QUEEN_OBSERVE_SKILL_ID,
   SPACE_QUEEN_TOP_SKILL_ID,

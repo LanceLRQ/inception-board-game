@@ -93,6 +93,7 @@ import {
   applyBlackHoleLevy,
   applyBlackHoleAbsorb,
   applyImperialCityWorldShoot,
+  applyRevive,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -435,6 +436,18 @@ export const InceptionCityGame = {
             if (!master || master.characterId !== 'dm_imperial_city') return INVALID_MOVE;
             const roll = random.D6();
             const applied = applyImperialCityWorldShoot(G, ctx.currentPlayer, targetID, roll);
+            if (applied === null) return INVALID_MOVE;
+            return incrementMoveCounter(applied);
+          },
+          client: false,
+        },
+
+        // 复活：出牌阶段弃 2 张手牌复活自己或他人（密道世界观：弃 1 张穿梭剂）
+        // 对照：docs/manual/03-game-flow.md 复活 / docs/manual/06-dream-master.md 密道
+        playRevive: {
+          move: ({ G, ctx }: MoveCtx, targetID: string | null, discardedCardIds: CardID[]) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const applied = applyRevive(G, ctx.currentPlayer, targetID, discardedCardIds);
             if (applied === null) return INVALID_MOVE;
             return incrementMoveCounter(applied);
           },

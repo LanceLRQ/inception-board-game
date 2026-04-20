@@ -2307,3 +2307,85 @@ export function applyImperialCityWorldShoot(
   // miss
   return { ...state };
 }
+
+// === 复活机制 ===
+// 对照：docs/manual/03-game-flow.md 复活
+
+/** 判断是否为密道世界观（只能弃 1 张穿梭剂复活） */
+export function isSecretPassageWorldActive(state: SetupState): boolean {
+  const master = state.players[state.dreamMasterID];
+  return master?.characterId === 'dm_secret_passage';
+}
+
+/**
+ * 基础复活：弃 2 张手牌复活自己或他人
+ * 密道世界观变体：弃 1 张【梦境穿梭剂】复活
+ */
+export function applyRevive(
+  state: SetupState,
+  selfID: string,
+  targetID: string | null,
+  discardedCardIds: CardID[],
+): SetupState | null {
+  const self = state.players[selfID];
+  if (!self) return null;
+  const effectiveTarget = targetID ?? selfID;
+  const isSelfRevive = effectiveTarget === selfID;
+
+  // 复活自己时允许已死亡（在迷失层复活自己）；复活他人时自己必须存活
+  if (!isSelfRevive && !self.isAlive) return null;
+  // 复活自己时自己必须在迷失层
+  if (isSelfRevive && self.isAlive) return null;
+
+  const target = state.players[effectiveTarget];
+  if (!target) return null;
+  // 目标必须已死亡
+  if (target.isAlive) return null;
+  // 复活他人时自己不能在迷失层
+  if (!isSelfRevive && self.currentLayer === 0) return null;
+
+  const secretPassage = isSecretPassageWorldActive(state);
+
+  if (secretPassage) {
+    // 密道世界观：只能弃 1 张穿梭剂
+    if (discardedCardIds.length !== 1) return null;
+    if (discardedCardIds[0] !== 'action_dream_transit') return null;
+  } else {
+    // 基础规则：弃 2 张手牌
+    if (discardedCardIds.length !== 2) return null;
+  }
+
+  // 校验手牌包含所有弃牌
+  for (const cid of discardedCardIds) {
+    if (!self.hand.includes(cid)) return null;
+  }
+
+  // 弃牌
+  const newHand = [...self.hand];
+  for (const cid of discardedCardIds) {
+    const idx = newHand.indexOf(cid);
+    if (idx < 0) return null;
+    newHand.splice(idx, 1);
+  }
+
+  // 复活目标：isAlive=true, deathTurn=null
+  const reviveLayer = effectiveTarget === selfID ? 1 : self.currentLayer;
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [selfID]: { ...self, hand: newHand },
+      [effectiveTarget]: {
+        ...state.players[effectiveTarget]!,
+        isAlive: true,
+        deathTurn: null,
+      },
+    },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, ...discardedCardIds],
+    },
+  };
+  s = movePlayerToLayer(s, effectiveTarget, reviveLayer as Layer);
+  return s;
+}
