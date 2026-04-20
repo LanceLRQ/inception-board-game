@@ -2,7 +2,7 @@
 // 对照：docs/manual/05-dream-thieves.md 格林射线
 
 import { describe, expect, it } from 'vitest';
-import type { CardID, Layer } from '@icgame/shared';
+import type { CardID } from '@icgame/shared';
 import { scenarioStartOfGame3p } from './testing/scenarios.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 

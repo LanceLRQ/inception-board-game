@@ -85,6 +85,8 @@ import {
   applyMarsBattlefieldExchange,
   applyDiscardHiddenNightmare,
   applyMercuryRouteExtraFailBribe,
+  applySudgerVerdict,
+  SUDGER_SKILL_ID,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -449,6 +451,150 @@ export const InceptionCityGame = {
               decreeId,
             });
             return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
+          },
+          client: false,
+        },
+        // 意念判官·定罪（两步 move 第 1 步）：掷双骰 → 存 pending
+        // 对照：docs/manual/05-dream-thieves.md 意念判官
+        playShootSudger: {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            targetPlayerID: string,
+            cardId: CardID,
+            decreeId?: CardID,
+          ) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingSudgerRolls) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            if (!self || !self.isAlive) return INVALID_MOVE;
+            if (self.characterId !== 'thief_sudger_of_mind') return INVALID_MOVE;
+            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+            if (!isShootClassCard(cardId)) return INVALID_MOVE;
+            const target = G.players[targetPlayerID];
+            if (!target || !target.isAlive || targetPlayerID === ctx.currentPlayer)
+              return INVALID_MOVE;
+
+            // 死亡宣言校验
+            const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
+            if (decreeCheck === 'INVALID') return INVALID_MOVE;
+
+            // 根据卡牌类型确定 deathFaces/moveFaces/extraOnMove
+            const optsMap: Record<
+              string,
+              {
+                deathFaces: number[];
+                moveFaces: number[];
+                extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
+              }
+            > = {
+              action_shoot: { deathFaces: [1], moveFaces: [2, 3, 4, 5], extraOnMove: null },
+              action_shoot_dream_transit: {
+                deathFaces: [1],
+                moveFaces: [2, 3, 4, 5],
+                extraOnMove: null,
+              },
+              action_shoot_king: { deathFaces: [1, 2], moveFaces: [3, 4, 5], extraOnMove: null },
+              action_shoot_armor: {
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: 'discard_unlocks',
+              },
+              action_shoot_burst: {
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: 'discard_shoots',
+              },
+            };
+            const opts = optsMap[cardId];
+            if (!opts) return INVALID_MOVE;
+            const deathFaces =
+              decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
+
+            const rollA = random.D6();
+            const rollB = random.D6();
+            const s = markSkillUsed(G, ctx.currentPlayer, SUDGER_SKILL_ID);
+            return {
+              ...s,
+              pendingSudgerRolls: {
+                rollA,
+                rollB,
+                targetPlayerID,
+                cardId,
+                deathFaces,
+                moveFaces: opts.moveFaces,
+                extraOnMove: opts.extraOnMove,
+              },
+            };
+          },
+          client: false,
+        },
+        // 意念判官·定罪（两步 move 第 2 步）：选 A/B → SHOOT 结算
+        resolveSudgerPick: {
+          move: ({ G, ctx }: MoveCtx, pick: 'A' | 'B') => {
+            const pending = G.pendingSudgerRolls;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
+
+            const chosenRoll = applySudgerVerdict(pending.rollA, pending.rollB, pick);
+            const result = resolveShootCustom(chosenRoll, pending.deathFaces, pending.moveFaces);
+
+            let s = discardCard(G, ctx.currentPlayer, pending.cardId);
+
+            if (result === 'kill') {
+              const tp = s.players[pending.targetPlayerID]!;
+              const handover = tp.hand.slice(0, 2);
+              s = {
+                ...s,
+                pendingSudgerRolls: null,
+                players: {
+                  ...s.players,
+                  [pending.targetPlayerID]: {
+                    ...tp,
+                    isAlive: false,
+                    deathTurn: s.turnNumber,
+                    hand: tp.hand.slice(2),
+                  },
+                  [ctx.currentPlayer]: {
+                    ...s.players[ctx.currentPlayer]!,
+                    hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
+                    shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
+                  },
+                },
+              };
+              s = movePlayerToLayer(s, pending.targetPlayerID, 0);
+              s = dispatchPassives(s, 'onKilled').state;
+            } else if (result === 'move') {
+              if (pending.extraOnMove) {
+                const tp = s.players[pending.targetPlayerID]!;
+                const keep: CardID[] = [];
+                const dropped: CardID[] = [];
+                for (const id of tp.hand) {
+                  const shouldDrop =
+                    pending.extraOnMove === 'discard_unlocks'
+                      ? id === 'action_unlock'
+                      : isShootClassCard(id);
+                  (shouldDrop ? dropped : keep).push(id);
+                }
+                if (dropped.length > 0) {
+                  s = {
+                    ...s,
+                    players: { ...s.players, [pending.targetPlayerID]: { ...tp, hand: keep } },
+                    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...dropped] },
+                  };
+                }
+              }
+              const target = s.players[pending.targetPlayerID]!;
+              const cur = target.currentLayer;
+              const dir = cur >= 4 ? -1 : 1;
+              const nl = Math.max(1, Math.min(4, cur + dir));
+              s = { ...s, pendingSudgerRolls: null };
+              s = movePlayerToLayer(s, pending.targetPlayerID, nl);
+            } else {
+              s = { ...s, pendingSudgerRolls: null };
+            }
+
+            s = dispatchPassives(s, 'onAfterShoot').state;
+            return recordCardPlayed(incrementMoveCounter(s), pending.cardId);
           },
           client: false,
         },

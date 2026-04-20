@@ -44,6 +44,8 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playShootBurst',
     'playShootDreamTransit',
     'playGreenRayArrest',
+    'playShootSudger',
+    'resolveSudgerPick',
     'playShift',
     'masterRevealNightmare',
     'masterDiscardNightmare',
@@ -93,6 +95,8 @@ const MOVE_PRIORITY: Record<string, number> = {
   playShootBurst: 106,
   playShootDreamTransit: 107,
   playGreenRayArrest: 109,
+  playShootSudger: 111,
+  resolveSudgerPick: 0, // 必须优先结算定罪选择
   playShift: 108,
   masterRevealNightmare: 200, // 梦主低优先：Bot L0 默认不主动触发
   masterDiscardNightmare: 201,

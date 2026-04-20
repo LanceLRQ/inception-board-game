@@ -140,6 +140,17 @@ export interface SetupState {
     /** target 提交的分组（提交后填入） */
     split: { pile1: CardID[]; pile2: CardID[] } | null;
   } | null;
+  // 意念判官·定罪：SHOOT 双骰待选（两步 move 中间态）
+  // 对照：docs/manual/05-dream-thieves.md 意念判官
+  pendingSudgerRolls?: {
+    rollA: number;
+    rollB: number;
+    targetPlayerID: string;
+    cardId: CardID;
+    deathFaces: number[];
+    moveFaces: number[];
+    extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
+  } | null;
   // 筑梦师·迷宫：被困玩家在其下回合结束前不受行动牌+技能影响、不能移动
   // 对照：docs/manual/05-dream-thieves.md 筑梦师
   mazeState: {
@@ -335,6 +346,7 @@ export function createInitialState(options: {
     shiftSnapshot: null,
     pendingResponseWindow: null,
     pendingLibra: null,
+    pendingSudgerRolls: null,
     mazeState: null,
     winner: null,
     winReason: null,
