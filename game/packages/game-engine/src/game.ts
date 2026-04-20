@@ -43,6 +43,12 @@ import {
   canUseSkill,
   markSkillUsed,
   SCORPIUS_SKILL_ID,
+  applyApolloWorship,
+  applyMartyrSacrifice,
+  applySoulSculptorCarve,
+  applyHaleyImpact,
+  applyAthenaAwe,
+  HALEY_SKILL_ID,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -575,6 +581,63 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 哈雷·冲击：成功解封后 unlocker 可对另一位玩家发动 -2 修饰 SHOOT
+        // 对照：docs/manual/05-dream-thieves.md 哈雷
+        // 设计：可选触发，独立 move；同回合多次解封可多次触发
+        playHaleyImpact: {
+          move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
+            const self = G.players[ctx.currentPlayer];
+            if (!self || self.characterId !== 'thief_haley') return INVALID_MOVE;
+            if (!self.isAlive) return INVALID_MOVE;
+            if (G.turnPhase !== 'action') return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingUnlock) return INVALID_MOVE;
+            const target = G.players[targetID];
+            if (!target || !target.isAlive) return INVALID_MOVE;
+            if (targetID === ctx.currentPlayer) return INVALID_MOVE;
+            // 必须本回合刚成功解封过（successfulUnlocksThisTurn > 已用 haley 次数）
+            const used = self.skillUsedThisTurn[HALEY_SKILL_ID] ?? 0;
+            if (self.successfulUnlocksThisTurn <= used) return INVALID_MOVE;
+
+            let s = markSkillUsed(G, ctx.currentPlayer, HALEY_SKILL_ID);
+            // 用 applyShootVariant 复用 SHOOT 结算（虚拟 cardId='haley_skill_proxy'）
+            // 但 applyShootVariant 校验 cardId 必须在手中，这里需要绕过。
+            // 简化：直接结算骰值 + 应用效果（不通过 applyShootVariant）
+            const rawRoll = random.D6();
+            const finalRoll = applyHaleyImpact(rawRoll);
+            const shootResult =
+              finalRoll === 1 ? 'kill' : finalRoll >= 2 && finalRoll <= 5 ? 'move' : 'miss';
+            if (shootResult === 'kill') {
+              const tp = s.players[targetID]!;
+              const handover = tp.hand.slice(0, 2);
+              s = {
+                ...s,
+                players: {
+                  ...s.players,
+                  [targetID]: {
+                    ...tp,
+                    isAlive: false,
+                    deathTurn: s.turnNumber,
+                    hand: tp.hand.slice(2),
+                  },
+                  [ctx.currentPlayer]: {
+                    ...s.players[ctx.currentPlayer]!,
+                    hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
+                    shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
+                  },
+                },
+              };
+              s = movePlayerToLayer(s, targetID, 0);
+            } else if (shootResult === 'move') {
+              const cur = target.currentLayer;
+              const dir = cur >= 4 ? -1 : 1;
+              const nl = Math.max(1, Math.min(4, cur + dir));
+              s = movePlayerToLayer(s, targetID, nl);
+            }
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
         respondCancelUnlock: {
           move: ({ G }: MoveCtx) => {
             if (!G.pendingUnlock) return INVALID_MOVE;
@@ -964,6 +1027,59 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 阿波罗·崇拜：随机抽取受贿盗梦者 1 张手牌
+        // 对照：docs/manual/05-dream-thieves.md 阿波罗
+        playApolloWorship: {
+          move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            // 用 D6 注入随机性（保证 BGIO 确定性）
+            const pickIdx = random.D6() - 1;
+            const next = applyApolloWorship(G, ctx.currentPlayer, targetID, pickIdx);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
+        // 殉道者·牺牲：略过出牌阶段，掷骰 → 改变心锁 ±2 + 自杀
+        // 对照：docs/manual/05-dream-thieves.md 殉道者
+        playMartyrSacrifice: {
+          move: ({ G, ctx, random }: MoveCtx, direction: 'increase' | 'decrease') => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const player = G.players[ctx.currentPlayer];
+            if (!player) return INVALID_MOVE;
+            // 取本人当前层"原始"心锁数为 cap：使用 PLAYER_COUNT_CONFIGS 的初始值
+            const layerNum = player.currentLayer;
+            // heartLocks 是长度 4 的元组，layer 1-4 对应索引 0-3
+            const heartLocksTuple = PLAYER_COUNT_CONFIGS[G.playerOrder.length]?.heartLocks;
+            const cap =
+              heartLocksTuple && layerNum >= 1 && layerNum <= 4
+                ? ((heartLocksTuple as readonly number[])[layerNum - 1] ?? 5)
+                : 5;
+            const roll = random.D6();
+            const r = applyMartyrSacrifice(G, ctx.currentPlayer, roll, direction, cap);
+            if (r === null) return INVALID_MOVE;
+            return setTurnPhase(r.state, 'discard');
+          },
+          client: false,
+        },
+
+        // 雅典娜·惊叹：展示 4 手牌 + 1 牌库顶；5 张同名 → 击杀同层 1 玩家
+        // 对照：docs/manual/05-dream-thieves.md 雅典娜
+        playAthenaAwe: {
+          move: ({ G, ctx }: MoveCtx, shownHandIds: CardID[], targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (!Array.isArray(shownHandIds)) return INVALID_MOVE;
+            const next = applyAthenaAwe(G, ctx.currentPlayer, shownHandIds, targetID);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
         // 药剂师·调剂：弃 1 手牌 → 弃牌堆梦境穿梭剂入手
         // 对照：docs/manual/05-dream-thieves.md 药剂师
         playChemistRefine: {
@@ -1295,6 +1411,8 @@ interface ShootVariantOpts {
   moveFaces: number[];
   extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
   decreeId?: CardID; // 死亡宣言展示（不弃，附加死亡骰面）
+  /** 骰值前置修饰 hook（用于哈雷·冲击 -2 等场景；优先级低于灵雕师/天蝎/金牛） */
+  dicePreModifier?: (baseRoll: number) => number;
 }
 
 /** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用 + 死亡宣言
@@ -1325,13 +1443,18 @@ function applyShootVariant(
   const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
   const baseRoll = random.D6();
 
-  // === 角色 SHOOT 修饰链（W12 Tier B 接入） ===
-  // 天蝎·毒针：双骰差值，0 视为 1（回合限 1 次）
-  // 金牛·号角：target 掷骰后 self 再掷 1，self > target 强制 kill
+  // === 角色 SHOOT 修饰链 ===
+  // W12 Tier B: 天蝎·毒针 / 金牛·号角
+  // W13 Tier A: 灵雕师·雕琢（最高优先级，override 不可改）
+  // hook 注入: opts.diceModifierHint 用于哈雷·冲击的免费 SHOOT
   let result: 'kill' | 'move' | 'miss';
   let preState: SetupState = G;
 
-  if (
+  // 灵雕师·雕琢：override 模式，直接用 target 手牌数当骰值
+  if (shooter.characterId === 'thief_soul_sculptor') {
+    const finalRoll = applySoulSculptorCarve(target.hand.length);
+    result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
+  } else if (
     shooter.characterId === 'thief_scorpius' &&
     canUseSkill(shooter, SCORPIUS_SKILL_ID, 'ownTurnOncePerTurn')
   ) {
@@ -1348,6 +1471,10 @@ function applyShootVariant(
     } else {
       result = baseResult;
     }
+  } else if (opts.dicePreModifier) {
+    // hook：哈雷·冲击附带 -2 修饰（仅由解封触发的免费 SHOOT 使用）
+    const finalRoll = opts.dicePreModifier(baseRoll);
+    result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
   } else {
     result = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
   }

@@ -557,3 +557,298 @@ export function getChessUsesLeft(player: PlayerSetup): number {
   const used = player.skillUsedThisGame[CHESS_SKILL_ID] ?? 0;
   return Math.max(0, CHESS_MAX_USES - used);
 }
+
+// ============================================================================
+// W13 高复杂度角色（7 个 / 9 技能）
+// ============================================================================
+// Tier A 完整接入：阿波罗·崇拜 / 殉道者·牺牲 / 灵雕师·雕琢 / 雅典娜·惊叹 / 哈雷·冲击
+// Tier B 纯函数：处女·完美 / 筑梦师·迷宫 / 雅典娜·急智（接入待 pending state 批次）
+// 跳过：阿波罗·日冕（元能力，需 abilities registry 框架）
+
+// === 阿波罗 · 崇拜 ===
+// 出牌阶段：选择一位拥有贿赂牌的盗梦者，随机抽取该盗梦者的 1 张牌入手。回合限 1 次。
+export const APOLLO_WORSHIP_SKILL_ID = 'thief_apollo.skill_0';
+
+/** 阿波罗崇拜：从指定 target 随机抽 1 张手牌 */
+export function applyApolloWorship(
+  state: SetupState,
+  selfID: string,
+  targetID: string,
+  pickIndex: number, // 由调用方提供随机索引（注入 D6 随机性）
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_apollo') return null;
+  if (!player.isAlive) return null;
+  if (selfID === targetID) return null;
+  if (!canUseSkill(player, APOLLO_WORSHIP_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  const target = state.players[targetID];
+  if (!target || !target.isAlive) return null;
+  // target 必须是盗梦者且拥有贿赂牌（bribeReceived > 0）
+  if (target.faction !== 'thief') return null;
+  if (target.bribeReceived <= 0) return null;
+  if (target.hand.length === 0) return null;
+
+  const safeIdx = ((pickIndex % target.hand.length) + target.hand.length) % target.hand.length;
+  const picked = target.hand[safeIdx]!;
+
+  let s = markSkillUsed(state, selfID, APOLLO_WORSHIP_SKILL_ID);
+  const newTargetHand = [...target.hand];
+  newTargetHand.splice(safeIdx, 1);
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, picked] },
+      [targetID]: { ...s.players[targetID]!, hand: newTargetHand },
+    },
+  };
+  return s;
+}
+
+// === 殉道者 · 牺牲 ===
+// 略过出牌阶段，掷 1 骰；3-6 改变当层心锁 ±2（不超原值）；自杀 + 弃手牌
+export const MARTYR_SKILL_ID = 'thief_martyr.skill_0';
+
+export interface MartyrOutcome {
+  state: SetupState;
+  rolled: number;
+  heartLockChanged: boolean;
+}
+
+/** 殉道者·牺牲；direction='increase'|'decrease'，受 originalHeartLock 上限 */
+export function applyMartyrSacrifice(
+  state: SetupState,
+  selfID: string,
+  roll: number,
+  direction: 'increase' | 'decrease',
+  originalHeartLockCap: number,
+): MartyrOutcome | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_martyr') return null;
+  if (!player.isAlive) return null;
+  if (player.currentLayer < 1) return null;
+
+  const layer = state.layers[player.currentLayer];
+  if (!layer) return null;
+
+  let s = markSkillUsed(state, selfID, MARTYR_SKILL_ID);
+
+  // 自杀 + 弃手牌（无论骰值）
+  const handToDiscard = [...player.hand];
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: {
+        ...s.players[selfID]!,
+        isAlive: false,
+        deathTurn: s.turnNumber,
+        hand: [],
+        currentLayer: 0,
+      },
+    },
+    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...handToDiscard] },
+    layers: {
+      ...s.layers,
+      [player.currentLayer]: {
+        ...layer,
+        playersInLayer: layer.playersInLayer.filter((id) => id !== selfID),
+      },
+      0: s.layers[0]
+        ? { ...s.layers[0]!, playersInLayer: [...s.layers[0]!.playersInLayer, selfID] }
+        : {
+            layer: 0,
+            dreamCardId: null,
+            nightmareId: null,
+            nightmareRevealed: false,
+            nightmareTriggered: false,
+            playersInLayer: [selfID],
+            heartLockValue: 0,
+          },
+    },
+  };
+
+  let heartLockChanged = false;
+  if (roll >= 3 && roll <= 6) {
+    const cur = layer.heartLockValue;
+    const delta = direction === 'increase' ? 2 : -2;
+    let next = cur + delta;
+    next = Math.max(0, Math.min(originalHeartLockCap, next));
+    if (next !== cur) {
+      heartLockChanged = true;
+      s = {
+        ...s,
+        layers: {
+          ...s.layers,
+          [player.currentLayer]: { ...s.layers[player.currentLayer]!, heartLockValue: next },
+        },
+      };
+    }
+  }
+
+  return { state: s, rolled: roll, heartLockChanged };
+}
+
+// === 灵雕师 · 雕琢 ===
+// 使用 SHOOT 时，掷骰后用 target 手牌数作为最终骰值；不可被改
+export const SOUL_SCULPTOR_SKILL_ID = 'thief_soul_sculptor.skill_0';
+
+/** 灵雕师·雕琢：用 target 手牌数替换骰值（限 [1,6]） */
+export function applySoulSculptorCarve(targetHandCount: number): number {
+  return Math.max(1, Math.min(6, targetHandCount));
+}
+
+// === 哈雷 · 冲击 ===
+// 成功解封后，视为对另一玩家使用 1 张 SHOOT，掷骰结果 -2
+export const HALEY_SKILL_ID = 'thief_haley.skill_0';
+
+/** 哈雷·冲击：附带 -2 修饰的骰值（[1,6] clamp） */
+export function applyHaleyImpact(rawRoll: number): number {
+  return Math.max(1, Math.min(6, rawRoll - 2));
+}
+
+// === 雅典娜 · 惊叹 ===
+// 展示 4 手牌 + 1 牌库顶；若 5 张同名（互不重复）→ 击杀同层 1 玩家，取手牌
+export const ATHENA_AWE_SKILL_ID = 'thief_athena.skill_1';
+
+/** 雅典娜·惊叹：5 张牌名是否全部互不相同 */
+export function checkAthenaAweCondition(cards: readonly CardID[]): boolean {
+  if (cards.length !== 5) return false;
+  const set = new Set<string>(cards);
+  return set.size === 5;
+}
+
+/** 雅典娜·惊叹：执行（fail 则技能仍消耗） */
+export function applyAthenaAwe(
+  state: SetupState,
+  selfID: string,
+  shownHandIds: readonly CardID[], // 4 张展示的手牌 cardId
+  targetID: string,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_athena') return null;
+  if (!player.isAlive) return null;
+  if (selfID === targetID) return null;
+  if (!canUseSkill(player, ATHENA_AWE_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  if (shownHandIds.length !== 4) return null;
+
+  // 4 张必须都在手中（multiset）
+  const handCopy = [...player.hand];
+  for (const id of shownHandIds) {
+    const idx = handCopy.indexOf(id);
+    if (idx === -1) return null;
+    handCopy.splice(idx, 1);
+  }
+
+  // 牌库为空时不能触发
+  if (state.deck.cards.length === 0) return null;
+  const deckTop = state.deck.cards[0]!;
+
+  const target = state.players[targetID];
+  if (!target || !target.isAlive) return null;
+  if (target.currentLayer !== player.currentLayer) return null;
+
+  let s = markSkillUsed(state, selfID, ATHENA_AWE_SKILL_ID);
+
+  // 5 张牌名是否全不同
+  const all5 = [...shownHandIds, deckTop];
+  const success = checkAthenaAweCondition(all5);
+
+  if (!success) {
+    // 失败：仍消耗技能 + 牌库顶不动（仅展示）
+    return s;
+  }
+
+  // 成功：击杀 target，取其全部手牌
+  const targetHand = [...target.hand];
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: {
+        ...s.players[selfID]!,
+        hand: [...s.players[selfID]!.hand, ...targetHand],
+        shootCount: s.players[selfID]!.shootCount + 1,
+      },
+      [targetID]: {
+        ...s.players[targetID]!,
+        isAlive: false,
+        deathTurn: s.turnNumber,
+        hand: [],
+        currentLayer: 0,
+      },
+    },
+    layers: {
+      ...s.layers,
+      [player.currentLayer]: {
+        ...s.layers[player.currentLayer]!,
+        playersInLayer: s.layers[player.currentLayer]!.playersInLayer.filter(
+          (id) => id !== targetID,
+        ),
+      },
+      0: s.layers[0]
+        ? { ...s.layers[0]!, playersInLayer: [...s.layers[0]!.playersInLayer, targetID] }
+        : {
+            layer: 0,
+            dreamCardId: null,
+            nightmareId: null,
+            nightmareRevealed: false,
+            nightmareTriggered: false,
+            playersInLayer: [targetID],
+            heartLockValue: 0,
+          },
+    },
+  };
+  return s;
+}
+
+// ============================================================================
+// W13 Tier B 纯函数（接入待 pending state 批次）
+// ============================================================================
+
+// === 处女 · 完美 ===
+// 当任意玩家掷出 6 时可触发：复活一位玩家 / 抽 2 张 / 移到任意层
+export const VIRGO_SKILL_ID = 'thief_virgo.skill_0';
+
+export type VirgoPerfectChoice = 'revive' | 'draw_two' | 'teleport';
+
+/** 处女完美触发条件：任意玩家骰 6 */
+export function isVirgoPerfectTriggered(rawRoll: number): boolean {
+  return rawRoll === 6;
+}
+
+// === 筑梦师 · 迷宫 ===
+// 弃 1 SHOOT 类牌；同层 1 玩家在其下回合结束前不受行动牌+技能影响、不能移动
+export const ARCHITECT_SKILL_ID = 'thief_architect.skill_0';
+
+/** 是否 SHOOT 类牌（迷宫弃牌门禁） */
+export function isShootClassCard(cardId: CardID): boolean {
+  return (
+    cardId === 'action_shoot' ||
+    cardId === 'action_shoot_king' ||
+    cardId === 'action_shoot_armor' ||
+    cardId === 'action_shoot_burst' ||
+    cardId === 'action_shoot_dream_transit'
+  );
+}
+
+// === 雅典娜 · 急智 ===
+// 同层盗梦者对你用行动牌时，可先抽弃牌堆 1 张。回合限 1 次（每个对手回合）
+export const ATHENA_WIT_SKILL_ID = 'thief_athena.skill_0';
+
+/** 雅典娜·急智：从弃牌堆顶抽 1 张到 selfID 手牌（纯函数） */
+export function applyAthenaWit(state: SetupState, selfID: string): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_athena') return null;
+  if (!player.isAlive) return null;
+  if (state.deck.discardPile.length === 0) return null;
+
+  const top = state.deck.discardPile[state.deck.discardPile.length - 1]!;
+  const newDiscard = state.deck.discardPile.slice(0, -1);
+  return {
+    ...state,
+    players: { ...state.players, [selfID]: { ...player, hand: [...player.hand, top] } },
+    deck: { ...state.deck, discardPile: newDiscard },
+  };
+}

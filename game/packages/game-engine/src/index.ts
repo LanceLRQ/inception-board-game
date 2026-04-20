@@ -150,6 +150,23 @@ export {
   SCORPIUS_SKILL_ID,
   TAURUS_SKILL_ID,
   LIBRA_SKILL_ID,
+  applyApolloWorship,
+  applyMartyrSacrifice,
+  applySoulSculptorCarve,
+  applyHaleyImpact,
+  applyAthenaAwe,
+  applyAthenaWit,
+  checkAthenaAweCondition,
+  isVirgoPerfectTriggered,
+  isShootClassCard,
+  APOLLO_WORSHIP_SKILL_ID,
+  MARTYR_SKILL_ID,
+  SOUL_SCULPTOR_SKILL_ID,
+  HALEY_SKILL_ID,
+  ATHENA_AWE_SKILL_ID,
+  ATHENA_WIT_SKILL_ID,
+  VIRGO_SKILL_ID,
+  ARCHITECT_SKILL_ID,
 } from './engine/skills.js';
 
 // 测试 fixtures（B12）
