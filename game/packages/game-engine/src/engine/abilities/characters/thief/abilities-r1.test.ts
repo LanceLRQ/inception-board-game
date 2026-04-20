@@ -66,11 +66,11 @@ describe('R1 · createDefaultRegistry', () => {
     expect(list[0]!.id).toBe('thief_virgo.skill_0');
   });
 
-  it('按 trigger 检索：onBeforeShoot → sudger + pisces', () => {
+  it('按 trigger 检索：onBeforeShoot → 含 sudger + pisces', () => {
     const reg = createDefaultRegistry();
-    const list = reg.getByTrigger('onBeforeShoot');
-    const ids = list.map((a) => a.id).sort();
-    expect(ids).toEqual(['thief_pisces.skill_0', 'thief_sudger_of_mind.skill_0']);
+    const ids = reg.getByTrigger('onBeforeShoot').map((a) => a.id);
+    expect(ids).toContain('thief_pisces.skill_0');
+    expect(ids).toContain('thief_sudger_of_mind.skill_0');
   });
 
   it('按 trigger 检索：onAfterShoot → virgo', () => {
@@ -82,13 +82,13 @@ describe('R1 · createDefaultRegistry', () => {
   it('按 trigger 检索：onActionPhase → athenaWit', () => {
     const reg = createDefaultRegistry();
     const list = reg.getByTrigger('onActionPhase');
-    expect(list.map((a) => a.id)).toEqual(['thief_athena.skill_0']);
+    expect(list.map((a) => a.id)).toContain('thief_athena.skill_0');
   });
 
   it('按 trigger 检索：passive → aquarius', () => {
     const reg = createDefaultRegistry();
     const list = reg.getByTrigger('passive');
-    expect(list.map((a) => a.id)).toEqual(['thief_aquarius.skill_1']);
+    expect(list.map((a) => a.id)).toContain('thief_aquarius.skill_1');
   });
 });
 

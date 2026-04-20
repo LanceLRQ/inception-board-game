@@ -50,11 +50,12 @@ describe('R2 · registry 扩展', () => {
     expect(reg.get(ariesExtraDraw.id)).toBe(ariesExtraDraw);
   });
 
-  it('onDrawPhase trigger → joker + black_swan + aries', () => {
+  it('onDrawPhase trigger → 含 joker + black_swan + aries', () => {
     const reg = createDefaultRegistry();
-    const list = reg.getByTrigger('onDrawPhase');
-    const ids = list.map((a) => a.id).sort();
-    expect(ids).toEqual(['thief_aries.skill_1', 'thief_black_swan.skill_0', 'thief_joker.skill_0']);
+    const ids = reg.getByTrigger('onDrawPhase').map((a) => a.id);
+    expect(ids).toContain('thief_joker.skill_0');
+    expect(ids).toContain('thief_black_swan.skill_0');
+    expect(ids).toContain('thief_aries.skill_1');
   });
 });
 

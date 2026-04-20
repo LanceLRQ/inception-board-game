@@ -17,6 +17,11 @@ import { piscesEvade } from './thief/pisces.js';
 import { jokerGamble } from './thief/joker.js';
 import { blackSwanTour } from './thief/black-swan.js';
 import { ariesExtraDraw } from './thief/aries.js';
+import { blackHoleLevy } from './thief/black-hole.js';
+import { spaceQueenObserve, spaceQueenStashTop } from './thief/space-queen.js';
+import { sagittariusHeartLock } from './thief/sagittarius.js';
+import { terroristCrossLayer } from './thief/terrorist.js';
+import { greenRayTransfer } from './thief/green-ray.js';
 
 export const ALL_THIEF_ABILITIES: readonly AbilityDefinition[] = [
   virgoPerfect,
@@ -27,6 +32,12 @@ export const ALL_THIEF_ABILITIES: readonly AbilityDefinition[] = [
   jokerGamble,
   blackSwanTour,
   ariesExtraDraw,
+  blackHoleLevy,
+  spaceQueenObserve,
+  spaceQueenStashTop,
+  sagittariusHeartLock,
+  terroristCrossLayer,
+  greenRayTransfer,
 ];
 
 export const ALL_MASTER_ABILITIES: readonly AbilityDefinition[] = [];
@@ -48,4 +59,10 @@ export {
   jokerGamble,
   blackSwanTour,
   ariesExtraDraw,
+  blackHoleLevy,
+  spaceQueenObserve,
+  spaceQueenStashTop,
+  sagittariusHeartLock,
+  terroristCrossLayer,
+  greenRayTransfer,
 };
