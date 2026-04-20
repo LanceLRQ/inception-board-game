@@ -9,6 +9,8 @@ import {
   getAvailableActiveSkills,
   MARS_KILL,
   MARTYR_SACRIFICE,
+  MASTER_DISCARD_NIGHTMARE,
+  MASTER_REVEAL_NIGHTMARE,
   PLUTO_BURNING,
   SATURN_FREE_MOVE,
   SHADE_FOLLOW,
@@ -192,9 +194,53 @@ describe('getAvailableActiveSkills · 火星·杀戮（梦主·targetLayer）', 
     expect(MARS_KILL.argKind).toBe('targetLayer');
   });
 
-  it('SATURN_FREE_MOVE 常量存在但未自动注册（特殊角色无关技能）', () => {
+  it('SATURN_FREE_MOVE argKind + move 正确', () => {
     expect(SATURN_FREE_MOVE.argKind).toBe('targetLayer');
     expect(SATURN_FREE_MOVE.move).toBe('useSaturnFreeMove');
+  });
+});
+
+describe('getAvailableActiveSkills · 土星·自由移动（贿赂持有者）', () => {
+  it('盗梦者 + 持贿赂 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ faction: 'thief', hasBribe: true, characterId: 'thief_any' }),
+    );
+    expect(list).toContain(SATURN_FREE_MOVE);
+  });
+
+  it('盗梦者 + 无贿赂 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ faction: 'thief', hasBribe: false, characterId: 'thief_any' }),
+    );
+    expect(list).not.toContain(SATURN_FREE_MOVE);
+  });
+
+  it('梦主 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ faction: 'master', hasBribe: true, characterId: 'dm_x' }),
+    );
+    expect(list).not.toContain(SATURN_FREE_MOVE);
+  });
+});
+
+describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
+  it('梦主 → 含 MASTER_REVEAL_NIGHTMARE + MASTER_DISCARD_NIGHTMARE', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ faction: 'master', characterId: 'dm_fortress' }),
+    );
+    expect(list).toContain(MASTER_REVEAL_NIGHTMARE);
+    expect(list).toContain(MASTER_DISCARD_NIGHTMARE);
+  });
+
+  it('盗梦者 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ faction: 'thief' }));
+    expect(list).not.toContain(MASTER_REVEAL_NIGHTMARE);
+    expect(list).not.toContain(MASTER_DISCARD_NIGHTMARE);
+  });
+
+  it('MASTER_REVEAL move = masterRevealNightmare / argKind = targetLayer', () => {
+    expect(MASTER_REVEAL_NIGHTMARE.move).toBe('masterRevealNightmare');
+    expect(MASTER_REVEAL_NIGHTMARE.argKind).toBe('targetLayer');
   });
 });
 

@@ -44,6 +44,8 @@ export interface ActiveSkillContext {
   readonly skillUsedThisTurn: Record<string, number>;
   readonly hand: readonly string[];
   readonly faction: 'thief' | 'master';
+  /** 是否持有贿赂牌（仅盗梦者相关） */
+  readonly hasBribe?: boolean;
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -128,6 +130,27 @@ export const SATURN_FREE_MOVE: ActiveSkillDescriptor = {
   nameKey: 'skill.dm_saturn_territory.free_move.name',
   descKey: 'skill.dm_saturn_territory.free_move.desc',
   argKind: 'targetLayer',
+  extraCheck: (ctx) => ctx.faction === 'thief' && ctx.hasBribe === true,
+};
+
+export const MASTER_REVEAL_NIGHTMARE: ActiveSkillDescriptor = {
+  id: '__any_master__.reveal_nightmare',
+  characterId: '__any__',
+  move: 'masterRevealNightmare',
+  nameKey: 'skill.master.reveal_nightmare.name',
+  descKey: 'skill.master.reveal_nightmare.desc',
+  argKind: 'targetLayer',
+  extraCheck: (ctx) => ctx.faction === 'master',
+};
+
+export const MASTER_DISCARD_NIGHTMARE: ActiveSkillDescriptor = {
+  id: '__any_master__.discard_nightmare',
+  characterId: '__any__',
+  move: 'masterDiscardNightmare',
+  nameKey: 'skill.master.discard_nightmare.name',
+  descKey: 'skill.master.discard_nightmare.desc',
+  argKind: 'targetLayer',
+  extraCheck: (ctx) => ctx.faction === 'master',
 };
 
 export const MARS_KILL: ActiveSkillDescriptor = {
@@ -160,8 +183,9 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   ARCHITECT_MAZE,
   PLUTO_BURNING,
   MARS_KILL,
-  // SATURN_FREE_MOVE 特殊：角色无关（任意持贿赂 thief 可用），当前架构以 characterId 过滤为主，
-  // 留到后续批次接入"世界观触发"分支。R11 暂只注册常量供外部使用
+  SATURN_FREE_MOVE,
+  MASTER_REVEAL_NIGHTMARE,
+  MASTER_DISCARD_NIGHTMARE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */
@@ -171,7 +195,8 @@ export function getAvailableActiveSkills(ctx: ActiveSkillContext): ActiveSkillDe
   if (ctx.hasPending) return [];
 
   return ALL_DESCRIPTORS.filter((d) => {
-    if (d.characterId !== ctx.characterId) return false;
+    // '__any__' 作为通配匹配任意 characterId（配合 extraCheck 做阵营过滤）
+    if (d.characterId !== '__any__' && d.characterId !== ctx.characterId) return false;
     const required = d.requiredPhase ?? 'action';
     if (ctx.turnPhase !== required) return false;
     if (d.extraCheck && !d.extraCheck(ctx)) return false;

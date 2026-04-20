@@ -565,6 +565,9 @@ export function LocalMatchRuntime({
           skillUsedThisTurn: (humanPlayer?.skillUsedThisTurn as Record<string, number>) ?? {},
           hand: humanHand,
           faction: humanFaction === 'master' ? 'master' : 'thief',
+          hasBribe:
+            typeof humanPlayer?.bribeReceived === 'number' &&
+            (humanPlayer.bribeReceived as number) > 0,
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players
