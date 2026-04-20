@@ -170,7 +170,13 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
   }
 
   // 排除 pending-only 的 move（上面已处理有 pending 状态的情况）
-  const pendingOnly = new Set(['resolveGraft', 'resolveGravityPick']);
+  // resolveLibraSplit/Pick 虽然 MOVE_PRIORITY=0 最高，但无 pendingLibra 时调用会 INVALID_MOVE → 必须排除
+  const pendingOnly = new Set([
+    'resolveGraft',
+    'resolveGravityPick',
+    'resolveLibraSplit',
+    'resolveLibraPick',
+  ]);
   const candidates = legalMoves.filter((m) => !pendingOnly.has(m));
   const sorted = [...candidates].sort(
     (a, b) => (MOVE_PRIORITY[a] ?? 99) - (MOVE_PRIORITY[b] ?? 99),
@@ -207,8 +213,17 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
     }
     case 'resolveLibraSplit': {
       // Bot 代 target：把 target 手牌对半分（偶数放 pile1，奇数放 pile2）
+      // 注意：传入的 state 是 humanClient 的 playerView，target ≠ human 时 hand 被过滤为 null。
+      // 必须从 target 自己的 client 读状态（每个 client 能看见自己的手牌）。
       const pl = G?.pendingLibra;
-      const targetHand = (G?.players?.[pl?.targetPlayerID]?.hand as string[]) ?? [];
+      const targetID = pl?.targetPlayerID as string | undefined;
+      let targetHand: string[] = [];
+      if (targetID !== undefined) {
+        const targetIdx = parseInt(targetID, 10);
+        const ownState = getState(clients[targetIdx]);
+        const rawHand = ownState?.G?.players?.[targetID]?.hand;
+        if (Array.isArray(rawHand)) targetHand = rawHand as string[];
+      }
       const pile1: string[] = [];
       const pile2: string[] = [];
       targetHand.forEach((c, i) => (i % 2 === 0 ? pile1 : pile2).push(c));
@@ -320,7 +335,10 @@ function autoPlayBots(): void {
     if (!moveFn) return;
 
     try {
-      const args = defaultArgsFor(chosen, state, currentPlayer);
+      // 关键：用 bot 自己 client 的 state 构造参数（它能看到自己的手牌等隐藏信息）；
+      // humanClient state 经 playerView 过滤后 bot 的 hand 为 null，会导致 defaultArgsFor 返回空参数。
+      const botState = getState(client) ?? state;
+      const args = defaultArgsFor(chosen, botState, currentPlayer);
       logAI(`bot ${currentPlayer} plays ${chosen}`, { turnPhase, args });
       moveFn(...args);
     } catch (err) {
