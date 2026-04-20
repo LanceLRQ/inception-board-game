@@ -563,6 +563,7 @@ export function LocalMatchRuntime({
           masterLayer,
           hasPending,
           skillUsedThisTurn: (humanPlayer?.skillUsedThisTurn as Record<string, number>) ?? {},
+          hand: humanHand,
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players

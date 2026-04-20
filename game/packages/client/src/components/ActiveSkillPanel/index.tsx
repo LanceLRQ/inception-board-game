@@ -27,9 +27,11 @@ export function ActiveSkillPanel({
   const { t } = useTranslation();
   const [pendingTargetSkill, setPendingTargetSkill] = useState<ActiveSkillDescriptor | null>(null);
   const [pendingChoiceSkill, setPendingChoiceSkill] = useState<ActiveSkillDescriptor | null>(null);
+  const [pendingCardSkill, setPendingCardSkill] = useState<ActiveSkillDescriptor | null>(null);
 
   const skills = getAvailableActiveSkills(context);
-  if (skills.length === 0 && !pendingTargetSkill && !pendingChoiceSkill) return null;
+  if (skills.length === 0 && !pendingTargetSkill && !pendingChoiceSkill && !pendingCardSkill)
+    return null;
 
   const handleClick = (skill: ActiveSkillDescriptor) => {
     if (skill.argKind === 'none') {
@@ -44,6 +46,16 @@ export function ActiveSkillPanel({
       setPendingChoiceSkill(skill);
       return;
     }
+    if (skill.argKind === 'handCard') {
+      setPendingCardSkill(skill);
+      return;
+    }
+  };
+
+  const confirmCard = (cardId: string) => {
+    if (!pendingCardSkill) return;
+    onInvoke(pendingCardSkill, [cardId]);
+    setPendingCardSkill(null);
   };
 
   const confirmTarget = (targetId: string) => {
@@ -68,7 +80,7 @@ export function ActiveSkillPanel({
         {t('skill.panelTitle', { defaultValue: '角色技能' })}
       </div>
 
-      {!pendingTargetSkill && !pendingChoiceSkill && (
+      {!pendingTargetSkill && !pendingChoiceSkill && !pendingCardSkill && (
         <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
           {skills.map((skill) => (
             <button
@@ -118,6 +130,38 @@ export function ActiveSkillPanel({
               onClick={() => setPendingChoiceSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-choice"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingCardSkill && (
+        <div className="space-y-2" data-testid="active-skill-card-picker">
+          <div className="text-xs text-muted-foreground">
+            {t('skill.chooseHandCard', { defaultValue: '选择手牌：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingCardSkill.nameKey, { defaultValue: pendingCardSkill.id })}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {context.hand.map((cardId, idx) => (
+              <button
+                key={`${cardId}-${idx}`}
+                type="button"
+                onClick={() => confirmCard(cardId)}
+                className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                data-testid={`active-skill-card-${idx}`}
+              >
+                {cardId}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPendingCardSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-card"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>

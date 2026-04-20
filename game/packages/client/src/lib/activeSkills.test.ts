@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   APOLLO_WORSHIP,
+  CHEMIST_REFINE,
+  GEMINI_SYNC,
   getAvailableActiveSkills,
   MARTYR_SACRIFICE,
   SHADE_FOLLOW,
@@ -20,6 +22,7 @@ function baseCtx(overrides: Partial<ActiveSkillContext> = {}): ActiveSkillContex
     masterLayer: 2,
     hasPending: false,
     skillUsedThisTurn: {},
+    hand: [],
     ...overrides,
   };
 }
@@ -126,5 +129,60 @@ describe('getAvailableActiveSkills · 殉道者·牺牲', () => {
   it('非殉道者 → 不含', () => {
     const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_apollo' }));
     expect(list).not.toContain(MARTYR_SACRIFICE);
+  });
+});
+
+describe('getAvailableActiveSkills · 药剂师·调剂（handCard）', () => {
+  it('药剂师 + 有手牌 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_chemist', hand: ['action_unlock'] }),
+    );
+    expect(list).toContain(CHEMIST_REFINE);
+  });
+
+  it('药剂师 + 手牌空 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_chemist', hand: [] }));
+    expect(list).not.toContain(CHEMIST_REFINE);
+  });
+
+  it('argKind = handCard', () => {
+    expect(CHEMIST_REFINE.argKind).toBe('handCard');
+  });
+});
+
+describe('getAvailableActiveSkills · 双子·协同（弃牌阶段）', () => {
+  it('双子 + 弃牌阶段 + 梦主层>己层 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gemini',
+        turnPhase: 'discard',
+        humanLayer: 1,
+        masterLayer: 3,
+      }),
+    );
+    expect(list).toContain(GEMINI_SYNC);
+  });
+
+  it('双子 + 弃牌阶段 + 梦主层=己层 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gemini',
+        turnPhase: 'discard',
+        humanLayer: 2,
+        masterLayer: 2,
+      }),
+    );
+    expect(list).not.toContain(GEMINI_SYNC);
+  });
+
+  it('双子 + 行动阶段 → 不含（requiredPhase=discard）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_gemini', turnPhase: 'action', masterLayer: 3 }),
+    );
+    expect(list).not.toContain(GEMINI_SYNC);
+  });
+
+  it('requiredPhase = discard', () => {
+    expect(GEMINI_SYNC.requiredPhase).toBe('discard');
   });
 });
