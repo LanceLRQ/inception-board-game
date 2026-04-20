@@ -67,6 +67,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playForgerExchangeSingle',
     'useSpaceQueenStashTop',
     'useBlackHoleAbsorb',
+    'useImperialCityWorldShoot',
   ],
   discard: ['doDiscard', 'skipDiscard', 'useSpaceQueenStashTop'],
 };
@@ -126,6 +127,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   useSpaceQueenStashTop: 220, // 空间女王·造物（Bot L0 不主动选）
   playBlackHoleLevy: 222, // 黑洞·吞噬（draw 阶段替代，Bot L0 不主动选）
   useBlackHoleAbsorb: 119, // 黑洞·吸纳（盗梦者主动技能，中优先级）
+  useImperialCityWorldShoot: 120, // 皇城世界观（中优先级）
   skipDiscard: 1,
   doDiscard: 2,
 };

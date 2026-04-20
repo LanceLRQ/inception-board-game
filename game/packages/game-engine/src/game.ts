@@ -92,6 +92,7 @@ import {
   applySpaceQueenStashTop,
   applyBlackHoleLevy,
   applyBlackHoleAbsorb,
+  applyImperialCityWorldShoot,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -421,6 +422,21 @@ export const InceptionCityGame = {
             const applied = applyBlackHoleAbsorb(G, ctx.currentPlayer, targetLayer);
             if (applied === null) return INVALID_MOVE;
             return applied;
+          },
+          client: false,
+        },
+
+        // 皇城世界观：收到贿赂的玩家选一个未收到贿赂的盗梦者视为 SHOOT（掷骰-3）
+        // 对照：docs/manual/06-dream-master.md 皇城
+        useImperialCityWorldShoot: {
+          move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const master = G.players[G.dreamMasterID];
+            if (!master || master.characterId !== 'dm_imperial_city') return INVALID_MOVE;
+            const roll = random.D6();
+            const applied = applyImperialCityWorldShoot(G, ctx.currentPlayer, targetID, roll);
+            if (applied === null) return INVALID_MOVE;
+            return incrementMoveCounter(applied);
           },
           client: false,
         },

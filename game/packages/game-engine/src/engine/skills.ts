@@ -4,6 +4,7 @@
 
 import type { SetupState, PlayerSetup } from '../setup.js';
 import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
+import { resolveShootCustom } from '../dice.js';
 import { flipCharacter } from './abilities/dual-faced.js';
 import type { CardID, Layer } from '@icgame/shared';
 
@@ -2264,4 +2265,45 @@ export function applyMercuryReverse(
     masterID,
     MERCURY_REVERSE_SKILL_ID,
   );
+}
+
+// === 皇城世界观 · 贿赂后 SHOOT（纯函数） ===
+// 对照：docs/manual/06-dream-master.md 皇城
+// 收到贿赂的玩家选一个未收到贿赂的盗梦者视为 SHOOT，掷骰结果 -3
+export const IMPERIAL_CITY_WORLD_SKILL_ID = 'dm_imperial_city.world_0';
+
+export function applyImperialCityWorldShoot(
+  state: SetupState,
+  shooterID: string,
+  targetID: string,
+  roll: number,
+): SetupState | null {
+  const shooter = state.players[shooterID];
+  const target = state.players[targetID];
+  if (!shooter || !target) return null;
+  if (!shooter.isAlive || !target.isAlive) return null;
+  if (shooterID === targetID) return null;
+  if (target.faction !== 'thief') return null;
+  if (target.bribeReceived > 0) return null;
+  // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4,5]
+  const modifiedRoll = Math.max(1, roll - 3);
+  const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4, 5]);
+  if (result === 'kill') {
+    let s = movePlayerToLayer(state, targetID, 0);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [targetID]: { ...s.players[targetID]!, isAlive: false, deathTurn: s.turnNumber },
+      },
+    };
+    return s;
+  }
+  if (result === 'move') {
+    const cur = state.players[targetID]!.currentLayer;
+    const newLayer = cur >= 4 ? cur - 1 : cur + 1;
+    return movePlayerToLayer(state, targetID, newLayer as Layer);
+  }
+  // miss
+  return { ...state };
 }
