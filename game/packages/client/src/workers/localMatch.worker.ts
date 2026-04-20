@@ -43,6 +43,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playShootArmor',
     'playShootBurst',
     'playShootDreamTransit',
+    'playGreenRayArrest',
     'playShift',
     'masterRevealNightmare',
     'masterDiscardNightmare',
@@ -91,6 +92,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   playShootArmor: 105,
   playShootBurst: 106,
   playShootDreamTransit: 107,
+  playGreenRayArrest: 109,
   playShift: 108,
   masterRevealNightmare: 200, // 梦主低优先：Bot L0 默认不主动触发
   masterDiscardNightmare: 201,

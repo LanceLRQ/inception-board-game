@@ -711,6 +711,74 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 格林射线·缉捕：弃穿梭剂 + SHOOT → 移到任意层 → 执行 SHOOT 效果
+        // 对照：docs/manual/05-dream-thieves.md 格林射线
+        playGreenRayArrest: {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            shootCardId: CardID,
+            targetPlayerID: string,
+            targetLayer: number,
+          ) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            if (!self || !self.isAlive) return INVALID_MOVE;
+            if (self.characterId !== 'thief_green_ray') return INVALID_MOVE;
+            const transitCard = 'action_dream_transit' as CardID;
+            if (!self.hand.includes(transitCard)) return INVALID_MOVE;
+            if (!self.hand.includes(shootCardId)) return INVALID_MOVE;
+            if (!isShootClassCard(shootCardId)) return INVALID_MOVE;
+            // target 基本校验（完整校验由 applyShootVariant 处理）
+            const target = G.players[targetPlayerID];
+            if (!target || !target.isAlive || targetPlayerID === ctx.currentPlayer)
+              return INVALID_MOVE;
+            if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
+
+            // 1) 弃穿梭剂（SHOOT 牌留给 applyShootVariant 弃）
+            let s = discardCard(G, ctx.currentPlayer, transitCard);
+            // 2) 移到目标层
+            s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer as Layer);
+            // 3) 根据卡牌类型映射 SHOOT opts → 复用 applyShootVariant
+            const optsMap: Record<string, ShootVariantOpts> = {
+              action_shoot: {
+                sameLayerRequired: true,
+                deathFaces: [1],
+                moveFaces: [2, 3, 4, 5],
+                extraOnMove: null,
+              },
+              action_shoot_dream_transit: {
+                sameLayerRequired: true,
+                deathFaces: [1],
+                moveFaces: [2, 3, 4, 5],
+                extraOnMove: null,
+              },
+              action_shoot_king: {
+                sameLayerRequired: false,
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: null,
+              },
+              action_shoot_armor: {
+                sameLayerRequired: true,
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: 'discard_unlocks',
+              },
+              action_shoot_burst: {
+                sameLayerRequired: true,
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: 'discard_shoots',
+              },
+            };
+            const opts = optsMap[shootCardId];
+            if (!opts) return INVALID_MOVE;
+            const r = applyShootVariant(s, ctx, random, targetPlayerID, shootCardId, opts);
+            return r === INVALID_MOVE ? r : recordCardPlayed(r, shootCardId);
+          },
+          client: false,
+        },
 
         dreamMasterMove: {
           move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
