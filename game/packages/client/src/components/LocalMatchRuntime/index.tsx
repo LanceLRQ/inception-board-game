@@ -10,6 +10,8 @@ import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
 import { LayerMap } from '../LayerMap';
+import { ActiveSkillPanel } from '../ActiveSkillPanel';
+import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
   G: Record<string, unknown>;
@@ -537,6 +539,54 @@ export function LocalMatchRuntime({
           )}
         </div>
       )}
+
+      {/* 角色主动技能面板（R7：影子·潜伏 / 阿波罗·崇拜） */}
+      {(() => {
+        if (!isHumanTurn || winner) return null;
+        const masterPlayer = players?.[dreamMasterID];
+        const masterLayer =
+          typeof masterPlayer?.currentLayer === 'number'
+            ? (masterPlayer.currentLayer as number)
+            : 0;
+        const hasPending =
+          !!G?.pendingUnlock ||
+          !!G?.pendingGraft ||
+          !!G?.pendingGravity ||
+          !!G?.pendingLibra ||
+          !!G?.pendingResponseWindow;
+        const skillCtx: ActiveSkillContext = {
+          characterId: humanCharacterId,
+          turnPhase,
+          isHumanTurn,
+          isAlive: !!humanPlayer?.isAlive,
+          humanLayer: (humanPlayer?.currentLayer as number) ?? 1,
+          masterLayer,
+          hasPending,
+          skillUsedThisTurn: (humanPlayer?.skillUsedThisTurn as Record<string, number>) ?? {},
+        };
+        // 主动技能目标列表：其他存活玩家
+        const targetIds = players
+          ? Object.entries(players)
+              .filter(([pid, p]) => pid !== '0' && !!p.isAlive)
+              .map(([pid]) => pid)
+          : [];
+        const nickMap = players
+          ? Object.fromEntries(
+              Object.entries(players).map(([pid, p]) => [pid, (p.nickname as string) ?? pid]),
+            )
+          : {};
+        const handleInvoke = (skill: ActiveSkillDescriptor, args: unknown[]) => {
+          void makeMove(skill.move, args);
+        };
+        return (
+          <ActiveSkillPanel
+            context={skillCtx}
+            availableTargetIds={targetIds}
+            playerNicknames={nickMap}
+            onInvoke={handleInvoke}
+          />
+        );
+      })()}
 
       {isHumanTurn && !winner && (
         <div className="mb-4 flex flex-wrap gap-2">
