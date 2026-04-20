@@ -12,6 +12,7 @@ import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/
 import { getCardImageUrl } from '../../lib/cardImages';
 import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
+import { CardDetailModal } from '../CardDetailModal';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
@@ -32,17 +33,50 @@ interface LocalMatchRuntimeProps {
 function CharacterSummary({ characterId }: { characterId: string }) {
   const summary = getCharacterSkillSummary(characterId);
   if (!summary) return null;
+  const imgUrl = getCardImageUrl(characterId);
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-xs text-primary"
+    <div
+      className="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 p-1 text-xs"
       title={summary.skills.map((s) => `${s.name}：${s.description}`).join('\n')}
       data-testid="human-character"
     >
-      <span className="font-medium">{summary.name}</span>
-      {summary.skills[0] && (
-        <span className="text-muted-foreground">· {summary.skills[0].name}</span>
+      {imgUrl && (
+        <img
+          src={imgUrl}
+          alt={summary.name}
+          loading="lazy"
+          className="h-16 w-[44px] rounded-sm object-cover"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+        />
       )}
-    </span>
+      <div className="flex flex-col">
+        <span className="font-semibold text-primary">{summary.name}</span>
+        {summary.skills[0] && (
+          <span className="text-[10px] text-muted-foreground">· {summary.skills[0].name}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 其他玩家列表行内的角色小缩略图（仅在 characterId 已揭示时显示） */
+function PlayerMiniAvatar({ characterId }: { characterId: string }) {
+  const imgUrl = getCardImageUrl(characterId);
+  if (!imgUrl) return null;
+  const summary = getCharacterSkillSummary(characterId);
+  return (
+    <img
+      src={imgUrl}
+      alt={summary?.name ?? characterId}
+      title={summary?.name ?? characterId}
+      loading="lazy"
+      className="h-10 w-[28px] flex-shrink-0 rounded-sm object-cover"
+      onError={(e) => {
+        (e.currentTarget as HTMLImageElement).style.display = 'none';
+      }}
+    />
   );
 }
 
@@ -55,6 +89,8 @@ export function LocalMatchRuntime({
   const { t } = useTranslation();
   const [gameState, setGameState] = useState<BGIOState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 长按 / 双击预览的卡牌 ID
+  const [previewCard, setPreviewCard] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const apiRef = useRef<Comlink.Remote<LocalMatchWorker> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -471,7 +507,15 @@ export function LocalMatchRuntime({
           <div className="mb-2 flex items-center justify-between">
             <span className="text-sm font-medium">{t('localMatch.yourInfo')}</span>
             {typeof humanPlayer.characterId === 'string' && humanPlayer.characterId && (
-              <CharacterSummary characterId={humanPlayer.characterId as string} />
+              <button
+                type="button"
+                onClick={() => setPreviewCard(humanPlayer.characterId as string)}
+                className="inline-block transition-transform hover:scale-[1.02]"
+                aria-label="查看自己角色详情"
+                data-testid="human-character-preview"
+              >
+                <CharacterSummary characterId={humanPlayer.characterId as string} />
+              </button>
             )}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -514,11 +558,35 @@ export function LocalMatchRuntime({
                     else if (isActionPlayable) startPlay(card);
                   };
                   const imgUrl = getCardImageUrl(card);
+                  // 长按 500ms / 双击 → 打开预览
+                  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+                  const startPress = () => {
+                    pressTimer = setTimeout(() => {
+                      setPreviewCard(card);
+                      pressTimer = null;
+                    }, 500);
+                  };
+                  const cancelPress = () => {
+                    if (pressTimer) {
+                      clearTimeout(pressTimer);
+                      pressTimer = null;
+                    }
+                  };
                   return (
                     <button
                       key={`${card}-${i}`}
                       type="button"
-                      disabled={!isDiscardSelect && !isActionPlayable}
+                      onPointerDown={startPress}
+                      onPointerUp={cancelPress}
+                      onPointerLeave={cancelPress}
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        setPreviewCard(card);
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setPreviewCard(card);
+                      }}
                       onClick={onClickHand}
                       className={cn(
                         'relative flex h-[108px] w-[76px] flex-col items-center justify-end overflow-hidden rounded-md border-2 transition-all',
@@ -1115,24 +1183,38 @@ export function LocalMatchRuntime({
 
       {players && (
         <div className="space-y-2">
-          {Object.entries(players).map(([id, p]) => (
-            <div
-              key={id}
-              className={cn(
-                'flex items-center gap-3 rounded-lg border px-3 py-2 text-sm',
-                id === currentPlayerID ? 'border-primary bg-primary/5' : 'border-border bg-card',
-                id === '0' && 'ring-1 ring-primary/30',
-              )}
-            >
-              <span className="font-medium">{id === '0' ? t('localMatch.you') : `AI ${id}`}</span>
-              <span className="text-xs text-muted-foreground">{String(p.faction)}</span>
-              <span className="text-xs text-muted-foreground">L{String(p.currentLayer)}</span>
-              {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}
-              <span className="ml-auto text-xs text-muted-foreground">
-                {t('localMatch.cards')}：{(p.hand as unknown[])?.length ?? 0}
-              </span>
-            </div>
-          ))}
+          {Object.entries(players).map(([id, p]) => {
+            const cid = typeof p.characterId === 'string' ? p.characterId : '';
+            return (
+              <div
+                key={id}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border px-3 py-2 text-sm',
+                  id === currentPlayerID ? 'border-primary bg-primary/5' : 'border-border bg-card',
+                  id === '0' && 'ring-1 ring-primary/30',
+                )}
+              >
+                {cid && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewCard(cid)}
+                    className="flex-shrink-0 transition-transform hover:scale-110"
+                    aria-label={`查看 ${cid}`}
+                    data-testid={`player-avatar-${id}`}
+                  >
+                    <PlayerMiniAvatar characterId={cid} />
+                  </button>
+                )}
+                <span className="font-medium">{id === '0' ? t('localMatch.you') : `AI ${id}`}</span>
+                <span className="text-xs text-muted-foreground">{String(p.faction)}</span>
+                <span className="text-xs text-muted-foreground">L{String(p.currentLayer)}</span>
+                {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {t('localMatch.cards')}：{(p.hand as unknown[])?.length ?? 0}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1143,6 +1225,9 @@ export function LocalMatchRuntime({
       )}
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+      {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
+      <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />
     </div>
   );
 }

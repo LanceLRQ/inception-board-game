@@ -86,6 +86,8 @@ export interface CharacterDefinition {
   readonly front: CharacterSideDefinition;
   readonly back?: CharacterSideDefinition;
   readonly imagePath: string;
+  /** 双面角色背面卡图（doubleSided=true 时非空）；单面角色留空 */
+  readonly backImagePath?: string;
   readonly isExpansion: boolean;
 }
 

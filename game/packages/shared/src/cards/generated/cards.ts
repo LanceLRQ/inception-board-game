@@ -536,6 +536,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
       ],
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_双子·命运.webp',
+    backImagePath: 'thief/盗梦都市_角色牌_盗梦者_双子·抉择.webp',
     isExpansion: false,
   },
   {
@@ -573,6 +574,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
       ],
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_双鱼·游离.webp',
+    backImagePath: 'thief/盗梦都市_角色牌_盗梦者_双鱼·洗礼.webp',
     isExpansion: false,
   },
   {
@@ -732,6 +734,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
       ],
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_露娜·月蚀.webp',
+    backImagePath: 'thief/盗梦都市_角色牌_盗梦者_露娜·满月.webp',
     isExpansion: false,
   },
   {

@@ -20,8 +20,13 @@ import {
 
 const PUBLIC_PREFIX = '/cards/';
 
-function buildImageMap(): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
+interface ImageEntry {
+  readonly front: string;
+  readonly back?: string;
+}
+
+function buildImageMap(): ReadonlyMap<string, ImageEntry> {
+  const map = new Map<string, ImageEntry>();
   const all = [
     ...THIEF_CHARACTERS,
     ...MASTER_CHARACTERS,
@@ -32,9 +37,14 @@ function buildImageMap(): ReadonlyMap<string, string> {
     ...BRIBE_CARDS,
   ];
   for (const card of all) {
-    const path = (card as { imagePath?: string }).imagePath;
-    if (!card.id || !path) continue;
-    map.set(card.id, PUBLIC_PREFIX + encodeURI(path));
+    const front = (card as { imagePath?: string }).imagePath;
+    if (!card.id || !front) continue;
+    const backRaw = (card as { backImagePath?: string }).backImagePath;
+    const entry: ImageEntry = {
+      front: PUBLIC_PREFIX + encodeURI(front),
+      ...(backRaw ? { back: PUBLIC_PREFIX + encodeURI(backRaw) } : {}),
+    };
+    map.set(card.id, entry);
   }
   return map;
 }
@@ -48,7 +58,22 @@ const IMAGE_MAP = buildImageMap();
  */
 export function getCardImageUrl(cardId: string | null | undefined): string | undefined {
   if (!cardId) return undefined;
-  return IMAGE_MAP.get(cardId);
+  return IMAGE_MAP.get(cardId)?.front;
+}
+
+/**
+ * 获取双面卡牌的背面图 URL；单面卡或未登记返回 undefined。
+ * 用于 CardDetailModal 翻面预览。
+ */
+export function getCardBackImageUrl(cardId: string | null | undefined): string | undefined {
+  if (!cardId) return undefined;
+  return IMAGE_MAP.get(cardId)?.back;
+}
+
+/** 判断一张卡是否为双面（有背面图） */
+export function hasCardBackImage(cardId: string | null | undefined): boolean {
+  if (!cardId) return false;
+  return !!IMAGE_MAP.get(cardId)?.back;
 }
 
 /** 已登记的卡牌总数（测试/诊断用） */

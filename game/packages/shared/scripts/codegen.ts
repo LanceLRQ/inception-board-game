@@ -172,6 +172,8 @@ function cardToCharacter(faction: 'thief' | 'master') {
           }
         : {}),
       imagePath: normalizeImagePath(front?.image ?? ''),
+      // 双面角色才保留 backImagePath；单面角色 back.image 通常是通用"背面"图，对预览无意义
+      ...(isDouble && back?.image ? { backImagePath: normalizeImagePath(back.image) } : {}),
       isExpansion: false,
     };
   };
