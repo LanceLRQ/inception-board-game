@@ -65,6 +65,12 @@ import {
   applyGaiaShift,
   applyDarwinEvolution,
   isAquariusUnlimitedActive,
+  getEffectiveMaxUnlockPerTurn,
+  checkHarborWin,
+  checkNeptuneWin,
+  isJupiterPeakWorldActive,
+  isJupiterPeakLayerOK,
+  shouldJupiterThunderKill,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -568,8 +574,10 @@ export const InceptionCityGame = {
             if (player.faction !== 'thief') return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
             // 摩羯·节奏 / 水瓶·同流：被动豁免解封次数限制
+            // 黑洞·DM 世界观：上限提升至 2
+            const effectiveMax = getEffectiveMaxUnlockPerTurn(G, G.maxUnlockPerTurn);
             if (
-              player.successfulUnlocksThisTurn >= G.maxUnlockPerTurn &&
+              player.successfulUnlocksThisTurn >= effectiveMax &&
               !isCapricornusRhythmActive(player) &&
               !isAquariusUnlimitedActive(player)
             ) {
@@ -1416,6 +1424,18 @@ export const InceptionCityGame = {
       return { winner: 'master' as Faction, reason: 'all_thieves_dead' };
     }
 
+    // 港口世界观：≥2 金库打开且秘密未开 → 梦主胜
+    // 对照：cards-data.json dm_harbor 世界观
+    if (checkHarborWin(G)) {
+      return { winner: 'master' as Faction, reason: 'harbor_two_vaults' };
+    }
+
+    // 海王星·泓洋世界观：金币金库被打开 → 梦主胜
+    // 对照：cards-data.json dm_neptune_ocean 世界观
+    if (checkNeptuneWin(G)) {
+      return { winner: 'master' as Faction, reason: 'neptune_coin_opened' };
+    }
+
     // 牌库耗尽 + 秘密金库未开 → 梦主胜
     // 对照：docs/manual/03-game-flow.md 第 20 行
     if (G.deck && G.deck.cards.length === 0 && G.phase === 'playing') {
@@ -1667,7 +1687,15 @@ function applyShootVariant(
   if (opts.sameLayerRequired && shooter.currentLayer !== target.currentLayer) {
     // 摩羯·节奏：手牌数 >= 所在层数字时，SHOOT 类不受层数限制
     // 恐怖分子·远程：被动免除层数限制
-    if (!isCapricornusRhythmActive(shooter) && !isTerroristCrossLayerActive(shooter)) {
+    // 木星·巅峰世界观：SHOOT 类可对相邻层使用
+    const jupiterRelaxed =
+      isJupiterPeakWorldActive(G) &&
+      isJupiterPeakLayerOK(shooter.currentLayer, target.currentLayer);
+    if (
+      !isCapricornusRhythmActive(shooter) &&
+      !isTerroristCrossLayerActive(shooter) &&
+      !jupiterRelaxed
+    ) {
       return INVALID_MOVE;
     }
   }
@@ -1712,6 +1740,15 @@ function applyShootVariant(
     result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
   } else {
     result = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
+  }
+
+  // 木星·雷霆：梦主使用 SHOOT 类，目标骰 < 梦主层 → 直接击杀
+  // 对照：cards-data.json dm_jupiter_peak 雷霆
+  if (
+    result !== 'kill' &&
+    shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, baseRoll)
+  ) {
+    result = 'kill';
   }
 
   let s = discardCard(preState, ctx.currentPlayer, cardId);

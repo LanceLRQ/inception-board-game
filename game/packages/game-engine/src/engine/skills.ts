@@ -1383,3 +1383,256 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
   );
   return hasTransit && hasShoot;
 }
+
+// ============================================================================
+// W16-A 梦主 6 角色（纯函数 + 简单接入）
+// ============================================================================
+// 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
+// 对照：plans/design/05-card-system.md + docs/manual/06-dream-master.md
+
+/** 找当前梦主玩家 ID（faction === 'master'，alive 优先） */
+export function findMasterID(state: SetupState): string | null {
+  for (const pid of state.playerOrder) {
+    const p = state.players[pid];
+    if (p?.faction === 'master') return pid;
+  }
+  return null;
+}
+
+/** 找当前梦主角色 ID */
+export function getMasterCharacterID(state: SetupState): CardID | null {
+  const mid = findMasterID(state);
+  if (!mid) return null;
+  return state.players[mid]?.characterId ?? null;
+}
+
+// === 港口 · 海啸 + 世界观 ===
+// 技能 海啸：当任一金库被打开，游戏未结束时，所有盗梦者各掷 1 颗骰子
+//   1-5 → 该盗梦者死亡（直接迷失层，跳过击杀状态，不给手牌）
+//   6   → 躲过
+// 世界观 港口：当 2 个金库被打开仍未找到秘密，则梦主胜
+// 对照：cards-data.json dm_harbor
+
+export const HARBOR_TSUNAMI_SKILL_ID = 'dm_harbor.skill_0';
+
+/** 港口·海啸：金库打开后触发；rolls 顺序对应 alive thieves 的 playerOrder 排序 */
+export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupState {
+  const mid = findMasterID(state);
+  if (!mid) return state;
+  const master = state.players[mid];
+  if (!master || master.characterId !== 'dm_harbor') return state;
+
+  // 收集存活盗梦者（按 playerOrder 排序）
+  const aliveThieves = state.playerOrder.filter((pid) => {
+    const p = state.players[pid];
+    return p && p.faction === 'thief' && p.isAlive;
+  });
+  if (aliveThieves.length === 0) return state;
+
+  let s = state;
+  for (let i = 0; i < aliveThieves.length; i++) {
+    const pid = aliveThieves[i]!;
+    const roll = rolls[i] ?? 6;
+    if (roll >= 1 && roll <= 5) {
+      // 死亡 → 直接迷失层；不交手牌（跳过击杀状态）
+      const target = s.players[pid];
+      if (!target || !target.isAlive) continue;
+      s = {
+        ...s,
+        players: {
+          ...s.players,
+          [pid]: {
+            ...target,
+            isAlive: false,
+            deathTurn: s.turnNumber,
+          },
+        },
+      };
+      s = movePlayerToLayer(s, pid, 0);
+    }
+  }
+  return s;
+}
+
+/** 港口世界观激活判定 */
+export function isHarborWorldActive(state: SetupState): boolean {
+  return getMasterCharacterID(state) === 'dm_harbor';
+}
+
+/** 港口胜利判定：≥2 金库打开且秘密未开 → 梦主胜 */
+export function checkHarborWin(state: SetupState): boolean {
+  if (!isHarborWorldActive(state)) return false;
+  const opened = state.vaults.filter((v) => v.isOpened).length;
+  if (opened < 2) return false;
+  const secret = state.vaults.find((v) => v.contentType === 'secret');
+  return !secret?.isOpened;
+}
+
+// === 盛夏 · 充盈 + 世界观 ===
+// 技能 充盈：梦主抽牌阶段，每拥有 1 张未派发贿赂牌 → 多抽 1 张
+// 世界观 盛夏：所有盗梦者抽牌阶段抽牌数 +1
+// 对照：cards-data.json dm_midsummer
+
+/** 盛夏·充盈：梦主额外抽牌数（=未派发贿赂池剩余张数） */
+export function getMidsummerExtraDraws(state: SetupState): number {
+  if (getMasterCharacterID(state) !== 'dm_midsummer') return 0;
+  return state.bribePool?.length ?? 0;
+}
+
+/** 盛夏世界观：盗梦者抽牌额外 +N（默认 +1） */
+export function getMidsummerWorldThiefBonus(state: SetupState): number {
+  return getMasterCharacterID(state) === 'dm_midsummer' ? 1 : 0;
+}
+
+// === 黑洞 (梦主版) · 倒流 + 世界观 ===
+// 技能 倒流：梦主每回合抽牌阶段，每未开金库的层 +2 心锁，不超过原始数
+// 世界观 黑洞：盗梦者每回合可成功解封 2 次
+// 对照：cards-data.json dm_black_hole
+
+export const BLACK_HOLE_REVERSE_SKILL_ID = 'dm_black_hole.skill_0';
+const BLACK_HOLE_HEART_LOCK_REGEN = 2;
+
+/** 黑洞·DM·倒流：每个未开金库层 +2 心锁（capped at originalHeartLocks per layer） */
+export function applyBlackHoleReverse(
+  state: SetupState,
+  originalHeartLocks: Record<number, number>,
+): SetupState {
+  if (getMasterCharacterID(state) !== 'dm_black_hole') return state;
+
+  let s = state;
+  for (const layerStr of Object.keys(s.layers)) {
+    const layerNum = Number(layerStr);
+    if (layerNum < 1 || layerNum > 4) continue;
+    const layerInfo = s.layers[layerNum];
+    if (!layerInfo) continue;
+    // 该层金库已开 → 不增
+    const vault = s.vaults.find((v) => v.layer === layerNum);
+    if (!vault || vault.isOpened) continue;
+    const cap = originalHeartLocks[layerNum] ?? layerInfo.heartLockValue;
+    const next = Math.min(cap, layerInfo.heartLockValue + BLACK_HOLE_HEART_LOCK_REGEN);
+    if (next === layerInfo.heartLockValue) continue;
+    s = {
+      ...s,
+      layers: {
+        ...s.layers,
+        [layerNum]: { ...layerInfo, heartLockValue: next },
+      },
+    };
+  }
+  return s;
+}
+
+/** 黑洞世界观：解封次数上限改为 2 */
+export function isBlackHoleWorldActive(state: SetupState): boolean {
+  return getMasterCharacterID(state) === 'dm_black_hole';
+}
+
+/** 获取当前实际解封次数上限（黑洞世界观时为 2，否则用 G.maxUnlockPerTurn） */
+export function getEffectiveMaxUnlockPerTurn(state: SetupState, base: number): number {
+  return isBlackHoleWorldActive(state) ? Math.max(base, 2) : base;
+}
+
+// === 海王星·泓洋 · 风暴 + 世界观 ===
+// 技能 风暴：每当心锁数减少时 / 时间风暴效果结算后 → 牌库顶弃 5 张
+// 世界观 泓洋：当放着金币的金库被打开 → 梦主胜
+// 对照：cards-data.json dm_neptune_ocean
+
+export const NEPTUNE_STORM_SKILL_ID = 'dm_neptune_ocean.skill_0';
+const NEPTUNE_STORM_DISCARD = 5;
+
+/** 海王星·风暴：心锁减少 / 时间风暴后触发，弃 5 张 */
+export function applyNeptuneStorm(state: SetupState): SetupState {
+  if (getMasterCharacterID(state) !== 'dm_neptune_ocean') return state;
+  const n = Math.min(NEPTUNE_STORM_DISCARD, state.deck.cards.length);
+  if (n === 0) return state;
+  const dropped = state.deck.cards.slice(0, n);
+  return {
+    ...state,
+    deck: {
+      ...state.deck,
+      cards: state.deck.cards.slice(n),
+      discardPile: [...state.deck.discardPile, ...dropped],
+    },
+  };
+}
+
+/** 海王星泓洋胜利判定：金币金库被打开 → 梦主胜 */
+export function checkNeptuneWin(state: SetupState): boolean {
+  if (getMasterCharacterID(state) !== 'dm_neptune_ocean') return false;
+  return state.vaults.some((v) => v.isOpened && v.contentType === 'coin');
+}
+
+// === 木星·巅峰 · 雷霆 + 世界观 ===
+// 技能 雷霆：梦主使用 SHOOT 类牌，目标掷骰 < 梦主所在层数 → 直接击杀
+// 世界观 巅峰：SHOOT 类牌可对相邻层数玩家使用
+// 对照：cards-data.json dm_jupiter_peak
+
+/** 木星巅峰世界观激活 */
+export function isJupiterPeakWorldActive(state: SetupState): boolean {
+  return getMasterCharacterID(state) === 'dm_jupiter_peak';
+}
+
+/** 巅峰世界观：SHOOT 跨层判定（同层或相邻层即可） */
+export function isJupiterPeakLayerOK(shooterLayer: number, targetLayer: number): boolean {
+  if (shooterLayer === targetLayer) return true;
+  // 相邻层（不包括迷失层 0）
+  if (shooterLayer < 1 || targetLayer < 1) return false;
+  return Math.abs(shooterLayer - targetLayer) === 1;
+}
+
+/** 木星·雷霆：是否触发额外击杀（只在梦主为 dm_jupiter_peak 且骰值<梦主层时返回 true） */
+export function shouldJupiterThunderKill(
+  shooterCharacter: CardID,
+  shooterLayer: number,
+  finalRoll: number,
+): boolean {
+  if (shooterCharacter !== 'dm_jupiter_peak') return false;
+  if (shooterLayer < 1) return false;
+  return finalRoll < shooterLayer;
+}
+
+// === 土星·领地 · 律令（纯函数） ===
+// 技能 律令：弃 1 手牌抵消 1 张同名牌效果，并从牌库顶抽 1
+// 世界观 领地：拥有贿赂的盗梦者，自己回合出牌阶段可不用行动牌移动 1 次到相邻层
+// 集成留 W16-B（需 pending state + UI）；本批仅纯函数
+// 对照：cards-data.json dm_saturn_territory
+
+export const SATURN_DECREE_SKILL_ID = 'dm_saturn_territory.skill_0';
+
+/** 律令：弃 1 张手牌（抵消同名后）+ 抽 1 */
+export function applySaturnDecree(
+  state: SetupState,
+  masterID: string,
+  discardCardId: CardID,
+): SetupState | null {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_saturn_territory') return null;
+  if (!master.isAlive) return null;
+  const idx = master.hand.indexOf(discardCardId);
+  if (idx === -1) return null;
+
+  const newHand = [...master.hand];
+  newHand.splice(idx, 1);
+
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [masterID]: { ...master, hand: newHand },
+    },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, discardCardId],
+    },
+  };
+  s = drawCards(s, masterID, 1);
+  return s;
+}
+
+/** 土星领地世界观：盗梦者持有贿赂时获得 1 次免费移动（消耗后置 false） */
+export function canSaturnFreeMove(state: SetupState, playerID: string): boolean {
+  if (getMasterCharacterID(state) !== 'dm_saturn_territory') return false;
+  const p = state.players[playerID];
+  if (!p || p.faction !== 'thief' || !p.isAlive) return false;
+  return p.bribeReceived > 0;
+}
