@@ -26,9 +26,10 @@ export function ActiveSkillPanel({
 }: ActiveSkillPanelProps) {
   const { t } = useTranslation();
   const [pendingTargetSkill, setPendingTargetSkill] = useState<ActiveSkillDescriptor | null>(null);
+  const [pendingChoiceSkill, setPendingChoiceSkill] = useState<ActiveSkillDescriptor | null>(null);
 
   const skills = getAvailableActiveSkills(context);
-  if (skills.length === 0 && !pendingTargetSkill) return null;
+  if (skills.length === 0 && !pendingTargetSkill && !pendingChoiceSkill) return null;
 
   const handleClick = (skill: ActiveSkillDescriptor) => {
     if (skill.argKind === 'none') {
@@ -39,12 +40,22 @@ export function ActiveSkillPanel({
       setPendingTargetSkill(skill);
       return;
     }
+    if (skill.argKind === 'choiceIncDec') {
+      setPendingChoiceSkill(skill);
+      return;
+    }
   };
 
   const confirmTarget = (targetId: string) => {
     if (!pendingTargetSkill) return;
     onInvoke(pendingTargetSkill, [targetId]);
     setPendingTargetSkill(null);
+  };
+
+  const confirmChoice = (choice: 'increase' | 'decrease') => {
+    if (!pendingChoiceSkill) return;
+    onInvoke(pendingChoiceSkill, [choice]);
+    setPendingChoiceSkill(null);
   };
 
   return (
@@ -57,7 +68,7 @@ export function ActiveSkillPanel({
         {t('skill.panelTitle', { defaultValue: '角色技能' })}
       </div>
 
-      {!pendingTargetSkill && (
+      {!pendingTargetSkill && !pendingChoiceSkill && (
         <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
           {skills.map((skill) => (
             <button
@@ -74,6 +85,43 @@ export function ActiveSkillPanel({
               {t(skill.nameKey, { defaultValue: skill.id })}
             </button>
           ))}
+        </div>
+      )}
+
+      {pendingChoiceSkill && (
+        <div className="space-y-2" data-testid="active-skill-choice-picker">
+          <div className="text-xs text-muted-foreground">
+            {t('skill.chooseDirection', { defaultValue: '选择方向：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingChoiceSkill.nameKey, { defaultValue: pendingChoiceSkill.id })}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => confirmChoice('increase')}
+              className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+              data-testid="active-skill-choice-increase"
+            >
+              {t('skill.choiceIncrease', { defaultValue: '+' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => confirmChoice('decrease')}
+              className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+              data-testid="active-skill-choice-decrease"
+            >
+              {t('skill.choiceDecrease', { defaultValue: '-' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingChoiceSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-choice"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
         </div>
       )}
 

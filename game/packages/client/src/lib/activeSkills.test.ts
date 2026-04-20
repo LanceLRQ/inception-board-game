@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import {
   APOLLO_WORSHIP,
   getAvailableActiveSkills,
+  MARTYR_SACRIFICE,
   SHADE_FOLLOW,
+  TOURIST_ASSIST,
   type ActiveSkillContext,
 } from './activeSkills.js';
 
@@ -85,5 +87,44 @@ describe('描述符元数据', () => {
   it('APOLLO_WORSHIP move=playApolloWorship，argKind=targetPlayer', () => {
     expect(APOLLO_WORSHIP.move).toBe('playApolloWorship');
     expect(APOLLO_WORSHIP.argKind).toBe('targetPlayer');
+  });
+
+  it('TOURIST_ASSIST move=playTouristAssist，argKind=targetPlayer', () => {
+    expect(TOURIST_ASSIST.move).toBe('playTouristAssist');
+    expect(TOURIST_ASSIST.argKind).toBe('targetPlayer');
+  });
+
+  it('MARTYR_SACRIFICE move=playMartyrSacrifice，argKind=choiceIncDec', () => {
+    expect(MARTYR_SACRIFICE.move).toBe('playMartyrSacrifice');
+    expect(MARTYR_SACRIFICE.argKind).toBe('choiceIncDec');
+  });
+});
+
+describe('getAvailableActiveSkills · 穿行者·支助（回合限 1）', () => {
+  it('穿行者 + 未用过 → 含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_tourist' }));
+    expect(list).toContain(TOURIST_ASSIST);
+  });
+
+  it('穿行者 + 已用过 1 次 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_tourist',
+        skillUsedThisTurn: { 'thief_tourist.skill_0': 1 },
+      }),
+    );
+    expect(list).not.toContain(TOURIST_ASSIST);
+  });
+});
+
+describe('getAvailableActiveSkills · 殉道者·牺牲', () => {
+  it('殉道者 → 含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_martyr' }));
+    expect(list).toContain(MARTYR_SACRIFICE);
+  });
+
+  it('非殉道者 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_apollo' }));
+    expect(list).not.toContain(MARTYR_SACRIFICE);
   });
 });

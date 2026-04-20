@@ -2,11 +2,14 @@
 // 对照：engine/abilities/characters/ + engine/skills.ts
 //
 // 仅处理"行动阶段可点按钮触发"的主动技能；被动技能由 dispatcher 自动触发
-// R7 首批支持：
+// R7-R8 支持：
 //   - 影子·潜伏 (thief_shade → playShadeFollow, 无参)
 //   - 阿波罗·崇拜 (thief_apollo → playApolloWorship, 1 target)
+//   - 穿行者·支助 (thief_tourist → playTouristAssist, 1 target)
+//   - 殉道者·牺牲 (thief_martyr → playMartyrSacrifice, choice: increase/decrease)
+//   - 战争之王·黑市 (thief_lord_of_war → playLordOfWarBlackMarket, needs custom picker)
 
-export type ActiveSkillArgKind = 'none' | 'targetPlayer';
+export type ActiveSkillArgKind = 'none' | 'targetPlayer' | 'choiceIncDec';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -56,7 +59,34 @@ export const APOLLO_WORSHIP: ActiveSkillDescriptor = {
   argKind: 'targetPlayer',
 };
 
-const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [SHADE_FOLLOW, APOLLO_WORSHIP];
+export const TOURIST_ASSIST: ActiveSkillDescriptor = {
+  id: 'thief_tourist.skill_0',
+  characterId: 'thief_tourist',
+  move: 'playTouristAssist',
+  nameKey: 'skill.thief_tourist.skill_0.name',
+  descKey: 'skill.thief_tourist.skill_0.desc',
+  argKind: 'targetPlayer',
+  extraCheck: (ctx) => {
+    // 穿行者·支助每回合限 1 次
+    return (ctx.skillUsedThisTurn['thief_tourist.skill_0'] ?? 0) < 1;
+  },
+};
+
+export const MARTYR_SACRIFICE: ActiveSkillDescriptor = {
+  id: 'thief_martyr.skill_0',
+  characterId: 'thief_martyr',
+  move: 'playMartyrSacrifice',
+  nameKey: 'skill.thief_martyr.skill_0.name',
+  descKey: 'skill.thief_martyr.skill_0.desc',
+  argKind: 'choiceIncDec',
+};
+
+const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
+  SHADE_FOLLOW,
+  APOLLO_WORSHIP,
+  TOURIST_ASSIST,
+  MARTYR_SACRIFICE,
+];
 
 /** 推导当前人类玩家可见的主动技能列表 */
 export function getAvailableActiveSkills(ctx: ActiveSkillContext): ActiveSkillDescriptor[] {
