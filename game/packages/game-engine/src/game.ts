@@ -85,6 +85,7 @@ import {
   applyDiscardHiddenNightmare,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
+import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import type { CardID, Faction, Layer } from '@icgame/shared';
 
 export type { SetupState } from './setup.js';
@@ -261,6 +262,9 @@ export const InceptionCityGame = {
             s = applyPointmanAssault(s, G.currentPlayerID, drawn);
             // 狮子王道：抽完后从牌库顶额外抽 = 梦主手牌数
             s = applyLeoKingdom(s, G.currentPlayerID);
+            // abilities registry：运行 onDrawPhase passive（白羊·skill_1 等）
+            // 主动技能（小丑/黑天鹅）由 UI 通过 listAvailableActives 展示按钮，显式触发
+            s = dispatchPassives(s, 'onDrawPhase').state;
             s = setTurnPhase(s, 'action');
             return s;
           },
@@ -646,6 +650,8 @@ export const InceptionCityGame = {
             s = applyInterpreterForeshadow(s, unlockerId);
             // 梦境猎手·满载：成功解封后抽 = 当层心锁数
             s = applyExtractorBounty(s, unlockerId);
+            // abilities registry：运行 onUnlock passive（空间女王·监察 等）
+            s = dispatchPassives(s, 'onUnlock').state;
             return s;
           },
           client: false,
