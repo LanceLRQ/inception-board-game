@@ -186,6 +186,7 @@ export function LocalMatchRuntime({
               contentType: v.contentType as 'secret' | 'coin' | 'empty',
             })) ?? [],
         nightmareRevealed: !!(l.nightmareRevealed as boolean),
+        nightmareCardId: (l.nightmareId as string | null) ?? null,
         playerIds: (l.playersInLayer as string[]) ?? [],
       }))
     : [];
@@ -504,6 +505,7 @@ export function LocalMatchRuntime({
           humanPlayerId="0"
           dreamMasterId={dreamMasterID}
           currentPlayerId={currentPlayerID}
+          onCardPreview={setPreviewCard}
         />
       )}
 

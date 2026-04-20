@@ -5,8 +5,9 @@
 // 对照：plans/design/02-game-rules-spec.md §2.3 梦境层
 
 import { useTranslation } from 'react-i18next';
-import { Coins, Crown, Gem, Heart, Lock, Skull, Unlock, User } from 'lucide-react';
+import { Crown, Heart, Skull, User } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getCardImageUrl } from '../../lib/cardImages';
 
 interface PlayerView {
   id: string;
@@ -23,6 +24,8 @@ interface LayerView {
   /** 已打开且可见的金库内容（秘密/金币/空） */
   openedVaults: Array<{ contentType: 'secret' | 'coin' | 'empty' }>;
   nightmareRevealed: boolean;
+  /** 已翻开的梦魇牌 cardId（用于展示真实卡图） */
+  nightmareCardId?: string | null;
   playerIds: string[];
 }
 
@@ -32,6 +35,8 @@ export interface LayerMapProps {
   readonly humanPlayerId: string;
   readonly dreamMasterId: string;
   readonly currentPlayerId: string;
+  /** 点击金库/梦魇缩略图时触发预览模态框（上游 setPreviewCard） */
+  readonly onCardPreview?: (cardId: string) => void;
 }
 
 export function LayerMap({
@@ -40,6 +45,7 @@ export function LayerMap({
   humanPlayerId,
   dreamMasterId,
   currentPlayerId,
+  onCardPreview,
 }: LayerMapProps) {
   const { t } = useTranslation();
   // 按层序显示：L4 在上方（最深），L0（迷失层）在最下
@@ -57,6 +63,7 @@ export function LayerMap({
           humanPlayerId={humanPlayerId}
           dreamMasterId={dreamMasterId}
           currentPlayerId={currentPlayerId}
+          onCardPreview={onCardPreview}
         />
       ))}
       {deadPlayers.length > 0 && (
@@ -92,12 +99,14 @@ function LayerRow({
   humanPlayerId,
   dreamMasterId,
   currentPlayerId,
+  onCardPreview,
 }: {
   layer: LayerView;
   players: Record<string, PlayerView>;
   humanPlayerId: string;
   dreamMasterId: string;
   currentPlayerId: string;
+  onCardPreview?: (cardId: string) => void;
 }) {
   const occupants = layer.playerIds.map((id) => players[id]).filter((p): p is PlayerView => !!p);
 
@@ -113,32 +122,43 @@ function LayerRow({
         <Heart className="h-3 w-3 text-rose-400" />
         <span>{layer.heartLockValue}</span>
       </div>
+      {/* 未开金库：卡背缩略图（叠加数量徽标） */}
       {layer.vaultCount > 0 && (
-        <div className="flex items-center gap-1 text-muted-foreground" title="未打开金库数">
-          <Lock className="h-3 w-3 text-amber-400" />
-          <span>{layer.vaultCount}</span>
-        </div>
+        <CardThumb
+          cardId="vault_back"
+          title={`未打开金库 ×${layer.vaultCount}`}
+          badge={layer.vaultCount > 1 ? String(layer.vaultCount) : undefined}
+          onClick={onCardPreview ? () => onCardPreview('vault_back') : undefined}
+        />
       )}
-      {layer.openedVaults.map((v, i) => (
-        <span
-          key={`opened-${i}`}
-          className={cn(
-            'inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px]',
-            v.contentType === 'secret' && 'bg-rose-500/20 text-rose-300',
-            v.contentType === 'coin' && 'bg-yellow-500/20 text-yellow-300',
-            v.contentType === 'empty' && 'bg-muted text-muted-foreground',
-          )}
-          title={v.contentType === 'secret' ? '秘密' : v.contentType === 'coin' ? '金币' : '空'}
-        >
-          <Unlock className="h-2.5 w-2.5" />
-          {v.contentType === 'secret' && <Gem className="h-2.5 w-2.5" />}
-          {v.contentType === 'coin' && <Coins className="h-2.5 w-2.5" />}
-        </span>
-      ))}
-      {layer.nightmareRevealed && (
-        <span className="rounded bg-destructive/20 px-1.5 py-0.5 text-[10px] text-destructive">
-          梦魇
-        </span>
+      {/* 已开金库：按内容显示真实卡图（秘密/金币）或空占位 */}
+      {layer.openedVaults.map((v, i) => {
+        const cardId =
+          v.contentType === 'secret'
+            ? 'vault_secret'
+            : v.contentType === 'coin'
+              ? 'vault_gold'
+              : null;
+        return (
+          <CardThumb
+            key={`opened-${i}`}
+            cardId={cardId}
+            title={
+              v.contentType === 'secret' ? '秘密' : v.contentType === 'coin' ? '金币' : '空金库'
+            }
+            emptyLabel={v.contentType === 'empty' ? '空' : undefined}
+            onClick={onCardPreview && cardId ? () => onCardPreview(cardId) : undefined}
+          />
+        );
+      })}
+      {/* 已翻梦魇：真实梦魇卡图 */}
+      {layer.nightmareRevealed && layer.nightmareCardId && (
+        <CardThumb
+          cardId={layer.nightmareCardId}
+          title="梦魇（已翻开）"
+          highlight="destructive"
+          onClick={onCardPreview ? () => onCardPreview(layer.nightmareCardId!) : undefined}
+        />
       )}
       <div className="ml-auto flex flex-wrap gap-1">
         {occupants.map((p) => (
@@ -151,6 +171,80 @@ function LayerRow({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+/** 金库/梦魇在 LayerMap 内的紧凑缩略图 · 点击触发预览 */
+function CardThumb({
+  cardId,
+  title,
+  badge,
+  emptyLabel,
+  highlight,
+  onClick,
+}: {
+  cardId: string | null;
+  title: string;
+  badge?: string;
+  emptyLabel?: string;
+  highlight?: 'destructive';
+  onClick?: () => void;
+}) {
+  const imgUrl = cardId ? getCardImageUrl(cardId) : undefined;
+  const content = emptyLabel ? (
+    <span className="flex h-full w-full items-center justify-center text-[9px] text-muted-foreground">
+      {emptyLabel}
+    </span>
+  ) : imgUrl ? (
+    <img
+      src={imgUrl}
+      alt={title}
+      loading="lazy"
+      className="h-full w-full object-cover"
+      onError={(e) => {
+        (e.currentTarget as HTMLImageElement).style.display = 'none';
+      }}
+    />
+  ) : (
+    <span className="flex h-full w-full items-center justify-center text-[9px] text-muted-foreground">
+      ?
+    </span>
+  );
+
+  const className = cn(
+    'relative h-10 w-[28px] flex-shrink-0 overflow-hidden rounded-sm border transition-transform',
+    highlight === 'destructive' ? 'border-destructive/60' : 'border-border',
+    onClick && 'cursor-pointer hover:scale-110 hover:border-primary/60',
+  );
+
+  const inner = (
+    <>
+      {content}
+      {badge && (
+        <span className="absolute right-0 top-0 rounded-bl bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+          {badge}
+        </span>
+      )}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={className}
+        title={title}
+        aria-label={title}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <div className={className} title={title}>
+      {inner}
     </div>
   );
 }
