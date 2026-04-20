@@ -117,6 +117,7 @@ export function LocalMatchRuntime({
   useEffect(() => {
     if (winner) logger.flow('game', 'match ended', { winner });
   }, [winner]);
+
   const turnNumber = (G?.turnNumber as number) ?? 0;
   const turnPhase = (G?.turnPhase as string) ?? '';
   const currentPlayerID = (ctx?.currentPlayer as string) ?? '';
