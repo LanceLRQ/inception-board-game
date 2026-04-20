@@ -9,6 +9,7 @@ import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
+import { getCardImageUrl } from '../../lib/cardImages';
 import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
@@ -512,6 +513,7 @@ export function LocalMatchRuntime({
                     if (isDiscardSelect) toggleDiscard(card);
                     else if (isActionPlayable) startPlay(card);
                   };
+                  const imgUrl = getCardImageUrl(card);
                   return (
                     <button
                       key={`${card}-${i}`}
@@ -519,19 +521,33 @@ export function LocalMatchRuntime({
                       disabled={!isDiscardSelect && !isActionPlayable}
                       onClick={onClickHand}
                       className={cn(
-                        'rounded border px-2 py-0.5 text-xs transition-colors',
-                        selected && 'border-destructive bg-destructive/20 text-destructive',
-                        isPending && 'border-primary bg-primary/20 text-primary',
+                        'relative flex h-[108px] w-[76px] flex-col items-center justify-end overflow-hidden rounded-md border-2 transition-all',
+                        selected && 'border-destructive ring-2 ring-destructive/40',
+                        isPending && 'border-primary ring-2 ring-primary/40 scale-[1.03]',
                         !selected && !isPending && 'border-border bg-muted',
                         (isDiscardSelect || isActionPlayable) &&
                           !selected &&
                           !isPending &&
-                          'hover:border-primary/60',
+                          'hover:border-primary/60 hover:scale-[1.02]',
+                        !isDiscardSelect && !isActionPlayable && 'opacity-60',
                       )}
                       data-testid={`card-${i}`}
-                      title={card}
+                      title={getCardName(card)}
                     >
-                      {getCardName(card)}
+                      {imgUrl && (
+                        <img
+                          src={imgUrl}
+                          alt={getCardName(card)}
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
+                      <span className="relative z-10 w-full bg-black/70 px-1 py-0.5 text-center text-[10px] leading-tight text-white">
+                        {getCardName(card)}
+                      </span>
                     </button>
                   );
                 })}
