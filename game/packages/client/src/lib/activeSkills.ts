@@ -49,6 +49,10 @@ export interface ActiveSkillContext {
   readonly faction: 'thief' | 'master';
   /** 是否持有贿赂牌（仅盗梦者相关） */
   readonly hasBribe?: boolean;
+  /** 本回合成功解封次数（哈雷·冲击触发前提） */
+  readonly successfulUnlocksThisTurn?: number;
+  /** 贿赂池是否仍有可派发项（梦主派贿赂前提） */
+  readonly bribePoolAvailable?: boolean;
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -240,6 +244,35 @@ export const PLUTO_BURNING: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master' && ctx.hand.length > 0,
 };
 
+// R16：哈雷·冲击 —— 每成功解封 1 次可触发 1 次，掷骰击杀 / 位移目标
+// 对照：docs/manual/05-dream-thieves.md 哈雷 + engine/game.ts playHaleyImpact
+export const HALEY_IMPACT: ActiveSkillDescriptor = {
+  id: 'thief_haley.skill_0',
+  characterId: 'thief_haley',
+  move: 'playHaleyImpact',
+  nameKey: 'skill.thief_haley.skill_0.name',
+  descKey: 'skill.thief_haley.skill_0.desc',
+  argKind: 'targetPlayer',
+  extraCheck: (ctx) => {
+    const unlocks = ctx.successfulUnlocksThisTurn ?? 0;
+    const used = ctx.skillUsedThisTurn['thief_haley.skill_0'] ?? 0;
+    // 每成功解封可触发 1 次，使用次数不得超过成功解封次数
+    return unlocks > used;
+  },
+};
+
+// R16：梦主·贿赂派发（所有梦主通用）—— 从贿赂池随机派 1 张给盗梦者
+// 对照：docs/manual/03-game-flow.md 贿赂阶段 + engine/game.ts masterDealBribe
+export const MASTER_DEAL_BRIBE: ActiveSkillDescriptor = {
+  id: '__any_master__.deal_bribe',
+  characterId: '__any__',
+  move: 'masterDealBribe',
+  nameKey: 'skill.master.deal_bribe.name',
+  descKey: 'skill.master.deal_bribe.desc',
+  argKind: 'targetPlayer',
+  extraCheck: (ctx) => ctx.faction === 'master' && ctx.bribePoolAvailable === true,
+};
+
 const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   SHADE_FOLLOW,
   APOLLO_WORSHIP,
@@ -259,6 +292,8 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   MASTER_ACTIVATE_NIGHTMARE,
   SECRET_PASSAGE_TELEPORT,
   DARWIN_EVOLUTION,
+  HALEY_IMPACT,
+  MASTER_DEAL_BRIBE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

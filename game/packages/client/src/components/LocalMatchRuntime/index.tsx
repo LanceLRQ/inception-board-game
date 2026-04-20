@@ -569,6 +569,13 @@ export function LocalMatchRuntime({
           hasBribe:
             typeof humanPlayer?.bribeReceived === 'number' &&
             (humanPlayer.bribeReceived as number) > 0,
+          successfulUnlocksThisTurn:
+            typeof humanPlayer?.successfulUnlocksThisTurn === 'number'
+              ? (humanPlayer.successfulUnlocksThisTurn as number)
+              : 0,
+          bribePoolAvailable: Array.isArray(G?.bribePool)
+            ? (G.bribePool as Array<Record<string, unknown>>).some((b) => b.status === 'inPool')
+            : false,
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players

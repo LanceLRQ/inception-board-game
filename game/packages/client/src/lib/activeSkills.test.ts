@@ -7,8 +7,10 @@ import {
   CHEMIST_REFINE,
   GEMINI_SYNC,
   getAvailableActiveSkills,
+  HALEY_IMPACT,
   MARS_KILL,
   MARTYR_SACRIFICE,
+  MASTER_DEAL_BRIBE,
   MASTER_DISCARD_NIGHTMARE,
   MASTER_REVEAL_NIGHTMARE,
   PLUTO_BURNING,
@@ -398,5 +400,108 @@ describe('getAvailableActiveSkills · 双子·协同（弃牌阶段）', () => {
 
   it('requiredPhase = discard', () => {
     expect(GEMINI_SYNC.requiredPhase).toBe('discard');
+  });
+});
+
+describe('getAvailableActiveSkills · R16 哈雷·冲击', () => {
+  it('哈雷 + 本回合成功解封 1 次 + 未触发 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_haley',
+        successfulUnlocksThisTurn: 1,
+        skillUsedThisTurn: {},
+      }),
+    );
+    expect(list).toContain(HALEY_IMPACT);
+  });
+
+  it('哈雷 + 解封 0 次 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_haley', successfulUnlocksThisTurn: 0 }),
+    );
+    expect(list).not.toContain(HALEY_IMPACT);
+  });
+
+  it('哈雷 + 解封 2 次 + 已触发 2 次 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_haley',
+        successfulUnlocksThisTurn: 2,
+        skillUsedThisTurn: { 'thief_haley.skill_0': 2 },
+      }),
+    );
+    expect(list).not.toContain(HALEY_IMPACT);
+  });
+
+  it('哈雷 + 解封 2 次 + 已触发 1 次 → 含（还能再触发 1 次）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_haley',
+        successfulUnlocksThisTurn: 2,
+        skillUsedThisTurn: { 'thief_haley.skill_0': 1 },
+      }),
+    );
+    expect(list).toContain(HALEY_IMPACT);
+  });
+
+  it('非哈雷角色 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_apollo', successfulUnlocksThisTurn: 5 }),
+    );
+    expect(list).not.toContain(HALEY_IMPACT);
+  });
+
+  it('argKind = targetPlayer', () => {
+    expect(HALEY_IMPACT.argKind).toBe('targetPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · R16 梦主·贿赂派发', () => {
+  it('梦主 + 池中有可派发项 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_fortress',
+        faction: 'master',
+        bribePoolAvailable: true,
+      }),
+    );
+    expect(list).toContain(MASTER_DEAL_BRIBE);
+  });
+
+  it('梦主 + 池空 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_fortress',
+        faction: 'master',
+        bribePoolAvailable: false,
+      }),
+    );
+    expect(list).not.toContain(MASTER_DEAL_BRIBE);
+  });
+
+  it('盗梦者阵营 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_shade',
+        faction: 'thief',
+        bribePoolAvailable: true,
+      }),
+    );
+    expect(list).not.toContain(MASTER_DEAL_BRIBE);
+  });
+
+  it('任意梦主角色都可用（characterId=__any__）', () => {
+    const list1 = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_chess', faction: 'master', bribePoolAvailable: true }),
+    );
+    const list2 = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_pluto_hell', faction: 'master', bribePoolAvailable: true }),
+    );
+    expect(list1).toContain(MASTER_DEAL_BRIBE);
+    expect(list2).toContain(MASTER_DEAL_BRIBE);
+  });
+
+  it('argKind = targetPlayer', () => {
+    expect(MASTER_DEAL_BRIBE.argKind).toBe('targetPlayer');
   });
 });
