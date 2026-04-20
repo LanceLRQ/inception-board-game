@@ -16,7 +16,8 @@ export type ActiveSkillArgKind =
   | 'choiceIncDec'
   | 'handCard'
   | 'cardAndPlayer'
-  | 'targetLayer';
+  | 'targetLayer'
+  | 'playerAndLayer';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -113,6 +114,46 @@ export const GEMINI_SYNC: ActiveSkillDescriptor = {
     ctx.masterLayer > ctx.humanLayer,
 };
 
+export const PAPRIK_SALVATION: ActiveSkillDescriptor = {
+  id: 'thief_paprik.skill_0',
+  characterId: 'thief_paprik',
+  move: 'playPaprikSalvation',
+  nameKey: 'skill.thief_paprik.skill_0.name',
+  descKey: 'skill.thief_paprik.skill_0.desc',
+  argKind: 'cardAndPlayer',
+  extraCheck: (ctx) => ctx.hand.length > 0,
+};
+
+export const URANUS_POWER: ActiveSkillDescriptor = {
+  id: 'dm_uranus_firmament.skill_0',
+  characterId: 'dm_uranus_firmament',
+  move: 'useUranusPower',
+  nameKey: 'skill.dm_uranus_firmament.skill_0.name',
+  descKey: 'skill.dm_uranus_firmament.skill_0.desc',
+  argKind: 'playerAndLayer',
+  extraCheck: (ctx) => ctx.faction === 'master',
+};
+
+export const MASTER_DISCARD_HIDDEN_NIGHTMARE: ActiveSkillDescriptor = {
+  id: '__any_master__.discard_hidden_nightmare',
+  characterId: '__any__',
+  move: 'masterDiscardHiddenNightmare',
+  nameKey: 'skill.master.discard_hidden_nightmare.name',
+  descKey: 'skill.master.discard_hidden_nightmare.desc',
+  argKind: 'targetLayer',
+  extraCheck: (ctx) => ctx.faction === 'master',
+};
+
+export const MASTER_ACTIVATE_NIGHTMARE: ActiveSkillDescriptor = {
+  id: '__any_master__.activate_nightmare',
+  characterId: '__any__',
+  move: 'masterActivateNightmare',
+  nameKey: 'skill.master.activate_nightmare.name',
+  descKey: 'skill.master.activate_nightmare.desc',
+  argKind: 'targetLayer',
+  extraCheck: (ctx) => ctx.faction === 'master',
+};
+
 export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
   id: 'thief_architect.skill_0',
   characterId: 'thief_architect',
@@ -186,6 +227,10 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   SATURN_FREE_MOVE,
   MASTER_REVEAL_NIGHTMARE,
   MASTER_DISCARD_NIGHTMARE,
+  PAPRIK_SALVATION,
+  URANUS_POWER,
+  MASTER_DISCARD_HIDDEN_NIGHTMARE,
+  MASTER_ACTIVATE_NIGHTMARE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

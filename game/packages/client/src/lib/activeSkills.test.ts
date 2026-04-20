@@ -224,12 +224,15 @@ describe('getAvailableActiveSkills · 土星·自由移动（贿赂持有者）'
 });
 
 describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
-  it('梦主 → 含 MASTER_REVEAL_NIGHTMARE + MASTER_DISCARD_NIGHTMARE', () => {
+  it('梦主 → 含 4 个通用梦魇操作（REVEAL/DISCARD/HIDDEN/ACTIVATE）', async () => {
+    const mod = await import('./activeSkills.js');
     const list = getAvailableActiveSkills(
       baseCtx({ faction: 'master', characterId: 'dm_fortress' }),
     );
     expect(list).toContain(MASTER_REVEAL_NIGHTMARE);
     expect(list).toContain(MASTER_DISCARD_NIGHTMARE);
+    expect(list).toContain(mod.MASTER_DISCARD_HIDDEN_NIGHTMARE);
+    expect(list).toContain(mod.MASTER_ACTIVATE_NIGHTMARE);
   });
 
   it('盗梦者 → 不含', () => {
@@ -241,6 +244,39 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
   it('MASTER_REVEAL move = masterRevealNightmare / argKind = targetLayer', () => {
     expect(MASTER_REVEAL_NIGHTMARE.move).toBe('masterRevealNightmare');
     expect(MASTER_REVEAL_NIGHTMARE.argKind).toBe('targetLayer');
+  });
+});
+
+describe('getAvailableActiveSkills · 灵魂牧师·拯救 & 天王星·权力', () => {
+  it('灵魂牧师 + 手牌 → 含 PAPRIK', async () => {
+    const { PAPRIK_SALVATION } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_paprik', hand: ['action_unlock'] }),
+    );
+    expect(list).toContain(PAPRIK_SALVATION);
+  });
+
+  it('灵魂牧师 + 手牌空 → 不含', async () => {
+    const { PAPRIK_SALVATION } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_paprik', hand: [] }));
+    expect(list).not.toContain(PAPRIK_SALVATION);
+  });
+
+  it('天王星·权力（梦主）→ 含 URANUS_POWER · argKind=playerAndLayer', async () => {
+    const { URANUS_POWER } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_uranus_firmament', faction: 'master' }),
+    );
+    expect(list).toContain(URANUS_POWER);
+    expect(URANUS_POWER.argKind).toBe('playerAndLayer');
+  });
+
+  it('非梦主 → 不含 URANUS_POWER', async () => {
+    const { URANUS_POWER } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_uranus_firmament', faction: 'thief' }),
+    );
+    expect(list).not.toContain(URANUS_POWER);
   });
 });
 

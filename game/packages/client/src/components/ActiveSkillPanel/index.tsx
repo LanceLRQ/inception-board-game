@@ -34,6 +34,11 @@ export function ActiveSkillPanel({
     card: string | null;
   } | null>(null);
   const [pendingLayerSkill, setPendingLayerSkill] = useState<ActiveSkillDescriptor | null>(null);
+  // playerAndLayer: 先选玩家再选层
+  const [pendingPlayerLayerSkill, setPendingPlayerLayerSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    targetId: string | null;
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -42,7 +47,8 @@ export function ActiveSkillPanel({
     !pendingChoiceSkill &&
     !pendingCardSkill &&
     !pendingCardPlayerSkill &&
-    !pendingLayerSkill
+    !pendingLayerSkill &&
+    !pendingPlayerLayerSkill
   )
     return null;
 
@@ -71,12 +77,22 @@ export function ActiveSkillPanel({
       setPendingLayerSkill(skill);
       return;
     }
+    if (skill.argKind === 'playerAndLayer') {
+      setPendingPlayerLayerSkill({ skill, targetId: null });
+      return;
+    }
   };
 
   const confirmLayer = (layer: number) => {
     if (!pendingLayerSkill) return;
     onInvoke(pendingLayerSkill, [layer]);
     setPendingLayerSkill(null);
+  };
+
+  const confirmPlayerLayer = (layer: number) => {
+    if (!pendingPlayerLayerSkill || !pendingPlayerLayerSkill.targetId) return;
+    onInvoke(pendingPlayerLayerSkill.skill, [pendingPlayerLayerSkill.targetId, layer]);
+    setPendingPlayerLayerSkill(null);
   };
 
   const confirmCardPlayer = (targetId: string) => {
@@ -117,7 +133,8 @@ export function ActiveSkillPanel({
         !pendingChoiceSkill &&
         !pendingCardSkill &&
         !pendingCardPlayerSkill &&
-        !pendingLayerSkill && (
+        !pendingLayerSkill &&
+        !pendingPlayerLayerSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -250,6 +267,57 @@ export function ActiveSkillPanel({
               onClick={() => setPendingCardPlayerSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-cp"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingPlayerLayerSkill && (
+        <div className="space-y-2" data-testid="active-skill-player-layer-picker">
+          <div className="text-xs text-muted-foreground">
+            {pendingPlayerLayerSkill.targetId
+              ? t('skill.chooseLayer', { defaultValue: '选择层：' })
+              : t('skill.chooseTarget', { defaultValue: '选择目标：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingPlayerLayerSkill.skill.nameKey, {
+                defaultValue: pendingPlayerLayerSkill.skill.id,
+              })}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!pendingPlayerLayerSkill.targetId &&
+              availableTargetIds.map((pid) => (
+                <button
+                  key={pid}
+                  type="button"
+                  onClick={() =>
+                    setPendingPlayerLayerSkill((prev) => (prev ? { ...prev, targetId: pid } : prev))
+                  }
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-pl-target-${pid}`}
+                >
+                  {playerNicknames[pid] ?? pid}
+                </button>
+              ))}
+            {pendingPlayerLayerSkill.targetId &&
+              [1, 2, 3, 4].map((layer) => (
+                <button
+                  key={layer}
+                  type="button"
+                  onClick={() => confirmPlayerLayer(layer)}
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-pl-layer-${layer}`}
+                >
+                  {t('localMatch.layer', { defaultValue: '层' })} {layer}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setPendingPlayerLayerSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-pl"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>
