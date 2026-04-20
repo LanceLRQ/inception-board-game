@@ -20,7 +20,7 @@ const HUMAN_PLAYER_ID = '0';
 // 基于 G.turnPhase 的合法 move 白名单
 // 对照：game-engine/src/game.ts guardTurnPhase
 const MOVES_BY_PHASE: Record<string, string[]> = {
-  draw: ['doDraw', 'skipDraw'],
+  draw: ['doDraw', 'skipDraw', 'playJokerGamble', 'playBlackSwanTour'],
   action: [
     'endActionPhase',
     'playShoot',
@@ -55,6 +55,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'useMarsKill',
     'useSaturnFreeMove',
     'useMarsBattlefield',
+    'useVenusDouble',
     'masterDiscardHiddenNightmare',
     'playLibraBalance',
     'resolveLibraSplit',
@@ -103,6 +104,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   useSaturnFreeMove: 115, // 盗梦者主动技能（中优先级）
   useMarsBattlefield: 116,
   masterDiscardHiddenNightmare: 215, // 梦主低优先：Bot L0 默认不主动触发
+  useVenusDouble: 216, // 金星·重影（梦主低优先，避免 Bot 无手牌时误发）
+  playJokerGamble: 220, // 小丑·赌博：draw 阶段替代 doDraw（Bot L0 不主动选）
+  playBlackSwanTour: 221, // 黑天鹅·巡演：draw 阶段替代 doDraw（Bot L0 不主动选）
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   resolveLibraSplit: 0, // pendingLibra step 2：优先处理

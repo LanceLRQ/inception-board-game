@@ -2086,3 +2086,81 @@ export function applyMercuryRouteExtraFailBribe(
     ],
   };
 }
+
+// ============================================================================
+// 金星·镜界 · 重影
+// 对照：docs/manual/06-dream-master.md 金星·镜界
+// 你的回合出牌前，可展示牌库顶等于非死亡盗梦者数的牌，然后展示任意手牌
+// 并将所有展示的同名牌收入手牌，其余混洗放回牌库顶。回合限 1 次
+//
+// 实现语义：
+//   1. N = 非死亡盗梦者数
+//   2. 从牌库顶取 N 张（若牌库不足则不足即可，按实际）
+//   3. 统计"展示的手牌名字集合"
+//   4. 牌库顶取出中，名字 ∈ 手牌集合的 → 进入梦主手牌
+//   5. 其余（不匹配的）→ 由调用方提供 shuffle 后的顺序放回牌库顶
+// ============================================================================
+
+export const VENUS_DOUBLE_SKILL_ID = 'dm_venus_mirror.skill_0';
+
+/**
+ * 金星·重影：纯函数实现。
+ * @param state        当前状态
+ * @param masterID     梦主 playerID
+ * @param revealedHandIds 梦主展示的手牌 id 数组（multiset 视角；必须都在手牌中）
+ * @param shuffle      外部注入的 shuffle（用于测试确定性；move 层传入 BGIO random.Shuffle）
+ * @returns 新 state 或 null（失败）
+ */
+export function applyVenusDouble(
+  state: SetupState,
+  masterID: string,
+  revealedHandIds: readonly CardID[],
+  shuffle: <T>(arr: readonly T[]) => T[],
+): SetupState | null {
+  const master = state.players[masterID];
+  if (!master) return null;
+  if (master.characterId !== 'dm_venus_mirror') return null;
+  if (!master.isAlive) return null;
+  if (!canUseSkill(master, VENUS_DOUBLE_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  // 展示的手牌必须全部在手中（multiset）
+  const handCopy = [...master.hand];
+  for (const cid of revealedHandIds) {
+    const idx = handCopy.indexOf(cid);
+    if (idx === -1) return null;
+    handCopy.splice(idx, 1);
+  }
+
+  // N = 非死亡盗梦者数
+  const aliveThievesCount = Object.values(state.players).filter(
+    (p) => p.faction === 'thief' && p.isAlive,
+  ).length;
+  if (aliveThievesCount <= 0) return null;
+
+  // 牌库不足时按实际可用数量
+  const takeN = Math.min(aliveThievesCount, state.deck.cards.length);
+  const topSlice = state.deck.cards.slice(0, takeN);
+  const restDeck = state.deck.cards.slice(takeN);
+
+  // 匹配：展示的手牌名字集合
+  const revealedNames = new Set<string>(revealedHandIds);
+  const matched: CardID[] = [];
+  const unmatched: CardID[] = [];
+  for (const cid of topSlice) {
+    if (revealedNames.has(cid)) matched.push(cid);
+    else unmatched.push(cid);
+  }
+
+  let s = markSkillUsed(state, masterID, VENUS_DOUBLE_SKILL_ID);
+  // 匹配的牌入梦主手牌；剩余混洗放回牌库顶
+  const shuffledBack = shuffle(unmatched);
+  s = {
+    ...s,
+    deck: { ...s.deck, cards: [...shuffledBack, ...restDeck] },
+    players: {
+      ...s.players,
+      [masterID]: { ...s.players[masterID]!, hand: [...s.players[masterID]!.hand, ...matched] },
+    },
+  };
+  return s;
+}

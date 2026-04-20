@@ -86,6 +86,7 @@ import {
   applyDiscardHiddenNightmare,
   applyMercuryRouteExtraFailBribe,
   applyBlackSwanTour,
+  applyVenusDouble,
   jokerDrawCount,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
@@ -1046,6 +1047,25 @@ export const InceptionCityGame = {
 
         // 天王星·权力（W16-B）：每未派发贿赂可移动 1 个盗梦者到指定层（非迷失层）
         // 对照：cards-data.json dm_uranus_firmament
+        // 金星·镜界 · 重影：展示牌库顶 N（N=活盗梦者数）+ 展示手牌 → 同名入手，其余混洗回顶
+        // 对照：docs/manual/06-dream-master.md 金星·镜界
+        useVenusDouble: {
+          move: ({ G, ctx, random }: MoveCtx, revealedHandIds: CardID[]) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            if (!Array.isArray(revealedHandIds)) return INVALID_MOVE;
+            const result = applyVenusDouble(
+              G,
+              ctx.currentPlayer,
+              revealedHandIds,
+              <T>(arr: readonly T[]) => random.Shuffle([...arr]),
+            );
+            if (result === null) return INVALID_MOVE;
+            return result;
+          },
+          client: false,
+        },
+
         useUranusPower: {
           move: ({ G, ctx }: MoveCtx, targetPlayerID: string, targetLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;

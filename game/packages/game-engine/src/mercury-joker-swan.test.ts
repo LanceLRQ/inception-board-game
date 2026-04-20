@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { CardID } from '@icgame/shared';
-import { applyMercuryRouteExtraFailBribe } from './engine/skills.js';
+import { applyMercuryRouteExtraFailBribe, applyVenusDouble } from './engine/skills.js';
 import { scenarioStartOfGame3p } from './testing/scenarios.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 
@@ -358,6 +358,212 @@ describe('playBlackSwanTour move', () => {
       },
     };
     const r = callMove(s, 'playBlackSwanTour', [{}]);
+    expect(r).toBe('INVALID_MOVE');
+  });
+});
+
+// 固定顺序 shuffle（测试确定性）
+const identityShuffle = <T>(arr: readonly T[]): T[] => [...arr];
+
+describe('applyVenusDouble（金星·重影纯函数）', () => {
+  function setVenusMaster(
+    state: ReturnType<typeof scenarioStartOfGame3p>,
+  ): ReturnType<typeof scenarioStartOfGame3p> {
+    const mid = 'pM';
+    return {
+      ...state,
+      players: {
+        ...state.players,
+        [mid]: { ...state.players[mid]!, characterId: 'dm_venus_mirror' as CardID },
+      },
+    };
+  }
+
+  it('非金星梦主 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyVenusDouble(s, 'pM', [], identityShuffle);
+    expect(r).toBeNull();
+  });
+
+  it('展示手牌不在手中 → null', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, hand: ['action_unlock' as CardID] } },
+    };
+    const r = applyVenusDouble(s, 'pM', ['action_shoot' as CardID], identityShuffle);
+    expect(r).toBeNull();
+  });
+
+  it('牌库顶无同名 → 全部混洗回顶 + 手牌不变', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, hand: ['action_unlock' as CardID] } },
+      deck: {
+        ...s.deck,
+        cards: ['action_shoot' as CardID, 'action_shift' as CardID, 'action_kick' as CardID],
+      },
+    };
+    // aliveThieves = p1 + p2 = 2
+    const r = applyVenusDouble(s, 'pM', ['action_unlock' as CardID], identityShuffle);
+    expect(r).not.toBeNull();
+    expect(r!.players.pM!.hand).toEqual(['action_unlock']); // 未增加
+    // 前 2 张（非同名）混洗回顶，原第 3 张保留
+    expect(r!.deck.cards).toEqual(['action_shoot', 'action_shift', 'action_kick']);
+  });
+
+  it('牌库顶有 1 张同名 → 入梦主手 + 剩余回顶', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, hand: ['action_shoot' as CardID] } },
+      deck: {
+        ...s.deck,
+        cards: ['action_shoot' as CardID, 'action_shift' as CardID, 'action_kick' as CardID],
+      },
+    };
+    const r = applyVenusDouble(s, 'pM', ['action_shoot' as CardID], identityShuffle);
+    expect(r).not.toBeNull();
+    // 同名 shoot 入手 → 梦主手牌 +1 shoot
+    expect(r!.players.pM!.hand.sort()).toEqual(['action_shoot', 'action_shoot']);
+    // 剩余（shift）回顶 + 原第 3 张（kick）保留
+    expect(r!.deck.cards).toEqual(['action_shift', 'action_kick']);
+  });
+
+  it('牌库顶两张同名 → 全部入手', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, hand: ['action_unlock' as CardID] } },
+      deck: {
+        ...s.deck,
+        cards: ['action_unlock' as CardID, 'action_unlock' as CardID, 'action_shift' as CardID],
+      },
+    };
+    const r = applyVenusDouble(s, 'pM', ['action_unlock' as CardID], identityShuffle);
+    expect(r).not.toBeNull();
+    expect(r!.players.pM!.hand.length).toBe(3); // 原 1 + 2 同名
+    expect(r!.deck.cards).toEqual(['action_shift']);
+  });
+
+  it('梦主死亡 → null', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = { ...s, players: { ...s.players, pM: { ...s.players.pM!, isAlive: false } } };
+    const r = applyVenusDouble(s, 'pM', [], identityShuffle);
+    expect(r).toBeNull();
+  });
+
+  it('活盗梦者 = 0 → null', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, isAlive: false },
+        p2: { ...s.players.p2!, isAlive: false },
+      },
+    };
+    const r = applyVenusDouble(s, 'pM', [], identityShuffle);
+    expect(r).toBeNull();
+  });
+
+  it('牌库不足 N → 按实际 take 数量处理', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, hand: ['action_shoot' as CardID] } },
+      deck: { ...s.deck, cards: ['action_shoot' as CardID] }, // 仅 1 张，但 N=2
+    };
+    const r = applyVenusDouble(s, 'pM', ['action_shoot' as CardID], identityShuffle);
+    expect(r).not.toBeNull();
+    expect(r!.players.pM!.hand.length).toBe(2); // 收了 1 张同名
+    expect(r!.deck.cards).toEqual([]);
+  });
+
+  it('第二次调用 → null（回合限 1 次）', () => {
+    let s = setVenusMaster(scenarioStartOfGame3p());
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, hand: ['action_shoot' as CardID] } },
+      deck: { ...s.deck, cards: ['action_shoot' as CardID, 'action_shift' as CardID] },
+    };
+    const once = applyVenusDouble(s, 'pM', ['action_shoot' as CardID], identityShuffle);
+    expect(once).not.toBeNull();
+    const twice = applyVenusDouble(once!, 'pM', [], identityShuffle);
+    expect(twice).toBeNull();
+  });
+});
+
+describe('useVenusDouble move', () => {
+  it('非梦主回合 → INVALID_MOVE', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'action',
+      currentPlayerID: 'p1', // 非梦主
+      players: {
+        ...s.players,
+        pM: { ...s.players.pM!, characterId: 'dm_venus_mirror' as CardID },
+      },
+    };
+    const r = callMove(s, 'useVenusDouble', [[]]);
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('非 action 阶段 → INVALID_MOVE', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'draw',
+      currentPlayerID: 'pM',
+      players: {
+        ...s.players,
+        pM: { ...s.players.pM!, characterId: 'dm_venus_mirror' as CardID },
+      },
+    };
+    const r = callMove(s, 'useVenusDouble', [[]], { currentPlayer: 'pM' });
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('金星梦主 + action + 牌库有同名 → 入手成功', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'action',
+      currentPlayerID: 'pM',
+      players: {
+        ...s.players,
+        pM: {
+          ...s.players.pM!,
+          characterId: 'dm_venus_mirror' as CardID,
+          hand: ['action_shoot' as CardID],
+        },
+      },
+      deck: {
+        ...s.deck,
+        cards: ['action_shoot' as CardID, 'action_shift' as CardID],
+      },
+    };
+    const r = callMove(s, 'useVenusDouble', [['action_shoot' as CardID]], {
+      currentPlayer: 'pM',
+    });
+    expectMoveOk(r);
+    expect(r.players.pM!.hand.length).toBe(2);
+  });
+
+  it('参数非数组 → INVALID_MOVE', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'action',
+      currentPlayerID: 'pM',
+      players: {
+        ...s.players,
+        pM: { ...s.players.pM!, characterId: 'dm_venus_mirror' as CardID },
+      },
+    };
+    const r = callMove(s, 'useVenusDouble', ['not-array'], { currentPlayer: 'pM' });
     expect(r).toBe('INVALID_MOVE');
   });
 });
