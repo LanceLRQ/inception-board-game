@@ -4,6 +4,7 @@
 
 import type { SetupState, PlayerSetup } from '../setup.js';
 import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
+import { flipCharacter } from './abilities/dual-faced.js';
 import type { CardID, Layer } from '@icgame/shared';
 
 // === 技能使用前检查 ===
@@ -1114,4 +1115,271 @@ export function applySpaceQueenStashTop(
     players: { ...state.players, [selfID]: { ...player, hand: newHand } },
     deck: { ...state.deck, cards: [cardId, ...state.deck.cards] },
   };
+}
+
+// ============================================================================
+// W15 双面 / 扩展 9 角色
+// ============================================================================
+// 完整接入：双子 / 双鱼 / 露娜（含翻面）/ 盖亚 / 达尔文
+// 纯函数：白羊 / 射手 / 水瓶 / 格林射线（接入待响应窗口/扩展批次）
+
+// === 双子 · 协同 ===
+// 弃牌阶段：梦主层数 > self 层数时，可掷骰 → 3 → 当层 -2 心锁 → 翻面
+export const GEMINI_SKILL_ID = 'thief_gemini.skill_0';
+
+export function applyGeminiSync(
+  state: SetupState,
+  selfID: string,
+  roll: number,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_gemini') return null;
+  if (!player.isAlive) return null;
+  if (player.currentLayer < 1) return null;
+  const master = state.players[state.dreamMasterID];
+  if (!master) return null;
+  if (master.currentLayer <= player.currentLayer) return null;
+  if (!canUseSkill(player, GEMINI_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  let s = markSkillUsed(state, selfID, GEMINI_SKILL_ID);
+  if (roll === 3) {
+    const layerInfo = s.layers[player.currentLayer]!;
+    const nextHL = Math.max(0, layerInfo.heartLockValue - 2);
+    s = {
+      ...s,
+      layers: { ...s.layers, [player.currentLayer]: { ...layerInfo, heartLockValue: nextHL } },
+    };
+  }
+  // 翻面（无论骰值）
+  s = flipCharacter(s, selfID);
+  return s;
+}
+
+// === 双鱼 · 闪避 ===
+// 成为 SHOOT 目标时，可移到数字更小相邻层忽略 SHOOT 效果 → 翻面
+// 接入：在 applyShootVariant 前置 hook 检查（被动）
+export const PISCES_SKILL_ID = 'thief_pisces.skill_0';
+
+/** 双鱼是否可发动（是 thief_pisces 且未翻面 + 当前层 > 1） */
+export function canPiscesEvade(player: PlayerSetup): boolean {
+  if (player.characterId !== 'thief_pisces') return false;
+  if (!player.isAlive) return false;
+  if (player.currentLayer <= 1) return false;
+  if (!canUseSkill(player, PISCES_SKILL_ID, 'ownTurnOncePerTurn')) return false;
+  return true;
+}
+
+/** 执行双鱼闪避：移到 currentLayer-1 + 翻面 */
+export function applyPiscesEvade(state: SetupState, selfID: string): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || !canPiscesEvade(player)) return null;
+  let s = markSkillUsed(state, selfID, PISCES_SKILL_ID);
+  s = movePlayerToLayer(s, selfID, (player.currentLayer - 1) as Layer);
+  s = flipCharacter(s, selfID);
+  return s;
+}
+
+// === 露娜 · 月蚀 ===
+// 出牌阶段：弃 2 张 SHOOT 击杀同层任意玩家 → 翻面
+export const LUNA_SKILL_ID = 'thief_luna.skill_0';
+
+export function applyLunaEclipse(
+  state: SetupState,
+  selfID: string,
+  shootCardIds: readonly CardID[],
+  targetID: string,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_luna') return null;
+  if (!player.isAlive) return null;
+  if (selfID === targetID) return null;
+  if (!canUseSkill(player, LUNA_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  if (shootCardIds.length !== 2) return null;
+  // 必须都是 action_shoot（基础 SHOOT）
+  for (const cid of shootCardIds) {
+    if (cid !== 'action_shoot') return null;
+  }
+  const target = state.players[targetID];
+  if (!target || !target.isAlive) return null;
+  if (target.currentLayer !== player.currentLayer) return null;
+  // 校验手牌
+  const handCopy = [...player.hand];
+  for (const cid of shootCardIds) {
+    const idx = handCopy.indexOf(cid);
+    if (idx === -1) return null;
+    handCopy.splice(idx, 1);
+  }
+
+  let s = markSkillUsed(state, selfID, LUNA_SKILL_ID);
+  // 弃 2 张 SHOOT 到弃牌堆
+  s = {
+    ...s,
+    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
+    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...shootCardIds] },
+  };
+  // 击杀 target
+  const targetHand = [...target.hand];
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: {
+        ...s.players[selfID]!,
+        hand: [...s.players[selfID]!.hand, ...targetHand.slice(0, 2)],
+        shootCount: s.players[selfID]!.shootCount + 1,
+      },
+      [targetID]: {
+        ...s.players[targetID]!,
+        isAlive: false,
+        deathTurn: s.turnNumber,
+        hand: targetHand.slice(2),
+      },
+    },
+  };
+  s = movePlayerToLayer(s, targetID, 0);
+  // 翻面
+  s = flipCharacter(s, selfID);
+  return s;
+}
+
+// === 盖亚 · 大地 ===
+// 出牌阶段：令同层其余玩家移到 ±1 层（不入迷失层）。回合限 2 次
+export const GAIA_SKILL_ID = 'thief_gaia.skill_0';
+const GAIA_LIMIT_PER_TURN = 2;
+
+export function applyGaiaShift(
+  state: SetupState,
+  selfID: string,
+  picks: Record<string, -1 | 1>, // 每玩家方向
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_gaia') return null;
+  if (!player.isAlive) return null;
+  if (!canUseSkill(player, GAIA_SKILL_ID, 'ownTurnLimitN', GAIA_LIMIT_PER_TURN)) return null;
+  const layerInfo = state.layers[player.currentLayer];
+  if (!layerInfo) return null;
+  const others = layerInfo.playersInLayer.filter((id) => id !== selfID);
+  // picks 必须仅含同层其他玩家
+  for (const id of Object.keys(picks)) {
+    if (!others.includes(id)) return null;
+    const dir = picks[id];
+    if (dir !== -1 && dir !== 1) return null;
+    const next = player.currentLayer + dir;
+    if (next < 1 || next > 4) return null; // 不入迷失层（0）也不超 4
+  }
+
+  let s = markSkillUsed(state, selfID, GAIA_SKILL_ID);
+  for (const [pid, dir] of Object.entries(picks)) {
+    const next = (player.currentLayer + dir) as Layer;
+    s = movePlayerToLayer(s, pid, next);
+  }
+  return s;
+}
+
+// === 达尔文 · 进化 ===
+// 出牌阶段：抽牌库顶 2 张 → 任意 2 张手牌按任意顺序放回牌库顶。每回合 1 次
+// MVP：一步式 — 输入 returnCards（要放回顶的 2 张，第一张为最顶）
+export const DARWIN_SKILL_ID = 'thief_darwin.skill_0';
+
+export function applyDarwinEvolution(
+  state: SetupState,
+  selfID: string,
+  returnCards: readonly CardID[],
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_darwin') return null;
+  if (!player.isAlive) return null;
+  if (state.deck.cards.length < 2) return null;
+  if (returnCards.length !== 2) return null;
+  if (!canUseSkill(player, DARWIN_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  // 抽牌库顶 2 张
+  const drawn = state.deck.cards.slice(0, 2);
+  const remainingDeck = state.deck.cards.slice(2);
+  const tempHand = [...player.hand, ...drawn];
+  // 校验 returnCards 都在 tempHand
+  const handCopy = [...tempHand];
+  for (const cid of returnCards) {
+    const idx = handCopy.indexOf(cid);
+    if (idx === -1) return null;
+    handCopy.splice(idx, 1);
+  }
+
+  const s = markSkillUsed(state, selfID, DARWIN_SKILL_ID);
+  return {
+    ...s,
+    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
+    deck: { ...s.deck, cards: [...returnCards, ...remainingDeck] },
+  };
+}
+
+// ============================================================================
+// W15 纯函数（接入待响应窗口 / 扩展批次）
+// ============================================================================
+
+// === 白羊 · 解封者（纯函数） ===
+// 1: 盗梦者被杀时翻当层梦魇（响应触发）
+// 2: 弃掉的梦魇牌每张让 self 抽牌阶段 +1
+export const ARIES_REVEAL_SKILL_ID = 'thief_aries.skill_0';
+export const ARIES_DRAW_SKILL_ID = 'thief_aries.skill_1';
+
+/** 白羊·已弃梦魇加成抽 N（N = 已弃梦魇数） */
+export function ariesExtraDrawCount(state: SetupState): number {
+  return state.usedNightmareIds.length;
+}
+
+// === 射手 · 神射（纯函数） ===
+// 1: SHOOT 目标移动时可不让其移动（响应）
+// 2: 击杀 1 玩家后改 1 心锁（限 1 次）
+export const SAGITTARIUS_NO_MOVE_SKILL_ID = 'thief_sagittarius.skill_0';
+export const SAGITTARIUS_HEART_LOCK_SKILL_ID = 'thief_sagittarius.skill_1';
+
+/** 射手心锁修改：±1，受 cap 限制 */
+export function applySagittariusHeartLock(
+  state: SetupState,
+  layer: number,
+  delta: -1 | 1,
+  cap: number,
+): SetupState | null {
+  const layerInfo = state.layers[layer];
+  if (!layerInfo) return null;
+  const next = Math.max(0, Math.min(cap, layerInfo.heartLockValue + delta));
+  if (next === layerInfo.heartLockValue) return state;
+  return {
+    ...state,
+    layers: { ...state.layers, [layer]: { ...layerInfo, heartLockValue: next } },
+  };
+}
+
+// === 水瓶 · 同流（纯函数） ===
+// 1: 每用过 2 张同名 → 弃牌堆取 1 张未用过的牌
+// 2: 解封次数无限制（被动）
+export const AQUARIUS_REUSE_SKILL_ID = 'thief_aquarius.skill_0';
+export const AQUARIUS_UNLOCK_SKILL_ID = 'thief_aquarius.skill_1';
+
+/** 水瓶·解封无限被动判定（与摩羯类似） */
+export function isAquariusUnlimitedActive(player: PlayerSetup): boolean {
+  if (player.characterId !== 'thief_aquarius') return false;
+  if (!player.isAlive) return false;
+  return true;
+}
+
+// === 格林射线 · 移转（纯函数） ===
+// 弃 1 梦境穿梭剂 + 1 SHOOT → 移到任意层 + 执行 SHOOT 效果
+export const GREEN_RAY_SKILL_ID = 'thief_green_ray.skill_0';
+
+/** 格林射线弃牌组合判定 */
+export function canGreenRayActivate(player: PlayerSetup): boolean {
+  if (player.characterId !== 'thief_green_ray') return false;
+  if (!player.isAlive) return false;
+  const hasTransit = player.hand.some((c) => c === 'action_dream_transit');
+  const hasShoot = player.hand.some(
+    (c) =>
+      c === 'action_shoot' ||
+      c === 'action_shoot_king' ||
+      c === 'action_shoot_armor' ||
+      c === 'action_shoot_burst' ||
+      c === 'action_shoot_dream_transit',
+  );
+  return hasTransit && hasShoot;
 }

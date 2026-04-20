@@ -60,6 +60,11 @@ import {
   applyForgerExchange,
   isTerroristCrossLayerActive,
   type ForgerExchange,
+  applyGeminiSync,
+  applyLunaEclipse,
+  applyGaiaShift,
+  applyDarwinEvolution,
+  isAquariusUnlimitedActive,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -562,10 +567,11 @@ export const InceptionCityGame = {
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (player.faction !== 'thief') return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
-            // 摩羯·节奏：手牌数 >= 所在层数字时，解封次数不受限制
+            // 摩羯·节奏 / 水瓶·同流：被动豁免解封次数限制
             if (
               player.successfulUnlocksThisTurn >= G.maxUnlockPerTurn &&
-              !isCapricornusRhythmActive(player)
+              !isCapricornusRhythmActive(player) &&
+              !isAquariusUnlimitedActive(player)
             ) {
               return INVALID_MOVE;
             }
@@ -1044,6 +1050,62 @@ export const InceptionCityGame = {
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = drawCards(s, ctx.currentPlayer, 2);
             return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
+        // 双子·协同：弃牌阶段，梦主在更大层时掷骰 → 3 → 当层 -2 心锁 → 翻面
+        // 对照：docs/manual/05-dream-thieves.md 双子
+        playGeminiSync: {
+          move: ({ G, ctx, random }: MoveCtx) => {
+            if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
+            if (G.turnPhase !== 'discard') return INVALID_MOVE;
+            const roll = random.D6();
+            const next = applyGeminiSync(G, ctx.currentPlayer, roll);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
+        // 露娜·月蚀：弃 2 张 SHOOT → 击杀同层任意玩家 → 翻面
+        // 对照：docs/manual/05-dream-thieves.md 露娜
+        playLunaEclipse: {
+          move: ({ G, ctx }: MoveCtx, shootCardIds: CardID[], targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (!Array.isArray(shootCardIds)) return INVALID_MOVE;
+            const next = applyLunaEclipse(G, ctx.currentPlayer, shootCardIds, targetID);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
+        // 盖亚·大地：令同层其余玩家移到 ±1 层（限 2 次/回合）
+        // 对照：docs/manual/05-dream-thieves.md 盖亚
+        playGaiaShift: {
+          move: ({ G, ctx }: MoveCtx, picks: Record<string, -1 | 1>) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (!picks || typeof picks !== 'object') return INVALID_MOVE;
+            const next = applyGaiaShift(G, ctx.currentPlayer, picks);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
+        // 达尔文·进化：抽牌库顶 2 + 还 2 任意顺序到顶（限 1 次/回合）
+        // 对照：docs/manual/05-dream-thieves.md 达尔文
+        playDarwinEvolution: {
+          move: ({ G, ctx }: MoveCtx, returnCards: CardID[]) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (!Array.isArray(returnCards)) return INVALID_MOVE;
+            const next = applyDarwinEvolution(G, ctx.currentPlayer, returnCards);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
           },
           client: false,
         },

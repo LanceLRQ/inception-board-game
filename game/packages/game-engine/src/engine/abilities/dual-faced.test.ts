@@ -12,9 +12,9 @@ import { createTestState } from '../../testing/fixtures.js';
 
 describe('isDualFaced', () => {
   it('双面角色返回 true', () => {
-    expect(isDualFaced('thief_gemini_front')).toBe(true);
+    expect(isDualFaced('thief_gemini')).toBe(true);
     expect(isDualFaced('thief_gemini_back')).toBe(true);
-    expect(isDualFaced('thief_pisces_front')).toBe(true);
+    expect(isDualFaced('thief_pisces')).toBe(true);
     expect(isDualFaced('thief_luna_back')).toBe(true);
   });
 
@@ -26,11 +26,11 @@ describe('isDualFaced', () => {
 
 describe('getFlippedId', () => {
   it('正面翻到背面', () => {
-    expect(getFlippedId('thief_gemini_front')).toBe('thief_gemini_back');
+    expect(getFlippedId('thief_gemini')).toBe('thief_gemini_back');
   });
 
   it('背面翻到正面', () => {
-    expect(getFlippedId('thief_gemini_back')).toBe('thief_gemini_front');
+    expect(getFlippedId('thief_gemini_back')).toBe('thief_gemini');
   });
 
   it('非双面角色返回 null', () => {
@@ -40,16 +40,16 @@ describe('getFlippedId', () => {
 
 describe('getDualFacedConfig', () => {
   it('通过正面 ID 查找', () => {
-    const config = getDualFacedConfig('thief_gemini_front');
+    const config = getDualFacedConfig('thief_gemini');
     expect(config).toBeDefined();
-    expect(config!.frontId).toBe('thief_gemini_front');
+    expect(config!.frontId).toBe('thief_gemini');
     expect(config!.backId).toBe('thief_gemini_back');
   });
 
   it('通过背面 ID 查找', () => {
     const config = getDualFacedConfig('thief_pisces_back');
     expect(config).toBeDefined();
-    expect(config!.frontId).toBe('thief_pisces_front');
+    expect(config!.frontId).toBe('thief_pisces');
   });
 
   it('未知 ID 返回 undefined', () => {
@@ -65,13 +65,13 @@ describe('flipCharacter', () => {
       ...s,
       players: {
         ...s.players,
-        p1: { ...s.players.p1!, characterId: 'thief_gemini_front' },
+        p1: { ...s.players.p1!, characterId: 'thief_gemini' },
       },
     };
     const next = flipCharacter(s, 'p1');
     expect(next.players.p1!.characterId).toBe('thief_gemini_back');
     // 不修改原 state
-    expect(s.players.p1!.characterId).toBe('thief_gemini_front');
+    expect(s.players.p1!.characterId).toBe('thief_gemini');
   });
 
   it('再次翻面恢复正面', () => {
@@ -80,13 +80,13 @@ describe('flipCharacter', () => {
       ...s,
       players: {
         ...s.players,
-        p1: { ...s.players.p1!, characterId: 'thief_gemini_front' },
+        p1: { ...s.players.p1!, characterId: 'thief_gemini' },
       },
     };
     s = flipCharacter(s, 'p1');
     expect(s.players.p1!.characterId).toBe('thief_gemini_back');
     s = flipCharacter(s, 'p1');
-    expect(s.players.p1!.characterId).toBe('thief_gemini_front');
+    expect(s.players.p1!.characterId).toBe('thief_gemini');
   });
 
   it('非双面角色不变', () => {
@@ -116,8 +116,8 @@ describe('flipCharacters', () => {
       ...s,
       players: {
         ...s.players,
-        p1: { ...s.players.p1!, characterId: 'thief_gemini_front' },
-        p2: { ...s.players.p2!, characterId: 'thief_pisces_front' },
+        p1: { ...s.players.p1!, characterId: 'thief_gemini' },
+        p2: { ...s.players.p2!, characterId: 'thief_pisces' },
       },
     };
     const next = flipCharacters(s, ['p1', 'p2']);

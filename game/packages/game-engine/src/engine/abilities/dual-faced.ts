@@ -21,21 +21,21 @@ export interface DualFacedConfig {
 export const DUAL_FACED_CHARS: DualFacedConfig[] = [
   // 双子（Gemini）
   {
-    frontId: 'thief_gemini_front',
+    frontId: 'thief_gemini',
     backId: 'thief_gemini_back',
     frontFaction: 'thief',
     backFaction: 'thief',
   },
   // 双鱼（Pisces）
   {
-    frontId: 'thief_pisces_front',
+    frontId: 'thief_pisces',
     backId: 'thief_pisces_back',
     frontFaction: 'thief',
     backFaction: 'thief',
   },
   // 露娜（Luna）
   {
-    frontId: 'thief_luna_front',
+    frontId: 'thief_luna',
     backId: 'thief_luna_back',
     frontFaction: 'thief',
     backFaction: 'thief',
