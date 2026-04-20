@@ -9,7 +9,7 @@ import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
-import { getCardImageUrl, GENERIC_BACK_IMAGES } from '../../lib/cardImages';
+import { getCardImageUrl, GENERIC_BACK_IMAGES, preloadAllCardImages } from '../../lib/cardImages';
 import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import { CardDetailModal } from '../CardDetailModal';
@@ -122,6 +122,20 @@ export function LocalMatchRuntime({
     apiRef.current = api;
 
     logger.flow('game', 'runtime mount', { playerCount, matchId });
+
+    // 后台预加载所有卡图（不阻塞对局启动）· 浏览器 HTTP cache 接管后续 <img> 秒出
+    void preloadAllCardImages({
+      onProgress: (loaded, total, failed) => {
+        if (loaded === total) {
+          logger.flow('game/assets', 'card images preloaded', {
+            loaded,
+            total,
+            failed: failed.length,
+          });
+        }
+      },
+    });
+
     void api
       .createLocalMatch(playerCount, matchId)
       .then(() => refreshState())

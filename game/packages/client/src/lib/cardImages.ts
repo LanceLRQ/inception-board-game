@@ -86,3 +86,79 @@ export function hasCardBackImage(cardId: string | null | undefined): boolean {
 export function getCardImageCount(): number {
   return IMAGE_MAP.size;
 }
+
+/** 遍历所有登记的卡图 URL（front + back + 通用背面） */
+export function getAllCardImageUrls(): string[] {
+  const urls: string[] = [];
+  for (const entry of IMAGE_MAP.values()) {
+    urls.push(entry.front);
+    if (entry.back) urls.push(entry.back);
+  }
+  urls.push(GENERIC_BACK_IMAGES.thief, GENERIC_BACK_IMAGES.master);
+  return urls;
+}
+
+/**
+ * 最小版 AssetPreloader。
+ * 后台并发创建 Image() 实例触发浏览器下载；不阻塞调用方。
+ * 单次调用后浏览器 HTTP cache 会接管，后续 <img> 渲染秒出。
+ *
+ * @param opts.concurrency 并发上限（默认 8，避免打爆 dev server）
+ * @param opts.onProgress 每加载完成一张回调（可选）
+ * @returns 返回一个 Promise，所有图加载结束（成功或失败）时 resolve，
+ *          并提供失败 URL 列表供诊断；已在加载中的后续调用复用结果。
+ */
+export async function preloadAllCardImages(
+  opts: {
+    readonly concurrency?: number;
+    readonly onProgress?: (loaded: number, total: number, failed: readonly string[]) => void;
+  } = {},
+): Promise<{ loaded: number; failed: string[] }> {
+  if (preloadPromise) return preloadPromise;
+  const concurrency = Math.max(1, opts.concurrency ?? 8);
+  const onProgress = opts.onProgress;
+  const all = getAllCardImageUrls();
+  const total = all.length;
+  let loaded = 0;
+  const failed: string[] = [];
+  let cursor = 0;
+
+  const loadOne = (url: string): Promise<void> =>
+    new Promise((resolve) => {
+      if (typeof Image === 'undefined') {
+        resolve(); // SSR / 测试环境兜底
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        loaded++;
+        onProgress?.(loaded, total, failed);
+        resolve();
+      };
+      img.onerror = () => {
+        failed.push(url);
+        loaded++;
+        onProgress?.(loaded, total, failed);
+        resolve();
+      };
+      img.src = url;
+    });
+
+  const runner = async (): Promise<void> => {
+    while (true) {
+      const i = cursor++;
+      if (i >= total) return;
+      await loadOne(all[i]!);
+    }
+  };
+
+  preloadPromise = (async () => {
+    const workers = Array.from({ length: Math.min(concurrency, total) }, () => runner());
+    await Promise.all(workers);
+    return { loaded, failed };
+  })();
+
+  return preloadPromise;
+}
+
+let preloadPromise: Promise<{ loaded: number; failed: string[] }> | null = null;
