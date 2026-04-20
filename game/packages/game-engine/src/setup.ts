@@ -129,6 +129,9 @@ export interface SetupState {
   // 移形换影（EX）：当回合开始时快照；回合末强制还原
   // 对照：docs/manual/04-action-cards.md 移形换影
   shiftSnapshot: Record<string, CardID> | null;
+  // 响应窗口（能力系统）
+  // 对照：plans/design/02-game-rules-spec.md §2.4.2
+  pendingResponseWindow: import('./engine/abilities/response-chain.js').ResponseWindowState | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -301,6 +304,7 @@ export function createInitialState(options: {
     pendingResonance: null,
     pendingGravity: null,
     shiftSnapshot: null,
+    pendingResponseWindow: null,
     winner: null,
     winReason: null,
     endTurn: null,

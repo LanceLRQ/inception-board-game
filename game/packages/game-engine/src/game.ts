@@ -33,6 +33,7 @@ import {
   applyInterpreterForeshadow,
   applyChessTranspose,
 } from './engine/skills.js';
+import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
 
 export type { SetupState } from './setup.js';
@@ -173,16 +174,7 @@ export const InceptionCityGame = {
         },
         // 回合末：还原移形换影快照（对照 docs/manual/04-action-cards.md 移形换影 解析）
         onEnd: ({ G }: { G: SetupState; ctx: BGIOCtx }) => {
-          if (!G.shiftSnapshot) return G;
-          const snap = G.shiftSnapshot;
-          const nextPlayers = { ...G.players };
-          for (const pid of Object.keys(snap)) {
-            const original = snap[pid];
-            if (nextPlayers[pid] && original !== undefined) {
-              nextPlayers[pid] = { ...nextPlayers[pid]!, characterId: original };
-            }
-          }
-          return { ...G, players: nextPlayers, shiftSnapshot: null };
+          return shiftGuardAndRestore(G);
         },
       },
       // 所有 move 扁平化（不用 BGIO stages）

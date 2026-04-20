@@ -140,6 +140,7 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     pendingResonance: null,
     pendingGravity: null,
     shiftSnapshot: null,
+    pendingResponseWindow: null,
     winner: null,
     winReason: null,
     endTurn: null,

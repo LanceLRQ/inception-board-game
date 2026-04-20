@@ -78,6 +78,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     winner: null,
     winReason: null,
     endTurn: null,
+    pendingResponseWindow: null,
   };
   base.layers[1]!.playersInLayer = ['0', '1'];
   return { ...base, ...overrides } as SetupState;

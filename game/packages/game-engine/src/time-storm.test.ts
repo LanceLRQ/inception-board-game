@@ -71,6 +71,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     winner: null,
     winReason: null,
     endTurn: null,
+    pendingResponseWindow: null,
   };
   return { ...base, ...overrides } as SetupState;
 }
