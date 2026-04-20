@@ -49,6 +49,9 @@ import {
   canUseTouristAssist,
   isCapricornusRhythmActive,
   applyChemistRefine,
+  applyTouristAssist,
+  applyLeoKingdom,
+  applyBlackHoleLevy,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -1263,6 +1266,153 @@ describe('W19-A · 药剂师·调剂守卫（R34）', () => {
       deck: { ...s.deck, discardPile: ['action_dream_transit' as CardID] },
     };
     const r = applyChemistRefine(s, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+});
+
+// ============================================================================
+// R35 · W19-A 交互矩阵扩充（第八批 · apply* 状态变更分支）
+// ============================================================================
+describe('W19-A · 穿行者·支助 happy path（R35）', () => {
+  it('手牌全转 target + self 移到 target 层', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_tourist');
+    s = setHand(s, 'p1', [
+      'action_unlock' as CardID,
+      'action_shoot' as CardID,
+      'action_shift' as CardID,
+    ]);
+    // p2 放到 L3
+    s = setLayer(s, 'p2', 3 as Layer);
+    const beforeP2Hand = s.players.p2!.hand.length;
+    const r = applyTouristAssist(s, 'p1', 'p2');
+    expect(r).not.toBeNull();
+    // p1 手牌清空
+    expect(r!.players.p1!.hand.length).toBe(0);
+    // p2 获得全部
+    expect(r!.players.p2!.hand.length).toBe(beforeP2Hand + 3);
+    // p1 移到 L3
+    expect(r!.players.p1!.currentLayer).toBe(3);
+  });
+
+  it('技能限 1 次/回合：第二次 apply → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_tourist');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    const r1 = applyTouristAssist(s, 'p1', 'p2');
+    expect(r1).not.toBeNull();
+    // 第二次从 r1 继续发动（但 p1 无手牌，也会 fail）
+    s = setHand(r1!, 'p1', ['action_shoot' as CardID]);
+    const r2 = applyTouristAssist(s, 'p1', 'p2');
+    expect(r2).toBeNull();
+  });
+});
+
+describe('W19-A · 狮子·王道触发分支（R35）', () => {
+  it('非狮子角色 → 原状态返回', () => {
+    let s = scenarioStartOfGame3p();
+    s = setHand(s, 'p1', []);
+    s = { ...s, deck: { cards: Array(5).fill('action_unlock') as CardID[], discardPile: [] } };
+    const r = applyLeoKingdom(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(0); // 不加
+  });
+
+  it('狮子 + 梦主手牌=3 → 抽 3 张', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_leo');
+    s = setHand(s, 'p1', []);
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, Array(3).fill('action_shoot') as CardID[]);
+    s = { ...s, deck: { cards: Array(10).fill('action_unlock') as CardID[], discardPile: [] } };
+    const r = applyLeoKingdom(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(3);
+  });
+
+  it('狮子 + 梦主手牌=0 + 弃牌堆有牌 → 从弃牌堆顶取 1', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_leo');
+    s = setHand(s, 'p1', []);
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, []);
+    s = {
+      ...s,
+      deck: {
+        cards: [],
+        discardPile: ['action_unlock' as CardID, 'action_shoot' as CardID],
+      },
+    };
+    const r = applyLeoKingdom(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(1);
+    expect(r.players.p1!.hand[0]).toBe('action_shoot');
+    // 弃牌堆少 1 张
+    expect(r.deck.discardPile.length).toBe(1);
+  });
+
+  it('狮子 + 梦主手牌=0 + 弃牌堆空 → 无效果但技能标记已用', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_leo');
+    s = setHand(s, 'p1', []);
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, []);
+    s = { ...s, deck: { cards: [], discardPile: [] } };
+    const r = applyLeoKingdom(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(0);
+    expect(r.players.p1!.skillUsedThisTurn['thief_leo.skill_0']).toBe(1);
+  });
+
+  it('狮子 + 技能已用过 → 直接返回原状态', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_leo');
+    s = setHand(s, 'p1', []);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, skillUsedThisTurn: { 'thief_leo.skill_0': 1 } },
+      },
+    };
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, Array(3).fill('action_shoot') as CardID[]);
+    s = { ...s, deck: { cards: Array(5).fill('action_unlock') as CardID[], discardPile: [] } };
+    const r = applyLeoKingdom(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(0); // 不触发
+  });
+});
+
+describe('W19-A · 黑洞·征收 apply 分支（R35）', () => {
+  it('非黑洞角色 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const picks: Record<string, CardID> = { p2: 'action_unlock' as CardID };
+    const r = applyBlackHoleLevy(s, 'p1', picks);
+    expect(r).toBeNull();
+  });
+
+  it('黑洞 + 同层无其他玩家 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_black_hole');
+    // 把 p2 移到其他层
+    s = setLayer(s, 'p2', 3 as Layer);
+    const picks: Record<string, CardID> = {};
+    const r = applyBlackHoleLevy(s, 'p1', picks);
+    expect(r).toBeNull();
+  });
+
+  it('黑洞 + giverPicks 缺失某玩家 → null（必须全齐）', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_black_hole');
+    s = setHand(s, 'p2', ['action_unlock' as CardID]);
+    // 空 picks（p2 存在于同层但未提供 pick）
+    const picks: Record<string, CardID> = {};
+    const r = applyBlackHoleLevy(s, 'p1', picks);
+    expect(r).toBeNull();
+  });
+
+  it('黑洞 + pick 不在 giver 手中 → null', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_black_hole');
+    s = setHand(s, 'p2', ['action_unlock' as CardID]);
+    const picks: Record<string, CardID> = { p2: 'action_shoot' as CardID, pM: 'x' as CardID };
+    const r = applyBlackHoleLevy(s, 'p1', picks);
     expect(r).toBeNull();
   });
 });
