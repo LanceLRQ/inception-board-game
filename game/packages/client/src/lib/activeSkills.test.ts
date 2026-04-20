@@ -10,6 +10,7 @@ import {
   GEMINI_SYNC,
   getAvailableActiveSkills,
   HALEY_IMPACT,
+  IMPERIAL_DEAL_BRIBE,
   LORD_OF_WAR_BLACK_MARKET,
   LUNA_ECLIPSE,
   MARS_KILL,
@@ -676,5 +677,55 @@ describe('getAvailableActiveSkills · R19 战争之王·黑市', () => {
 
   it('argKind = multiCardAndDiscardCard', () => {
     expect(LORD_OF_WAR_BLACK_MARKET.argKind).toBe('multiCardAndDiscardCard');
+  });
+});
+
+describe('getAvailableActiveSkills · R20 皇城·重金', () => {
+  it('皇城梦主 + 贿赂池有项 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_imperial_city',
+        faction: 'master',
+        bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
+      }),
+    );
+    expect(list).toContain(IMPERIAL_DEAL_BRIBE);
+  });
+
+  it('皇城梦主 + 贿赂池空 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_imperial_city',
+        faction: 'master',
+        bribePoolItems: [],
+      }),
+    );
+    expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
+  });
+
+  it('其他梦主角色 → 不含（角色限定）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_fortress',
+        faction: 'master',
+        bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
+      }),
+    );
+    expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
+  });
+
+  it('盗梦者阵营 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'dm_imperial_city',
+        faction: 'thief',
+        bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
+      }),
+    );
+    expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
+  });
+
+  it('argKind = playerAndBribeIndex', () => {
+    expect(IMPERIAL_DEAL_BRIBE.argKind).toBe('playerAndBribeIndex');
   });
 });

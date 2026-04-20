@@ -66,6 +66,11 @@ export function ActiveSkillPanel({
     selected: string[];
     phase: 'cards' | 'discard';
   } | null>(null);
+  // playerAndBribeIndex: 先选目标玩家再选贿赂池 idx（皇城·重金）
+  const [pendingPlayerBribeSkill, setPendingPlayerBribeSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    targetId: string | null;
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -80,7 +85,8 @@ export function ActiveSkillPanel({
     !pendingMultiCardSkill &&
     !pendingMultiCardPlayerSkill &&
     !pendingLayerShiftSkill &&
-    !pendingMultiCardDiscardSkill
+    !pendingMultiCardDiscardSkill &&
+    !pendingPlayerBribeSkill
   )
     return null;
 
@@ -131,6 +137,10 @@ export function ActiveSkillPanel({
     }
     if (skill.argKind === 'multiCardAndDiscardCard') {
       setPendingMultiCardDiscardSkill({ skill, selected: [], phase: 'cards' });
+      return;
+    }
+    if (skill.argKind === 'playerAndBribeIndex') {
+      setPendingPlayerBribeSkill({ skill, targetId: null });
       return;
     }
   };
@@ -228,6 +238,12 @@ export function ActiveSkillPanel({
     setPendingMultiCardDiscardSkill(null);
   };
 
+  const confirmPlayerBribe = (poolIndex: number) => {
+    if (!pendingPlayerBribeSkill || !pendingPlayerBribeSkill.targetId) return;
+    onInvoke(pendingPlayerBribeSkill.skill, [pendingPlayerBribeSkill.targetId, poolIndex]);
+    setPendingPlayerBribeSkill(null);
+  };
+
   const confirmPlayerCard = (cardId: string) => {
     if (!pendingPlayerCardSkill || !pendingPlayerCardSkill.targetId) return;
     onInvoke(pendingPlayerCardSkill.skill, [pendingPlayerCardSkill.targetId, cardId]);
@@ -290,7 +306,8 @@ export function ActiveSkillPanel({
         !pendingMultiCardSkill &&
         !pendingMultiCardPlayerSkill &&
         !pendingLayerShiftSkill &&
-        !pendingMultiCardDiscardSkill && (
+        !pendingMultiCardDiscardSkill &&
+        !pendingPlayerBribeSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -692,6 +709,58 @@ export function ActiveSkillPanel({
               onClick={() => setPendingMultiCardDiscardSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-mcd"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingPlayerBribeSkill && (
+        <div className="space-y-2" data-testid="active-skill-player-bribe-picker">
+          <div className="text-xs text-muted-foreground">
+            {pendingPlayerBribeSkill.targetId
+              ? t('skill.chooseBribe', { defaultValue: '选择贿赂：' })
+              : t('skill.chooseTarget', { defaultValue: '选择目标：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingPlayerBribeSkill.skill.nameKey, {
+                defaultValue: pendingPlayerBribeSkill.skill.id,
+              })}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!pendingPlayerBribeSkill.targetId &&
+              availableTargetIds.map((pid) => (
+                <button
+                  key={pid}
+                  type="button"
+                  onClick={() =>
+                    setPendingPlayerBribeSkill((prev) => (prev ? { ...prev, targetId: pid } : prev))
+                  }
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-pb-target-${pid}`}
+                >
+                  {playerNicknames[pid] ?? pid}
+                </button>
+              ))}
+            {pendingPlayerBribeSkill.targetId &&
+              (context.bribePoolItems ?? []).map((item) => (
+                <button
+                  key={`bribe-${item.index}`}
+                  type="button"
+                  onClick={() => confirmPlayerBribe(item.index)}
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-pb-bribe-${item.index}`}
+                  title={item.id}
+                >
+                  #{item.index}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setPendingPlayerBribeSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-pb"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>

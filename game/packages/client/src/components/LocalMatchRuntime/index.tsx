@@ -589,6 +589,12 @@ export function LocalMatchRuntime({
           discardPile: Array.isArray((G?.deck as Record<string, unknown> | undefined)?.discardPile)
             ? ((G!.deck as Record<string, unknown>).discardPile as string[])
             : [],
+          bribePoolItems: Array.isArray(G?.bribePool)
+            ? (G!.bribePool as Array<Record<string, unknown>>)
+                .map((b, i) => ({ index: i, id: b.id as string, status: b.status as string }))
+                .filter((b) => b.status === 'inPool')
+                .map(({ index, id }) => ({ index, id }))
+            : [],
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players

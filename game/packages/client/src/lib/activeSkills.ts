@@ -22,7 +22,8 @@ export type ActiveSkillArgKind =
   | 'multiCard'
   | 'multiCardAndPlayer'
   | 'layerShiftPicks'
-  | 'multiCardAndDiscardCard';
+  | 'multiCardAndDiscardCard'
+  | 'playerAndBribeIndex';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -60,6 +61,8 @@ export interface ActiveSkillContext {
   readonly sameLayerPlayerIds?: readonly string[];
   /** 弃牌堆（战争之王·黑市等选弃牌堆技能用） */
   readonly discardPile?: readonly string[];
+  /** 贿赂池中仍 inPool 的项（皇城·重金用）：{ index, id } 对，id 带 deal/fail 标识 */
+  readonly bribePoolItems?: readonly { readonly index: number; readonly id: string }[];
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -306,6 +309,18 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
+// R20：皇城·重金 —— 梦主指定池中 1 张贿赂派给盗梦者（替代随机抽）
+// 对照：cards-data.json dm_imperial_city + engine/game.ts masterDealBribeImperial
+export const IMPERIAL_DEAL_BRIBE: ActiveSkillDescriptor = {
+  id: 'dm_imperial_city.skill_0',
+  characterId: 'dm_imperial_city',
+  move: 'masterDealBribeImperial',
+  nameKey: 'skill.dm_imperial_city.skill_0.name',
+  descKey: 'skill.dm_imperial_city.skill_0.desc',
+  argKind: 'playerAndBribeIndex',
+  extraCheck: (ctx) => ctx.faction === 'master' && (ctx.bribePoolItems?.length ?? 0) > 0,
+};
+
 // R19：战争之王·黑市 —— 弃 2 张手牌 → 从弃牌堆取 1 张
 // 对照：docs/manual/05-dream-thieves.md 战争之王 + engine/game.ts playLordOfWarBlackMarket
 export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
@@ -365,6 +380,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   ATHENA_AWE,
   GAIA_SHIFT,
   LORD_OF_WAR_BLACK_MARKET,
+  IMPERIAL_DEAL_BRIBE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */
