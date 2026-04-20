@@ -23,6 +23,9 @@ import { sagittariusHeartLock } from './thief/sagittarius.js';
 import { terroristCrossLayer } from './thief/terrorist.js';
 import { greenRayTransfer } from './thief/green-ray.js';
 
+import { mercuryReverse, mercuryRouteWorldView } from './master/mercury-route.js';
+import { venusDouble, venusMirrorWorldView } from './master/venus-mirror.js';
+
 export const ALL_THIEF_ABILITIES: readonly AbilityDefinition[] = [
   virgoPerfect,
   athenaWit,
@@ -40,7 +43,12 @@ export const ALL_THIEF_ABILITIES: readonly AbilityDefinition[] = [
   greenRayTransfer,
 ];
 
-export const ALL_MASTER_ABILITIES: readonly AbilityDefinition[] = [];
+export const ALL_MASTER_ABILITIES: readonly AbilityDefinition[] = [
+  mercuryReverse,
+  mercuryRouteWorldView,
+  venusDouble,
+  venusMirrorWorldView,
+];
 
 /** 创建一个填好默认能力的 registry */
 export function createDefaultRegistry(): InMemoryAbilityRegistry {
@@ -65,4 +73,8 @@ export {
   sagittariusHeartLock,
   terroristCrossLayer,
   greenRayTransfer,
+  mercuryReverse,
+  mercuryRouteWorldView,
+  venusDouble,
+  venusMirrorWorldView,
 };
