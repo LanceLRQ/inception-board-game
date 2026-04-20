@@ -64,6 +64,15 @@ import {
   applyMarsBattlefieldExchange,
   applyMarsKillDiscardUnlock,
   applySaturnDecree,
+  applySpaceQueenObserve,
+  applySpaceQueenStashTop,
+  applyBlackSwanTour,
+  applyLordOfWarBlackMarket,
+  applyPaprikSalvation,
+  applyApolloWorship,
+  applyForgerExchange,
+  applyHlninoFlow,
+  applyChessWorldViewPeek,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -1959,5 +1968,264 @@ describe('W19-A · 火星·杀戮弃解封（R38）', () => {
     s = setHand(s, mid, ['action_shoot' as CardID]);
     const r = applyMarsKillDiscardUnlock(s, mid);
     expect(r).toBeNull();
+  });
+});
+
+// ============================================================================
+// R39 · W19-A 交互矩阵收官批（181 → 200）
+// 聚焦：空间女王 / 黑天鹅 / 战争之王 / 灵魂牧师 / 阿波罗 / 欺诈师 / 降世神通 / 棋局世界观
+// ============================================================================
+
+describe('W19-A · 空间女王 监察 / 置顶（R39）', () => {
+  it('非空间女王 → observe 返回 null', () => {
+    const s = scenarioStartOfGame3p();
+    expect(applySpaceQueenObserve(s, 'p1')).toBeNull();
+  });
+
+  it('空间女王 observe → 抽 1（手牌 +1）', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_space_queen');
+    s = { ...s, deck: { ...s.deck, cards: ['action_unlock' as CardID, 'action_shoot' as CardID] } };
+    const before = s.players.p1!.hand.length;
+    const r = applySpaceQueenObserve(s, 'p1');
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand.length).toBe(before + 1);
+  });
+
+  it('空间女王 stashTop → 牌移到牌库顶 + 手牌去除', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_space_queen');
+    s = setHand(s, 'p1', ['action_shoot' as CardID, 'action_unlock' as CardID]);
+    const r = applySpaceQueenStashTop(s, 'p1', 'action_unlock' as CardID);
+    expect(r).not.toBeNull();
+    expect(r!.deck.cards[0]).toBe('action_unlock');
+    expect(r!.players.p1!.hand).toEqual(['action_shoot']);
+  });
+
+  it('空间女王 stashTop 手牌无此卡 → null', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_space_queen');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    const r = applySpaceQueenStashTop(s, 'p1', 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 黑天鹅 巡演（R39）', () => {
+  it('非黑天鹅 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyBlackSwanTour(s, 'p1', {});
+    expect(r).toBeNull();
+  });
+
+  it('黑天鹅 + 分发给梦主（阵营不合） → null', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_black_swan');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    const mid = findMasterID(s)!;
+    const r = applyBlackSwanTour(s, 'p1', { [mid]: ['action_shoot' as CardID] });
+    expect(r).toBeNull();
+  });
+
+  it('黑天鹅 + 合法分发 → self 手牌清空后抽 4', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_black_swan');
+    s = setHand(s, 'p1', ['action_shoot' as CardID, 'action_unlock' as CardID]);
+    s = {
+      ...s,
+      deck: {
+        ...s.deck,
+        cards: [
+          'action_unlock' as CardID,
+          'action_unlock' as CardID,
+          'action_unlock' as CardID,
+          'action_unlock' as CardID,
+        ],
+      },
+    };
+    const r = applyBlackSwanTour(s, 'p1', {
+      p2: ['action_shoot' as CardID, 'action_unlock' as CardID],
+    });
+    expect(r).not.toBeNull();
+    // 手牌 = 0 + 4 抽牌
+    expect(r!.players.p1!.hand.length).toBe(4);
+    expect(r!.players.p2!.hand).toContain('action_shoot');
+  });
+});
+
+describe('W19-A · 战争之王 黑市（R39）', () => {
+  it('非战争之王 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyLordOfWarBlackMarket(
+      s,
+      'p1',
+      ['action_shoot' as CardID, 'action_unlock' as CardID],
+      'action_shift' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+
+  it('合法：弃 2 + 弃堆换 1 → 手牌换成目标牌', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_lord_of_war');
+    s = setHand(s, 'p1', ['action_shoot' as CardID, 'action_unlock' as CardID]);
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shift' as CardID] } };
+    const r = applyLordOfWarBlackMarket(
+      s,
+      'p1',
+      ['action_shoot' as CardID, 'action_unlock' as CardID],
+      'action_shift' as CardID,
+    );
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toEqual(['action_shift']);
+    expect(r!.deck.discardPile.sort()).toEqual(['action_shoot', 'action_unlock']);
+  });
+
+  it('弃牌数不为 2 → null', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_lord_of_war');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    const r = applyLordOfWarBlackMarket(
+      s,
+      'p1',
+      ['action_shoot' as CardID],
+      'action_shift' as CardID,
+    );
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 灵魂牧师 拯救（R39）', () => {
+  it('非灵魂牧师 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyPaprikSalvation(s, 'p1', 'action_shoot' as CardID, 'p2');
+    expect(r).toBeNull();
+  });
+
+  it('target 活着 → null', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_paprik');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    const r = applyPaprikSalvation(s, 'p1', 'action_shoot' as CardID, 'p2');
+    expect(r).toBeNull();
+  });
+
+  it('target 死亡 → 成功复活，手牌转给 self', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_paprik');
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    // 把 p2 杀到迷失层 + 给 p2 一张手牌
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p2: {
+          ...s.players.p2!,
+          isAlive: false,
+          deathTurn: 1,
+          currentLayer: 0,
+          hand: ['action_unlock' as CardID],
+        },
+      },
+    };
+    const r = applyPaprikSalvation(s, 'p1', 'action_shoot' as CardID, 'p2');
+    expect(r).not.toBeNull();
+    expect(r!.players.p2!.isAlive).toBe(true);
+    expect(r!.players.p2!.hand).toEqual([]);
+    // self 弃 shoot、收 unlock
+    expect(r!.players.p1!.hand).toEqual(['action_unlock']);
+  });
+});
+
+describe('W19-A · 阿波罗 崇拜（R39）', () => {
+  it('target 无贿赂 → null', () => {
+    const s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_apollo');
+    const r = applyApolloWorship(s, 'p1', 'p2', 0);
+    expect(r).toBeNull();
+  });
+
+  it('target 有贿赂 + pickIndex 越界 → 自动环绕并抽到牌', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_apollo');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p2: {
+          ...s.players.p2!,
+          bribeReceived: 1,
+          hand: ['action_shoot' as CardID, 'action_unlock' as CardID],
+        },
+      },
+    };
+    const r = applyApolloWorship(s, 'p1', 'p2', 5); // 5 % 2 = 1 → unlock
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toContain('action_unlock');
+    expect(r!.players.p2!.hand).toEqual(['action_shoot']);
+  });
+});
+
+describe('W19-A · 欺诈师 盗心（R39）', () => {
+  it('非欺诈师 → null', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyForgerExchange(s, 'p1', {
+      targetID: 'p2',
+      takenFromTarget: ['action_shoot' as CardID],
+      returnedToTarget: ['action_unlock' as CardID],
+    });
+    expect(r).toBeNull();
+  });
+
+  it('take 与 return 数量不等 → null', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_forger');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = setHand(s, 'p2', ['action_shoot' as CardID, 'action_shift' as CardID]);
+    const r = applyForgerExchange(s, 'p1', {
+      targetID: 'p2',
+      takenFromTarget: ['action_shoot' as CardID, 'action_shift' as CardID],
+      returnedToTarget: ['action_unlock' as CardID],
+    });
+    expect(r).toBeNull();
+  });
+
+  it('合法 1-for-1 交换 → 手牌互换成功', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_forger');
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = setHand(s, 'p2', ['action_shoot' as CardID]);
+    const r = applyForgerExchange(s, 'p1', {
+      targetID: 'p2',
+      takenFromTarget: ['action_shoot' as CardID],
+      returnedToTarget: ['action_unlock' as CardID],
+    });
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.hand).toEqual(['action_shoot']);
+    expect(r!.players.p2!.hand).toEqual(['action_unlock']);
+  });
+});
+
+describe('W19-A · 降世神通 顺流 / 棋局世界观窥视（R39）', () => {
+  it('非降世神通 → 状态不变', () => {
+    const s = scenarioStartOfGame3p();
+    const r = applyHlninoFlow(s, 'p1', 1, 2);
+    expect(r).toBe(s);
+  });
+
+  it('降世神通 + 往数字更小层移 → 状态不变（不触发）', () => {
+    const s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_hlnino');
+    const r = applyHlninoFlow(s, 'p1', 3, 2);
+    expect(r.players.p1!.hand.length).toBe(s.players.p1!.hand.length);
+  });
+
+  it('降世神通 + 往数字更大层移 → 抽 2 张', () => {
+    let s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_hlnino');
+    s = {
+      ...s,
+      deck: { ...s.deck, cards: ['action_unlock' as CardID, 'action_shoot' as CardID] },
+    };
+    const before = s.players.p1!.hand.length;
+    const r = applyHlninoFlow(s, 'p1', 1, 3);
+    expect(r.players.p1!.hand.length).toBe(before + 2);
+  });
+
+  it('棋局世界观窥视 → 梦主抽 2 张', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_chess');
+    s = {
+      ...s,
+      deck: { ...s.deck, cards: ['action_unlock' as CardID, 'action_shoot' as CardID] },
+    };
+    const mid = findMasterID(s)!;
+    const before = s.players[mid]!.hand.length;
+    const r = applyChessWorldViewPeek(s, mid);
+    expect(r.players[mid]!.hand.length).toBe(before + 2);
   });
 });
