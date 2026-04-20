@@ -40,6 +40,69 @@ describe('dispatcher 接入 · doDraw', () => {
     expect(r.turnPhase).toBe('action');
     expect(r.players['p1']!.hand.length).toBeGreaterThan(0);
   });
+
+  // R28 · 白羊实际多抽（接入响应/触发批次 · ariesExtraDraw.apply 调用 drawCards）
+  it('白羊 · 1 张已弃梦魇 → 比标准多抽 1 张', () => {
+    let base = scenarioStartOfGame3p();
+    base = { ...base, deck: { ...base.deck, cards: Array(20).fill('action_unlock') as CardID[] } };
+    // 基线：普通盗梦者（非白羊）走一遍 doDraw
+    const baseline = callMove(base, 'doDraw', [], { currentPlayer: 'p1' });
+    expectMoveOk(baseline);
+    const baselineHand = baseline.players['p1']!.hand.length;
+
+    // 白羊 + 1 张已弃梦魇
+    let s = setCharacter(base, 'p1', 'thief_aries');
+    s = setUsedNightmares(s, ['nightmare_despair_storm']);
+    const r = callMove(s, 'doDraw', [], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.players['p1']!.hand.length).toBe(baselineHand + 1);
+  });
+
+  it('白羊 · 3 张已弃梦魇 → 比标准多抽 3 张', () => {
+    let base = scenarioStartOfGame3p();
+    base = { ...base, deck: { ...base.deck, cards: Array(20).fill('action_unlock') as CardID[] } };
+    const baseline = callMove(base, 'doDraw', [], { currentPlayer: 'p1' });
+    expectMoveOk(baseline);
+    const baselineHand = baseline.players['p1']!.hand.length;
+
+    let s = setCharacter(base, 'p1', 'thief_aries');
+    s = setUsedNightmares(s, [
+      'nightmare_despair_storm',
+      'nightmare_hunger_bite',
+      'nightmare_fatal_whirl',
+    ]);
+    const r = callMove(s, 'doDraw', [], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.players['p1']!.hand.length).toBe(baselineHand + 3);
+  });
+
+  it('白羊 · 已弃梦魇 = 0 → 无多抽（与标准一致）', () => {
+    let base = scenarioStartOfGame3p();
+    base = { ...base, deck: { ...base.deck, cards: Array(20).fill('action_unlock') as CardID[] } };
+    const baseline = callMove(base, 'doDraw', [], { currentPlayer: 'p1' });
+    expectMoveOk(baseline);
+
+    const s = setCharacter(base, 'p1', 'thief_aries');
+    const r = callMove(s, 'doDraw', [], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.players['p1']!.hand.length).toBe(baseline.players['p1']!.hand.length);
+  });
+
+  it('白羊不是 currentPlayer → 其他玩家抽牌时不触发多抽（guard invokerID === currentPlayerID）', () => {
+    let base = scenarioStartOfGame3p();
+    base = { ...base, deck: { ...base.deck, cards: Array(20).fill('action_unlock') as CardID[] } };
+    // p2 是当前玩家（非白羊），p1 是白羊但不在当前回合
+    let s = setCharacter(base, 'p1', 'thief_aries');
+    s = setUsedNightmares(s, ['nightmare_despair_storm', 'nightmare_hunger_bite']);
+    s = { ...s, currentPlayerID: 'p2' };
+    const p1HandBefore = s.players['p1']!.hand.length;
+    const r = callMove(s, 'doDraw', [], { currentPlayer: 'p2' });
+    expectMoveOk(r);
+    // p1（白羊）手牌不变：passive 不在非自己回合触发
+    expect(r.players['p1']!.hand.length).toBe(p1HandBefore);
+    // p2 正常抽（非白羊无加成）
+    expect(r.players['p2']!.hand.length).toBeGreaterThan(0);
+  });
 });
 
 describe('dispatcher 接入 · resolveUnlock', () => {

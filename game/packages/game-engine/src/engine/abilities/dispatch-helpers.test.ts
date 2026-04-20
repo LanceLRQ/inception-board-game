@@ -114,15 +114,16 @@ describe('dispatch-helpers · dispatchPassives', () => {
     expect(r.events).toEqual([]);
   });
 
-  it('多玩家都有 passive 能力 → 全部触发', () => {
+  it('多玩家都有白羊 passive → 仅当前玩家触发（规则：仅自己的抽牌阶段生效）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_aries');
     s = setCharacter(s, 'p2', 'thief_aries');
     s = setUsedNightmares(s, ['nightmare_despair_storm']);
+    // currentPlayerID 默认 p1 → 只 p1 触发
     const r = dispatchPassives(s, 'onDrawPhase');
     const ariesEvents = r.events.filter((e) => e.type === 'aries_extra_draw_active');
-    expect(ariesEvents).toHaveLength(2);
-    expect(ariesEvents.map((e) => e.playerID).sort()).toEqual(['p1', 'p2']);
+    expect(ariesEvents).toHaveLength(1);
+    expect(ariesEvents[0]!.playerID).toBe('p1');
   });
 
   it('死亡玩家不触发', () => {
