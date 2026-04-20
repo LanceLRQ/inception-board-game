@@ -19,7 +19,8 @@ export type ActiveSkillArgKind =
   | 'targetLayer'
   | 'playerAndLayer'
   | 'playerAndCard'
-  | 'multiCard';
+  | 'multiCard'
+  | 'multiCardAndPlayer';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -273,6 +274,32 @@ export const MASTER_DEAL_BRIBE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master' && ctx.bribePoolAvailable === true,
 };
 
+// R17：露娜·月蚀 —— 弃 2 张 SHOOT → 击杀同层任意玩家 → 翻面
+// 对照：docs/manual/05-dream-thieves.md 露娜 + engine/game.ts playLunaEclipse
+export const LUNA_ECLIPSE: ActiveSkillDescriptor = {
+  id: 'thief_luna.skill_0',
+  characterId: 'thief_luna',
+  move: 'playLunaEclipse',
+  nameKey: 'skill.thief_luna.skill_0.name',
+  descKey: 'skill.thief_luna.skill_0.desc',
+  argKind: 'multiCardAndPlayer',
+  // 至少要 2 张手牌供挑选；SHOOT 类型校验交给 engine
+  extraCheck: (ctx) => ctx.hand.length >= 2,
+};
+
+// R17：雅典娜·惊叹 —— 展示 4 张手牌 + 1 牌库顶 → 5 张同名击杀同层玩家
+// 对照：docs/manual/05-dream-thieves.md 雅典娜 + engine/game.ts playAthenaAwe
+export const ATHENA_AWE: ActiveSkillDescriptor = {
+  id: 'thief_athena.skill_0',
+  characterId: 'thief_athena',
+  move: 'playAthenaAwe',
+  nameKey: 'skill.thief_athena.skill_0.name',
+  descKey: 'skill.thief_athena.skill_0.desc',
+  argKind: 'multiCardAndPlayer',
+  // 至少 4 张手牌才能参与展示
+  extraCheck: (ctx) => ctx.hand.length >= 4,
+};
+
 const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   SHADE_FOLLOW,
   APOLLO_WORSHIP,
@@ -294,6 +321,8 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   DARWIN_EVOLUTION,
   HALEY_IMPACT,
   MASTER_DEAL_BRIBE,
+  LUNA_ECLIPSE,
+  ATHENA_AWE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */

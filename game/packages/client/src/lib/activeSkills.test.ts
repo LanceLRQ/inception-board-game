@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   APOLLO_WORSHIP,
   ARCHITECT_MAZE,
+  ATHENA_AWE,
   CHEMIST_REFINE,
   GEMINI_SYNC,
   getAvailableActiveSkills,
   HALEY_IMPACT,
+  LUNA_ECLIPSE,
   MARS_KILL,
   MARTYR_SACRIFICE,
   MASTER_DEAL_BRIBE,
@@ -503,5 +505,59 @@ describe('getAvailableActiveSkills · R16 梦主·贿赂派发', () => {
 
   it('argKind = targetPlayer', () => {
     expect(MASTER_DEAL_BRIBE.argKind).toBe('targetPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · R17 露娜·月蚀', () => {
+  it('露娜 + 手牌 ≥2 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_luna', hand: ['action_shoot', 'action_shoot'] }),
+    );
+    expect(list).toContain(LUNA_ECLIPSE);
+  });
+
+  it('露娜 + 手牌 1 张 → 不含（基础手牌数闸门）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_luna', hand: ['action_shoot'] }),
+    );
+    expect(list).not.toContain(LUNA_ECLIPSE);
+  });
+
+  it('非露娜角色 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_apollo', hand: ['action_shoot', 'action_shoot'] }),
+    );
+    expect(list).not.toContain(LUNA_ECLIPSE);
+  });
+
+  it('argKind = multiCardAndPlayer', () => {
+    expect(LUNA_ECLIPSE.argKind).toBe('multiCardAndPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · R17 雅典娜·惊叹', () => {
+  it('雅典娜 + 手牌 ≥4 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_athena', hand: ['a', 'b', 'c', 'd'] }),
+    );
+    expect(list).toContain(ATHENA_AWE);
+  });
+
+  it('雅典娜 + 手牌 3 张 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_athena', hand: ['a', 'b', 'c'] }),
+    );
+    expect(list).not.toContain(ATHENA_AWE);
+  });
+
+  it('非雅典娜角色 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_apollo', hand: ['a', 'b', 'c', 'd', 'e'] }),
+    );
+    expect(list).not.toContain(ATHENA_AWE);
+  });
+
+  it('argKind = multiCardAndPlayer', () => {
+    expect(ATHENA_AWE.argKind).toBe('multiCardAndPlayer');
   });
 });

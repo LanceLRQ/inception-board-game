@@ -49,6 +49,12 @@ export function ActiveSkillPanel({
     skill: ActiveSkillDescriptor;
     selected: string[];
   } | null>(null);
+  // multiCardAndPlayer: 先多选手牌再选目标玩家（露娜·月蚀 / 雅典娜·惊叹）
+  const [pendingMultiCardPlayerSkill, setPendingMultiCardPlayerSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    selected: string[];
+    phase: 'cards' | 'target';
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -60,7 +66,8 @@ export function ActiveSkillPanel({
     !pendingLayerSkill &&
     !pendingPlayerLayerSkill &&
     !pendingPlayerCardSkill &&
-    !pendingMultiCardSkill
+    !pendingMultiCardSkill &&
+    !pendingMultiCardPlayerSkill
   )
     return null;
 
@@ -101,6 +108,10 @@ export function ActiveSkillPanel({
       setPendingMultiCardSkill({ skill, selected: [] });
       return;
     }
+    if (skill.argKind === 'multiCardAndPlayer') {
+      setPendingMultiCardPlayerSkill({ skill, selected: [], phase: 'cards' });
+      return;
+    }
   };
 
   const toggleMultiCard = (cardId: string) => {
@@ -120,6 +131,31 @@ export function ActiveSkillPanel({
     if (!pendingMultiCardSkill) return;
     onInvoke(pendingMultiCardSkill.skill, [pendingMultiCardSkill.selected]);
     setPendingMultiCardSkill(null);
+  };
+
+  const toggleMultiCardPlayer = (cardId: string) => {
+    setPendingMultiCardPlayerSkill((prev) => {
+      if (!prev || prev.phase !== 'cards') return prev;
+      const idx = prev.selected.indexOf(cardId);
+      if (idx >= 0) {
+        const next = [...prev.selected];
+        next.splice(idx, 1);
+        return { ...prev, selected: next };
+      }
+      return { ...prev, selected: [...prev.selected, cardId] };
+    });
+  };
+
+  const advanceMultiCardPlayerToTarget = () => {
+    setPendingMultiCardPlayerSkill((prev) =>
+      prev && prev.selected.length > 0 ? { ...prev, phase: 'target' } : prev,
+    );
+  };
+
+  const confirmMultiCardPlayer = (targetId: string) => {
+    if (!pendingMultiCardPlayerSkill) return;
+    onInvoke(pendingMultiCardPlayerSkill.skill, [pendingMultiCardPlayerSkill.selected, targetId]);
+    setPendingMultiCardPlayerSkill(null);
   };
 
   const confirmPlayerCard = (cardId: string) => {
@@ -181,7 +217,8 @@ export function ActiveSkillPanel({
         !pendingLayerSkill &&
         !pendingPlayerLayerSkill &&
         !pendingPlayerCardSkill &&
-        !pendingMultiCardSkill && (
+        !pendingMultiCardSkill &&
+        !pendingMultiCardPlayerSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -366,6 +403,79 @@ export function ActiveSkillPanel({
               onClick={() => setPendingMultiCardSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-mc"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingMultiCardPlayerSkill && (
+        <div className="space-y-2" data-testid="active-skill-multi-card-player-picker">
+          <div className="text-xs text-muted-foreground">
+            {pendingMultiCardPlayerSkill.phase === 'cards'
+              ? t('skill.chooseMultiCards', { defaultValue: '多选手牌：' })
+              : t('skill.chooseTarget', { defaultValue: '选择目标：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingMultiCardPlayerSkill.skill.nameKey, {
+                defaultValue: pendingMultiCardPlayerSkill.skill.id,
+              })}
+            </span>
+            {pendingMultiCardPlayerSkill.phase === 'cards' && (
+              <span className="ml-2 text-muted-foreground">
+                ({pendingMultiCardPlayerSkill.selected.length})
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {pendingMultiCardPlayerSkill.phase === 'cards' &&
+              context.hand.map((cardId, idx) => {
+                const active = pendingMultiCardPlayerSkill.selected.includes(cardId);
+                return (
+                  <button
+                    key={`${cardId}-${idx}`}
+                    type="button"
+                    onClick={() => toggleMultiCardPlayer(cardId)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs hover:border-primary',
+                      active
+                        ? 'border-primary bg-primary/20 text-primary'
+                        : 'border-border bg-muted',
+                    )}
+                    data-testid={`active-skill-mcp-card-${idx}`}
+                  >
+                    {cardId}
+                  </button>
+                );
+              })}
+            {pendingMultiCardPlayerSkill.phase === 'cards' && (
+              <button
+                type="button"
+                onClick={advanceMultiCardPlayerToTarget}
+                className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/80"
+                data-testid="active-skill-next-mcp"
+                disabled={pendingMultiCardPlayerSkill.selected.length === 0}
+              >
+                {t('common.next', { defaultValue: '下一步' })}
+              </button>
+            )}
+            {pendingMultiCardPlayerSkill.phase === 'target' &&
+              availableTargetIds.map((pid) => (
+                <button
+                  key={pid}
+                  type="button"
+                  onClick={() => confirmMultiCardPlayer(pid)}
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs hover:border-primary"
+                  data-testid={`active-skill-mcp-target-${pid}`}
+                >
+                  {playerNicknames[pid] ?? pid}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setPendingMultiCardPlayerSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-mcp"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>
