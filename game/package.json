@@ -13,7 +13,8 @@
     "prepare": "cd .. && husky game/.husky",
     "copyright:check": "tsx scripts/copyright-check.ts",
     "deploy:dry-run": "bash scripts/deploy-dry-run.sh",
-    "kill:dev": "bash scripts/kill-dev.sh"
+    "kill:dev": "bash scripts/kill-dev.sh",
+    "assets:sync": "tsx scripts/sync-card-assets.ts"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

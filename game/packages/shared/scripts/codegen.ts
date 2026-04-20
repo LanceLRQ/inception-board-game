@@ -41,6 +41,15 @@ interface RawData {
   };
 }
 
+// 图片路径规范化：cards-data.json 里的 OCR 源用的是 .jpg 扩展名，
+// 但对外产物要使用 plans/scripts/convert-to-webp.sh 预压缩过的 .webp 版本，
+// 同时剥掉前导 "cards/" 前缀，改为相对 /public/cards/ 根的路径（由 CardImage 组件补前缀）。
+function normalizeImagePath(src: string): string {
+  if (!src) return '';
+  const webp = src.replace(/\.(jpg|jpeg|png)$/i, '.webp');
+  return webp.replace(/^cards\//, '');
+}
+
 function main() {
   const raw: RawData = JSON.parse(readFileSync(INPUT, 'utf-8'));
 
@@ -162,7 +171,7 @@ function cardToCharacter(faction: 'thief' | 'master') {
             },
           }
         : {}),
-      imagePath: front?.image ?? '',
+      imagePath: normalizeImagePath(front?.image ?? ''),
       isExpansion: false,
     };
   };
@@ -180,7 +189,7 @@ function cardToAction(card: RawCard) {
     timing: ['actionPhase' as const],
     targetSpec: { kind: 'otherPlayer' as const },
     effects: [],
-    imagePath: card.image ?? '',
+    imagePath: normalizeImagePath(card.image ?? ''),
   };
 }
 
@@ -190,7 +199,7 @@ function cardToNightmare(card: RawCard) {
     id: card.id,
     name: card.name,
     description: card.description ?? '',
-    imagePath: card.image ?? '',
+    imagePath: normalizeImagePath(card.image ?? ''),
   };
 }
 
@@ -200,7 +209,7 @@ function cardToDream(card: RawCard) {
     id: card.id,
     name: card.name,
     description: card.description ?? '',
-    imagePath: card.image ?? '',
+    imagePath: normalizeImagePath(card.image ?? ''),
   };
 }
 
@@ -210,7 +219,7 @@ function cardToVault(card: RawCard) {
     id: card.id,
     name: card.name,
     description: card.description ?? '',
-    imagePath: card.image ?? '',
+    imagePath: normalizeImagePath(card.image ?? ''),
   };
 }
 
@@ -220,7 +229,7 @@ function cardToBribe(card: RawCard) {
     id: card.id,
     name: card.name,
     description: card.description ?? '',
-    imagePath: card.image ?? '',
+    imagePath: normalizeImagePath(card.image ?? ''),
   };
 }
 

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import { cn } from '../../lib/utils.js';
 import { GameCard } from '../GameCard/index.js';
+import { getCardImageUrl } from '../../lib/cardImages.js';
 import { useUIStore } from '../../stores/useUIStore.js';
 import type { CardID } from '@icgame/shared';
 
@@ -96,6 +97,7 @@ export function HandDrawer({ hand, playableCardIds, onPlayCard, onCardDetail }: 
               <GameCard
                 key={card.instanceId}
                 cardId={card.cardId}
+                imageUrl={getCardImageUrl(card.cardId)}
                 size={isDrawerOpen ? 'lg' : 'sm'}
                 playable={isPlayable}
                 selected={selectedId === card.instanceId}

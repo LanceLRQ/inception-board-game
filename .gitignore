@@ -141,8 +141,6 @@ vite.config.ts.timestamp-*
 # project
 .worktree
 plans
-# ADR-042: 卡图由 assets:sync 脚本从 plans/assets/ 生成，不 commit（版权 + 体积）；manifest.json 可 commit
-game/packages/client/public/cards/**/*.webp
 CLAUDE.local.md
 .claude
 .opencode
