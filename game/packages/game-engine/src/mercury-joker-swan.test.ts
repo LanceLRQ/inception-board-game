@@ -130,6 +130,140 @@ describe('playJokerGamble move', () => {
     const r = callMove(s, 'playJokerGamble', []);
     expect(r).toBe('INVALID_MOVE');
   });
+
+  it('小丑 → forcedDiscardArmedAtTurn 记录当前 turnNumber', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'draw',
+      currentPlayerID: 'p1',
+      turnNumber: 3,
+      players: { ...s.players, p1: { ...s.players.p1!, characterId: 'thief_joker' as CardID } },
+      deck: { ...s.deck, cards: ['action_unlock' as CardID, 'action_shoot' as CardID] },
+    };
+    const r = callMove(s, 'playJokerGamble', [], { rolls: [2] });
+    expectMoveOk(r);
+    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBe(3);
+  });
+});
+
+describe('小丑罚则 · 下回合 discard 强制全弃', () => {
+  it('同回合 discard（armed===turnNumber）→ 不强制，允许部分弃', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'discard',
+      currentPlayerID: 'p1',
+      turnNumber: 5,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: ['action_unlock' as CardID, 'action_shoot' as CardID],
+          forcedDiscardArmedAtTurn: 5, // 同回合设防
+        },
+      },
+    };
+    const r = callMove(s, 'doDiscard', [['action_unlock' as CardID]]);
+    expectMoveOk(r);
+    // 未过期 → armed 保留
+    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBe(5);
+  });
+
+  it('下回合 discard + 仅弃部分 → INVALID_MOVE', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'discard',
+      currentPlayerID: 'p1',
+      turnNumber: 6,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: ['action_unlock' as CardID, 'action_shoot' as CardID, 'action_shift' as CardID],
+          forcedDiscardArmedAtTurn: 5, // 上回合设防
+        },
+      },
+    };
+    const r = callMove(s, 'doDiscard', [['action_unlock' as CardID]]);
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('下回合 discard + 弃全部 → 成功 + armed 清除', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'discard',
+      currentPlayerID: 'p1',
+      turnNumber: 6,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: ['action_unlock' as CardID, 'action_shoot' as CardID],
+          forcedDiscardArmedAtTurn: 5,
+        },
+      },
+    };
+    const r = callMove(s, 'doDiscard', [['action_unlock' as CardID, 'action_shoot' as CardID]]);
+    expectMoveOk(r);
+    expect(r.players.p1!.hand).toEqual([]);
+    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBeNull();
+  });
+
+  it('下回合 skipDiscard 但手牌 > 0 → INVALID_MOVE（不得跳过）', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'discard',
+      currentPlayerID: 'p1',
+      turnNumber: 6,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: ['action_unlock' as CardID],
+          forcedDiscardArmedAtTurn: 5,
+        },
+      },
+    };
+    const r = callMove(s, 'skipDiscard', []);
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('下回合 skipDiscard + 手牌=0 → 允许（已自然满足全弃）', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'discard',
+      currentPlayerID: 'p1',
+      turnNumber: 6,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: [],
+          forcedDiscardArmedAtTurn: 5,
+        },
+      },
+    };
+    const r = callMove(s, 'skipDiscard', []);
+    expectMoveOk(r);
+  });
+
+  it('无 armed（字段 undefined）→ 正常 skipDiscard 不受影响', () => {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'discard',
+      currentPlayerID: 'p1',
+      turnNumber: 6,
+      players: { ...s.players, p1: { ...s.players.p1!, hand: ['action_unlock' as CardID] } },
+    };
+    const r = callMove(s, 'skipDiscard', []);
+    expectMoveOk(r);
+  });
 });
 
 describe('playBlackSwanTour move', () => {

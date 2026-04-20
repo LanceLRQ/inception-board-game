@@ -179,6 +179,12 @@ export interface PlayerSetup {
   skillUsedThisTurn: Record<string, number>;
   skillUsedThisGame: Record<string, number>;
   successfulUnlocksThisTurn: number;
+  /**
+   * 小丑·赌博：下一次本玩家回合 discard 阶段强制清空手牌。
+   * 记录设防时的 turnNumber；discard 检查时若 `armedAtTurn < G.turnNumber` 则触发后清空标记。
+   * 这样保证本回合 discard 不会误触发（本回合 armed===turnNumber，不满足 <）。
+   */
+  forcedDiscardArmedAtTurn?: number | null;
 }
 
 export interface LayerSetup {

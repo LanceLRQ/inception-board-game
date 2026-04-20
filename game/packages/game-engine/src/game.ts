@@ -356,6 +356,18 @@ export const InceptionCityGame = {
             const roll = random.D6();
             const count = jokerDrawCount(roll);
             let s = drawCards(G, G.currentPlayerID, count);
+            // 罚则：下回合本玩家 discard 阶段强制全弃
+            // 记录当前 turnNumber 作为"设防时刻"，discard 检查时仅在 turnNumber 前进后触发
+            s = {
+              ...s,
+              players: {
+                ...s.players,
+                [G.currentPlayerID]: {
+                  ...s.players[G.currentPlayerID]!,
+                  forcedDiscardArmedAtTurn: G.turnNumber,
+                },
+              },
+            };
             s = setTurnPhase(s, 'action');
             // 进入行动阶段 → 触发 onActionPhase passive
             s = dispatchPassives(s, 'onActionPhase').state;
@@ -1728,7 +1740,29 @@ export const InceptionCityGame = {
         doDiscard: {
           move: ({ G, ctx, events }: MoveCtx, cardIds: CardID[]) => {
             if (!guardTurnPhase(G, ctx, 'discard')) return INVALID_MOVE;
-            const next = discardToLimit(G, ctx.currentPlayer, cardIds);
+            const player = G.players[ctx.currentPlayer];
+            // 小丑·赌博罚则：armed 且已过"下个回合"（armedAtTurn < turnNumber）→ 强制传入 = 全手牌
+            const forced =
+              player &&
+              typeof player.forcedDiscardArmedAtTurn === 'number' &&
+              player.forcedDiscardArmedAtTurn < G.turnNumber;
+            if (forced) {
+              // 必须一次性弃掉全部手牌，否则拒绝
+              if (cardIds.length !== player!.hand.length) return INVALID_MOVE;
+            }
+            let next = discardToLimit(G, ctx.currentPlayer, cardIds);
+            if (forced) {
+              next = {
+                ...next,
+                players: {
+                  ...next.players,
+                  [ctx.currentPlayer]: {
+                    ...next.players[ctx.currentPlayer]!,
+                    forcedDiscardArmedAtTurn: null,
+                  },
+                },
+              };
+            }
             // 弃牌完成 → 切下一回合
             events.endTurn();
             return next;
@@ -1741,6 +1775,15 @@ export const InceptionCityGame = {
             // 手牌未超限则允许跳过
             const player = G.players[ctx.currentPlayer];
             if (player && player.hand.length > 5) return INVALID_MOVE;
+            // 小丑·赌博罚则：armed 已过期且手牌 > 0 → 不得跳过（必须走 doDiscard 全弃）
+            if (
+              player &&
+              typeof player.forcedDiscardArmedAtTurn === 'number' &&
+              player.forcedDiscardArmedAtTurn < G.turnNumber &&
+              player.hand.length > 0
+            ) {
+              return INVALID_MOVE;
+            }
             events.endTurn();
             return G;
           },
