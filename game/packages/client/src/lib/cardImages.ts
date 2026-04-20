@@ -51,6 +51,12 @@ function buildImageMap(): ReadonlyMap<string, ImageEntry> {
 
 const IMAGE_MAP = buildImageMap();
 
+/** 通用角色背面图（未揭示身份时展示） */
+export const GENERIC_BACK_IMAGES = {
+  thief: PUBLIC_PREFIX + encodeURI('thief/盗梦都市_角色牌_盗梦者_背面.webp'),
+  master: PUBLIC_PREFIX + encodeURI('dream-master/盗梦都市_角色牌_梦主_背面.webp'),
+} as const;
+
 /**
  * 通过 cardId 查询卡图的可访问 URL。
  * @param cardId 数据库 ID（如 thief_space_queen / action_shoot）

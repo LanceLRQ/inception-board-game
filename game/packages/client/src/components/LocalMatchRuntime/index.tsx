@@ -9,7 +9,7 @@ import type { LocalMatchWorker } from '../../workers/localMatch.worker';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
-import { getCardImageUrl } from '../../lib/cardImages';
+import { getCardImageUrl, GENERIC_BACK_IMAGES } from '../../lib/cardImages';
 import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import { CardDetailModal } from '../CardDetailModal';
@@ -61,16 +61,21 @@ function CharacterSummary({ characterId }: { characterId: string }) {
   );
 }
 
-/** 其他玩家列表行内的角色小缩略图（仅在 characterId 已揭示时显示） */
-function PlayerMiniAvatar({ characterId }: { characterId: string }) {
-  const imgUrl = getCardImageUrl(characterId);
-  if (!imgUrl) return null;
+/** 其他玩家列表行内的角色小缩略图。
+ *  - characterId 已揭示 → 显示角色图
+ *  - characterId 被过滤（空字符串）→ 用阵营对应的通用"背面"图
+ *    （梦主用梦主背，盗梦者用盗梦者背，让玩家至少能看到阵营轮廓）
+ */
+function PlayerMiniAvatar({ characterId, isMaster }: { characterId: string; isMaster: boolean }) {
+  const revealedUrl = getCardImageUrl(characterId);
+  const imgUrl = revealedUrl ?? (isMaster ? GENERIC_BACK_IMAGES.master : GENERIC_BACK_IMAGES.thief);
   const summary = getCharacterSkillSummary(characterId);
+  const label = summary?.name ?? (isMaster ? '梦主（未揭示）' : '盗梦者（未揭示）');
   return (
     <img
       src={imgUrl}
-      alt={summary?.name ?? characterId}
-      title={summary?.name ?? characterId}
+      alt={label}
+      title={label}
       loading="lazy"
       className="h-10 w-[28px] flex-shrink-0 rounded-sm object-cover"
       onError={(e) => {
@@ -1185,6 +1190,8 @@ export function LocalMatchRuntime({
         <div className="space-y-2">
           {Object.entries(players).map(([id, p]) => {
             const cid = typeof p.characterId === 'string' ? p.characterId : '';
+            const isMaster = id === dreamMasterID;
+            // 任何玩家都值得一个头像占位：已揭示用真实图，未揭示用阵营对应背面图
             return (
               <div
                 key={id}
@@ -1194,17 +1201,16 @@ export function LocalMatchRuntime({
                   id === '0' && 'ring-1 ring-primary/30',
                 )}
               >
-                {cid && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewCard(cid)}
-                    className="flex-shrink-0 transition-transform hover:scale-110"
-                    aria-label={`查看 ${cid}`}
-                    data-testid={`player-avatar-${id}`}
-                  >
-                    <PlayerMiniAvatar characterId={cid} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => cid && setPreviewCard(cid)}
+                  className="flex-shrink-0 transition-transform hover:scale-110 disabled:cursor-default"
+                  aria-label={`查看 ${cid || '未揭示角色'}`}
+                  data-testid={`player-avatar-${id}`}
+                  disabled={!cid}
+                >
+                  <PlayerMiniAvatar characterId={cid} isMaster={isMaster} />
+                </button>
                 <span className="font-medium">{id === '0' ? t('localMatch.you') : `AI ${id}`}</span>
                 <span className="text-xs text-muted-foreground">{String(p.faction)}</span>
                 <span className="text-xs text-muted-foreground">L{String(p.currentLayer)}</span>

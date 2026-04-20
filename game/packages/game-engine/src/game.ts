@@ -229,6 +229,11 @@ export const InceptionCityGame = {
                   ...nextPlayers[pid]!,
                   faction: 'master' as Faction,
                   characterId: masterChar,
+                  // 梦主的世界观效果对所有玩家公开可见（世界观全局触发规则），
+                  // 因此梦主 characterId 对所有玩家公开；盗梦者继续保持 isRevealed=false
+                  // 直到被翻面或贿赂揭示。
+                  // 对照：docs/manual/06-dream-master.md 各梦主"世界观"条目
+                  isRevealed: true,
                 };
               } else {
                 const ch = shuffledThieves[thiefCursor % shuffledThieves.length]!;
