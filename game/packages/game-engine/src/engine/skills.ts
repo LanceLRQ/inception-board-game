@@ -1909,3 +1909,94 @@ export function canUseSaturnFreeMoveThisTurn(state: SetupState, playerID: string
   if (!p) return false;
   return canUseSkill(p, SATURN_FREE_MOVE_SKILL_ID, 'ownTurnOncePerTurn');
 }
+
+// === 天王星·苍穹世界观 ===
+// 盗梦者因行动牌效果改变梦境层数 → 牌库顶弃 1 张
+// 梦主贿赂派发完毕 → 改弃 2 张
+// 复活离开迷失层不属于行动牌效果 → 不弃
+// 对照：cards-data.json dm_uranus_firmament 世界观
+
+/** 天王星·苍穹世界观激活 */
+export function isUranusFirmamentWorldActive(state: SetupState): boolean {
+  return getMasterCharacterID(state) === 'dm_uranus_firmament';
+}
+
+/** 行动牌触发的层数变更 → 梦主弃牌堆弃 1（或 2） */
+export function applyUranusFirmamentMoveDiscard(state: SetupState, playerID: string): SetupState {
+  if (!isUranusFirmamentWorldActive(state)) return state;
+  const p = state.players[playerID];
+  if (!p || p.faction !== 'thief') return state;
+  // 梦主未派发贿赂为 0 → 弃 2，否则弃 1
+  const inPool = state.bribePool.filter((b) => b.status === 'inPool').length;
+  const discardCount = inPool === 0 ? 2 : 1;
+  const n = Math.min(discardCount, state.deck.cards.length);
+  if (n === 0) return state;
+  const dropped = state.deck.cards.slice(0, n);
+  return {
+    ...state,
+    deck: {
+      ...state.deck,
+      cards: state.deck.cards.slice(n),
+      discardPile: [...state.deck.discardPile, ...dropped],
+    },
+  };
+}
+
+// === 火星·战场世界观 ===
+// 玩家自己回合出牌阶段：弃 2 张非 SHOOT 类牌 → 弃牌堆取任意 1 张 SHOOT 类入手
+// 对照：cards-data.json dm_mars_battlefield 世界观
+
+export const MARS_BATTLEFIELD_WORLD_SKILL_ID = 'dm_mars_battlefield.world.skill';
+
+/** 火星·战场世界观激活 */
+export function isMarsBattlefieldWorldActive(state: SetupState): boolean {
+  return getMasterCharacterID(state) === 'dm_mars_battlefield';
+}
+
+/** 火星·战场世界观：弃 2 非 SHOOT 换 1 SHOOT */
+export function applyMarsBattlefieldExchange(
+  state: SetupState,
+  playerID: string,
+  discardCardIds: [CardID, CardID],
+  targetShootCardId: CardID,
+): SetupState | null {
+  if (!isMarsBattlefieldWorldActive(state)) return null;
+  const p = state.players[playerID];
+  if (!p || !p.isAlive) return null;
+  // 两张要弃的牌必须在手牌里且都不是 SHOOT 类
+  const [c1, c2] = discardCardIds;
+  if (c1 === c2) {
+    // 同名两张：手牌至少需要 2 张同名
+    if (p.hand.filter((c) => c === c1).length < 2) return null;
+  } else {
+    if (!p.hand.includes(c1) || !p.hand.includes(c2)) return null;
+  }
+  if (isShootClassCard(c1) || isShootClassCard(c2)) return null;
+  // 目标 SHOOT 必须是 SHOOT 类且在弃牌堆
+  if (!isShootClassCard(targetShootCardId)) return null;
+  const targetIdx = state.deck.discardPile.indexOf(targetShootCardId);
+  if (targetIdx === -1) return null;
+
+  // 从手牌移除 c1, c2
+  const newHand = [...p.hand];
+  const i1 = newHand.indexOf(c1);
+  newHand.splice(i1, 1);
+  const i2 = newHand.indexOf(c2);
+  newHand.splice(i2, 1);
+  // 加入 SHOOT
+  newHand.push(targetShootCardId);
+
+  // 更新弃牌堆：移除目标 SHOOT，追加两张弃牌
+  const newDiscard = [...state.deck.discardPile];
+  newDiscard.splice(targetIdx, 1);
+  newDiscard.push(c1, c2);
+
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerID]: { ...p, hand: newHand },
+    },
+    deck: { ...state.deck, discardPile: newDiscard },
+  };
+}

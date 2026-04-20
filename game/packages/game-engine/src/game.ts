@@ -80,6 +80,8 @@ import {
   isPlutoHellWorldActive,
   applyPlutoHellLostCheck,
   applySaturnFreeMove,
+  applyUranusFirmamentMoveDiscard,
+  applyMarsBattlefieldExchange,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction, Layer } from '@icgame/shared';
@@ -719,6 +721,8 @@ export const InceptionCityGame = {
             s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
             // 降世神通·顺流：移到更大数字层时抽 2 张
             s = applyHlninoFlow(s, ctx.currentPlayer, fromLayer, targetLayer);
+            // 天王星·苍穹世界观：盗梦者因行动牌移动 → 牌库顶弃 1（贿赂派完弃 2）
+            s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
             return incrementMoveCounter(s);
           },
           client: false,
@@ -738,8 +742,14 @@ export const InceptionCityGame = {
             let s = discardCard(G, ctx.currentPlayer, cardId);
             const selfLayer = self.currentLayer;
             const targetLayer = target.currentLayer;
+            const sameLayer = selfLayer === targetLayer;
             s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
             s = movePlayerToLayer(s, targetPlayerID, selfLayer);
+            // 天王星·苍穹世界观：每位因行动牌改变层数的盗梦者各触发一次（同层 KICK 不算改变）
+            if (!sameLayer) {
+              s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
+              s = applyUranusFirmamentMoveDiscard(s, targetPlayerID);
+            }
             return incrementMoveCounter(s);
           },
           client: false,
@@ -757,7 +767,12 @@ export const InceptionCityGame = {
             if (!self.hand.includes(cardId)) return INVALID_MOVE;
 
             let s = discardCard(G, ctx.currentPlayer, cardId);
+            const moved = target.currentLayer !== self.currentLayer;
             s = movePlayerToLayer(s, targetPlayerID, self.currentLayer);
+            // 天王星·苍穹世界观：仅在 target 层数实际改变时弃
+            if (moved) {
+              s = applyUranusFirmamentMoveDiscard(s, targetPlayerID);
+            }
             return incrementMoveCounter(s);
           },
           client: false,
@@ -964,6 +979,28 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const result = applySaturnFreeMove(G, ctx.currentPlayer, targetLayer as Layer);
+            if (result === null) return INVALID_MOVE;
+            return incrementMoveCounter(result);
+          },
+          client: false,
+        },
+
+        // 火星·战场世界观（W16-D）：弃 2 非 SHOOT → 弃牌堆取 1 SHOOT 入手
+        // 对照：cards-data.json dm_mars_battlefield 世界观
+        useMarsBattlefield: {
+          move: (
+            { G, ctx }: MoveCtx,
+            discardCard1: CardID,
+            discardCard2: CardID,
+            targetShootCardId: CardID,
+          ) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const result = applyMarsBattlefieldExchange(
+              G,
+              ctx.currentPlayer,
+              [discardCard1, discardCard2],
+              targetShootCardId,
+            );
             if (result === null) return INVALID_MOVE;
             return incrementMoveCounter(result);
           },
