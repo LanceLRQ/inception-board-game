@@ -20,6 +20,11 @@ import {
   shouldJupiterThunderKill,
   applyPlutoHellLostCheck,
   isPlutoHellWorldActive,
+  applyFortressDiceModifier,
+  applyExtractorBounty,
+  applyInterpreterForeshadow,
+  isHarborWorldActive,
+  isMarsBattlefieldWorldActive,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -508,5 +513,124 @@ describe('W19-A · 达尔文·进化 + 木星 SHOOT', () => {
     });
     expectMoveOk(r);
     expect(r.players.p1!.isAlive).toBe(false);
+  });
+});
+
+// ============================================================================
+// R30 · W19-A 交互矩阵扩充（第三批）
+// 聚焦子集：世界观激活守卫 / 骰子修饰器 / 解封后被动抽牌 / 港口海啸边界
+// ============================================================================
+describe('W19-A · 世界观激活守卫（R30）', () => {
+  it('isHarborWorldActive：dm_harbor → true / 其他 → false', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    expect(isHarborWorldActive(s)).toBe(true);
+    const s2 = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
+    expect(isHarborWorldActive(s2)).toBe(false);
+  });
+
+  it('isPlutoHellWorldActive：dm_pluto_hell → true / 其他 → false', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    expect(isPlutoHellWorldActive(s)).toBe(true);
+    const s2 = setMasterCharacter(scenarioStartOfGame3p(), 'dm_neptune_ocean');
+    expect(isPlutoHellWorldActive(s2)).toBe(false);
+  });
+
+  it('isMarsBattlefieldWorldActive：dm_mars_battlefield → true / 其他 → false', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    expect(isMarsBattlefieldWorldActive(s)).toBe(true);
+    const s2 = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    expect(isMarsBattlefieldWorldActive(s2)).toBe(false);
+  });
+});
+
+describe('W19-A · 要塞骰子修饰器 clamp（R30）', () => {
+  it('applyFortressDiceModifier：roll=6 → 5（-1）', () => {
+    expect(applyFortressDiceModifier(6)).toBe(5);
+  });
+
+  it('applyFortressDiceModifier：roll=1 → 1（下限守卫）', () => {
+    expect(applyFortressDiceModifier(1)).toBe(1);
+  });
+
+  it('applyFortressDiceModifier：roll=0（非法）→ 1（下限守卫）', () => {
+    expect(applyFortressDiceModifier(0)).toBe(1);
+  });
+});
+
+describe('W19-A · 港口·海啸骰值矩阵（R30）', () => {
+  it('roll=6 → 盗梦者幸免（不杀）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    // 2 名盗梦者 p1 / p2
+    s = applyHarborTsunami(s, [6, 6]);
+    expect(s.players.p1!.isAlive).toBe(true);
+    expect(s.players.p2!.isAlive).toBe(true);
+  });
+
+  it('roll=1..5 → 死亡入迷失层', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    s = applyHarborTsunami(s, [3, 5]);
+    expect(s.players.p1!.isAlive).toBe(false);
+    expect(s.players.p2!.isAlive).toBe(false);
+    expect(s.players.p1!.currentLayer).toBe(0);
+    expect(s.players.p2!.currentLayer).toBe(0);
+  });
+
+  it('混合骰：一人幸免一人死', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    s = applyHarborTsunami(s, [6, 2]);
+    expect(s.players.p1!.isAlive).toBe(true);
+    expect(s.players.p2!.isAlive).toBe(false);
+  });
+
+  it('非 dm_harbor 梦主 → 海啸不生效（守卫）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
+    const before = { p1Alive: s.players.p1!.isAlive, p2Alive: s.players.p2!.isAlive };
+    s = applyHarborTsunami(s, [1, 1]);
+    expect(s.players.p1!.isAlive).toBe(before.p1Alive);
+    expect(s.players.p2!.isAlive).toBe(before.p2Alive);
+  });
+});
+
+describe('W19-A · 解封后被动抽牌（R30）', () => {
+  it('译梦师·先知：applyInterpreterForeshadow 抽 2', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_dream_interpreter');
+    s = setHand(s, 'p1', []);
+    s = { ...s, deck: { cards: Array(10).fill('action_unlock') as CardID[], discardPile: [] } };
+    const r = applyInterpreterForeshadow(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(2);
+  });
+
+  it('译梦师·先知：非译梦师角色 → 不生效', () => {
+    let s = scenarioStartOfGame3p();
+    s = setHand(s, 'p1', []);
+    s = { ...s, deck: { cards: Array(10).fill('action_unlock') as CardID[], discardPile: [] } };
+    const r = applyInterpreterForeshadow(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(0);
+  });
+
+  it('梦境猎手·满载：applyExtractorBounty 抽=当层心锁', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_extractor');
+    s = setHand(s, 'p1', []);
+    s = { ...s, deck: { cards: Array(10).fill('action_unlock') as CardID[], discardPile: [] } };
+    const hl = s.layers[s.players.p1!.currentLayer]!.heartLockValue;
+    const r = applyExtractorBounty(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(hl);
+  });
+
+  it('梦境猎手·满载：当层心锁=0 → 不抽', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_extractor');
+    s = setHand(s, 'p1', []);
+    const lyr = s.players.p1!.currentLayer;
+    // 强行设心锁为 0
+    s = {
+      ...s,
+      layers: { ...s.layers, [lyr]: { ...s.layers[lyr]!, heartLockValue: 0 } },
+    };
+    s = { ...s, deck: { cards: Array(10).fill('action_unlock') as CardID[], discardPile: [] } };
+    const r = applyExtractorBounty(s, 'p1');
+    expect(r.players.p1!.hand.length).toBe(0);
   });
 });
