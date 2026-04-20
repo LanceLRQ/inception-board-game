@@ -25,6 +25,10 @@ import {
   applyInterpreterForeshadow,
   isHarborWorldActive,
   isMarsBattlefieldWorldActive,
+  libraValidateSplit,
+  libraResolvePick,
+  canSaturnFreeMove,
+  canMarsKill,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -632,5 +636,122 @@ describe('W19-A · 解封后被动抽牌（R30）', () => {
     s = { ...s, deck: { cards: Array(10).fill('action_unlock') as CardID[], discardPile: [] } };
     const r = applyExtractorBounty(s, 'p1');
     expect(r.players.p1!.hand.length).toBe(0);
+  });
+});
+
+// ============================================================================
+// R31 · W19-A 交互矩阵扩充（第四批）
+// 聚焦子集：天秤分堆仲裁 / 土星领地免费移动守卫 / 火星杀戮守卫
+// ============================================================================
+describe('W19-A · 天秤·平衡分堆仲裁（R31）', () => {
+  it('libraValidateSplit：合法分堆（multiset 一致）', () => {
+    const hand = ['action_unlock', 'action_shoot', 'action_shift'] as CardID[];
+    const p1 = ['action_unlock'] as CardID[];
+    const p2 = ['action_shoot', 'action_shift'] as CardID[];
+    expect(libraValidateSplit(hand, p1, p2)).toBe(true);
+  });
+
+  it('libraValidateSplit：总数不符 → false', () => {
+    const hand = ['action_unlock', 'action_shoot'] as CardID[];
+    const p1 = ['action_unlock'] as CardID[];
+    const p2 = ['action_shoot', 'action_shift'] as CardID[];
+    expect(libraValidateSplit(hand, p1, p2)).toBe(false);
+  });
+
+  it('libraValidateSplit：牌型错配（伪造新牌）→ false', () => {
+    const hand = ['action_unlock', 'action_shoot'] as CardID[];
+    const p1 = ['action_unlock'] as CardID[];
+    const p2 = ['action_shift'] as CardID[];
+    expect(libraValidateSplit(hand, p1, p2)).toBe(false);
+  });
+
+  it('libraValidateSplit：空手牌两空堆 → true', () => {
+    expect(libraValidateSplit([] as CardID[], [] as CardID[], [] as CardID[])).toBe(true);
+  });
+
+  it('libraResolvePick：self 选 pile1 → selfGets=pile1 / targetGets=pile2', () => {
+    const split = {
+      pile1: ['action_unlock'] as CardID[],
+      pile2: ['action_shoot', 'action_shift'] as CardID[],
+    };
+    const r = libraResolvePick(split, 'pile1');
+    expect(r.selfGets).toEqual(['action_unlock']);
+    expect(r.targetGets).toEqual(['action_shoot', 'action_shift']);
+  });
+
+  it('libraResolvePick：self 选 pile2 → selfGets=pile2 / targetGets=pile1', () => {
+    const split = {
+      pile1: ['action_unlock'] as CardID[],
+      pile2: ['action_shoot'] as CardID[],
+    };
+    const r = libraResolvePick(split, 'pile2');
+    expect(r.selfGets).toEqual(['action_shoot']);
+    expect(r.targetGets).toEqual(['action_unlock']);
+  });
+});
+
+describe('W19-A · 土星领地免费移动守卫（R31）', () => {
+  it('非 dm_saturn_territory 梦主 → false', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    expect(canSaturnFreeMove(s, 'p1')).toBe(false);
+  });
+
+  it('土星梦主 + 盗梦者无贿赂 → false', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 0 } },
+    };
+    expect(canSaturnFreeMove(s, 'p1')).toBe(false);
+  });
+
+  it('土星梦主 + 盗梦者持贿赂 → true', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } },
+    };
+    expect(canSaturnFreeMove(s, 'p1')).toBe(true);
+  });
+
+  it('土星梦主 + 死亡盗梦者 → false（守卫）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, bribeReceived: 1, isAlive: false },
+      },
+    };
+    expect(canSaturnFreeMove(s, 'p1')).toBe(false);
+  });
+});
+
+describe('W19-A · 火星·战场杀戮守卫（R31）', () => {
+  it('非 dm_mars_battlefield 梦主 → false', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    expect(canMarsKill(s, findMasterID(s)!)).toBe(false);
+  });
+
+  it('火星梦主 + 手牌无解封 → false', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, findMasterID(s)!, ['action_shoot' as CardID]);
+    expect(canMarsKill(s, findMasterID(s)!)).toBe(false);
+  });
+
+  it('火星梦主 + 手牌有解封 → true', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, findMasterID(s)!, ['action_unlock' as CardID]);
+    expect(canMarsKill(s, findMasterID(s)!)).toBe(true);
+  });
+
+  it('火星梦主 + 混合手牌含解封 → true', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
+    s = setHand(s, findMasterID(s)!, [
+      'action_shoot' as CardID,
+      'action_unlock' as CardID,
+      'action_shift' as CardID,
+    ]);
+    expect(canMarsKill(s, findMasterID(s)!)).toBe(true);
   });
 });
