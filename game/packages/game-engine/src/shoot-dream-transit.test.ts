@@ -81,6 +81,8 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     pendingResponseWindow: null,
     pendingLibra: null,
     mazeState: null,
+    playedCardsThisTurn: [],
+    lastPlayedCardThisTurn: null,
   };
   base.layers[1]!.playersInLayer = ['0', '1'];
   return { ...base, ...overrides } as SetupState;

@@ -150,6 +150,14 @@ export interface SetupState {
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
+  // 出牌追踪（Phase 3 坑③子系统基础设施）
+  // 本回合内按时序记录每次成功打出的行动牌 cardId（SHOOT 变体也计入）。
+  // 消费方：水星·航路 / 金星·镜界 / 格林射线 等依赖"上一张打出的牌"的能力。
+  // 生命周期：turn.onBegin 清空；每个 playXxx move 成功结算后 push。
+  // 对照：plans/design/02-game-rules-spec.md §2.4 · abilities registry R4 deferred
+  playedCardsThisTurn: CardID[];
+  /** 最近一次打出的行动牌 cardId（便于 O(1) 查询；同 playedCardsThisTurn 末元素） */
+  lastPlayedCardThisTurn: CardID | null;
 }
 
 export interface PlayerSetup {
@@ -325,5 +333,7 @@ export function createInitialState(options: {
     winner: null,
     winReason: null,
     endTurn: null,
+    playedCardsThisTurn: [],
+    lastPlayedCardThisTurn: null,
   };
 }

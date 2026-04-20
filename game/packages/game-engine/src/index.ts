@@ -45,6 +45,7 @@ export {
   setTurnPhase,
   movePlayerToLayer,
   isAdjacentLayer,
+  recordCardPlayed,
 } from './moves.js';
 export { rollDice, resolveShoot } from './dice.js';
 export type { DiceResult, DiceModifier, ShootOutcome } from './dice.js';

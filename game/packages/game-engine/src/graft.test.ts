@@ -153,6 +153,8 @@ describe('嫁接 · 直接调用 move 函数（纯单元）', () => {
       pendingResponseWindow: null,
       pendingLibra: null,
       mazeState: null,
+      playedCardsThisTurn: [],
+      lastPlayedCardThisTurn: null,
     };
 
     // 调用 InceptionCityGame.playing.moves.resolveGraft 的 move 函数

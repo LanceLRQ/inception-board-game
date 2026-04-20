@@ -147,6 +147,8 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     winner: null,
     winReason: null,
     endTurn: null,
+    playedCardsThisTurn: [],
+    lastPlayedCardThisTurn: null,
   };
   return merge(base, overrides);
 }

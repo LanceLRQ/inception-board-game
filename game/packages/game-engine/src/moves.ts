@@ -91,6 +91,9 @@ export function beginTurn(state: SetupState, playerID: string): SetupState {
     turnNumber: state.turnNumber + 1,
     currentPlayerID: playerID,
     unlockThisTurn: 0,
+    // 出牌追踪 · 每回合清零（对照：setup.ts playedCardsThisTurn 注释）
+    playedCardsThisTurn: [],
+    lastPlayedCardThisTurn: null,
     players: {
       ...state.players,
       [playerID]: {
@@ -99,6 +102,21 @@ export function beginTurn(state: SetupState, playerID: string): SetupState {
         successfulUnlocksThisTurn: 0,
       },
     },
+  };
+}
+
+/**
+ * 记录本回合打出一张行动牌 · 追加到 playedCardsThisTurn + 更新 lastPlayedCardThisTurn。
+ * 由所有 playXxx move 在成功结算后调用（不改变其他状态，纯追加日志）。
+ * 对照：plans/design/02-game-rules-spec.md §2.4 水星/金星/格林射线等能力
+ */
+export function recordCardPlayed(state: SetupState, cardId: string): SetupState {
+  // 兼容早期 schema：字段缺失时 fallback 成空数组
+  const prev = Array.isArray(state.playedCardsThisTurn) ? state.playedCardsThisTurn : [];
+  return {
+    ...state,
+    playedCardsThisTurn: [...prev, cardId as SetupState['playedCardsThisTurn'][number]],
+    lastPlayedCardThisTurn: cardId as SetupState['lastPlayedCardThisTurn'],
   };
 }
 

@@ -26,6 +26,7 @@ import {
   incrementMoveCounter,
   applyUnlockSuccess,
   applyUnlockCancel,
+  recordCardPlayed,
 } from './moves.js';
 import { resolveShootCustom } from './dice.js';
 import {
@@ -386,13 +387,14 @@ export const InceptionCityGame = {
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
-            return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
+            const r = applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
               deathFaces: [1],
               moveFaces: [2, 3, 4, 5],
               extraOnMove: null,
               decreeId,
             });
+            return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
           },
           client: false,
         },
@@ -691,8 +693,8 @@ export const InceptionCityGame = {
             const layerState = G.layers[currentLayer];
             if (!layerState || layerState.heartLockValue <= 0) return INVALID_MOVE;
 
-            const s = discardCard(G, ctx.currentPlayer, cardId);
-            return {
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            s = {
               ...s,
               pendingUnlock: {
                 playerID: ctx.currentPlayer,
@@ -700,6 +702,7 @@ export const InceptionCityGame = {
                 cardId,
               },
             };
+            return recordCardPlayed(s, cardId);
           },
           client: false,
         },
@@ -804,7 +807,7 @@ export const InceptionCityGame = {
             s = applyHlninoFlow(s, ctx.currentPlayer, fromLayer, targetLayer);
             // 天王星·苍穹世界观：盗梦者因行动牌移动 → 牌库顶弃 1（贿赂派完弃 2）
             s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
-            return incrementMoveCounter(s);
+            return recordCardPlayed(incrementMoveCounter(s), cardId);
           },
           client: false,
         },
@@ -831,7 +834,7 @@ export const InceptionCityGame = {
               s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
               s = applyUranusFirmamentMoveDiscard(s, targetPlayerID);
             }
-            return incrementMoveCounter(s);
+            return recordCardPlayed(incrementMoveCounter(s), cardId);
           },
           client: false,
         },

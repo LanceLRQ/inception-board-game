@@ -90,6 +90,8 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     pendingResponseWindow: null,
     pendingLibra: null,
     mazeState: null,
+    playedCardsThisTurn: [],
+    lastPlayedCardThisTurn: null,
   };
   return { ...base, ...overrides } as SetupState;
 }
