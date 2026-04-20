@@ -222,7 +222,10 @@ export const InceptionCityGame = {
         },
         // 回合开始时同步 G 的 turn 状态
         onBegin: ({ G, ctx }: { G: SetupState; ctx: BGIOCtx }) => {
-          return beginTurn(G, ctx.currentPlayer);
+          let s = beginTurn(G, ctx.currentPlayer);
+          // abilities registry：触发 onTurnStart passive
+          s = dispatchPassives(s, 'onTurnStart').state;
+          return s;
         },
         // 回合末：还原移形换影快照（对照 docs/manual/04-action-cards.md 移形换影 解析）
         // + 检查筑梦师·迷宫是否到期（mazeState.untilTurnNumber 已被超过）
@@ -236,6 +239,8 @@ export const InceptionCityGame = {
           if (isPlutoHellWorldActive(s)) {
             s = applyPlutoHellLostCheck(s, ctx.currentPlayer);
           }
+          // abilities registry：触发 onTurnEnd passive
+          s = dispatchPassives(s, 'onTurnEnd').state;
           return s;
         },
       },
@@ -266,6 +271,8 @@ export const InceptionCityGame = {
             // 主动技能（小丑/黑天鹅）由 UI 通过 listAvailableActives 展示按钮，显式触发
             s = dispatchPassives(s, 'onDrawPhase').state;
             s = setTurnPhase(s, 'action');
+            // 进入行动阶段 → 触发 onActionPhase passive
+            s = dispatchPassives(s, 'onActionPhase').state;
             return s;
           },
           client: false,
@@ -311,7 +318,10 @@ export const InceptionCityGame = {
               }
               s = { ...s, pendingResonance: null };
             }
-            return setTurnPhase(s, 'discard');
+            s = setTurnPhase(s, 'discard');
+            // 进入弃牌阶段 → 触发 onDiscardPhase passive（空间女王·放置 等）
+            s = dispatchPassives(s, 'onDiscardPhase').state;
+            return s;
           },
           client: false,
         },
@@ -1919,6 +1929,8 @@ function applyShootVariant(
   const decreeCheck = validateDecree(G, ctx.currentPlayer, opts.decreeId);
   if (decreeCheck === 'INVALID') return INVALID_MOVE;
   const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
+  // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
+  const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const baseRoll = random.D6();
 
   // === 角色 SHOOT 修饰链 ===
@@ -1926,7 +1938,7 @@ function applyShootVariant(
   // W13 Tier A: 灵雕师·雕琢（最高优先级，override 不可改）
   // hook 注入: opts.diceModifierHint 用于哈雷·冲击的免费 SHOOT
   let result: 'kill' | 'move' | 'miss';
-  let preState: SetupState = G;
+  let preState: SetupState = preShootState;
 
   // 灵雕师·雕琢：override 模式，直接用 target 手牌数当骰值
   if (shooter.characterId === 'thief_soul_sculptor') {
@@ -1989,6 +2001,8 @@ function applyShootVariant(
       },
     };
     s = movePlayerToLayer(s, targetPlayerID, 0);
+    // abilities registry：击杀后触发 onKilled passive（射手·心锁等待此时机）
+    s = dispatchPassives(s, 'onKilled').state;
   } else if (result === 'move') {
     // on-move 副作用：弃目标特定手牌
     if (opts.extraOnMove) {
@@ -2021,5 +2035,7 @@ function applyShootVariant(
     s = movePlayerToLayer(s, targetPlayerID, nl);
   }
 
+  // abilities registry：SHOOT 结算完成后触发 onAfterShoot passive（处女·完美监听 roll=6）
+  s = dispatchPassives(s, 'onAfterShoot').state;
   return incrementMoveCounter(s);
 }
