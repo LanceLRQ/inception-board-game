@@ -177,6 +177,8 @@ export {
   applyBlackHoleLevy,
   applyBlackSwanTour,
   applyMercuryRouteExtraFailBribe,
+  applyMercuryReverse,
+  MERCURY_REVERSE_SKILL_ID,
   applySpaceQueenObserve,
   applySpaceQueenStashTop,
   SHADE_SKILL_ID,

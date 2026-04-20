@@ -2,8 +2,13 @@
 // 对照：docs/manual/06-dream-master.md 水星·航路 + docs/manual/05-dream-thieves.md 小丑/黑天鹅
 
 import { describe, expect, it } from 'vitest';
-import type { CardID } from '@icgame/shared';
-import { applyMercuryRouteExtraFailBribe, applyVenusDouble } from './engine/skills.js';
+import type { CardID, Layer } from '@icgame/shared';
+import {
+  applyMercuryRouteExtraFailBribe,
+  applyVenusDouble,
+  applyMercuryReverse,
+  MERCURY_REVERSE_SKILL_ID,
+} from './engine/skills.js';
 import { scenarioStartOfGame3p } from './testing/scenarios.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 
@@ -565,5 +570,226 @@ describe('useVenusDouble move', () => {
     };
     const r = callMove(s, 'useVenusDouble', ['not-array'], { currentPlayer: 'pM' });
     expect(r).toBe('INVALID_MOVE');
+  });
+});
+
+// === 水星·逆流（applyMercuryReverse 纯函数 + SHOOT/KICK 集成） ===
+
+describe('applyMercuryReverse 纯函数', () => {
+  function setupMercuryReverse() {
+    let s = scenarioStartOfGame3p();
+    // 梦主设为水星·航路
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        pM: { ...s.players.pM!, characterId: 'dm_mercury_route' as CardID, currentLayer: 1 },
+        // p1 设为贿赂者（faction=master），与梦主同层
+        p1: {
+          ...s.players.p1!,
+          faction: 'master' as const,
+          currentLayer: 1,
+          hand: ['action_shoot' as CardID],
+        },
+      },
+      // 弃牌堆中放入一张 action_shoot（模拟刚 discardCard）
+      deck: { ...s.deck, discardPile: ['action_shoot' as CardID] },
+    };
+    return s;
+  }
+
+  it('满足全部条件 → 牌从弃牌堆移入梦主手牌', () => {
+    const s = setupMercuryReverse();
+    const r = applyMercuryReverse(s, 'p1', 'action_shoot', 'pM');
+    expect(r).not.toBeNull();
+    expect(r!.players.pM!.hand).toContain('action_shoot');
+    expect(r!.deck.discardPile).not.toContain('action_shoot');
+  });
+
+  it('满足条件 → 标记技能使用 1 次', () => {
+    const s = setupMercuryReverse();
+    const r = applyMercuryReverse(s, 'p1', 'action_shoot', 'pM');
+    expect(r!.players.pM!.skillUsedThisTurn[MERCURY_REVERSE_SKILL_ID]).toBe(1);
+  });
+
+  it('非水星梦主 → null', () => {
+    let s = setupMercuryReverse();
+    s = {
+      ...s,
+      players: { ...s.players, pM: { ...s.players.pM!, characterId: 'dm_harbor' as CardID } },
+    };
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
+  });
+
+  it('目标不是梦主 → null', () => {
+    const s = setupMercuryReverse();
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'p2')).toBeNull();
+  });
+
+  it('出牌者不是贿赂者（faction=thief）→ null', () => {
+    let s = setupMercuryReverse();
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, faction: 'thief' as const } } };
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
+  });
+
+  it('不同层 → null', () => {
+    let s = setupMercuryReverse();
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, currentLayer: 2 as Layer } } };
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
+  });
+
+  it('时间风暴 → null', () => {
+    let s = setupMercuryReverse();
+    s = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, hand: ['action_time_storm' as CardID] } },
+      deck: { ...s.deck, discardPile: ['action_time_storm' as CardID] },
+    };
+    expect(applyMercuryReverse(s, 'p1', 'action_time_storm', 'pM')).toBeNull();
+  });
+
+  it('回合限 2 次 → 第 3 次返回 null', () => {
+    let s = setupMercuryReverse();
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        pM: {
+          ...s.players.pM!,
+          skillUsedThisTurn: { [MERCURY_REVERSE_SKILL_ID]: 2 },
+        },
+      },
+    };
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
+  });
+
+  it('梦主已死亡 → null', () => {
+    let s = setupMercuryReverse();
+    s = { ...s, players: { ...s.players, pM: { ...s.players.pM!, isAlive: false } } };
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
+  });
+
+  it('弃牌堆末尾不是该牌 → null', () => {
+    let s = setupMercuryReverse();
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_unlock' as CardID] } };
+    expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
+  });
+});
+
+describe('playShoot 水星·逆流集成', () => {
+  function setupShootScenario() {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'action',
+      currentPlayerID: 'p1',
+      turnNumber: 3,
+      players: {
+        ...s.players,
+        pM: {
+          ...s.players.pM!,
+          characterId: 'dm_mercury_route' as CardID,
+          currentLayer: 1,
+          hand: [],
+        },
+        p1: {
+          ...s.players.p1!,
+          faction: 'master' as const,
+          currentLayer: 1,
+          hand: ['action_shoot' as CardID],
+        },
+      },
+      layers: {
+        ...s.layers,
+        1: { ...s.layers[1]!, playersInLayer: ['p1', 'pM'] },
+      },
+    };
+    return s;
+  }
+
+  it('贿赂者 SHOOT 梦主 → 梦主收牌 + 效果仍结算', () => {
+    const s = setupShootScenario();
+    const r = callMove(s, 'playShoot', ['pM', 'action_shoot'], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    // 梦主获得该牌
+    expect(r.players.pM!.hand).toContain('action_shoot');
+    // 弃牌堆不应包含该牌
+    expect(r.deck.discardPile).not.toContain('action_shoot');
+  });
+
+  it('贿赂者 SHOOT 非梦主 → 正常结算（不触发逆流）', () => {
+    const s = setupShootScenario();
+    // p2 在同层
+    const r = callMove(s, 'playShoot', ['p2', 'action_shoot'], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    // 正常弃牌
+    expect(r.deck.discardPile).toContain('action_shoot');
+    // 梦主没拿到
+    expect(r.players.pM!.hand).not.toContain('action_shoot');
+  });
+
+  it('非贿赂者 SHOOT 梦主 → 正常结算', () => {
+    let s = setupShootScenario();
+    // p1 恢复为 thief 阵营
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, faction: 'thief' as const } } };
+    const r = callMove(s, 'playShoot', ['pM', 'action_shoot'], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.deck.discardPile).toContain('action_shoot');
+  });
+});
+
+describe('playKick 水星·逆流集成', () => {
+  function setupKickScenario() {
+    let s = scenarioStartOfGame3p();
+    s = {
+      ...s,
+      turnPhase: 'action',
+      currentPlayerID: 'p1',
+      turnNumber: 2,
+      players: {
+        ...s.players,
+        pM: {
+          ...s.players.pM!,
+          characterId: 'dm_mercury_route' as CardID,
+          currentLayer: 1,
+          hand: [],
+        },
+        p1: {
+          ...s.players.p1!,
+          faction: 'master' as const,
+          currentLayer: 1,
+          hand: ['action_kick' as CardID],
+        },
+      },
+      layers: {
+        ...s.layers,
+        1: { ...s.layers[1]!, playersInLayer: ['p1', 'pM'] },
+        2: { ...s.layers[2]!, playersInLayer: [] },
+      },
+    };
+    return s;
+  }
+
+  it('贿赂者 KICK 梦主 → 梦主收牌 + 层交换仍发生', () => {
+    const s = setupKickScenario();
+    const r = callMove(s, 'playKick', ['action_kick', 'pM'], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    // 梦主获得该牌
+    expect(r.players.pM!.hand).toContain('action_kick');
+    // 弃牌堆不应包含
+    expect(r.deck.discardPile).not.toContain('action_kick');
+  });
+
+  it('贿赂者 KICK 非梦主 → 正常结算', () => {
+    let s = setupKickScenario();
+    s = {
+      ...s,
+      players: { ...s.players, p2: { ...s.players.p2!, currentLayer: 1 } },
+      layers: { ...s.layers, 1: { ...s.layers[1]!, playersInLayer: ['p1', 'p2', 'pM'] } },
+    };
+    const r = callMove(s, 'playKick', ['action_kick', 'p2'], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.deck.discardPile).toContain('action_kick');
+    expect(r.players.pM!.hand).not.toContain('action_kick');
   });
 });

@@ -2164,3 +2164,64 @@ export function applyVenusDouble(
   };
   return s;
 }
+
+// === 水星·航路 逆流（被动：贿赂者对梦主出牌 → 梦主先收入） ===
+
+export const MERCURY_REVERSE_SKILL_ID = 'dm_mercury_route.skill_1';
+
+/**
+ * 水星·航路 逆流技能：同层贿赂者对梦主出牌时，梦主先收入手牌再结算。
+ * 限制：回合限 2 次；不能获取时间风暴。
+ * 触发时机：onCardPlayedAgainstMaster
+ * 对照：cards-data.json dm_mercury_route 逆流
+ */
+export function applyMercuryReverse(
+  state: SetupState,
+  cardPlayerID: string,
+  cardId: CardID,
+  targetPlayerID: string,
+): SetupState | null {
+  const masterID = state.dreamMasterID;
+  if (targetPlayerID !== masterID) return null;
+
+  const master = state.players[masterID];
+  if (!master || !master.isAlive) return null;
+  if (master.characterId !== 'dm_mercury_route') return null;
+
+  // 出牌者不是梦主自己
+  if (cardPlayerID === masterID) return null;
+
+  const cardPlayer = state.players[cardPlayerID];
+  if (!cardPlayer || !cardPlayer.isAlive) return null;
+
+  // 出牌者是贿赂者（faction 已转为 master 但不是梦主本人）
+  if (cardPlayer.faction !== 'master') return null;
+
+  // 同层
+  if (cardPlayer.currentLayer !== master.currentLayer) return null;
+
+  // 不能获取时间风暴
+  if (cardId === 'action_time_storm') return null;
+
+  // 回合限 2 次
+  const usedCount = master.skillUsedThisTurn[MERCURY_REVERSE_SKILL_ID] ?? 0;
+  if (usedCount >= 2) return null;
+
+  // 从弃牌堆末尾取出该牌（刚被 discardCard 放入），加入梦主手牌
+  const dp = state.deck.discardPile;
+  const lastIdx = dp.length - 1;
+  if (lastIdx < 0 || dp[lastIdx] !== cardId) return null;
+
+  return markSkillUsed(
+    {
+      ...state,
+      deck: { ...state.deck, discardPile: dp.slice(0, lastIdx) },
+      players: {
+        ...state.players,
+        [masterID]: { ...master, hand: [...master.hand, cardId] },
+      },
+    },
+    masterID,
+    MERCURY_REVERSE_SKILL_ID,
+  );
+}

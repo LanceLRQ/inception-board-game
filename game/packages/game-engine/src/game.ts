@@ -87,6 +87,7 @@ import {
   applyMercuryRouteExtraFailBribe,
   applyBlackSwanTour,
   applyVenusDouble,
+  applyMercuryReverse,
   jokerDrawCount,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
@@ -877,6 +878,8 @@ export const InceptionCityGame = {
             if (!self.hand.includes(cardId)) return INVALID_MOVE;
 
             let s = discardCard(G, ctx.currentPlayer, cardId);
+            // 水星·逆流：贿赂者对梦主出牌 → 梦主先收入
+            s = applyMercuryReverse(s, ctx.currentPlayer, cardId, targetPlayerID) ?? s;
             const selfLayer = self.currentLayer;
             const targetLayer = target.currentLayer;
             const sameLayer = selfLayer === targetLayer;
@@ -2163,6 +2166,8 @@ function applyShootVariant(
   }
 
   let s = discardCard(preState, ctx.currentPlayer, cardId);
+  // 水星·逆流：贿赂者对梦主出牌 → 梦主先收入
+  s = applyMercuryReverse(s, ctx.currentPlayer, cardId, targetPlayerID) ?? s;
 
   if (result === 'kill') {
     const tp = s.players[targetPlayerID]!;
