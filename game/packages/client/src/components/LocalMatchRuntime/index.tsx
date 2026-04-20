@@ -576,6 +576,16 @@ export function LocalMatchRuntime({
           bribePoolAvailable: Array.isArray(G?.bribePool)
             ? (G.bribePool as Array<Record<string, unknown>>).some((b) => b.status === 'inPool')
             : false,
+          sameLayerPlayerIds: players
+            ? Object.entries(players)
+                .filter(
+                  ([pid, p]) =>
+                    pid !== '0' &&
+                    !!p.isAlive &&
+                    (p.currentLayer as number) === ((humanPlayer?.currentLayer as number) ?? 1),
+                )
+                .map(([pid]) => pid)
+            : [],
         };
         // 主动技能目标列表：其他存活玩家
         const targetIds = players

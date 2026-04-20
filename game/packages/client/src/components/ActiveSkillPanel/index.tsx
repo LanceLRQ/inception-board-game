@@ -55,6 +55,11 @@ export function ActiveSkillPanel({
     selected: string[];
     phase: 'cards' | 'target';
   } | null>(null);
+  // layerShiftPicks: 同层玩家每人 +1/-1（盖亚·大地）
+  const [pendingLayerShiftSkill, setPendingLayerShiftSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    picks: Record<string, -1 | 1>;
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -67,7 +72,8 @@ export function ActiveSkillPanel({
     !pendingPlayerLayerSkill &&
     !pendingPlayerCardSkill &&
     !pendingMultiCardSkill &&
-    !pendingMultiCardPlayerSkill
+    !pendingMultiCardPlayerSkill &&
+    !pendingLayerShiftSkill
   )
     return null;
 
@@ -110,6 +116,10 @@ export function ActiveSkillPanel({
     }
     if (skill.argKind === 'multiCardAndPlayer') {
       setPendingMultiCardPlayerSkill({ skill, selected: [], phase: 'cards' });
+      return;
+    }
+    if (skill.argKind === 'layerShiftPicks') {
+      setPendingLayerShiftSkill({ skill, picks: {} });
       return;
     }
   };
@@ -156,6 +166,27 @@ export function ActiveSkillPanel({
     if (!pendingMultiCardPlayerSkill) return;
     onInvoke(pendingMultiCardPlayerSkill.skill, [pendingMultiCardPlayerSkill.selected, targetId]);
     setPendingMultiCardPlayerSkill(null);
+  };
+
+  const setLayerShiftPick = (pid: string, dir: -1 | 1) => {
+    setPendingLayerShiftSkill((prev) => {
+      if (!prev) return prev;
+      const cur = prev.picks[pid];
+      const nextPicks = { ...prev.picks };
+      if (cur === dir) {
+        // 再点同方向取消（不包含在 picks 中即表示不移动该玩家）
+        delete nextPicks[pid];
+      } else {
+        nextPicks[pid] = dir;
+      }
+      return { ...prev, picks: nextPicks };
+    });
+  };
+
+  const confirmLayerShift = () => {
+    if (!pendingLayerShiftSkill) return;
+    onInvoke(pendingLayerShiftSkill.skill, [pendingLayerShiftSkill.picks]);
+    setPendingLayerShiftSkill(null);
   };
 
   const confirmPlayerCard = (cardId: string) => {
@@ -218,7 +249,8 @@ export function ActiveSkillPanel({
         !pendingPlayerLayerSkill &&
         !pendingPlayerCardSkill &&
         !pendingMultiCardSkill &&
-        !pendingMultiCardPlayerSkill && (
+        !pendingMultiCardPlayerSkill &&
+        !pendingLayerShiftSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -476,6 +508,77 @@ export function ActiveSkillPanel({
               onClick={() => setPendingMultiCardPlayerSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-mcp"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingLayerShiftSkill && (
+        <div className="space-y-2" data-testid="active-skill-layer-shift-picker">
+          <div className="text-xs text-muted-foreground">
+            {t('skill.chooseLayerShift', {
+              defaultValue: '为同层玩家选择 +1/-1 层（可留空）：',
+            })}
+            <span className="ml-1 text-foreground">
+              {t(pendingLayerShiftSkill.skill.nameKey, {
+                defaultValue: pendingLayerShiftSkill.skill.id,
+              })}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {(context.sameLayerPlayerIds ?? []).map((pid) => {
+              const cur = pendingLayerShiftSkill.picks[pid];
+              return (
+                <div key={pid} className="flex items-center gap-2 text-xs">
+                  <span className="min-w-[3rem] text-muted-foreground">
+                    {playerNicknames[pid] ?? pid}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLayerShiftPick(pid, -1)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs hover:border-primary',
+                      cur === -1
+                        ? 'border-primary bg-primary/20 text-primary'
+                        : 'border-border bg-muted',
+                    )}
+                    data-testid={`active-skill-ls-${pid}-down`}
+                  >
+                    -1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLayerShiftPick(pid, 1)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs hover:border-primary',
+                      cur === 1
+                        ? 'border-primary bg-primary/20 text-primary'
+                        : 'border-border bg-muted',
+                    )}
+                    data-testid={`active-skill-ls-${pid}-up`}
+                  >
+                    +1
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={confirmLayerShift}
+              className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/80"
+              data-testid="active-skill-confirm-ls"
+            >
+              {t('common.confirm', { defaultValue: '确认' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingLayerShiftSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-ls"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>

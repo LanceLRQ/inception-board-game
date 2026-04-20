@@ -6,6 +6,7 @@ import {
   ARCHITECT_MAZE,
   ATHENA_AWE,
   CHEMIST_REFINE,
+  GAIA_SHIFT,
   GEMINI_SYNC,
   getAvailableActiveSkills,
   HALEY_IMPACT,
@@ -559,5 +560,58 @@ describe('getAvailableActiveSkills · R17 雅典娜·惊叹', () => {
 
   it('argKind = multiCardAndPlayer', () => {
     expect(ATHENA_AWE.argKind).toBe('multiCardAndPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · R18 盖亚·大地', () => {
+  it('盖亚 + 同层有其他玩家 + 未用完 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gaia',
+        sameLayerPlayerIds: ['1', '2'],
+        skillUsedThisTurn: {},
+      }),
+    );
+    expect(list).toContain(GAIA_SHIFT);
+  });
+
+  it('盖亚 + 同层无其他玩家 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_gaia', sameLayerPlayerIds: [] }),
+    );
+    expect(list).not.toContain(GAIA_SHIFT);
+  });
+
+  it('盖亚 + 已用 2 次 → 不含（回合限 2）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gaia',
+        sameLayerPlayerIds: ['1'],
+        skillUsedThisTurn: { 'thief_gaia.skill_0': 2 },
+      }),
+    );
+    expect(list).not.toContain(GAIA_SHIFT);
+  });
+
+  it('盖亚 + 已用 1 次 → 含（还能再触发 1 次）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gaia',
+        sameLayerPlayerIds: ['1'],
+        skillUsedThisTurn: { 'thief_gaia.skill_0': 1 },
+      }),
+    );
+    expect(list).toContain(GAIA_SHIFT);
+  });
+
+  it('非盖亚角色 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_shade', sameLayerPlayerIds: ['1'] }),
+    );
+    expect(list).not.toContain(GAIA_SHIFT);
+  });
+
+  it('argKind = layerShiftPicks', () => {
+    expect(GAIA_SHIFT.argKind).toBe('layerShiftPicks');
   });
 });

@@ -20,7 +20,8 @@ export type ActiveSkillArgKind =
   | 'playerAndLayer'
   | 'playerAndCard'
   | 'multiCard'
-  | 'multiCardAndPlayer';
+  | 'multiCardAndPlayer'
+  | 'layerShiftPicks';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -54,6 +55,8 @@ export interface ActiveSkillContext {
   readonly successfulUnlocksThisTurn?: number;
   /** 贿赂池是否仍有可派发项（梦主派贿赂前提） */
   readonly bribePoolAvailable?: boolean;
+  /** 与人类玩家同层的其他存活玩家 id 列表（盖亚·大地用） */
+  readonly sameLayerPlayerIds?: readonly string[];
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -300,6 +303,23 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
+// R18：盖亚·大地 —— 使同层其他玩家各自 +1 / -1 层（限 2 次/回合）
+// 对照：docs/manual/05-dream-thieves.md 盖亚 + engine/game.ts playGaiaShift
+export const GAIA_SHIFT: ActiveSkillDescriptor = {
+  id: 'thief_gaia.skill_0',
+  characterId: 'thief_gaia',
+  move: 'playGaiaShift',
+  nameKey: 'skill.thief_gaia.skill_0.name',
+  descKey: 'skill.thief_gaia.skill_0.desc',
+  argKind: 'layerShiftPicks',
+  extraCheck: (ctx) => {
+    // 回合限 2 次 + 同层必须有其他存活玩家可选
+    const used = ctx.skillUsedThisTurn['thief_gaia.skill_0'] ?? 0;
+    const sameLayerCount = ctx.sameLayerPlayerIds?.length ?? 0;
+    return used < 2 && sameLayerCount > 0;
+  },
+};
+
 const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   SHADE_FOLLOW,
   APOLLO_WORSHIP,
@@ -323,6 +343,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   MASTER_DEAL_BRIBE,
   LUNA_ECLIPSE,
   ATHENA_AWE,
+  GAIA_SHIFT,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */
