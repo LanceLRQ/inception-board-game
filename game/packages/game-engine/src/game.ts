@@ -35,6 +35,9 @@ import {
   applyTouristAssist,
   applyLeoKingdom,
   isCapricornusRhythmActive,
+  applyChemistRefine,
+  applyLordOfWarBlackMarket,
+  applyPaprikSalvation,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -952,6 +955,51 @@ export const InceptionCityGame = {
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = drawCards(s, ctx.currentPlayer, 2);
             return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
+        // 药剂师·调剂：弃 1 手牌 → 弃牌堆梦境穿梭剂入手
+        // 对照：docs/manual/05-dream-thieves.md 药剂师
+        playChemistRefine: {
+          move: ({ G, ctx }: MoveCtx, discardCardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const next = applyChemistRefine(G, ctx.currentPlayer, discardCardId);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
+        // 战争之王·黑市：弃 2 手牌 → 弃牌堆任 1 张入手
+        // 对照：docs/manual/05-dream-thieves.md 战争之王
+        playLordOfWarBlackMarket: {
+          move: ({ G, ctx }: MoveCtx, discardIds: CardID[], pickFromDiscard: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (!Array.isArray(discardIds)) return INVALID_MOVE;
+            const next = applyLordOfWarBlackMarket(
+              G,
+              ctx.currentPlayer,
+              discardIds,
+              pickFromDiscard,
+            );
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
+        // 灵魂牧师·拯救：弃 1 手牌 → 复活迷失层玩家到自己层 + 取其手牌
+        // 对照：docs/manual/05-dream-thieves.md 灵魂牧师
+        playPaprikSalvation: {
+          move: ({ G, ctx }: MoveCtx, discardCardId: CardID, targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const next = applyPaprikSalvation(G, ctx.currentPlayer, discardCardId, targetID);
+            if (next === null) return INVALID_MOVE;
+            return next;
           },
           client: false,
         },

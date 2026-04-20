@@ -128,6 +128,14 @@ export {
   canUseTouristAssist,
   applyLeoKingdom,
   isCapricornusRhythmActive,
+  applyChemistRefine,
+  applyLordOfWarBlackMarket,
+  applyPaprikSalvation,
+  applySudgerVerdict,
+  applyScorpiusPoison,
+  applyTaurusHorn,
+  libraValidateSplit,
+  libraResolvePick,
   POINTMAN_SKILL_ID,
   INTERPRETER_SKILL_ID,
   FORTRESS_SKILL_ID,
@@ -135,6 +143,13 @@ export {
   TOURIST_SKILL_ID,
   LEO_SKILL_ID,
   CAPRICORNUS_SKILL_ID,
+  CHEMIST_SKILL_ID,
+  LORD_OF_WAR_SKILL_ID,
+  PAPRIK_SKILL_ID,
+  SUDGER_SKILL_ID,
+  SCORPIUS_SKILL_ID,
+  TAURUS_SKILL_ID,
+  LIBRA_SKILL_ID,
 } from './engine/skills.js';
 
 // 测试 fixtures（B12）

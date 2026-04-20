@@ -188,6 +188,234 @@ export function isCapricornusRhythmActive(player: PlayerSetup): boolean {
   return player.hand.length >= player.currentLayer;
 }
 
+// ============================================================================
+// W12 中复杂度角色（7 个）
+// ============================================================================
+// Tier A（弃牌取牌类）：药剂师 / 战争之王 / 灵魂牧师 → 完整 skills + move 接入
+// Tier B（SHOOT 修饰类）：意念判官 / 天蝎 / 金牛 → skills 纯函数（move 接入待批次）
+// Tier C（多阶段交互）：天秤 → skills 纯函数（pending 状态机待批次）
+
+// === 药剂师 · 调剂 ===
+// 对照：docs/manual/05-dream-thieves.md 药剂师
+// 出牌阶段：弃 1 张手牌 → 弃牌堆中拿 1 张【梦境穿梭剂】到手牌。回合限 2 次。
+
+export const CHEMIST_SKILL_ID = 'thief_chemist.skill_0';
+const CHEMIST_LIMIT_PER_TURN = 2;
+
+/** 药剂师技能 */
+export function applyChemistRefine(
+  state: SetupState,
+  selfID: string,
+  discardCardId: CardID,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_chemist') return null;
+  if (!player.isAlive) return null;
+  if (!canUseSkill(player, CHEMIST_SKILL_ID, 'ownTurnLimitN', CHEMIST_LIMIT_PER_TURN)) return null;
+
+  // 弃牌必须在手中
+  const handIdx = player.hand.indexOf(discardCardId);
+  if (handIdx === -1) return null;
+
+  // 弃牌堆必须含 action_dream_transit
+  const transitIdx = state.deck.discardPile.lastIndexOf('action_dream_transit' as CardID);
+  if (transitIdx === -1) return null;
+
+  let s = markSkillUsed(state, selfID, CHEMIST_SKILL_ID);
+  // 移除手牌 + 加入弃牌堆
+  const newHand = [...player.hand];
+  newHand.splice(handIdx, 1);
+  // 取出梦境穿梭剂
+  const newDiscard = [...s.deck.discardPile];
+  newDiscard.splice(transitIdx, 1);
+  // 加入手牌
+  newHand.push('action_dream_transit' as CardID);
+  s = {
+    ...s,
+    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: newHand } },
+    deck: { ...s.deck, discardPile: [...newDiscard, discardCardId] },
+  };
+  return s;
+}
+
+// === 战争之王 · 黑市 ===
+// 对照：docs/manual/05-dream-thieves.md 战争之王
+// 出牌阶段：弃 2 张手牌 → 弃牌堆任意 1 张到手牌。回合限 1 次。
+
+export const LORD_OF_WAR_SKILL_ID = 'thief_lord_of_war.skill_0';
+
+/** 战争之王技能 */
+export function applyLordOfWarBlackMarket(
+  state: SetupState,
+  selfID: string,
+  discardIds: readonly CardID[],
+  pickFromDiscard: CardID,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_lord_of_war') return null;
+  if (!player.isAlive) return null;
+  if (!canUseSkill(player, LORD_OF_WAR_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  if (discardIds.length !== 2) return null;
+
+  // 两张弃牌必须都在手中（允许重复，但需要两个独立 index）
+  const newHand = [...player.hand];
+  for (const cid of discardIds) {
+    const idx = newHand.indexOf(cid);
+    if (idx === -1) return null;
+    newHand.splice(idx, 1);
+  }
+
+  // 弃牌堆必须含 pickFromDiscard
+  const pickIdx = state.deck.discardPile.lastIndexOf(pickFromDiscard);
+  if (pickIdx === -1) return null;
+
+  let s = markSkillUsed(state, selfID, LORD_OF_WAR_SKILL_ID);
+  const newDiscard = [...s.deck.discardPile];
+  newDiscard.splice(pickIdx, 1);
+  newHand.push(pickFromDiscard);
+  s = {
+    ...s,
+    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: newHand } },
+    deck: { ...s.deck, discardPile: [...newDiscard, ...discardIds] },
+  };
+  return s;
+}
+
+// === 灵魂牧师 · 拯救 ===
+// 对照：docs/manual/05-dream-thieves.md 灵魂牧师
+// 出牌阶段：弃 1 手牌 → 复活迷失层（layer 0）一名玩家到自己所在层 + 取该玩家所有手牌。回合限 2 次。
+
+export const PAPRIK_SKILL_ID = 'thief_paprik.skill_0';
+const PAPRIK_LIMIT_PER_TURN = 2;
+
+/** 灵魂牧师技能 */
+export function applyPaprikSalvation(
+  state: SetupState,
+  selfID: string,
+  discardCardId: CardID,
+  targetID: string,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_paprik') return null;
+  if (!player.isAlive) return null;
+  if (!canUseSkill(player, PAPRIK_SKILL_ID, 'ownTurnLimitN', PAPRIK_LIMIT_PER_TURN)) return null;
+
+  const target = state.players[targetID];
+  if (!target) return null;
+  // target 必须是死亡玩家（layer 0 / isAlive=false）
+  if (target.isAlive) return null;
+  if (selfID === targetID) return null;
+
+  // 弃牌必须在手中
+  const handIdx = player.hand.indexOf(discardCardId);
+  if (handIdx === -1) return null;
+
+  let s = markSkillUsed(state, selfID, PAPRIK_SKILL_ID);
+  // 弃手牌
+  const newHand = [...player.hand];
+  newHand.splice(handIdx, 1);
+  // 复活 target：isAlive=true、deathTurn=null、迁移到 self.currentLayer
+  // target 的所有手牌转给 self（先收手牌，再清 target.hand）
+  const targetHand = [...target.hand];
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [selfID]: { ...s.players[selfID]!, hand: [...newHand, ...targetHand] },
+      [targetID]: {
+        ...s.players[targetID]!,
+        isAlive: true,
+        deathTurn: null,
+        hand: [],
+      },
+    },
+    deck: { ...s.deck, discardPile: [...s.deck.discardPile, discardCardId] },
+  };
+  // 移动 target 到 self 所在层
+  s = movePlayerToLayer(s, targetID, player.currentLayer);
+  return s;
+}
+
+// === 意念判官 · 定罪（双骰择其一）===
+// 对照：docs/manual/05-dream-thieves.md 意念判官
+// 使用 SHOOT 时，target 改为掷 2 颗骰，由 self 选 1 颗作为结果。
+//
+// engine 纯函数：传入双骰 + 选择，返回最终骰值
+
+export const SUDGER_SKILL_ID = 'thief_sudger_of_mind.skill_0';
+
+/** 意念判官：从 2 个骰值中按选择返回 */
+export function applySudgerVerdict(rollA: number, rollB: number, pick: 'A' | 'B'): number {
+  return pick === 'A' ? rollA : rollB;
+}
+
+// === 天蝎 · 毒针（双骰差值）===
+// 对照：docs/manual/05-dream-thieves.md 天蝎
+// 使用 SHOOT 时，可让 target 改为掷 2 骰，结果取差值；0 视为 1。回合限 1 次。
+
+export const SCORPIUS_SKILL_ID = 'thief_scorpius.skill_0';
+
+/** 天蝎：双骰差值（绝对值，0 视为 1） */
+export function applyScorpiusPoison(rollA: number, rollB: number): number {
+  const diff = Math.abs(rollA - rollB);
+  return diff === 0 ? 1 : diff;
+}
+
+// === 金牛 · 号角（对掷比大小）===
+// 对照：docs/manual/05-dream-thieves.md 金牛
+// 使用 SHOOT 时，target 掷骰后 self 可掷 1 骰；若 self > target 则击杀 target，否则按原 SHOOT 效果结算。
+//
+// engine 纯函数：返回 'kill' 表示击杀，'normal' 表示按原效果结算
+
+export const TAURUS_SKILL_ID = 'thief_taurus.skill_0';
+
+export type TaurusOutcome = 'kill' | 'normal';
+
+/** 金牛：对掷判定 */
+export function applyTaurusHorn(targetRoll: number, selfRoll: number): TaurusOutcome {
+  return selfRoll > targetRoll ? 'kill' : 'normal';
+}
+
+// === 天秤 · 平衡（手牌分组拣选）===
+// 对照：docs/manual/05-dream-thieves.md 天秤
+// 出牌阶段：将所有手牌给 target → target 分两份 → self 选 1 份取走，余下归还 target。回合限 1 次。
+//
+// engine 纯函数：拆分为 split + pick 两步（move 接入 + pendingLibra 状态机待后续批次）
+
+export const LIBRA_SKILL_ID = 'thief_libra.skill_0';
+
+export interface LibraSplitResult {
+  pile1: CardID[];
+  pile2: CardID[];
+}
+
+/** 天秤 step 1：target 分组（合法性校验） */
+export function libraValidateSplit(
+  totalHand: readonly CardID[],
+  pile1: readonly CardID[],
+  pile2: readonly CardID[],
+): boolean {
+  if (pile1.length + pile2.length !== totalHand.length) return false;
+  // 两份合并后必须等于 totalHand 的多重集（multiset）
+  const expected = [...totalHand].sort();
+  const actual = [...pile1, ...pile2].sort();
+  for (let i = 0; i < expected.length; i++) {
+    if (expected[i] !== actual[i]) return false;
+  }
+  return true;
+}
+
+/** 天秤 step 2：self 选哪份（返回 self 收到的牌 + target 留下的牌） */
+export function libraResolvePick(
+  split: LibraSplitResult,
+  pick: 'pile1' | 'pile2',
+): { selfGets: CardID[]; targetGets: CardID[] } {
+  if (pick === 'pile1') {
+    return { selfGets: [...split.pile1], targetGets: [...split.pile2] };
+  }
+  return { selfGets: [...split.pile2], targetGets: [...split.pile1] };
+}
+
 // === 译梦师 · 伏笔 ===
 // 对照：docs/manual/05-dream-thieves.md 译梦师
 // 使用【解封】时，从牌库顶抽 2 张牌
