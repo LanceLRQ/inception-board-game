@@ -49,6 +49,11 @@ import {
   applyHaleyImpact,
   applyAthenaAwe,
   HALEY_SKILL_ID,
+  libraValidateSplit,
+  libraResolvePick,
+  isShootClassCard,
+  LIBRA_SKILL_ID,
+  ARCHITECT_SKILL_ID,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import type { CardID, Faction } from '@icgame/shared';
@@ -190,8 +195,13 @@ export const InceptionCityGame = {
           return beginTurn(G, ctx.currentPlayer);
         },
         // 回合末：还原移形换影快照（对照 docs/manual/04-action-cards.md 移形换影 解析）
+        // + 检查筑梦师·迷宫是否到期（mazeState.untilTurnNumber 已被超过）
         onEnd: ({ G }: { G: SetupState; ctx: BGIOCtx }) => {
-          return shiftGuardAndRestore(G);
+          let s = shiftGuardAndRestore(G);
+          if (s.mazeState && G.turnNumber >= s.mazeState.untilTurnNumber) {
+            s = { ...s, mazeState: null };
+          }
+          return s;
         },
       },
       // 所有 move 扁平化（不用 BGIO stages）
@@ -1022,6 +1032,129 @@ export const InceptionCityGame = {
 
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = drawCards(s, ctx.currentPlayer, 2);
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
+        // 天秤·平衡 step 1：bonder 把所有手牌交给 target，进入 pendingLibra
+        // 对照：docs/manual/05-dream-thieves.md 天秤
+        playLibraBalance: {
+          move: ({ G, ctx }: MoveCtx, targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingLibra) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            const target = G.players[targetID];
+            if (!self || !target) return INVALID_MOVE;
+            if (self.characterId !== 'thief_libra') return INVALID_MOVE;
+            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
+            if (targetID === ctx.currentPlayer) return INVALID_MOVE;
+            if (self.hand.length === 0) return INVALID_MOVE;
+            if (!canUseSkill(self, LIBRA_SKILL_ID, 'ownTurnOncePerTurn')) return INVALID_MOVE;
+
+            // 把 bonder 全部手牌转给 target；保留备份在 pendingLibra
+            let s = markSkillUsed(G, ctx.currentPlayer, LIBRA_SKILL_ID);
+            const transferredHand = [...self.hand];
+            s = {
+              ...s,
+              players: {
+                ...s.players,
+                [ctx.currentPlayer]: { ...s.players[ctx.currentPlayer]!, hand: [] },
+                [targetID]: {
+                  ...s.players[targetID]!,
+                  hand: [...s.players[targetID]!.hand, ...transferredHand],
+                },
+              },
+              pendingLibra: {
+                bonderPlayerID: ctx.currentPlayer,
+                targetPlayerID: targetID,
+                split: null,
+              },
+            };
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
+        // 天秤·平衡 step 2：target 提交分组
+        resolveLibraSplit: {
+          move: ({ G, ctx }: MoveCtx, pile1: CardID[], pile2: CardID[]) => {
+            const pl = G.pendingLibra;
+            if (!pl) return INVALID_MOVE;
+            if (pl.split !== null) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pl.targetPlayerID) return INVALID_MOVE;
+            const target = G.players[pl.targetPlayerID];
+            if (!target) return INVALID_MOVE;
+            if (!libraValidateSplit(target.hand, pile1, pile2)) return INVALID_MOVE;
+            return {
+              ...G,
+              pendingLibra: {
+                ...pl,
+                split: { pile1: [...pile1], pile2: [...pile2] },
+              },
+            };
+          },
+          client: false,
+        },
+
+        // 天秤·平衡 step 3：bonder 选哪份；执行后清空 pendingLibra
+        resolveLibraPick: {
+          move: ({ G, ctx }: MoveCtx, pick: 'pile1' | 'pile2') => {
+            const pl = G.pendingLibra;
+            if (!pl || !pl.split) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pl.bonderPlayerID) return INVALID_MOVE;
+            if (pick !== 'pile1' && pick !== 'pile2') return INVALID_MOVE;
+
+            const r = libraResolvePick(pl.split, pick);
+            const bonder = G.players[pl.bonderPlayerID]!;
+            const target = G.players[pl.targetPlayerID]!;
+            return {
+              ...G,
+              players: {
+                ...G.players,
+                [pl.bonderPlayerID]: {
+                  ...bonder,
+                  hand: [...bonder.hand, ...r.selfGets],
+                },
+                [pl.targetPlayerID]: {
+                  ...target,
+                  hand: r.targetGets,
+                },
+              },
+              pendingLibra: null,
+            };
+          },
+          client: false,
+        },
+
+        // 筑梦师·迷宫：弃 1 SHOOT 类牌，标记同层目标"被困"
+        // 对照：docs/manual/05-dream-thieves.md 筑梦师
+        playArchitectMaze: {
+          move: ({ G, ctx }: MoveCtx, discardCardId: CardID, targetID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            const target = G.players[targetID];
+            if (!self || !target) return INVALID_MOVE;
+            if (self.characterId !== 'thief_architect') return INVALID_MOVE;
+            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
+            if (targetID === ctx.currentPlayer) return INVALID_MOVE;
+            if (self.currentLayer !== target.currentLayer) return INVALID_MOVE;
+            if (!isShootClassCard(discardCardId)) return INVALID_MOVE;
+            if (!self.hand.includes(discardCardId)) return INVALID_MOVE;
+            if (!canUseSkill(self, ARCHITECT_SKILL_ID, 'ownTurnOncePerTurn')) return INVALID_MOVE;
+
+            let s = markSkillUsed(G, ctx.currentPlayer, ARCHITECT_SKILL_ID);
+            s = discardCard(s, ctx.currentPlayer, discardCardId);
+            // untilTurnNumber 取 target 的"下个回合 turnNumber"。简化：当前 turnNumber + N（N=玩家数）
+            // 真实场景：迷宫维持到 target 下个回合 turnEnd；MVP 用 (G.turnNumber + playerOrder.length) 估算
+            s = {
+              ...s,
+              mazeState: {
+                mazedPlayerID: targetID,
+                untilTurnNumber: G.turnNumber + G.playerOrder.length,
+              },
+            };
             return incrementMoveCounter(s);
           },
           client: false,

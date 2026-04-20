@@ -79,6 +79,8 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     winReason: null,
     endTurn: null,
     pendingResponseWindow: null,
+    pendingLibra: null,
+    mazeState: null,
   };
   base.layers[1]!.playersInLayer = ['0', '1'];
   return { ...base, ...overrides } as SetupState;

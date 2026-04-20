@@ -3,21 +3,21 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
 // 迁移链：按版本号顺序排列
 const MIGRATIONS: Map<number, Migration> = new Map([
-  // 示例：从 v0 → v1 添加 schemaVersion 字段
-  // [
-  //   1,
-  //   (state) => ({
-  //     ...state,
-  //     schemaVersion: 1,
-  //     moveCounter: (state as any).moveCounter ?? 0,
-  //   }),
-  // ],
+  // v1 → v2：添加 pendingLibra（天秤）+ mazeState（筑梦师·迷宫）字段
+  [
+    2,
+    (state) => ({
+      ...state,
+      pendingLibra: state.pendingLibra ?? null,
+      mazeState: state.mazeState ?? null,
+    }),
+  ],
 ]);
 
 // 将任意 GameState 迁移到当前版本

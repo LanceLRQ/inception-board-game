@@ -21,4 +21,27 @@ describe('migrations', () => {
     expect(state.turnNumber).toBe(5);
     expect(state.moveCounter).toBe(10);
   });
+
+  // v1 → v2：添加 pendingLibra + mazeState
+  it('v1 → v2 应补全 pendingLibra 与 mazeState 字段为 null', () => {
+    const raw = {
+      turnNumber: 3,
+      phase: 'playing',
+      players: { p1: {} },
+      moveCounter: 7,
+      schemaVersion: 1,
+    };
+    const state = migrateGameState(raw);
+    expect(state.schemaVersion).toBe(2);
+    expect(state.pendingLibra).toBeNull();
+    expect(state.mazeState).toBeNull();
+  });
+
+  it('v0 全链路迁移：从空 state 到当前版本', () => {
+    const raw = { turnNumber: 0, phase: 'setup', players: {} };
+    const state = migrateGameState(raw);
+    expect(state.schemaVersion).toBe(getSchemaVersion());
+    expect(state.pendingLibra).toBeNull();
+    expect(state.mazeState).toBeNull();
+  });
 });

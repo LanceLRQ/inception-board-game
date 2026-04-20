@@ -84,6 +84,8 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     winReason: null,
     endTurn: null,
     pendingResponseWindow: null,
+    pendingLibra: null,
+    mazeState: null,
   };
   return { ...base, ...overrides } as SetupState;
 }

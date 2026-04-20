@@ -132,6 +132,21 @@ export interface SetupState {
   // 响应窗口（能力系统）
   // 对照：plans/design/02-game-rules-spec.md §2.4.2
   pendingResponseWindow: import('./engine/abilities/response-chain.js').ResponseWindowState | null;
+  // 天秤·平衡：bonder 把所有手牌交给 target；target 分两份；bonder 选 1 份取走
+  // 对照：docs/manual/05-dream-thieves.md 天秤
+  pendingLibra: {
+    bonderPlayerID: string;
+    targetPlayerID: string;
+    /** target 提交的分组（提交后填入） */
+    split: { pile1: CardID[]; pile2: CardID[] } | null;
+  } | null;
+  // 筑梦师·迷宫：被困玩家在其下回合结束前不受行动牌+技能影响、不能移动
+  // 对照：docs/manual/05-dream-thieves.md 筑梦师
+  mazeState: {
+    mazedPlayerID: string;
+    /** 解除时机：被困者的"下个回合 turnNumber"，到达 turnEnd 后清除 */
+    untilTurnNumber: number;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -305,6 +320,8 @@ export function createInitialState(options: {
     pendingGravity: null,
     shiftSnapshot: null,
     pendingResponseWindow: null,
+    pendingLibra: null,
+    mazeState: null,
     winner: null,
     winReason: null,
     endTurn: null,
