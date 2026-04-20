@@ -7,8 +7,10 @@ import {
   CHEMIST_REFINE,
   GEMINI_SYNC,
   getAvailableActiveSkills,
+  MARS_KILL,
   MARTYR_SACRIFICE,
   PLUTO_BURNING,
+  SATURN_FREE_MOVE,
   SHADE_FOLLOW,
   TOURIST_ASSIST,
   type ActiveSkillContext,
@@ -168,6 +170,31 @@ describe('getAvailableActiveSkills · 筑梦师·迷宫（cardAndPlayer）', () 
 
   it('argKind = cardAndPlayer', () => {
     expect(ARCHITECT_MAZE.argKind).toBe('cardAndPlayer');
+  });
+});
+
+describe('getAvailableActiveSkills · 火星·杀戮（梦主·targetLayer）', () => {
+  it('梦主 + 火星·战场 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_mars_battlefield', faction: 'master' }),
+    );
+    expect(list).toContain(MARS_KILL);
+  });
+
+  it('非梦主 → 不含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'dm_mars_battlefield', faction: 'thief' }),
+    );
+    expect(list).not.toContain(MARS_KILL);
+  });
+
+  it('argKind = targetLayer', () => {
+    expect(MARS_KILL.argKind).toBe('targetLayer');
+  });
+
+  it('SATURN_FREE_MOVE 常量存在但未自动注册（特殊角色无关技能）', () => {
+    expect(SATURN_FREE_MOVE.argKind).toBe('targetLayer');
+    expect(SATURN_FREE_MOVE.move).toBe('useSaturnFreeMove');
   });
 });
 

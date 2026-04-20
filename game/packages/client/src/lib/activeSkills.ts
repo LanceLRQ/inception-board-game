@@ -121,6 +121,25 @@ export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length > 0,
 };
 
+export const SATURN_FREE_MOVE: ActiveSkillDescriptor = {
+  id: 'dm_saturn_territory.wv_free_move',
+  characterId: '__any__', // 任意 thief 角色，只要持贿赂
+  move: 'useSaturnFreeMove',
+  nameKey: 'skill.dm_saturn_territory.free_move.name',
+  descKey: 'skill.dm_saturn_territory.free_move.desc',
+  argKind: 'targetLayer',
+};
+
+export const MARS_KILL: ActiveSkillDescriptor = {
+  id: 'dm_mars_battlefield.skill_0',
+  characterId: 'dm_mars_battlefield',
+  move: 'useMarsKill',
+  nameKey: 'skill.dm_mars_battlefield.skill_0.name',
+  descKey: 'skill.dm_mars_battlefield.skill_0.desc',
+  argKind: 'targetLayer',
+  extraCheck: (ctx) => ctx.faction === 'master',
+};
+
 export const PLUTO_BURNING: ActiveSkillDescriptor = {
   id: 'dm_pluto_hell.skill_0',
   characterId: 'dm_pluto_hell',
@@ -140,6 +159,9 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   GEMINI_SYNC,
   ARCHITECT_MAZE,
   PLUTO_BURNING,
+  MARS_KILL,
+  // SATURN_FREE_MOVE 特殊：角色无关（任意持贿赂 thief 可用），当前架构以 characterId 过滤为主，
+  // 留到后续批次接入"世界观触发"分支。R11 暂只注册常量供外部使用
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */
