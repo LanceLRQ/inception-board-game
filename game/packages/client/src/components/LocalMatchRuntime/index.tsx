@@ -97,6 +97,12 @@ export function LocalMatchRuntime({
   const [error, setError] = useState<string | null>(null);
   // 长按 / 双击预览的卡牌 ID
   const [previewCard, setPreviewCard] = useState<string | null>(null);
+  // 卡图预载进度
+  const [preloadProgress, setPreloadProgress] = useState<{
+    loaded: number;
+    total: number;
+    failed: number;
+  } | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const apiRef = useRef<Comlink.Remote<LocalMatchWorker> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -126,12 +132,15 @@ export function LocalMatchRuntime({
     // 后台预加载所有卡图（不阻塞对局启动）· 浏览器 HTTP cache 接管后续 <img> 秒出
     void preloadAllCardImages({
       onProgress: (loaded, total, failed) => {
+        setPreloadProgress({ loaded, total, failed: failed.length });
         if (loaded === total) {
           logger.flow('game/assets', 'card images preloaded', {
             loaded,
             total,
             failed: failed.length,
           });
+          // 完成 800ms 后清空 state，进度条淡出
+          setTimeout(() => setPreloadProgress(null), 800);
         }
       },
     });
@@ -464,6 +473,37 @@ export function LocalMatchRuntime({
 
   return (
     <div className="min-h-screen bg-background p-4 text-foreground" data-testid="local-runtime">
+      {/* 卡图预载进度条（对局启动时后台拉取；完成后 800ms 淡出） */}
+      {preloadProgress && preloadProgress.total > 0 && (
+        <div
+          className={cn(
+            'mb-3 flex items-center gap-3 rounded-md border border-border bg-card/60 px-3 py-1.5 text-[11px] transition-opacity duration-500',
+            preloadProgress.loaded === preloadProgress.total ? 'opacity-40' : 'opacity-100',
+          )}
+          role="status"
+          aria-live="polite"
+          data-testid="asset-preload-progress"
+        >
+          <span className="text-muted-foreground">
+            {preloadProgress.loaded === preloadProgress.total ? '卡图就绪 ✓' : '卡图加载中'}
+          </span>
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full bg-primary transition-[width] duration-200"
+              style={{
+                width: `${Math.round((preloadProgress.loaded / preloadProgress.total) * 100)}%`,
+              }}
+            />
+          </div>
+          <span className="font-mono text-muted-foreground">
+            {preloadProgress.loaded}/{preloadProgress.total}
+            {preloadProgress.failed > 0 && (
+              <span className="ml-1 text-destructive">· {preloadProgress.failed} 失败</span>
+            )}
+          </span>
+        </div>
+      )}
+
       <div className="mb-4 flex items-center justify-between rounded-lg bg-card px-4 py-2 shadow-sm">
         <div className="text-sm">
           {t('localMatch.turn')} {turnNumber}
