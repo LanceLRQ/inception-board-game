@@ -52,6 +52,10 @@ import {
   applyTouristAssist,
   applyLeoKingdom,
   applyBlackHoleLevy,
+  applyUranusPower,
+  getUranusPowerUsesLeft,
+  applyPlutoBurning,
+  isUranusFirmamentWorldActive,
 } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
@@ -1413,6 +1417,162 @@ describe('W19-A · 黑洞·征收 apply 分支（R35）', () => {
     s = setHand(s, 'p2', ['action_unlock' as CardID]);
     const picks: Record<string, CardID> = { p2: 'action_shoot' as CardID, pM: 'x' as CardID };
     const r = applyBlackHoleLevy(s, 'p1', picks);
+    expect(r).toBeNull();
+  });
+});
+
+// ============================================================================
+// R36 · W19-A 交互矩阵扩充（第九批 · 天王星/冥王星业火梦主技能）
+// ============================================================================
+describe('W19-A · 天王星·权力 apply 分支（R36）', () => {
+  it('非天王星梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    s = withInPoolBribe(s);
+    const r = applyUranusPower(s, findMasterID(s)!, 'p1', 3 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('天王星梦主 + 有 inPool 贿赂 + 合法 target + 新层 → 移动成功', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    // p1 默认 L1 → 送 L3
+    const r = applyUranusPower(s, findMasterID(s)!, 'p1', 3 as Layer);
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.currentLayer).toBe(3);
+  });
+
+  it('天王星 + 目标已在目标层 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    // p1 默认 L1 → 再送 L1 = null
+    const r = applyUranusPower(s, findMasterID(s)!, 'p1', 1 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('天王星 + 送迷失层（0）→ null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    const r = applyUranusPower(s, findMasterID(s)!, 'p1', 0 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('天王星 + bribePool 为空（无 inPool）→ null', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    // bribePool=[] 默认
+    const r = applyUranusPower(s, findMasterID(s)!, 'p1', 3 as Layer);
+    expect(r).toBeNull();
+  });
+
+  it('天王星 + target 为梦主自己 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    const mid = findMasterID(s)!;
+    const r = applyUranusPower(s, mid, mid, 3 as Layer);
+    expect(r).toBeNull();
+  });
+});
+
+describe('W19-A · 天王星·权力剩余次数 + 世界观（R36）', () => {
+  it('getUranusPowerUsesLeft：非天王星梦主 → 0', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    expect(getUranusPowerUsesLeft(s, s.players[findMasterID(s)!]!)).toBe(0);
+  });
+
+  it('getUranusPowerUsesLeft：inPool=1 + 未用 → 1', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    expect(getUranusPowerUsesLeft(s, s.players[findMasterID(s)!]!)).toBe(1);
+  });
+
+  it('getUranusPowerUsesLeft：inPool=1 + 已用 1 次 → 0', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    s = withInPoolBribe(s);
+    const mid = findMasterID(s)!;
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [mid]: {
+          ...s.players[mid]!,
+          skillUsedThisTurn: { 'dm_uranus_firmament.skill_0': 1 },
+        },
+      },
+    };
+    expect(getUranusPowerUsesLeft(s, s.players[mid]!)).toBe(0);
+  });
+
+  it('isUranusFirmamentWorldActive：天王星梦主 → true / 其他 → false', () => {
+    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
+    expect(isUranusFirmamentWorldActive(s)).toBe(true);
+    const s2 = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    expect(isUranusFirmamentWorldActive(s2)).toBe(false);
+  });
+});
+
+describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
+  it('非冥王星梦主 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('冥王星梦主 + 手牌有指定弃牌 + 盗梦者手牌<2 → 抽 2', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    // p1 / p2 手牌各 1 张（<2）
+    s = setHand(s, 'p1', ['action_shoot' as CardID]);
+    s = setHand(s, 'p2', ['action_shift' as CardID]);
+    s = { ...s, deck: { cards: Array(10).fill('action_kick') as CardID[], discardPile: [] } };
+    const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
+    expect(r).not.toBeNull();
+    // 各 +2
+    expect(r!.players.p1!.hand.length).toBe(3);
+    expect(r!.players.p2!.hand.length).toBe(3);
+    // 梦主 -1 弃
+    expect(r!.players[mid]!.hand.length).toBe(0);
+  });
+
+  it('冥王星梦主 + 盗梦者手牌≥2 → 不抽（阈值守卫）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    // p1 已有 2 张 + p2 也是
+    s = setHand(s, 'p1', ['a' as CardID, 'b' as CardID]);
+    s = setHand(s, 'p2', ['c' as CardID, 'd' as CardID]);
+    s = { ...s, deck: { cards: Array(10).fill('action_kick') as CardID[], discardPile: [] } };
+    const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
+    expect(r).not.toBeNull();
+    // 手牌保持 2
+    expect(r!.players.p1!.hand.length).toBe(2);
+    expect(r!.players.p2!.hand.length).toBe(2);
+  });
+
+  it('冥王星梦主 + 手牌无指定弃 → null', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_shoot' as CardID]);
+    const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
+    expect(r).toBeNull();
+  });
+
+  it('冥王星梦主 + 已用过一次 → null（限 1 次/回合）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    const mid = findMasterID(s)!;
+    s = setHand(s, mid, ['action_unlock' as CardID]);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [mid]: {
+          ...s.players[mid]!,
+          skillUsedThisTurn: { 'dm_pluto_hell.skill_0': 1 },
+        },
+      },
+    };
+    const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
     expect(r).toBeNull();
   });
 });
