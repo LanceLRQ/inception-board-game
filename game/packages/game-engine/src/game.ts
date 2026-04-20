@@ -87,6 +87,8 @@ import {
   applyMercuryRouteExtraFailBribe,
   applySudgerVerdict,
   SUDGER_SKILL_ID,
+  applySagittariusHeartLock,
+  SAGITTARIUS_HEART_LOCK_SKILL_ID,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -440,15 +442,20 @@ export const InceptionCityGame = {
             targetPlayerID: string,
             cardId: CardID,
             decreeId?: CardID,
+            preventMove?: boolean,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            // 射手·禁足：仅射手角色可阻止移动
+            const shooter = G.players[ctx.currentPlayer];
+            const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
             const r = applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
               deathFaces: [1],
               moveFaces: [2, 3, 4, 5],
               extraOnMove: null,
               decreeId,
+              preventMove: canPrevent,
             });
             return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
           },
@@ -1354,6 +1361,26 @@ export const InceptionCityGame = {
             const result = applySaturnFreeMove(G, ctx.currentPlayer, targetLayer as Layer);
             if (result === null) return INVALID_MOVE;
             return incrementMoveCounter(result);
+          },
+          client: false,
+        },
+        // 射手·穿心：击杀后修改任意层心锁 ±1（回合限 1 次）
+        // 对照：docs/manual/05-dream-thieves.md 射手
+        useSagittariusHeartLock: {
+          move: ({ G, ctx }: MoveCtx, layer: number, delta: -1 | 1) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const self = G.players[ctx.currentPlayer];
+            if (!self || !self.isAlive) return INVALID_MOVE;
+            if (self.characterId !== 'thief_sagittarius') return INVALID_MOVE;
+            if (!canUseSkill(self, SAGITTARIUS_HEART_LOCK_SKILL_ID, 'ownTurnOncePerTurn'))
+              return INVALID_MOVE;
+            if (!G.layers[layer]) return INVALID_MOVE;
+            // cap = 该层初始心锁数（对照 config）
+            const heartLocksTuple = PLAYER_COUNT_CONFIGS[G.playerOrder.length]?.heartLocks;
+            const cap = heartLocksTuple?.[layer - 1] ?? 3;
+            const result = applySagittariusHeartLock(G, layer, delta, cap);
+            if (result === null) return INVALID_MOVE;
+            return markSkillUsed(result, ctx.currentPlayer, SAGITTARIUS_HEART_LOCK_SKILL_ID);
           },
           client: false,
         },
@@ -2291,6 +2318,8 @@ interface ShootVariantOpts {
   decreeId?: CardID; // 死亡宣言展示（不弃，附加死亡骰面）
   /** 骰值前置修饰 hook（用于哈雷·冲击 -2 等场景；优先级低于灵雕师/天蝎/金牛） */
   dicePreModifier?: (baseRoll: number) => number;
+  /** 射手·禁足：SHOOT 结果为 move 时阻止目标移动 */
+  preventMove?: boolean;
 }
 
 /** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用 + 死亡宣言
@@ -2432,10 +2461,13 @@ function applyShootVariant(
       }
     }
     // 相邻层移动（1<->2, 2<->3, 3<->4；4 向下，1 向上）
-    const cur = target.currentLayer;
-    const dir = cur >= 4 ? -1 : 1;
-    const nl = Math.max(1, Math.min(4, cur + dir));
-    s = movePlayerToLayer(s, targetPlayerID, nl);
+    // 射手·禁足：可令目标不移动
+    if (!opts.preventMove) {
+      const cur = target.currentLayer;
+      const dir = cur >= 4 ? -1 : 1;
+      const nl = Math.max(1, Math.min(4, cur + dir));
+      s = movePlayerToLayer(s, targetPlayerID, nl);
+    }
   }
 
   // abilities registry：SHOOT 结算完成后触发 onAfterShoot passive（处女·完美监听 roll=6）
