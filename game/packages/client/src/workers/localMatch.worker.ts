@@ -20,7 +20,7 @@ const HUMAN_PLAYER_ID = '0';
 // 基于 G.turnPhase 的合法 move 白名单
 // 对照：game-engine/src/game.ts guardTurnPhase
 const MOVES_BY_PHASE: Record<string, string[]> = {
-  draw: ['doDraw', 'skipDraw', 'playJokerGamble', 'playBlackSwanTour'],
+  draw: ['doDraw', 'skipDraw', 'playJokerGamble', 'playBlackSwanTour', 'playBlackHoleLevy'],
   action: [
     'endActionPhase',
     'playShoot',
@@ -66,6 +66,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'resolveLibraPick',
     'playForgerExchangeSingle',
     'useSpaceQueenStashTop',
+    'useBlackHoleAbsorb',
   ],
   discard: ['doDiscard', 'skipDiscard', 'useSpaceQueenStashTop'],
 };
@@ -123,6 +124,8 @@ const MOVE_PRIORITY: Record<string, number> = {
   playLibraBalance: 117, // 天秤入口（盗梦者主动技能，中优先级）
   playForgerExchangeSingle: 118, // 欺诈师入口（同上）
   useSpaceQueenStashTop: 220, // 空间女王·造物（Bot L0 不主动选）
+  playBlackHoleLevy: 222, // 黑洞·吞噬（draw 阶段替代，Bot L0 不主动选）
+  useBlackHoleAbsorb: 119, // 黑洞·吸纳（盗梦者主动技能，中优先级）
   skipDiscard: 1,
   doDiscard: 2,
 };

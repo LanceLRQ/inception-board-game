@@ -1035,6 +1035,46 @@ export function applyBlackHoleLevy(
   return { ...s, players: newPlayers };
 }
 
+// === 黑洞 · 吸纳（出牌阶段，指定相邻层，该层所有玩家移到黑洞所在层） ===
+export const BLACK_HOLE_ABSORB_SKILL_ID = 'thief_black_hole.skill_1';
+
+export function applyBlackHoleAbsorb(
+  state: SetupState,
+  selfID: string,
+  targetLayer: number,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_black_hole') return null;
+  if (!player.isAlive) return null;
+  if (!canUseSkill(player, BLACK_HOLE_ABSORB_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  const selfLayer = player.currentLayer;
+  if (selfLayer <= 0 || selfLayer > 4) return null;
+  // 相邻层检查
+  if (targetLayer !== selfLayer - 1 && targetLayer !== selfLayer + 1) return null;
+  if (targetLayer <= 0 || targetLayer > 4) return null;
+  const targetLayerInfo = state.layers[targetLayer];
+  if (!targetLayerInfo) return null;
+  const migrants = targetLayerInfo.playersInLayer.filter((id) => state.players[id]?.isAlive);
+  if (migrants.length === 0) return null;
+
+  const s = markSkillUsed(state, selfID, BLACK_HOLE_ABSORB_SKILL_ID);
+  const newPlayers = { ...s.players };
+  for (const pid of migrants) {
+    newPlayers[pid] = { ...newPlayers[pid]!, currentLayer: selfLayer };
+  }
+  // 更新层内玩家列表
+  const newLayers = { ...s.layers };
+  newLayers[selfLayer] = {
+    ...newLayers[selfLayer]!,
+    playersInLayer: [...newLayers[selfLayer]!.playersInLayer, ...migrants],
+  };
+  newLayers[targetLayer] = {
+    ...newLayers[targetLayer]!,
+    playersInLayer: newLayers[targetLayer]!.playersInLayer.filter((id) => !migrants.includes(id)),
+  };
+  return { ...s, players: newPlayers, layers: newLayers };
+}
+
 // === 黑天鹅 · 巡演（纯函数） ===
 // 略过抽牌阶段，分发所有手牌（≥1）给任意盗梦者，抽 4 张
 export const BLACK_SWAN_SKILL_ID = 'thief_black_swan.skill_0';

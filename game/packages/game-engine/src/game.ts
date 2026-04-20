@@ -90,6 +90,8 @@ import {
   applySagittariusHeartLock,
   SAGITTARIUS_HEART_LOCK_SKILL_ID,
   applySpaceQueenStashTop,
+  applyBlackHoleLevy,
+  applyBlackHoleAbsorb,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -393,6 +395,32 @@ export const InceptionCityGame = {
             let s = setTurnPhase(applied, 'action');
             s = dispatchPassives(s, 'onActionPhase').state;
             return s;
+          },
+          client: false,
+        },
+
+        // 黑洞·吞噬（抽牌阶段替代 doDraw：同层每个玩家给 1 张手牌）
+        // 对照：docs/manual/05-dream-thieves.md 黑洞
+        playBlackHoleLevy: {
+          move: ({ G, ctx }: MoveCtx, giverPicks: Record<string, CardID>) => {
+            if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
+            const applied = applyBlackHoleLevy(G, G.currentPlayerID, giverPicks);
+            if (applied === null) return INVALID_MOVE;
+            let s = setTurnPhase(applied, 'action');
+            s = dispatchPassives(s, 'onActionPhase').state;
+            return s;
+          },
+          client: false,
+        },
+
+        // 黑洞·吸纳（行动阶段：指定相邻层所有玩家移到黑洞所在层）
+        // 对照：docs/manual/05-dream-thieves.md 黑洞
+        useBlackHoleAbsorb: {
+          move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            const applied = applyBlackHoleAbsorb(G, ctx.currentPlayer, targetLayer);
+            if (applied === null) return INVALID_MOVE;
+            return applied;
           },
           client: false,
         },
