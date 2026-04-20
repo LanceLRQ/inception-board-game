@@ -56,6 +56,9 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'useSaturnFreeMove',
     'useMarsBattlefield',
     'masterDiscardHiddenNightmare',
+    'playLibraBalance',
+    'resolveLibraSplit',
+    'resolveLibraPick',
   ],
   discard: ['doDiscard', 'skipDiscard'],
 };
@@ -101,6 +104,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   masterDiscardHiddenNightmare: 215, // 梦主低优先：Bot L0 默认不主动触发
 
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
+  resolveLibraSplit: 0, // pendingLibra step 2：优先处理
+  resolveLibraPick: 0, // pendingLibra step 3：优先处理
+  playLibraBalance: 117, // 天秤入口（盗梦者主动技能，中优先级）
   skipDiscard: 1,
   doDiscard: 2,
 };
@@ -143,6 +149,14 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
   const pg = state?.G?.pendingGravity;
   if (pg && pg.bonderPlayerID === botPlayerID && legalMoves.includes('resolveGravityPick')) {
     return 'resolveGravityPick';
+  }
+
+  // pendingLibra：engine 已放宽 currentPlayer guard，任一参与方都可代发
+  // 单机简化：优先由 bonder（= 当前 Bot 回合）一次性补完 split + pick
+  const pl = state?.G?.pendingLibra;
+  if (pl && pl.bonderPlayerID === botPlayerID) {
+    if (!pl.split && legalMoves.includes('resolveLibraSplit')) return 'resolveLibraSplit';
+    if (pl.split && legalMoves.includes('resolveLibraPick')) return 'resolveLibraPick';
   }
 
   // discard 阶段：手牌超限必须走 doDiscard；否则 skipDiscard
@@ -189,6 +203,24 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
       const pool = (G?.pendingGravity?.pool as string[]) ?? [];
       return [pool[0]];
     }
+    case 'resolveLibraSplit': {
+      // Bot 代 target：把 target 手牌对半分（偶数放 pile1，奇数放 pile2）
+      const pl = G?.pendingLibra;
+      const targetHand = (G?.players?.[pl?.targetPlayerID]?.hand as string[]) ?? [];
+      const pile1: string[] = [];
+      const pile2: string[] = [];
+      targetHand.forEach((c, i) => (i % 2 === 0 ? pile1 : pile2).push(c));
+      return [pile1, pile2];
+    }
+    case 'resolveLibraPick': {
+      // Bot 代 bonder：比较两堆，选大的一堆；等长选 pile1
+      const pl = G?.pendingLibra;
+      const split = pl?.split;
+      if (!split) return ['pile1'];
+      const p1: string[] = split.pile1 ?? [];
+      const p2: string[] = split.pile2 ?? [];
+      return [p1.length >= p2.length ? 'pile1' : 'pile2'];
+    }
     default:
       return [];
   }
@@ -229,6 +261,37 @@ function autoPlayBots(): void {
       logFlow('setup complete → playing');
       const moves = getMoves(humanClient);
       moves['completeSetup']?.();
+      scheduleNext();
+      return;
+    }
+
+    // pendingLibra 自动补完（单机模式简化：engine 已放宽 currentPlayer guard）：
+    //   无论 bonder 是人类还是 Bot，worker 统一代 target 对半分 + 代 bonder 挑大堆。
+    //   ——保证人类 bonder 触发 playLibraBalance 后不会卡死。
+    //   对照：packages/client/src/workers/localMatch.worker.ts R23
+    const pendingLibra = state.G.pendingLibra as
+      | { bonderPlayerID: string; targetPlayerID: string; split: unknown }
+      | null
+      | undefined;
+    if (pendingLibra) {
+      if (!pendingLibra.split) {
+        const args = defaultArgsFor('resolveLibraSplit', state, pendingLibra.targetPlayerID);
+        logAI('auto resolveLibraSplit', { args });
+        getMoves(humanClient)['resolveLibraSplit']?.(...args);
+        scheduleNext();
+        return;
+      }
+      if (pendingLibra.bonderPlayerID !== HUMAN_PLAYER_ID) {
+        const args = defaultArgsFor('resolveLibraPick', state, pendingLibra.bonderPlayerID);
+        logAI('auto resolveLibraPick (bot bonder)', { args });
+        getMoves(humanClient)['resolveLibraPick']?.(...args);
+        scheduleNext();
+        return;
+      }
+      // bonder 是人类时，pick 也由 worker 自动（单机简化，避免引入 UI pile-picker）
+      const args = defaultArgsFor('resolveLibraPick', state, HUMAN_PLAYER_ID);
+      logAI('auto resolveLibraPick (human bonder, single-player simplification)', { args });
+      getMoves(humanClient)['resolveLibraPick']?.(...args);
       scheduleNext();
       return;
     }

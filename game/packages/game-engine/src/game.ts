@@ -1456,12 +1456,13 @@ export const InceptionCityGame = {
         },
 
         // 天秤·平衡 step 2：target 提交分组
+        // 单机版放宽：不检查 ctx.currentPlayer，允许任一参与方代发（含 worker Bot
+        // 代 target 在 bonder 回合内补完）。split 合法性由 libraValidateSplit 守护。
         resolveLibraSplit: {
-          move: ({ G, ctx }: MoveCtx, pile1: CardID[], pile2: CardID[]) => {
+          move: ({ G }: MoveCtx, pile1: CardID[], pile2: CardID[]) => {
             const pl = G.pendingLibra;
             if (!pl) return INVALID_MOVE;
             if (pl.split !== null) return INVALID_MOVE;
-            if (ctx.currentPlayer !== pl.targetPlayerID) return INVALID_MOVE;
             const target = G.players[pl.targetPlayerID];
             if (!target) return INVALID_MOVE;
             if (!libraValidateSplit(target.hand, pile1, pile2)) return INVALID_MOVE;
@@ -1477,11 +1478,12 @@ export const InceptionCityGame = {
         },
 
         // 天秤·平衡 step 3：bonder 选哪份；执行后清空 pendingLibra
+        // 天秤·平衡 step 3：bonder 选哪堆
+        // 单机版放宽：不检查 ctx.currentPlayer（理由同 step 2）。参与方由 pendingLibra 守护。
         resolveLibraPick: {
-          move: ({ G, ctx }: MoveCtx, pick: 'pile1' | 'pile2') => {
+          move: ({ G }: MoveCtx, pick: 'pile1' | 'pile2') => {
             const pl = G.pendingLibra;
             if (!pl || !pl.split) return INVALID_MOVE;
-            if (ctx.currentPlayer !== pl.bonderPlayerID) return INVALID_MOVE;
             if (pick !== 'pile1' && pick !== 'pile2') return INVALID_MOVE;
 
             const r = libraResolvePick(pl.split, pick);

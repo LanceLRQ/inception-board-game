@@ -11,6 +11,7 @@ import {
   getAvailableActiveSkills,
   HALEY_IMPACT,
   IMPERIAL_DEAL_BRIBE,
+  LIBRA_BALANCE,
   LORD_OF_WAR_BLACK_MARKET,
   LUNA_ECLIPSE,
   MARS_BATTLEFIELD_EXCHANGE,
@@ -793,5 +794,37 @@ describe('getAvailableActiveSkills · R21 火星·战场世界观', () => {
 
   it('argKind = twoCardsAndShoot', () => {
     expect(MARS_BATTLEFIELD_EXCHANGE.argKind).toBe('twoCardsAndShoot');
+  });
+});
+
+describe('getAvailableActiveSkills · R23 天秤·平衡', () => {
+  it('天秤 + 手牌>0 + 未用 → 含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_libra', hand: ['a'] }));
+    expect(list).toContain(LIBRA_BALANCE);
+  });
+
+  it('天秤 + 手牌空 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_libra', hand: [] }));
+    expect(list).not.toContain(LIBRA_BALANCE);
+  });
+
+  it('天秤 + 已用 1 次 → 不含（回合限 1）', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_libra',
+        hand: ['a'],
+        skillUsedThisTurn: { 'thief_libra.skill_0': 1 },
+      }),
+    );
+    expect(list).not.toContain(LIBRA_BALANCE);
+  });
+
+  it('非天秤角色 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_shade', hand: ['a'] }));
+    expect(list).not.toContain(LIBRA_BALANCE);
+  });
+
+  it('argKind = targetPlayer', () => {
+    expect(LIBRA_BALANCE.argKind).toBe('targetPlayer');
   });
 });

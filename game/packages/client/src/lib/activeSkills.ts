@@ -312,6 +312,24 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
+// R23：天秤·平衡 step 1 —— bonder 选 target；后续 split + pick 由 worker 自动补完
+// 对照：docs/manual/05-dream-thieves.md 天秤 + engine/game.ts playLibraBalance
+// 单机模式简化：engine 放宽 ctx.currentPlayer guard，worker 自动代 target 对半分
+// + 代 bonder 挑大堆（包括人类 bonder）；保证流程不卡死。
+export const LIBRA_BALANCE: ActiveSkillDescriptor = {
+  id: 'thief_libra.skill_0',
+  characterId: 'thief_libra',
+  move: 'playLibraBalance',
+  nameKey: 'skill.thief_libra.skill_0.name',
+  descKey: 'skill.thief_libra.skill_0.desc',
+  argKind: 'targetPlayer',
+  extraCheck: (ctx) => {
+    // 回合限 1 次 + 至少 1 张手牌
+    const used = ctx.skillUsedThisTurn['thief_libra.skill_0'] ?? 0;
+    return used < 1 && ctx.hand.length > 0;
+  },
+};
+
 // R21：火星·战场世界观 —— 弃 2 张非 SHOOT 手牌 → 从弃牌堆取 1 张 SHOOT
 // 对照：cards-data.json dm_mars_battlefield 世界观 + engine/game.ts useMarsBattlefield
 // 世界观激活时对所有存活玩家可用，SHOOT 类筛选交由 engine 精校
@@ -401,6 +419,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   LORD_OF_WAR_BLACK_MARKET,
   IMPERIAL_DEAL_BRIBE,
   MARS_BATTLEFIELD_EXCHANGE,
+  LIBRA_BALANCE,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */
