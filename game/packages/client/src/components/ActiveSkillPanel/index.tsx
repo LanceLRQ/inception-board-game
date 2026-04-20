@@ -44,6 +44,11 @@ export function ActiveSkillPanel({
     skill: ActiveSkillDescriptor;
     targetId: string | null;
   } | null>(null);
+  // multiCard: 多选手牌
+  const [pendingMultiCardSkill, setPendingMultiCardSkill] = useState<{
+    skill: ActiveSkillDescriptor;
+    selected: string[];
+  } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
   if (
@@ -54,7 +59,8 @@ export function ActiveSkillPanel({
     !pendingCardPlayerSkill &&
     !pendingLayerSkill &&
     !pendingPlayerLayerSkill &&
-    !pendingPlayerCardSkill
+    !pendingPlayerCardSkill &&
+    !pendingMultiCardSkill
   )
     return null;
 
@@ -91,6 +97,29 @@ export function ActiveSkillPanel({
       setPendingPlayerCardSkill({ skill, targetId: null });
       return;
     }
+    if (skill.argKind === 'multiCard') {
+      setPendingMultiCardSkill({ skill, selected: [] });
+      return;
+    }
+  };
+
+  const toggleMultiCard = (cardId: string) => {
+    setPendingMultiCardSkill((prev) => {
+      if (!prev) return prev;
+      const idx = prev.selected.indexOf(cardId);
+      if (idx >= 0) {
+        const next = [...prev.selected];
+        next.splice(idx, 1);
+        return { ...prev, selected: next };
+      }
+      return { ...prev, selected: [...prev.selected, cardId] };
+    });
+  };
+
+  const confirmMultiCard = () => {
+    if (!pendingMultiCardSkill) return;
+    onInvoke(pendingMultiCardSkill.skill, [pendingMultiCardSkill.selected]);
+    setPendingMultiCardSkill(null);
   };
 
   const confirmPlayerCard = (cardId: string) => {
@@ -151,7 +180,8 @@ export function ActiveSkillPanel({
         !pendingCardPlayerSkill &&
         !pendingLayerSkill &&
         !pendingPlayerLayerSkill &&
-        !pendingPlayerCardSkill && (
+        !pendingPlayerCardSkill &&
+        !pendingMultiCardSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
             {skills.map((skill) => (
               <button
@@ -284,6 +314,58 @@ export function ActiveSkillPanel({
               onClick={() => setPendingCardPlayerSkill(null)}
               className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
               data-testid="active-skill-cancel-cp"
+            >
+              {t('common.cancel', { defaultValue: '取消' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pendingMultiCardSkill && (
+        <div className="space-y-2" data-testid="active-skill-multi-card-picker">
+          <div className="text-xs text-muted-foreground">
+            {t('skill.chooseMultiCards', { defaultValue: '多选手牌：' })}
+            <span className="ml-1 text-foreground">
+              {t(pendingMultiCardSkill.skill.nameKey, {
+                defaultValue: pendingMultiCardSkill.skill.id,
+              })}
+            </span>
+            <span className="ml-2 text-muted-foreground">
+              ({pendingMultiCardSkill.selected.length})
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {context.hand.map((cardId, idx) => {
+              const active = pendingMultiCardSkill.selected.includes(cardId);
+              return (
+                <button
+                  key={`${cardId}-${idx}`}
+                  type="button"
+                  onClick={() => toggleMultiCard(cardId)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs hover:border-primary',
+                    active ? 'border-primary bg-primary/20 text-primary' : 'border-border bg-muted',
+                  )}
+                  data-testid={`active-skill-mc-card-${idx}`}
+                >
+                  {cardId}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={confirmMultiCard}
+              className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/80"
+              data-testid="active-skill-confirm-mc"
+              disabled={pendingMultiCardSkill.selected.length === 0}
+            >
+              {t('common.confirm', { defaultValue: '确认' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingMultiCardSkill(null)}
+              className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+              data-testid="active-skill-cancel-mc"
             >
               {t('common.cancel', { defaultValue: '取消' })}
             </button>

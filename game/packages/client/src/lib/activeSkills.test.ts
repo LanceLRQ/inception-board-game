@@ -247,6 +247,27 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
   });
 });
 
+describe('getAvailableActiveSkills · 达尔文·进化（multiCard）', () => {
+  it('达尔文 + 手牌 → 含', async () => {
+    const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock'] }),
+    );
+    expect(list).toContain(DARWIN_EVOLUTION);
+  });
+
+  it('达尔文 + 手牌空 → 不含', async () => {
+    const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_darwin', hand: [] }));
+    expect(list).not.toContain(DARWIN_EVOLUTION);
+  });
+
+  it('argKind = multiCard', async () => {
+    const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
+    expect(DARWIN_EVOLUTION.argKind).toBe('multiCard');
+  });
+});
+
 describe('getAvailableActiveSkills · 密道·传送（playerAndCard）', () => {
   it('梦主 + 手牌 + 未用满 → 含', async () => {
     const { SECRET_PASSAGE_TELEPORT } = await import('./activeSkills.js');

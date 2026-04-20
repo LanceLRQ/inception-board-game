@@ -18,7 +18,8 @@ export type ActiveSkillArgKind =
   | 'cardAndPlayer'
   | 'targetLayer'
   | 'playerAndLayer'
-  | 'playerAndCard';
+  | 'playerAndCard'
+  | 'multiCard';
 
 export interface ActiveSkillDescriptor {
   readonly id: string;
@@ -169,6 +170,16 @@ export const MASTER_ACTIVATE_NIGHTMARE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master',
 };
 
+export const DARWIN_EVOLUTION: ActiveSkillDescriptor = {
+  id: 'thief_darwin.skill_0',
+  characterId: 'thief_darwin',
+  move: 'playDarwinEvolution',
+  nameKey: 'skill.thief_darwin.skill_0.name',
+  descKey: 'skill.thief_darwin.skill_0.desc',
+  argKind: 'multiCard',
+  extraCheck: (ctx) => ctx.hand.length > 0,
+};
+
 export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
   id: 'thief_architect.skill_0',
   characterId: 'thief_architect',
@@ -247,6 +258,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   MASTER_DISCARD_HIDDEN_NIGHTMARE,
   MASTER_ACTIVATE_NIGHTMARE,
   SECRET_PASSAGE_TELEPORT,
+  DARWIN_EVOLUTION,
 ];
 
 /** 推导当前人类玩家可见的主动技能列表 */
