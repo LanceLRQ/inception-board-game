@@ -250,6 +250,7 @@ export function MasterBoard({ state, onDispatch }: MasterBoardProps) {
           if (cardId) actions.selectCard(cardId);
         }}
         onCardDetail={(cid) => setDetailCard(cid)}
+        intentStep={actions.intent.step}
       />
 
       <CardDetailModal cardId={detailCard} onClose={() => setDetailCard(null)} />

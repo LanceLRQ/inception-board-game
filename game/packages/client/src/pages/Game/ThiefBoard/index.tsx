@@ -238,6 +238,7 @@ export function ThiefBoard({ state, onDispatch }: ThiefBoardProps) {
         playableCardIds={playableByCardId as Set<string>}
         onPlayCard={handleCardClick}
         onCardDetail={(cid) => setDetailCard(cid)}
+        intentStep={actions.intent.step}
       />
 
       {/* === 卡牌详情弹窗 === */}

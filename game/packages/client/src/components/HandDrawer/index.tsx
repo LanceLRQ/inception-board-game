@@ -1,7 +1,7 @@
 // 手牌抽屉 - 上滑展开/选中/两步点击打牌
 // 对照：plans/design/06-frontend-design.md §6.4.3 HandDrawer + §6.4.4 两步点击
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import { cn } from '../../lib/utils.js';
@@ -24,13 +24,27 @@ export interface HandDrawerProps {
   onPlayCard: (step: 'selectCard' | 'selectTarget', cardInstanceId: string) => void;
   /** 查看卡牌详情（长按） */
   onCardDetail?: (cardId: CardID) => void;
+  /** 外部意图步骤：idle/confirm 时清除选中态 */
+  intentStep?: string;
 }
 
-export function HandDrawer({ hand, playableCardIds, onPlayCard, onCardDetail }: HandDrawerProps) {
+export function HandDrawer({
+  hand,
+  playableCardIds,
+  onPlayCard,
+  onCardDetail,
+  intentStep,
+}: HandDrawerProps) {
   const isDrawerOpen = useUIStore((s) => s.isHandDrawerOpen);
   const setDrawerOpen = useUIStore((s) => s.setHandDrawerOpen);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // 外部 intent 回到 idle/confirm 时，选中态视为已清除
+  const activeSelectedId = useMemo(() => {
+    if (intentStep === 'idle' || intentStep === 'confirm') return null;
+    return selectedId;
+  }, [selectedId, intentStep]);
 
   // 手势：上滑展开，下滑收起
   const bind = useDrag(
@@ -48,15 +62,16 @@ export function HandDrawer({ hand, playableCardIds, onPlayCard, onCardDetail }: 
 
   const handleCardClick = useCallback(
     (card: HandCard) => {
-      if (selectedId === card.instanceId) {
-        // 再次点击 → 取消选中
+      if (activeSelectedId === card.instanceId) {
+        // 再次点击同一张 → 取消选中
         setSelectedId(null);
       } else {
+        // 选新牌 → 清除旧选中，只展开这一张的操作面板
         setSelectedId(card.instanceId);
         onPlayCard('selectCard', card.instanceId);
       }
     },
-    [selectedId, onPlayCard],
+    [activeSelectedId, onPlayCard],
   );
 
   // 提取手势事件（过滤与 framer-motion 冲突的属性）
@@ -77,7 +92,7 @@ export function HandDrawer({ hand, playableCardIds, onPlayCard, onCardDetail }: 
       </div>
 
       {/* 阶段提示 */}
-      {selectedId && (
+      {activeSelectedId && (
         <div className="px-4 pb-2 text-center text-sm text-muted-foreground">
           已选牌，点击目标确认打出
         </div>
@@ -100,7 +115,7 @@ export function HandDrawer({ hand, playableCardIds, onPlayCard, onCardDetail }: 
                 imageUrl={getCardImageUrl(card.cardId)}
                 size={isDrawerOpen ? 'lg' : 'sm'}
                 playable={isPlayable}
-                selected={selectedId === card.instanceId}
+                selected={activeSelectedId === card.instanceId}
                 onClick={() => handleCardClick(card)}
                 onLongPress={() => onCardDetail?.(card.cardId)}
                 aria-label={card.cardId}
