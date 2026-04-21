@@ -80,6 +80,12 @@ describe('computeUnlockResponseState', () => {
     expect(r.unlockerID).toBe('1');
     expect(r.layer).toBe(2);
     expect(r.remainingResponders).toBe(3);
+    // W19-B F11 · timeoutMs 从 pendingResponseWindow 透传
+    expect(r.timeoutMs).toBe(30_000);
+  });
+
+  it('W19-B F11 · 不可见状态下 timeoutMs=0（避免污染）', () => {
+    expect(computeUnlockResponseState(null, '0').timeoutMs).toBe(0);
   });
 
   it('无 action_unlock 手牌 → canCancel=false，仍 visible', () => {

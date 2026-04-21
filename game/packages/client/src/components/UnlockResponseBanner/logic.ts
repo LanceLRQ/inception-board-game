@@ -24,6 +24,10 @@ export interface UnlockResponseBannerState {
   canCancel: boolean;
   /** 剩余未响应玩家数（含 viewer 自己）*/
   remainingResponders: number;
+  /** 响应窗口配置的超时毫秒数（从 pendingResponseWindow.timeoutMs 透传）
+   *  W19-B F11：供 banner 侧做本地倒计时 + 到期自动 passResponse 用。
+   *  不参与规则判定，仅用于 UI 体验；未来 server BGIO 实装后由 WindowTimerManager 兜底。 */
+  timeoutMs: number;
 }
 
 const UNLOCK_CARD = 'action_unlock';
@@ -38,6 +42,7 @@ export function computeUnlockResponseState(
     layer: null,
     canCancel: false,
     remainingResponders: 0,
+    timeoutMs: 0,
   };
   if (!G) return empty;
   const prw = G.pendingResponseWindow;
@@ -59,5 +64,6 @@ export function computeUnlockResponseState(
     layer: pendingUnlock?.layer ?? null,
     canCancel,
     remainingResponders,
+    timeoutMs: prw.timeoutMs,
   };
 }
