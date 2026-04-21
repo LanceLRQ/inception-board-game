@@ -15,6 +15,9 @@ import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import { CardDetailModal } from '../CardDetailModal';
 import { CopyrightNotice } from '../CopyrightNotice';
 import { MasterNightmareDecisionBanner } from '../MasterNightmareDecisionBanner';
+import { UnlockResponseBanner } from '../UnlockResponseBanner';
+import { MasterPeekBribeBanner } from '../MasterPeekBribeBanner';
+import { PeekerVaultRevealBanner } from '../PeekerVaultRevealBanner';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
@@ -1320,6 +1323,25 @@ export function LocalMatchRuntime({
         dreamMasterID={dreamMasterID}
         makeMove={makeMove}
       />
+
+      {/* W19-B F4 · 解封响应 banner：其他玩家打解封时人类响应者的抵消/跳过入口 */}
+      <UnlockResponseBanner
+        G={G as never}
+        viewerPlayerID="0"
+        nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
+        makeMove={makeMove}
+      />
+
+      {/* W19-B F9 · 梦境窥视派贿赂决策 banner（梦主端）*/}
+      <MasterPeekBribeBanner
+        G={G as never}
+        viewerPlayerID="0"
+        nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
+        makeMove={makeMove}
+      />
+
+      {/* W19-B F9 · 盗梦者金库查看 banner（peeker 端，私密展示 playerView 授权内容）*/}
+      <PeekerVaultRevealBanner G={G as never} viewerPlayerID="0" makeMove={makeMove} />
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
       <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />
