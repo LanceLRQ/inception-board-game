@@ -181,12 +181,16 @@ function cardToCharacter(faction: 'thief' | 'master') {
 }
 
 function cardToAction(card: RawCard) {
+  // quantity 必须从 cards-data.json 透传，不能硬编码为 1，
+  // 否则 buildInitialDeck 只会造出 21 张行动牌（原版应为 ~144 张），
+  // 导致 deck_exhausted 提前触发 → 游戏第 2-3 回合就被判梦主胜。
+  // 对照：docs/manual/04-action-cards.md + plans/assets/cards-data.json
   return {
     category: 'action' as const,
     id: card.id,
     name: card.name,
     subType: 'shoot_basic' as const,
-    quantity: 1,
+    quantity: card.quantity ?? 1,
     isExpansion: false,
     isRemovedAfterUse: false,
     timing: ['actionPhase' as const],

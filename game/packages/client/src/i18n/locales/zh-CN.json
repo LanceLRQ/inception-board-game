@@ -84,6 +84,7 @@
     "skipDiscard": "跳过弃牌",
     "confirmDiscard": "确认弃牌（{{selected}}/{{required}}）",
     "mustDiscard": "手牌超限，必须弃掉 {{n}} 张",
+    "endActionHandWarn": "本回合结束需弃 {{n}} 张（手牌超出 5 张上限）",
     "confirmPlay": "确认打出「{{card}}」",
     "pickPlayerTarget": "打出「{{card}}」——请选择目标玩家",
     "pickLayerTarget": "打出「{{card}}」——请选择目标层",

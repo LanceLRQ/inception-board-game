@@ -795,6 +795,17 @@ export function LocalMatchRuntime({
               {t('localMatch.draw')}
             </button>
           )}
+          {turnPhase === 'action' && !effectivePending && overHand > 0 && (
+            <div
+              className="w-full rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+              data-testid="action-hand-overflow-warning"
+            >
+              {t('localMatch.endActionHandWarn', {
+                n: overHand,
+                defaultValue: '本回合结束需弃 {{n}} 张（手牌超出 5 张上限）',
+              })}
+            </div>
+          )}
           {turnPhase === 'action' && !effectivePending && (
             <button
               type="button"

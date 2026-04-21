@@ -84,6 +84,7 @@
     "skipDiscard": "Skip Discard",
     "confirmDiscard": "Confirm Discard ({{selected}}/{{required}})",
     "mustDiscard": "Hand limit exceeded, discard {{n}} cards",
+    "endActionHandWarn": "Must discard {{n}} at end of turn (hand over 5-card limit)",
     "confirmPlay": "Confirm playing \"{{card}}\"",
     "pickPlayerTarget": "Play \"{{card}}\" — choose a target player",
     "pickLayerTarget": "Play \"{{card}}\" — choose a target layer",
