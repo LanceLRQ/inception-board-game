@@ -15,7 +15,7 @@
 
 import { INVALID_MOVE } from 'boardgame.io/core';
 import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
-import { PLAYER_COUNT_CONFIGS } from './config.js';
+import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT } from './config.js';
 import {
   drawCards,
   discardCard,
@@ -95,6 +95,8 @@ import {
   applyImperialCityWorldShoot,
   applyRevive,
   applyVenusMirrorWorld,
+  getMidsummerExtraDraws,
+  getMidsummerWorldThiefBonus,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -327,11 +329,16 @@ export const InceptionCityGame = {
             // 对照：cards-data.json dm_pluto_hell 世界观
             const currentPlayer = G.players[G.currentPlayerID];
             const isThief = currentPlayer?.faction === 'thief';
+            const isMaster = currentPlayer?.faction === 'master';
             const plutoOverride = isPlutoHellWorldActive(G) && isThief ? random.D6() : null;
-            let s =
-              plutoOverride !== null
-                ? drawCards(G, G.currentPlayerID, plutoOverride)
-                : drawCards(G, G.currentPlayerID);
+            // 盛夏·充盈：梦主多抽 = 未派发贿赂数
+            // 盛夏·世界观：盗梦者多抽 +1
+            // 对照：docs/manual/06-dream-master.md 盛夏
+            const midsummerMasterBonus = isMaster ? getMidsummerExtraDraws(G) : 0;
+            const midsummerThiefBonus = isThief ? getMidsummerWorldThiefBonus(G) : 0;
+            const totalDraw =
+              (plutoOverride ?? BASE_DRAW_COUNT) + midsummerMasterBonus + midsummerThiefBonus;
+            let s = drawCards(G, G.currentPlayerID, totalDraw);
             const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
             const drawn = afterHand.slice(beforeHand.length);
             // 先锋技能：抽到 action_dream_transit 则额外抽 2 张
