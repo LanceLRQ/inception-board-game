@@ -178,7 +178,13 @@ export function LocalMatchRuntime({
 
   const G = gameState?.G as Record<string, unknown> | undefined;
   const ctx = gameState?.ctx as Record<string, unknown> | undefined;
-  const winner = G?.winner as string | null;
+  // 胜负优先读 BGIO ctx.gameover（engine endIf 返回时由框架写入），再回退 G.winner。
+  // 对照：game-engine/src/game.ts endIf({ winner, reason }) —— endIf 不改 G，
+  // 仅设置 ctx.gameover；UI 原先只看 G.winner 会导致 gameover 后按钮仍可点击
+  // → move 派发 → BGIO 拒绝（ERROR: disallowed move / game over）。
+  const ctxGameover = ctx?.gameover as { winner?: string; reason?: string } | undefined;
+  const winner = (ctxGameover?.winner ?? (G?.winner as string | null)) || null;
+  const winReason = (ctxGameover?.reason ?? (G?.winReason as string | undefined)) || null;
 
   // 胜负一旦产生，打一次 INFO
   useEffect(() => {
@@ -332,6 +338,12 @@ export function LocalMatchRuntime({
 
   const startPlay = useCallback(
     (card: string) => {
+      // 新选一张牌 → 清掉其他 picker / pendingPlay，避免多个操作面板同时展开
+      // 对照：HandDrawer 单选语义 + useGameActions 单一 intent 模型
+      setPendingPlay(null);
+      setDreamTransitPicker(null);
+      setGravityPicker(null);
+
       // SHOOT·梦境穿梭剂：进入 mode 选择
       if (card === 'action_shoot_dream_transit') {
         setDreamTransitPicker(card);
@@ -535,10 +547,10 @@ export function LocalMatchRuntime({
           <h2 className="text-xl font-bold">
             {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')}
           </h2>
-          {typeof G?.winReason === 'string' && G.winReason && (
+          {winReason && (
             <p className="mt-1 text-xs text-muted-foreground" data-testid="win-reason">
-              {t(`localMatch.winReason.${G.winReason as string}`, {
-                defaultValue: G.winReason as string,
+              {t(`localMatch.winReason.${winReason}`, {
+                defaultValue: winReason,
               })}
             </p>
           )}
