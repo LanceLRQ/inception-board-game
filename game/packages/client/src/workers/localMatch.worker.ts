@@ -303,8 +303,11 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
   }
 }
 
-// Worker 内不共享 client 的 logger；改用受控 console.debug 模仿 DEBUG 等级
-// 约定：AI 打点走 console.debug（dev 工具默认显示）
+// Worker 内不共享 client 的 logger；改用受控 console.* 模仿等级
+// 约定：
+//   logFlow → INFO（游戏流程关键点，prod 也显示）
+//   logAI   → DEBUG（bot 决策细节，prod 静默）
+//   logMove → INFO（统一 move dispatch 打点，覆盖 human / bot / 自动代发）
 function logAI(msg: string, ctx?: unknown): void {
   if (ctx !== undefined) console.debug(`[ai/worker] ${msg}`, ctx);
   else console.debug(`[ai/worker] ${msg}`);
@@ -312,6 +315,16 @@ function logAI(msg: string, ctx?: unknown): void {
 function logFlow(msg: string, ctx?: unknown): void {
   if (ctx !== undefined) console.info(`[game/worker] ${msg}`, ctx);
   else console.info(`[game/worker] ${msg}`);
+}
+/**
+ * 统一 move dispatch 打点（INFO 级别）。
+ *   actor 形如 "human(0)" / "bot(2)" / "auto-master(4)" / "auto-peeker(1)"
+ *   move  move 名称
+ *   ctx   { args, source?, ... }
+ */
+function logMove(actor: string, move: string, ctx?: unknown): void {
+  if (ctx !== undefined) console.info(`[game/move] ${actor} → ${move}`, ctx);
+  else console.info(`[game/move] ${actor} → ${move}`);
 }
 
 /** Bot 自动循环：当轮到 Bot 时自动执行 move */
@@ -337,6 +350,7 @@ function autoPlayBots(): void {
     if (ctxPhase === 'setup') {
       logFlow('setup complete → playing');
       const moves = getMoves(humanClient);
+      logMove(`auto-setup(${HUMAN_PLAYER_ID})`, 'completeSetup');
       moves['completeSetup']?.();
       scheduleNext();
       return;
@@ -370,7 +384,10 @@ function autoPlayBots(): void {
         // bot 响应者：代发 passResponse(responderID)
         const curIdx = parseInt(currentPlayer, 10);
         const curClient = clients[curIdx] ?? humanClient;
-        logAI(`auto passResponse for bot ${next}`, { source: prw.sourceAbilityID });
+        logMove(`auto-responder(${next})`, 'passResponse', {
+          source: prw.sourceAbilityID,
+          via: `currentPlayer=${currentPlayer}`,
+        });
         try {
           getMoves(curClient)['passResponse']?.(next);
         } catch (err) {
@@ -396,7 +413,11 @@ function autoPlayBots(): void {
       }
       const curIdx = parseInt(currentPlayer, 10);
       const curClient = clients[curIdx] ?? humanClient;
-      logAI(`bot master ${masterID} skip peek bribe`, { peekerID: ppd.peekerID });
+      logMove(`auto-master(${masterID})`, 'masterPeekBribeDecision', {
+        deal: false,
+        peekerID: ppd.peekerID,
+        reason: 'bot master L0 默认 skip 避免浪费贿赂池',
+      });
       try {
         getMoves(curClient)['masterPeekBribeDecision']?.(false);
       } catch (err) {
@@ -419,7 +440,9 @@ function autoPlayBots(): void {
       }
       const curIdx = parseInt(currentPlayer, 10);
       const curClient = clients[curIdx] ?? humanClient;
-      logAI(`bot peeker ${pr.peekerID} auto acknowledge`, { pr });
+      logMove(`auto-peeker(${pr.peekerID})`, 'peekerAcknowledge', {
+        revealKind: pr.revealKind,
+      });
       try {
         getMoves(curClient)['peekerAcknowledge']?.();
       } catch (err) {
@@ -440,21 +463,27 @@ function autoPlayBots(): void {
     if (pendingLibra) {
       if (!pendingLibra.split) {
         const args = defaultArgsFor('resolveLibraSplit', state, pendingLibra.targetPlayerID);
-        logAI('auto resolveLibraSplit', { args });
+        logMove(`auto-libra-target(${pendingLibra.targetPlayerID})`, 'resolveLibraSplit', { args });
         getMoves(humanClient)['resolveLibraSplit']?.(...args);
         scheduleNext();
         return;
       }
       if (pendingLibra.bonderPlayerID !== HUMAN_PLAYER_ID) {
         const args = defaultArgsFor('resolveLibraPick', state, pendingLibra.bonderPlayerID);
-        logAI('auto resolveLibraPick (bot bonder)', { args });
+        logMove(`auto-libra-bonder(${pendingLibra.bonderPlayerID})`, 'resolveLibraPick', {
+          args,
+          bonderType: 'bot',
+        });
         getMoves(humanClient)['resolveLibraPick']?.(...args);
         scheduleNext();
         return;
       }
       // bonder 是人类时，pick 也由 worker 自动（单机简化，避免引入 UI pile-picker）
       const args = defaultArgsFor('resolveLibraPick', state, HUMAN_PLAYER_ID);
-      logAI('auto resolveLibraPick (human bonder, single-player simplification)', { args });
+      logMove(`auto-libra-bonder(${HUMAN_PLAYER_ID})`, 'resolveLibraPick', {
+        args,
+        bonderType: 'human (single-player simplification)',
+      });
       getMoves(humanClient)['resolveLibraPick']?.(...args);
       scheduleNext();
       return;
@@ -486,7 +515,7 @@ function autoPlayBots(): void {
       // humanClient state 经 playerView 过滤后 bot 的 hand 为 null，会导致 defaultArgsFor 返回空参数。
       const botState = getState(client) ?? state;
       const args = defaultArgsFor(chosen, botState, currentPlayer);
-      logAI(`bot ${currentPlayer} plays ${chosen}`, { turnPhase, args });
+      logMove(`bot(${currentPlayer})`, chosen, { turnPhase, args });
       moveFn(...args);
     } catch (err) {
       console.warn(`[ai/worker] bot ${currentPlayer} move ${chosen} failed`, err);
@@ -537,7 +566,7 @@ const workerApi: LocalMatchWorker = {
     const moves = getMoves(humanClient);
     const fn = moves[move];
     if (fn) {
-      logFlow(`human plays ${move}`, { args });
+      logMove(`human(${HUMAN_PLAYER_ID})`, move, { args });
       fn(...args);
     }
     scheduleNext();
