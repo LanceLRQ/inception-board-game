@@ -26,13 +26,14 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playShoot',
     'dreamMasterMove',
     'playUnlock',
-    // W19-B F4b · 解封响应窗口
-    'respondCancelUnlock',
-    'passResponse',
-    'resolveUnlock',
-    // W19-B F4b · 梦境窥视三段式
-    'masterPeekBribeDecision',
-    'peekerAcknowledge',
+    // W19-B Bug fix（2026-04-21）：响应类 / peek 三段式中间态 move 不放进 action 白名单
+    //   原因：MOVES_BY_PHASE 是 pickBotMove 的合法 move 来源；若包含响应类，
+    //         simpleBot.play 会主动选 → engine INVALID_MOVE 污染日志。
+    //   正确路径：响应窗口 / pendingPeekDecision / peekReveal 由 autoPlayBots 顶部分支
+    //         专用代发（见下方 prw / pendingPeekDecision / peekReveal 拦截分支）。
+    //   被移除的 move（仅供顶部分支显式 dispatch，不参与 pickBotMove）：
+    //     - respondCancelUnlock / passResponse / resolveUnlock
+    //     - masterPeekBribeDecision / peekerAcknowledge
     'playDreamTransit',
     'playCreation',
     'playKick',

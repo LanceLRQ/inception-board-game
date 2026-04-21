@@ -38,14 +38,24 @@ describe('SimpleBot L0', () => {
     expect(choice).toBe('playShoot:action_shoot');
   });
 
-  describe('W19-B F12 · 梦境窥视三段式 move 优先级', () => {
-    it('peekerAcknowledge 挂起时优先于 endActionPhase', () => {
-      const choice = bot.play(null, ['endActionPhase', 'peekerAcknowledge']);
-      expect(choice).toBe('peekerAcknowledge');
+  describe('W19-B Bug fix · 响应类 move 不被 play() 主动选', () => {
+    // 修复前：respondCancelUnlock=1 最高优 → bot 自己回合主动选 → engine INVALID_MOVE
+    // 修复后：响应类全部 999，由 worker 顶部分支专用代发；play 永不主动选
+    it('endActionPhase 优先于 respondCancelUnlock', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondCancelUnlock']);
+      expect(choice).toBe('endActionPhase');
     });
-    it('masterPeekBribeDecision 挂起时优先于 endActionPhase', () => {
+    it('endActionPhase 优先于 passResponse', () => {
+      const choice = bot.play(null, ['endActionPhase', 'passResponse']);
+      expect(choice).toBe('endActionPhase');
+    });
+    it('endActionPhase 优先于 peekerAcknowledge', () => {
+      const choice = bot.play(null, ['endActionPhase', 'peekerAcknowledge']);
+      expect(choice).toBe('endActionPhase');
+    });
+    it('endActionPhase 优先于 masterPeekBribeDecision', () => {
       const choice = bot.play(null, ['endActionPhase', 'masterPeekBribeDecision']);
-      expect(choice).toBe('masterPeekBribeDecision');
+      expect(choice).toBe('endActionPhase');
     });
     it('有 playShoot 时不主动选 playPeekMaster（低优先级）', () => {
       const choice = bot.play(null, ['playShoot', 'playPeekMaster']);

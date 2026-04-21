@@ -153,12 +153,23 @@ export function movePlayerToLayer(
 
   const oldLayer = player.currentLayer;
 
+  // W19-B Bug fix（2026-04-21 · client React key 重复）：
+  //   若 targetLayer === oldLayer（移到自身当前层 / 同层移动 no-op），
+  //   下方 layers[oldLayer]/[targetLayer] 写入同一 key，[targetLayer] 后写覆盖 →
+  //   playersInLayer = [...原数组, playerID] 含重复 playerID，
+  //   导致 client LayerMap PlayerBadge key 重复警告。
+  //   早返回保留原 state，行为与"未移动"一致。
+  if (oldLayer === targetLayer) return state;
+
   // 从旧层移除
   const oldLayerPlayers =
     state.layers[oldLayer]?.playersInLayer.filter((id) => id !== playerID) ?? [];
 
-  // 加入新层
-  const newLayerPlayers = [...(state.layers[targetLayer]?.playersInLayer ?? []), playerID];
+  // 加入新层（防御性 dedupe：若 target 层数组已含 playerID，避免重复）
+  const targetExisting = state.layers[targetLayer]?.playersInLayer ?? [];
+  const newLayerPlayers = targetExisting.includes(playerID)
+    ? targetExisting
+    : [...targetExisting, playerID];
 
   return {
     ...state,

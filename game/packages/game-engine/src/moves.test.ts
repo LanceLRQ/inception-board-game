@@ -226,6 +226,26 @@ describe('moves', () => {
       const s = makeState();
       expect(movePlayerToLayer(s, 'UNKNOWN', 3)).toBe(s);
     });
+
+    // W19-B Bug fix · 同层移动不应造成 playersInLayer 重复
+    it('targetLayer === currentLayer 时 no-op，不重复 playerID', () => {
+      const s = makeState();
+      const result = movePlayerToLayer(s, 'P1', 1); // P1 已在 layer 1
+      expect(result).toBe(s);
+      expect(result.layers[1]!.playersInLayer.filter((id) => id === 'P1')).toHaveLength(1);
+    });
+
+    // 防御性 dedupe：若 target 层数组已含该 playerID（异常 state），不再重复加
+    it('防御性 dedupe：target 层已含 playerID 时不再追加', () => {
+      const s = makeState({
+        layers: {
+          ...makeState().layers,
+          2: { ...makeState().layers[2]!, playersInLayer: ['P1', 'P2'] },
+        },
+      });
+      const result = movePlayerToLayer(s, 'P1', 2);
+      expect(result.layers[2]!.playersInLayer.filter((id) => id === 'P1')).toHaveLength(1);
+    });
   });
 
   // === isAdjacentLayer ===

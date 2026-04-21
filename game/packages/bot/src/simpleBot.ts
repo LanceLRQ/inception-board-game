@@ -43,14 +43,18 @@ const MOVE_PRIORITY: Record<string, number> = {
   doDraw: 10, // 抽牌基本总是选
   doDiscard: 50,
   skipDiscard: 51,
-  respondCancelUnlock: 1, // 响应类按下方逻辑
-  passResponse: 2,
-  resolveUnlock: 3,
-  // W19-B F12 · 梦境窥视三段式 move 注册
-  //   peekerAcknowledge / masterPeekBribeDecision：挂起态必推进，优先级 0
-  //   playPeek / playPeekMaster：主动打出类，低优先级（不主动选）
-  peekerAcknowledge: 0,
-  masterPeekBribeDecision: 0,
+  // W19-B Bug fix（2026-04-21）：响应类 move 不能在 SimpleBot.play 里主动选
+  //   原因：play() 看到 legalMoves 含 respondCancelUnlock 就会因高优先级选中 →
+  //         无 pendingResponseWindow / 不在 responders 时 engine 返回 INVALID_MOVE，
+  //         污染日志且浪费循环。
+  //   正确路径：响应窗口由 worker 顶部分支专用代发（passResponse / respondCancelUnlock）
+  //   playResponse() 方法用 startsWith() 直接匹配，不依赖 MOVE_PRIORITY → 不受影响。
+  respondCancelUnlock: 999,
+  passResponse: 999,
+  resolveUnlock: 999,
+  // W19-B F12 · 梦境窥视三段式 move 注册（同上原则：响应类 999 不主动选）
+  peekerAcknowledge: 999,
+  masterPeekBribeDecision: 999,
   playPeek: 80,
   playPeekMaster: 85,
 };
