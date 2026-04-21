@@ -175,6 +175,16 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
   if (pg && pg.bonderPlayerID === botPlayerID && legalMoves.includes('resolveGravityPick')) {
     return 'resolveGravityPick';
   }
+  // pendingSudgerRolls 存在时由 shooter（= currentPlayer）驱动 A/B 选择
+  // 对照：game-engine/src/game.ts resolveSudgerPick guard（currentPlayer !== currentPlayerID → INVALID_MOVE）
+  const psr = state?.G?.pendingSudgerRolls;
+  if (
+    psr &&
+    state?.G?.currentPlayerID === botPlayerID &&
+    legalMoves.includes('resolveSudgerPick')
+  ) {
+    return 'resolveSudgerPick';
+  }
 
   // pendingLibra：engine 已放宽 currentPlayer guard，任一参与方都可代发
   // 单机简化：优先由 bonder（= 当前 Bot 回合）一次性补完 split + pick
@@ -199,6 +209,7 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
     'resolveGravityPick',
     'resolveLibraSplit',
     'resolveLibraPick',
+    'resolveSudgerPick',
   ]);
   const candidates = legalMoves.filter((m) => !pendingOnly.has(m));
   const sorted = [...candidates].sort(
@@ -233,6 +244,15 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
       // Bot 简单策略：从 pool 挑第 1 张
       const pool = (G?.pendingGravity?.pool as string[]) ?? [];
       return [pool[0]];
+    }
+    case 'resolveSudgerPick': {
+      // Bot 简单策略：选较大的 roll（更可能命中 SHOOT 结算）
+      // 对照：game-engine/src/game.ts resolveSudgerPick —— pick: 'A' | 'B'
+      const psr = G?.pendingSudgerRolls;
+      if (!psr) return ['A'];
+      const rollA = (psr.rollA as number) ?? 0;
+      const rollB = (psr.rollB as number) ?? 0;
+      return [rollA >= rollB ? 'A' : 'B'];
     }
     case 'resolveLibraSplit': {
       // Bot 代 target：把 target 手牌对半分（偶数放 pile1，奇数放 pile2）

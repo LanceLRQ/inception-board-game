@@ -184,5 +184,152 @@
   "about": {
     "title": "About",
     "copyright": "Original board game Inception City © publisher"
+  },
+  "skill": {
+    "panelTitle": "Character Skills",
+    "chooseTarget": "Choose target:",
+    "chooseDirection": "Choose direction:",
+    "chooseHandCard": "Choose hand card:",
+    "chooseMultiCards": "Multi-select hand cards:",
+    "chooseLayer": "Choose layer:",
+    "chooseLayerShift": "Set +1/-1 per same-layer player (optional):",
+    "chooseDiscardCard": "Pick 1 from discard pile:",
+    "chooseBribe": "Choose bribe:",
+    "chooseTwoNonShoot": "Discard 2 non-SHOOT cards:",
+    "chooseDiscardShoot": "Pick 1 SHOOT from discard pile:",
+    "choiceIncrease": "+",
+    "choiceDecrease": "-",
+    "master": {
+      "reveal_nightmare": {
+        "name": "Reveal Nightmare",
+        "desc": "Reveal a face-down nightmare on the target layer"
+      },
+      "discard_nightmare": {
+        "name": "Discard Nightmare",
+        "desc": "Discard a face-up nightmare on the target layer"
+      },
+      "discard_hidden_nightmare": {
+        "name": "Discard Hidden Nightmare",
+        "desc": "Discard a face-down nightmare on the target layer"
+      },
+      "activate_nightmare": {
+        "name": "Activate Nightmare",
+        "desc": "Activate a face-up nightmare on the target layer"
+      },
+      "secret_passage_teleport": {
+        "name": "Secret Passage Teleport",
+        "desc": "Discard 1 card → teleport a player to an adjacent layer (up to 2/turn)"
+      },
+      "deal_bribe": {
+        "name": "Deal Bribe",
+        "desc": "Randomly deal 1 bribe from the pool to a chosen thief"
+      }
+    },
+    "thief_shade": {
+      "skill_0": { "name": "Shade · Shadow", "desc": "Move to the dream master's layer" }
+    },
+    "thief_apollo": {
+      "skill_0": { "name": "Apollo · Worship", "desc": "Pick a target player to resolve Worship" }
+    },
+    "thief_tourist": {
+      "skill_0": { "name": "Tourist · Assist", "desc": "Assist a chosen player (1/turn)" }
+    },
+    "thief_martyr": {
+      "skill_0": {
+        "name": "Martyr · Sacrifice",
+        "desc": "Choose direction: +1 or -1 heart-lock on current layer"
+      }
+    },
+    "thief_chemist": {
+      "skill_0": { "name": "Chemist · Refine", "desc": "Refine a chosen hand card" }
+    },
+    "thief_gemini": {
+      "skill_0": {
+        "name": "Gemini · Sync",
+        "desc": "Discard phase: sync when master's layer is higher"
+      }
+    },
+    "thief_paprik": {
+      "skill_0": {
+        "name": "Soul Priest · Salvation",
+        "desc": "Give a chosen hand card to a target player"
+      }
+    },
+    "thief_architect": {
+      "skill_0": {
+        "name": "Architect · Maze",
+        "desc": "Pick 1 hand card + 1 target player to build a maze"
+      }
+    },
+    "thief_darwin": {
+      "skill_0": { "name": "Darwin · Evolve", "desc": "Select hand cards to evolve / swap" }
+    },
+    "thief_haley": {
+      "skill_0": {
+        "name": "Haley · Impact",
+        "desc": "Target + roll to kill or shift (once per successful unlock)"
+      }
+    },
+    "thief_luna": {
+      "skill_0": {
+        "name": "Luna · Eclipse",
+        "desc": "Discard 2 SHOOTs → kill any same-layer player"
+      }
+    },
+    "thief_athena": {
+      "skill_0": {
+        "name": "Athena · Awe",
+        "desc": "Reveal 4 hand cards + top of deck; 5 of a kind kills a same-layer player"
+      }
+    },
+    "thief_forger": {
+      "skill_0": {
+        "name": "Forger · Steal Heart",
+        "desc": "Choose target + return 1 hand card (1/turn)"
+      }
+    },
+    "thief_libra": {
+      "skill_0": {
+        "name": "Libra · Balance",
+        "desc": "Pick 1 target player for balance-split (1/turn)"
+      }
+    },
+    "thief_lord_of_war": {
+      "skill_0": {
+        "name": "Lord of War · Black Market",
+        "desc": "Discard 2 → pick 1 from discard pile (1/turn)"
+      }
+    },
+    "thief_gaia": {
+      "skill_0": {
+        "name": "Gaia · Earth",
+        "desc": "Shift each same-layer player +1/-1 (up to 2/turn)"
+      }
+    },
+    "dm_uranus_firmament": {
+      "skill_0": { "name": "Uranus · Firmament", "desc": "Move a chosen player to a target layer" }
+    },
+    "dm_mars_battlefield": {
+      "skill_0": { "name": "Mars · Slaughter", "desc": "Resolve slaughter on a target layer" },
+      "world": {
+        "name": "Mars · Battlefield",
+        "desc": "Discard 2 non-SHOOT → pick 1 SHOOT from discard pile"
+      }
+    },
+    "dm_pluto_hell": {
+      "skill_0": { "name": "Pluto · Burning", "desc": "Discard 1 hand card to trigger Burning" }
+    },
+    "dm_saturn_territory": {
+      "free_move": {
+        "name": "Saturn · Free Move",
+        "desc": "While holding a bribe, move freely to a target layer"
+      }
+    },
+    "dm_imperial_city": {
+      "skill_0": {
+        "name": "Imperial City · Bounty",
+        "desc": "Choose target + pick 1 bribe from the pool to deal"
+      }
+    }
   }
 }
