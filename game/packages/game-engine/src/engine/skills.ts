@@ -835,6 +835,29 @@ export function isShootClassCard(cardId: CardID): boolean {
   );
 }
 
+// 迷宫允许的行动牌（对照：docs/manual/05-dream-thieves.md 筑梦师）
+const MAZE_ALLOWED_MOVES = new Set([
+  'playShoot',
+  'playShootKing',
+  'playShootArmor',
+  'playShootBurst',
+  'playShootDreamTransit',
+  'playUnlock',
+  'playPeek',
+  'playTelekinesis',
+  'playDeathDecree',
+  'playTimeStorm',
+  'playNightmareUnlock',
+  'playGreenRayArrest',
+]);
+
+/** 检查目标是否被迷宫影响且当前 move 不在白名单 */
+export function isMazeBlocked(state: SetupState, targetID: string, moveName: string): boolean {
+  if (!state.mazeState) return false;
+  if (state.mazeState.mazedPlayerID !== targetID) return false;
+  return !MAZE_ALLOWED_MOVES.has(moveName);
+}
+
 // === 雅典娜 · 急智 ===
 // 同层盗梦者对你用行动牌时，可先抽弃牌堆 1 张。回合限 1 次（每个对手回合）
 export const ATHENA_WIT_SKILL_ID = 'thief_athena.skill_0';

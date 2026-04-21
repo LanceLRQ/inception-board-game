@@ -97,6 +97,7 @@ import {
   applyVenusMirrorWorld,
   getMidsummerExtraDraws,
   getMidsummerWorldThiefBonus,
+  isMazeBlocked,
   applyBlackSwanTour,
   applyVenusDouble,
   applyMercuryReverse,
@@ -1176,6 +1177,7 @@ export const InceptionCityGame = {
         playKick: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (isMazeBlocked(G, targetPlayerID, 'playKick')) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetPlayerID];
             if (!self || !target) return INVALID_MOVE;
@@ -1562,6 +1564,9 @@ export const InceptionCityGame = {
         playGravity: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetIds: string[]) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            for (const tid of targetIds) {
+              if (isMazeBlocked(G, tid, 'playGravity')) return INVALID_MOVE;
+            }
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             if (!Array.isArray(targetIds) || targetIds.length < 1 || targetIds.length > 2) {
               return INVALID_MOVE;
@@ -1654,6 +1659,7 @@ export const InceptionCityGame = {
         playResonance: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (isMazeBlocked(G, targetPlayerID, 'playResonance')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
             // 每回合限 1 张
             if (G.pendingResonance) return INVALID_MOVE;
