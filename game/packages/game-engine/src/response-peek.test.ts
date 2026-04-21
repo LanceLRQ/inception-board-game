@@ -324,6 +324,25 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
     });
   });
 
+  describe('E · endActionPhase 阻断（W19-B F4a · 防 bot 跳过窥视结算）', () => {
+    it('pendingPeekDecision 挂起时 endActionPhase → INVALID_MOVE', () => {
+      const s0 = withStandardBribes(sceneBeforePeek());
+      const s1 = callMove(s0, 'playPeek', [PEEK_CARD, 3], { currentPlayer: 'p1' }) as SetupState;
+      const r = callMove(s1, 'endActionPhase', [], { currentPlayer: 'p1' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('peekReveal 挂起时 endActionPhase → INVALID_MOVE', () => {
+      const s0 = sceneBeforePeek();
+      const s = {
+        ...s0,
+        peekReveal: { peekerID: 'p1', revealKind: 'vault' as const, vaultLayer: 3 },
+      };
+      const r = callMove(s, 'endActionPhase', [], { currentPlayer: 'p1' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+  });
+
   describe('D · playerView 授权', () => {
     /** 构造一个窥视第 2 层金库的已挂起 reveal state */
     function stateWithPeekReveal(): SetupState {

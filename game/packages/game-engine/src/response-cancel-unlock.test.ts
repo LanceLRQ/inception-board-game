@@ -308,4 +308,22 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
       expect(s2.pendingResponseWindow!.responded).toContain('p2');
     });
   });
+
+  describe('endActionPhase 阻断（W19-B F4a · 防 bot 跳过响应）', () => {
+    it('pendingUnlock 挂起时 endActionPhase → INVALID_MOVE', () => {
+      const s0 = sceneBeforeUnlock();
+      const s1 = doPlayUnlock(s0);
+      const r = callMove(s1, 'endActionPhase', [], { currentPlayer: 'p1' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('pendingResponseWindow 挂起时 endActionPhase → INVALID_MOVE', () => {
+      const s0 = sceneBeforeUnlock();
+      const s1 = doPlayUnlock(s0);
+      // 构造：pendingUnlock 已结算但窗口残留（理论极小概率）→ 仍应阻断
+      const s = { ...s1, pendingUnlock: null };
+      const r = callMove(s, 'endActionPhase', [], { currentPlayer: 'p1' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+  });
 });

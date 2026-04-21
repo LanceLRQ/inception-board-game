@@ -26,6 +26,13 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playShoot',
     'dreamMasterMove',
     'playUnlock',
+    // W19-B F4b · 解封响应窗口
+    'respondCancelUnlock',
+    'passResponse',
+    'resolveUnlock',
+    // W19-B F4b · 梦境窥视三段式
+    'masterPeekBribeDecision',
+    'peekerAcknowledge',
     'playDreamTransit',
     'playCreation',
     'playKick',
@@ -124,6 +131,13 @@ const MOVE_PRIORITY: Record<string, number> = {
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   resolveLibraSplit: 0, // pendingLibra step 2：优先处理
   resolveLibraPick: 0, // pendingLibra step 3：优先处理
+  // W19-B F4b · 响应窗口 / 梦境窥视回合外推进（由 autoPlayBots 顶部分支代发，
+  //   不走 pickBotMove 路径；此处记录以保持白名单一致）
+  respondCancelUnlock: 0,
+  passResponse: 0,
+  resolveUnlock: 0,
+  masterPeekBribeDecision: 0,
+  peekerAcknowledge: 0,
   playLibraBalance: 117, // 天秤入口（盗梦者主动技能，中优先级）
   playForgerExchangeSingle: 118, // 欺诈师入口（同上）
   useSpaceQueenStashTop: 220, // 空间女王·造物（Bot L0 不主动选）
@@ -321,6 +335,91 @@ function autoPlayBots(): void {
       logFlow('setup complete → playing');
       const moves = getMoves(humanClient);
       moves['completeSetup']?.();
+      scheduleNext();
+      return;
+    }
+
+    // W19-B F4b · 响应窗口自动推进（栈式 pendingResponseWindow）
+    //   - 当前只实装"解封响应"源（sourceAbilityID=action_unlock_effect_1）
+    //   - bot responder L0 策略：永远 pass；人类 responder 等 UI（MVP 阶段尚无 UI → 等 F4 后续）
+    //   - 所有响应 move 由当前 BGIO ctx.currentPlayer 对应的 client 代发（绕过 BGIO 默认
+    //     "只有 currentPlayer 可发 move"限制；engine passResponse(responderID?) 已支持）
+    const prw = state.G.pendingResponseWindow as
+      | {
+          sourceAbilityID: string;
+          responders: string[];
+          responded: string[];
+        }
+      | null
+      | undefined;
+    if (prw) {
+      const remaining = prw.responders.filter((id) => !prw.responded.includes(id));
+      if (remaining.length > 0) {
+        const next = remaining[0]!;
+        // 人类响应者 → 等 UI（暂未接入，会卡住；F4 后续批次修）
+        if (next === HUMAN_PLAYER_ID) {
+          logAI('waiting human response (UI not yet wired)', {
+            source: prw.sourceAbilityID,
+            pendingResponders: remaining,
+          });
+          return;
+        }
+        // bot 响应者：代发 passResponse(responderID)
+        const curIdx = parseInt(currentPlayer, 10);
+        const curClient = clients[curIdx] ?? humanClient;
+        logAI(`auto passResponse for bot ${next}`, { source: prw.sourceAbilityID });
+        try {
+          getMoves(curClient)['passResponse']?.(next);
+        } catch (err) {
+          console.warn('[ai/worker] auto passResponse failed', err);
+        }
+        scheduleNext();
+        return;
+      }
+    }
+
+    // W19-B F4b · 梦境窥视三段式自动推进
+    //   - pendingPeekDecision → 梦主决策（人类梦主等 UI；bot 梦主默认 skip bribe 避免浪费池）
+    //   - peekReveal → peeker 自动 ack（bot peeker 立即确认；人类 peeker 等 UI）
+    const ppd = state.G.pendingPeekDecision as
+      | { peekerID: string; targetLayer: number }
+      | null
+      | undefined;
+    if (ppd) {
+      const masterID = state.G.dreamMasterID as string;
+      if (masterID === HUMAN_PLAYER_ID) {
+        logAI('waiting human master peek bribe decision (UI not yet wired)', { ppd });
+        return;
+      }
+      const curIdx = parseInt(currentPlayer, 10);
+      const curClient = clients[curIdx] ?? humanClient;
+      logAI(`bot master ${masterID} skip peek bribe`, { peekerID: ppd.peekerID });
+      try {
+        getMoves(curClient)['masterPeekBribeDecision']?.(false);
+      } catch (err) {
+        console.warn('[ai/worker] auto masterPeekBribeDecision failed', err);
+      }
+      scheduleNext();
+      return;
+    }
+
+    const pr = state.G.peekReveal as
+      | { peekerID: string; revealKind: 'vault'; vaultLayer: number }
+      | null
+      | undefined;
+    if (pr) {
+      if (pr.peekerID === HUMAN_PLAYER_ID) {
+        logAI('waiting human peeker ack (UI not yet wired)', { pr });
+        return;
+      }
+      const curIdx = parseInt(currentPlayer, 10);
+      const curClient = clients[curIdx] ?? humanClient;
+      logAI(`bot peeker ${pr.peekerID} auto acknowledge`, { vaultLayer: pr.vaultLayer });
+      try {
+        getMoves(curClient)['peekerAcknowledge']?.();
+      } catch (err) {
+        console.warn('[ai/worker] auto peekerAcknowledge failed', err);
+      }
       scheduleNext();
       return;
     }

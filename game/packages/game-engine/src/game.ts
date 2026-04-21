@@ -589,6 +589,12 @@ export const InceptionCityGame = {
             // 嫁接/万有引力未结算不得结束行动阶段
             if (G.pendingGraft) return INVALID_MOVE;
             if (G.pendingGravity) return INVALID_MOVE;
+            // W19-B F4a：解封响应 / 梦境窥视三段式未结算不得结束行动阶段
+            // 防止 bot 自回合打完 playUnlock 或 playPeek 后直接 endActionPhase 跳过结算
+            if (G.pendingUnlock) return INVALID_MOVE;
+            if (G.pendingResponseWindow) return INVALID_MOVE;
+            if (G.pendingPeekDecision) return INVALID_MOVE;
+            if (G.peekReveal) return INVALID_MOVE;
             // 共鸣归还：弃牌阶段前将 bonder 的全部手牌给予 target
             // 若 target 已进入迷失层（layer 0）或死亡则保留手牌
             // 对照：docs/manual/04-action-cards.md 共鸣 解析
