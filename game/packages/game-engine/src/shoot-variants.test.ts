@@ -131,14 +131,33 @@ describe('resolveShootCustom 骰面表', () => {
 });
 
 describe('SHOOT·刺客之王（playShootKing）', () => {
-  it('任意层均可使用', () => {
+  it('任意层均可使用（L2 目标命中 move → 挂起 pendingShootMove.choices=[1,3]）', () => {
     const s = makeState();
     // target 处于不同层
     s.players['1']!.currentLayer = 2;
     const r = callMove('playShootKing', s, '1', 'action_shoot_king', 4);
     expect(r).not.toBe('INVALID_MOVE');
-    // 当前自动方向策略：非顶层向上，顶层 4 向下。从 2 → 3
-    expect(r.players['1']!.currentLayer).toBe(3);
+    // 规则：由发动方选移动方向（docs/manual/04-action-cards.md）
+    // L2 → 两相邻层 [1,3]，必须挂起
+    expect(r.pendingShootMove).not.toBeNull();
+    expect(r.pendingShootMove.shooterID).toBe('0');
+    expect(r.pendingShootMove.targetPlayerID).toBe('1');
+    expect(r.pendingShootMove.choices).toEqual([1, 3]);
+    // 目标尚未移动
+    expect(r.players['1']!.currentLayer).toBe(2);
+    // 发动方选 L3 → 移动
+    const r2 = moves.resolveShootMove.move(
+      {
+        G: r,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: r.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => 4, Die: () => 4, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      3,
+    );
+    expect(r2.players['1']!.currentLayer).toBe(3);
+    expect(r2.pendingShootMove).toBeNull();
   });
 
   it('骰 1 杀死目标 + 目标入迷失层', () => {
@@ -267,5 +286,170 @@ describe('基础 SHOOT 骰面（playShoot）—— [1] 死 / [2,3,4] 移 / [5,6]
     const r = callMove('playShoot', makeBaseState(), '1', 'action_shoot', 1);
     expect(r.players['1']!.isAlive).toBe(false);
     expect(r.players['1']!.currentLayer).toBe(0);
+  });
+});
+
+// ============================================================================
+// SHOOT 发动方选层响应窗口（pendingShootMove + resolveShootMove）
+// 对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
+// 场景：L1/L4 唯一相邻层 → 自动移动；L2/L3 两相邻层 → 挂起等发动方选
+// ============================================================================
+describe('SHOOT 发动方选层响应窗口', () => {
+  function setupSameLayer(shooterLayer: number, targetLayer: number) {
+    const s = makeState();
+    s.players['0']!.currentLayer = shooterLayer as 1 | 2 | 3 | 4;
+    s.players['1']!.currentLayer = targetLayer as 1 | 2 | 3 | 4;
+    // 确保同层通过（普通 SHOOT 要求同层；此处 shooterLayer==targetLayer）
+    s.players['0']!.hand = ['action_shoot'] as CardID[];
+    s.layers[shooterLayer as 1 | 2] = {
+      layer: shooterLayer as 1 | 2,
+      dreamCardId: null,
+      nightmareId: null,
+      nightmareRevealed: false,
+      nightmareTriggered: false,
+      playersInLayer: ['0', '1'],
+      heartLockValue: 0,
+    };
+    return s;
+  }
+
+  it('目标在 L1 → 自动移动到 L2（唯一相邻层，不挂起）', () => {
+    const s = setupSameLayer(1, 1);
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    expect(r).not.toBe('INVALID_MOVE');
+    expect(r.pendingShootMove ?? null).toBeNull();
+    expect(r.players['1']!.currentLayer).toBe(2);
+  });
+
+  it('目标在 L2 → 挂起 choices=[1,3]，等发动方选', () => {
+    const s = setupSameLayer(2, 2);
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    expect(r.pendingShootMove).toBeTruthy();
+    expect(r.pendingShootMove.choices).toEqual([1, 3]);
+    expect(r.players['1']!.currentLayer).toBe(2);
+  });
+
+  it('目标在 L3 → 挂起 choices=[2,4]，等发动方选', () => {
+    const s = makeState();
+    s.players['0']!.currentLayer = 3;
+    s.players['1']!.currentLayer = 3;
+    s.players['0']!.hand = ['action_shoot_king'] as CardID[];
+    const r = callMove('playShootKing', s, '1', 'action_shoot_king', 4);
+    expect(r.pendingShootMove.choices).toEqual([2, 4]);
+    expect(r.players['1']!.currentLayer).toBe(3);
+  });
+
+  it('目标在 L4 → 自动移动到 L3（唯一相邻层，不挂起）', () => {
+    const s = makeState();
+    s.players['0']!.currentLayer = 4;
+    s.players['1']!.currentLayer = 4;
+    s.players['0']!.hand = ['action_shoot_king'] as CardID[];
+    const r = callMove('playShootKing', s, '1', 'action_shoot_king', 4);
+    expect(r.pendingShootMove ?? null).toBeNull();
+    expect(r.players['1']!.currentLayer).toBe(3);
+  });
+
+  it('resolveShootMove：非发动方调用 → INVALID_MOVE', () => {
+    const s = setupSameLayer(2, 2);
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    const r2 = moves.resolveShootMove.move(
+      {
+        G: r,
+        ctx: { numPlayers: 2, currentPlayer: '1', playOrder: r.playerOrder, playOrderPos: 0 },
+        playerID: '1',
+        random: { D6: () => 4, Die: () => 4, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      1,
+    );
+    expect(r2).toBe('INVALID_MOVE');
+  });
+
+  it('resolveShootMove：非相邻层 → INVALID_MOVE', () => {
+    const s = setupSameLayer(2, 2);
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    const r2 = moves.resolveShootMove.move(
+      {
+        G: r,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: r.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => 4, Die: () => 4, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      4, // L2 相邻层是 [1,3]，选 4 违规
+    );
+    expect(r2).toBe('INVALID_MOVE');
+  });
+
+  it('resolveShootMove：选择 L1（合法）→ 移动 + 清 pending', () => {
+    const s = setupSameLayer(2, 2);
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    const r2 = moves.resolveShootMove.move(
+      {
+        G: r,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: r.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => 4, Die: () => 4, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      1,
+    );
+    expect(r2.players['1']!.currentLayer).toBe(1);
+    expect(r2.pendingShootMove).toBeNull();
+  });
+
+  it('梦主作为发动方亦可选层（阵营无关）', () => {
+    // 规则：SHOOT 类发动方不分阵营，梦主如有 SHOOT 手牌可发动，同样走选层流程
+    // 对照：docs/manual/04-action-cards.md SHOOT（使用时机未限定阵营）
+    const s = makeState();
+    // 改造：让 '0' 扮演梦主身份同时也是 currentPlayer
+    s.dreamMasterID = '0';
+    s.players['0']!.faction = 'master';
+    s.players['0']!.currentLayer = 2;
+    s.players['1']!.currentLayer = 2;
+    s.players['0']!.hand = ['action_shoot'] as CardID[];
+    s.layers[2] = {
+      layer: 2,
+      dreamCardId: null,
+      nightmareId: null,
+      nightmareRevealed: false,
+      nightmareTriggered: false,
+      playersInLayer: ['0', '1'],
+      heartLockValue: 0,
+    };
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    expect(r).not.toBe('INVALID_MOVE');
+    expect(r.pendingShootMove).toBeTruthy();
+    expect(r.pendingShootMove.shooterID).toBe('0');
+    expect(r.pendingShootMove.choices).toEqual([1, 3]);
+
+    // 梦主作为发动方选择 L3 → 目标移动
+    const r2 = moves.resolveShootMove.move(
+      {
+        G: r,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: r.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => 3, Die: () => 3, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      3,
+    );
+    expect(r2.players['1']!.currentLayer).toBe(3);
+    expect(r2.pendingShootMove).toBeNull();
+  });
+
+  it('无 pendingShootMove 时调用 resolveShootMove → INVALID_MOVE', () => {
+    const s = makeState();
+    const r = moves.resolveShootMove.move(
+      {
+        G: s,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: s.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => 4, Die: () => 4, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      2,
+    );
+    expect(r).toBe('INVALID_MOVE');
   });
 });

@@ -55,6 +55,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'playGreenRayArrest',
     'playShootSudger',
     'resolveSudgerPick',
+    'resolveShootMove',
     'useSagittariusHeartLock',
     'playShift',
     'masterRevealNightmare',
@@ -113,6 +114,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   playGreenRayArrest: 109,
   playShootSudger: 111,
   resolveSudgerPick: 0, // 必须优先结算定罪选择
+  resolveShootMove: 0, // 必须优先结算 pendingShootMove（发动方选层）
   useSagittariusHeartLock: 112,
   playShift: 108,
   masterRevealNightmare: 200, // 梦主低优先：Bot L0 默认不主动触发
@@ -203,6 +205,13 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
     return 'resolveSudgerPick';
   }
 
+  // pendingShootMove 存在时，仅发动方（shooterID）可消费；Bot 是发动方 → 立即 resolve
+  // 对照：game-engine/src/game.ts resolveShootMove guard
+  const psm = state?.G?.pendingShootMove;
+  if (psm && psm.shooterID === botPlayerID && legalMoves.includes('resolveShootMove')) {
+    return 'resolveShootMove';
+  }
+
   // pendingLibra：engine 已放宽 currentPlayer guard，任一参与方都可代发
   // 单机简化：优先由 bonder（= 当前 Bot 回合）一次性补完 split + pick
   const pl = state?.G?.pendingLibra;
@@ -227,6 +236,7 @@ function pickBotMove(legalMoves: string[], state: any, botPlayerID: string): str
     'resolveLibraSplit',
     'resolveLibraPick',
     'resolveSudgerPick',
+    'resolveShootMove',
   ]);
   const candidates = legalMoves.filter((m) => !pendingOnly.has(m));
   const sorted = [...candidates].sort(
@@ -270,6 +280,13 @@ function defaultArgsFor(move: string, state: any, botPlayerID: string): unknown[
       const rollA = (psr.rollA as number) ?? 0;
       const rollB = (psr.rollB as number) ?? 0;
       return [rollA >= rollB ? 'A' : 'B'];
+    }
+    case 'resolveShootMove': {
+      // Bot 简单策略：选择 choices 的第一个（可行即可，L0 不做博弈优化）
+      // 对照：game-engine/src/game.ts resolveShootMove
+      const psm = G?.pendingShootMove as { choices?: number[] } | null | undefined;
+      const choices = psm?.choices ?? [];
+      return [choices[0] ?? 1];
     }
     case 'resolveLibraSplit': {
       // Bot 代 target：把 target 手牌对半分（偶数放 pile1，奇数放 pile2）

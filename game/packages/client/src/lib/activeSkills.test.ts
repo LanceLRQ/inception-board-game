@@ -464,8 +464,11 @@ describe('getAvailableActiveSkills · R16 哈雷·冲击', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R16 梦主·贿赂派发', () => {
-  it('梦主 + 池中有可派发项 → 含', () => {
+describe('getAvailableActiveSkills · 梦主·贿赂派发（已从常驻主动技能移除）', () => {
+  // 规则：贿赂派发不能由梦主主动发起，只能在盗梦者【梦境窥视】/打开金币金库时触发。
+  // 因此 MASTER_DEAL_BRIBE 已从 ALL_DESCRIPTORS 注册表移除，但常量定义保留供响应窗口复用。
+  // 对照：docs/manual/03-game-flow.md §贿赂&背叛者
+  it('梦主 + 池中有可派发项 → 不再出现在主动技能列表', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
         characterId: 'dm_fortress',
@@ -473,44 +476,12 @@ describe('getAvailableActiveSkills · R16 梦主·贿赂派发', () => {
         bribePoolAvailable: true,
       }),
     );
-    expect(list).toContain(MASTER_DEAL_BRIBE);
-  });
-
-  it('梦主 + 池空 → 不含', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'dm_fortress',
-        faction: 'master',
-        bribePoolAvailable: false,
-      }),
-    );
     expect(list).not.toContain(MASTER_DEAL_BRIBE);
   });
 
-  it('盗梦者阵营 → 不含', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'thief_shade',
-        faction: 'thief',
-        bribePoolAvailable: true,
-      }),
-    );
-    expect(list).not.toContain(MASTER_DEAL_BRIBE);
-  });
-
-  it('任意梦主角色都可用（characterId=__any__）', () => {
-    const list1 = getAvailableActiveSkills(
-      baseCtx({ characterId: 'dm_chess', faction: 'master', bribePoolAvailable: true }),
-    );
-    const list2 = getAvailableActiveSkills(
-      baseCtx({ characterId: 'dm_pluto_hell', faction: 'master', bribePoolAvailable: true }),
-    );
-    expect(list1).toContain(MASTER_DEAL_BRIBE);
-    expect(list2).toContain(MASTER_DEAL_BRIBE);
-  });
-
-  it('argKind = targetPlayer', () => {
+  it('常量定义仍保留（供后续响应窗口复用）', () => {
     expect(MASTER_DEAL_BRIBE.argKind).toBe('targetPlayer');
+    expect(MASTER_DEAL_BRIBE.move).toBe('masterDealBribe');
   });
 });
 
@@ -683,8 +654,12 @@ describe('getAvailableActiveSkills · R19 战争之王·黑市', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R20 皇城·重金', () => {
-  it('皇城梦主 + 贿赂池有项 → 含', () => {
+describe('getAvailableActiveSkills · 皇城·重金（已从常驻主动技能移除）', () => {
+  // 规则：重金是"派贿赂时可指定 1 张牌"的修饰能力（替代随机抽），
+  // 本质仍属于派贿赂响应流程，不能由梦主主动发起。
+  // 本次修复移除其常驻主动面板；响应窗口的"指定派发"交互留待后续迭代。
+  // 对照：docs/manual/06-dream-master.md 皇城·重金
+  it('皇城梦主 + 贿赂池有项 → 不再出现在主动技能列表', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
         characterId: 'dm_imperial_city',
@@ -692,44 +667,12 @@ describe('getAvailableActiveSkills · R20 皇城·重金', () => {
         bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
       }),
     );
-    expect(list).toContain(IMPERIAL_DEAL_BRIBE);
-  });
-
-  it('皇城梦主 + 贿赂池空 → 不含', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'dm_imperial_city',
-        faction: 'master',
-        bribePoolItems: [],
-      }),
-    );
     expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
   });
 
-  it('其他梦主角色 → 不含（角色限定）', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'dm_fortress',
-        faction: 'master',
-        bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
-      }),
-    );
-    expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
-  });
-
-  it('盗梦者阵营 → 不含', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'dm_imperial_city',
-        faction: 'thief',
-        bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
-      }),
-    );
-    expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
-  });
-
-  it('argKind = playerAndBribeIndex', () => {
+  it('常量定义仍保留（供后续响应窗口复用）', () => {
     expect(IMPERIAL_DEAL_BRIBE.argKind).toBe('playerAndBribeIndex');
+    expect(IMPERIAL_DEAL_BRIBE.move).toBe('masterDealBribeImperial');
   });
 });
 

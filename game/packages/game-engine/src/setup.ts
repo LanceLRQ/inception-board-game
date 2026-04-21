@@ -170,6 +170,19 @@ export interface SetupState {
     moveFaces: number[];
     extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
   } | null;
+  // SHOOT 结算判定 move 时，由发动方选择目标去哪一相邻层的响应窗口。
+  //   对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
+  //   生命周期：applyShootVariant 在 result==='move' 且 choices.length>=2 时挂起 →
+  //             resolveShootMove(layer) 消费。choices.length===1（L1/L4）自动移动，不挂起。
+  //   choices：目标当前层的相邻层列表（1..4，已排除 0 迷失层；L1→[2]、L4→[3]、L2→[1,3]、L3→[2,4]）。
+  //   onAfterShoot passive 的触发推迟到 resolveShootMove（自动分支仍在 applyShootVariant 末尾触发一次）。
+  pendingShootMove?: {
+    shooterID: string;
+    targetPlayerID: string;
+    cardId: CardID;
+    extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
+    choices: number[];
+  } | null;
   // 筑梦师·迷宫：被困玩家在其下回合结束前不受行动牌+技能影响、不能移动
   // 对照：docs/manual/05-dream-thieves.md 筑梦师
   mazeState: {
@@ -375,6 +388,7 @@ export function createInitialState(options: {
     peekReveal: null,
     pendingLibra: null,
     pendingSudgerRolls: null,
+    pendingShootMove: null,
     mazeState: null,
     winner: null,
     winReason: null,

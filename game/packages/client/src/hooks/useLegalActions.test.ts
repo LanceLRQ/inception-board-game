@@ -90,6 +90,30 @@ describe('useLegalActions', () => {
     expect(result.current.legalTargetsByCard['action_shoot']?.has('M')).toBe(false);
   });
 
+  it('SHOOT·刺客之王（action_shoot_king）允许跨层目标', () => {
+    // 对照：docs/manual/04-action-cards.md SHOOT·刺客之王 使用目标 = 任意一层梦境的另一位玩家
+    const s = baseState({
+      players: {
+        ...baseState().players,
+        T1: {
+          ...baseState().players.T1!,
+          hand: ['action_shoot_king'] as CardID[],
+        },
+      },
+    });
+    const result = { current: computeLegalActions(s) };
+    expect(result.current.playableCardIds.has('action_shoot_king' as CardID)).toBe(true);
+    // 跨层目标 M（L4）应当可选
+    expect(result.current.legalTargetsByCard['action_shoot_king']?.has('M')).toBe(true);
+    expect(result.current.legalTargetsByCard['action_shoot_king']?.has('T2')).toBe(true);
+  });
+
+  it('普通 SHOOT 不允许跨层目标（L2 viewer → L4 梦主 M 不在列表）', () => {
+    const s = baseState();
+    const result = { current: computeLegalActions(s) };
+    expect(result.current.legalTargetsByCard['action_shoot']?.has('M')).toBe(false);
+  });
+
   it('unlock unplayable when no heart lock', () => {
     const s = baseState({
       layers: {

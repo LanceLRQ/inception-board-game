@@ -3,7 +3,7 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -25,6 +25,15 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       ...state,
       pendingPeekDecision: state.pendingPeekDecision ?? null,
       peekReveal: state.peekReveal ?? null,
+    }),
+  ],
+  // v3 → v4：添加 pendingShootMove（SHOOT 判定 move 时发动方选层响应窗口）
+  //   对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
+  [
+    4,
+    (state) => ({
+      ...state,
+      pendingShootMove: state.pendingShootMove ?? null,
     }),
   ],
 ]);

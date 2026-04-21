@@ -17,6 +17,7 @@ import { CopyrightNotice } from '../CopyrightNotice';
 import { MasterNightmareDecisionBanner } from '../MasterNightmareDecisionBanner';
 import { UnlockResponseBanner } from '../UnlockResponseBanner';
 import { MasterPeekBribeBanner } from '../MasterPeekBribeBanner';
+import { ShooterLayerPickerBanner } from '../ShooterLayerPickerBanner';
 import { PeekerVaultRevealBanner } from '../PeekerVaultRevealBanner';
 import { MasterBribeInspectBanner } from '../MasterBribeInspectBanner';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
@@ -319,20 +320,60 @@ export function LocalMatchRuntime({
     setChessPick([]);
   }, [chessPick, makeMove]);
 
-  // 贿赂派发：梦主行动阶段可选目标
-  const bribePool = G?.bribePool as Array<Record<string, unknown>> | undefined;
-  const bribePoolRemaining = bribePool?.filter((b) => b.status === 'inPool').length ?? 0;
+  // 贿赂派发：移除常驻主动 UI（违反规则）。
+  // 规则：仅在盗梦者使用【梦境窥视】或打开金币金库时，梦主通过响应窗口决策派发。
+  // 对照：docs/manual/03-game-flow.md §贿赂&背叛者 + MasterPeekBribeBanner
   const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
-  const canDealBribe =
-    isHumanTurn && turnPhase === 'action' && humanFaction === 'master' && bribePoolRemaining > 0;
-  const [bribeTargetOpen, setBribeTargetOpen] = useState(false);
-  const dealBribeTo = useCallback(
-    async (targetId: string) => {
-      await makeMove('masterDealBribe', [targetId]);
-      setBribeTargetOpen(false);
-    },
-    [makeMove],
-  );
+  const playerLayer = (humanPlayer?.currentLayer as number) ?? 1;
+
+  // SHOOT 结算 toast：追踪 lastPlayedCardThisTurn 变化 + 玩家层位移，展示 3 秒通知
+  //   触发：action_shoot* 类牌打出后，任一玩家 currentLayer 变化（kill → 0；move → 相邻层）
+  //   用途：L1/L4 目标自动移动时，让玩家知道刚发生了什么（规则："UI 上要有通知"）
+  //   对照：docs/manual/04-action-cards.md SHOOT 解析
+  const lastPlayedCard = (G?.lastPlayedCardThisTurn as string | null | undefined) ?? null;
+  const [shootNotice, setShootNotice] = useState<string | null>(null);
+  const shootNoticeTrackRef = useRef<{ card: string | null; layers: Record<string, number> }>({
+    card: null,
+    layers: {},
+  });
+  useEffect(() => {
+    if (!G) return;
+    const nextLayers: Record<string, number> = {};
+    for (const [id, p] of Object.entries(players ?? {})) {
+      nextLayers[id] = (p.currentLayer as number) ?? 0;
+    }
+    const prev = shootNoticeTrackRef.current;
+    const isShootCard =
+      typeof lastPlayedCard === 'string' && lastPlayedCard.startsWith('action_shoot');
+    const hasPendingShootMove =
+      (G as unknown as { pendingShootMove?: unknown }).pendingShootMove != null;
+
+    let message: string | null = null;
+    if (isShootCard && lastPlayedCard !== prev.card && !hasPendingShootMove) {
+      for (const [id, layer] of Object.entries(nextLayers)) {
+        const prevLayer = prev.layers[id];
+        if (prevLayer !== undefined && prevLayer !== layer) {
+          const name = (players?.[id]?.nickname as string | undefined) ?? `P${id}`;
+          message =
+            layer === 0
+              ? `${getCardName(lastPlayedCard)} 命中 · ${name} 被击杀`
+              : `${getCardName(lastPlayedCard)} 命中 · ${name} 被推至 L${layer}`;
+          break;
+        }
+      }
+    }
+
+    shootNoticeTrackRef.current = { card: lastPlayedCard, layers: nextLayers };
+
+    if (!message) return;
+    // 异步触发 setState，避免 effect 同步渲染级联（react-hooks/set-state-in-effect）
+    const raf = requestAnimationFrame(() => setShootNotice(message));
+    const timer = setTimeout(() => setShootNotice(null), 3000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [G, players, lastPlayedCard]);
 
   // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
   const effectivePending =
@@ -901,20 +942,38 @@ export function LocalMatchRuntime({
                 );
               })()}
 
+              {/* SHOOT 目标同层/跨层约束：
+                    action_shoot_king → 跨层合法（刺客之王）
+                    其他 action_shoot* → 仅同层合法
+                  对照：docs/manual/04-action-cards.md SHOOT 变体使用目标 */}
               <div className="flex flex-wrap gap-2">
                 {Object.entries(players ?? {})
                   .filter(([id, p]) => id !== '0' && (p.isAlive as boolean))
-                  .map(([id]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => void confirmPlayTargetPlayer(id)}
-                      className="rounded-full bg-destructive px-3 py-1 text-xs text-destructive-foreground"
-                      data-testid={`target-player-${id}`}
-                    >
-                      AI {id}
-                    </button>
-                  ))}
+                  .map(([id, p]) => {
+                    const card = effectivePending.card as string;
+                    const isShootCard = card.startsWith('action_shoot');
+                    const sameLayerRequired = isShootCard && card !== 'action_shoot_king';
+                    const targetLayer = (p.currentLayer as number) ?? 1;
+                    const crossLayer = targetLayer !== playerLayer;
+                    const disabled = sameLayerRequired && crossLayer;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        disabled={disabled}
+                        title={disabled ? '该 SHOOT 仅限同层目标' : undefined}
+                        onClick={() => {
+                          if (disabled) return;
+                          void confirmPlayTargetPlayer(id);
+                        }}
+                        className="rounded-full bg-destructive px-3 py-1 text-xs text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                        data-testid={`target-player-${id}`}
+                      >
+                        AI {id}
+                        {disabled ? ` · L${targetLayer}（跨层）` : ''}
+                      </button>
+                    );
+                  })}
                 <button
                   type="button"
                   onClick={() => {
@@ -989,61 +1048,9 @@ export function LocalMatchRuntime({
         </div>
       )}
 
-      {/* 贿赂派发：梦主限定 */}
-      {canDealBribe && (
-        <div
-          className="mb-4 rounded-md border border-purple-500/40 bg-purple-500/5 p-3 text-xs"
-          data-testid="bribe-panel"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="font-medium text-purple-400">
-              {t('localMatch.bribeTitle', { defaultValue: '派发贿赂牌' })}
-            </span>
-            <span className="text-muted-foreground">
-              {t('localMatch.bribeRemaining', {
-                n: bribePoolRemaining,
-                defaultValue: `池剩 ${bribePoolRemaining}`,
-              })}
-            </span>
-          </div>
-          {!bribeTargetOpen ? (
-            <button
-              type="button"
-              onClick={() => setBribeTargetOpen(true)}
-              className="rounded-full bg-purple-500 px-3 py-1 text-[11px] text-white"
-              data-testid="bribe-open"
-            >
-              {t('localMatch.bribePickTarget', { defaultValue: '选择盗梦者' })}
-            </button>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(players ?? {})
-                .filter(
-                  ([id, p]) =>
-                    (p.isAlive as boolean) && (p.faction as string) === 'thief' && id !== '0',
-                )
-                .map(([id]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => void dealBribeTo(id)}
-                    className="rounded-full bg-purple-500 px-3 py-1 text-[11px] text-white"
-                    data-testid={`bribe-target-${id}`}
-                  >
-                    AI {id}
-                  </button>
-                ))}
-              <button
-                type="button"
-                onClick={() => setBribeTargetOpen(false)}
-                className="rounded-full border border-muted px-3 py-1 text-[11px] text-muted-foreground"
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* 贿赂派发：遵循桌游规则（仅在梦境窥视/金币金库触发的响应窗口中进行），
+          常驻主动派发 UI 已移除；决策入口走 MasterPeekBribeBanner 等响应式组件。
+          对照：docs/manual/03-game-flow.md §贿赂&背叛者 / 04-action-cards.md 梦境窥视 */}
 
       {/* 棋局·易位：梦主专属主动技能 */}
       {isChessMaster && !effectivePending && vaultsRaw && (
@@ -1346,6 +1353,27 @@ export function LocalMatchRuntime({
 
       {/* W19-B F10 · 梦主查看盗梦者贿赂牌 banner（梦境窥视 效果②）*/}
       <MasterBribeInspectBanner G={G as never} viewerPlayerID="0" makeMove={makeMove} />
+
+      {/* SHOOT 发动方选层 banner（对照：docs/manual/04-action-cards.md SHOOT 解析）*/}
+      <ShooterLayerPickerBanner
+        G={G as never}
+        viewerPlayerID="0"
+        nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
+        cardNameOf={(cardId) => getCardName(cardId)}
+        makeMove={makeMove}
+      />
+
+      {/* SHOOT 结算轻量 toast · L1/L4 自动移动 / 击杀后的通知
+          3 秒后自动消失；对应规则 "UI 上要有通知" */}
+      {shootNotice && (
+        <div
+          role="status"
+          data-testid="shoot-move-notice"
+          className="mt-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-xs text-orange-900 dark:text-orange-200"
+        >
+          {shootNotice}
+        </div>
+      )}
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
       <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />

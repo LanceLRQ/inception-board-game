@@ -589,6 +589,9 @@ export const InceptionCityGame = {
             // 嫁接/万有引力未结算不得结束行动阶段
             if (G.pendingGraft) return INVALID_MOVE;
             if (G.pendingGravity) return INVALID_MOVE;
+            // SHOOT 发动方选层未完成前不得结束行动阶段
+            //   对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
+            if (G.pendingShootMove) return INVALID_MOVE;
             // W19-B F4a：解封响应 / 梦境窥视三段式未结算不得结束行动阶段
             // 防止 bot 自回合打完 playUnlock 或 playPeek 后直接 endActionPhase 跳过结算
             if (G.pendingUnlock) return INVALID_MOVE;
@@ -637,7 +640,7 @@ export const InceptionCityGame = {
             preventMove?: boolean,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             // 射手·禁足：仅射手角色可阻止移动
             const shooter = G.players[ctx.currentPlayer];
             const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
@@ -663,7 +666,8 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingSudgerRolls) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove || G.pendingSudgerRolls)
+              return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (self.characterId !== 'thief_sudger_of_mind') return INVALID_MOVE;
@@ -802,7 +806,7 @@ export const InceptionCityGame = {
         playNightmareUnlock: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, layer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_nightmare_unlock') return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
@@ -911,7 +915,7 @@ export const InceptionCityGame = {
             // 允许任意阶段使用（manual: 你的任意阶段）
             if (G.phase !== 'playing') return INVALID_MOVE;
             if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shift') return INVALID_MOVE;
             if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
@@ -963,7 +967,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_dream_transit') return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
@@ -1002,7 +1006,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_king') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: false,
@@ -1023,7 +1027,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_armor') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
@@ -1044,7 +1048,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_burst') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
@@ -1053,6 +1057,24 @@ export const InceptionCityGame = {
               extraOnMove: 'discard_shoots',
               decreeId,
             });
+          },
+          client: false,
+        },
+        // SHOOT 结算判定 move 后的"发动方选层"响应：L2/L3 目标由发动方选相邻层
+        //   对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
+        //   生命周期：applyShootVariant 挂起 pendingShootMove → 本 move 消费 + 触发 onAfterShoot
+        //   仅 shooterID 可消费（非当前回合玩家也能操作，因 SHOOT 发动可能跨 turnPhase 时机；故不 guard turnPhase）
+        resolveShootMove: {
+          move: ({ G, ctx }: MoveCtx, layer: number) => {
+            const p = G.pendingShootMove;
+            if (!p) return INVALID_MOVE;
+            if (ctx.currentPlayer !== p.shooterID) return INVALID_MOVE;
+            if (!Number.isInteger(layer) || !p.choices.includes(layer)) return INVALID_MOVE;
+            let s: SetupState = movePlayerToLayer(G, p.targetPlayerID, layer);
+            s = { ...s, pendingShootMove: null };
+            // 延后的 onAfterShoot passive 在此触发一次（处女·完美监听等）
+            s = dispatchPassives(s, 'onAfterShoot').state;
+            return incrementMoveCounter(s);
           },
           client: false,
         },
@@ -1066,7 +1088,7 @@ export const InceptionCityGame = {
             targetLayer: number,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (self.characterId !== 'thief_green_ray') return INVALID_MOVE;
@@ -1214,7 +1236,8 @@ export const InceptionCityGame = {
             if (!self || self.characterId !== 'thief_haley') return INVALID_MOVE;
             if (!self.isAlive) return INVALID_MOVE;
             if (G.turnPhase !== 'action') return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingUnlock) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove || G.pendingUnlock)
+              return INVALID_MOVE;
             const target = G.players[targetID];
             if (!target || !target.isAlive) return INVALID_MOVE;
             if (targetID === ctx.currentPlayer) return INVALID_MOVE;
@@ -1866,7 +1889,7 @@ export const InceptionCityGame = {
             for (const tid of targetIds) {
               if (isMazeBlocked(G, tid, 'playGravity')) return INVALID_MOVE;
             }
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(targetIds) || targetIds.length < 1 || targetIds.length > 2) {
               return INVALID_MOVE;
             }
@@ -1959,7 +1982,7 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (isMazeBlocked(G, targetPlayerID, 'playResonance')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             // 每回合限 1 张
             if (G.pendingResonance) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
@@ -2001,7 +2024,7 @@ export const InceptionCityGame = {
         playTimeStorm: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (cardId !== 'action_time_storm') return INVALID_MOVE;
@@ -2070,7 +2093,7 @@ export const InceptionCityGame = {
         playLunaEclipse: {
           move: ({ G, ctx }: MoveCtx, shootCardIds: CardID[], targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(shootCardIds)) return INVALID_MOVE;
             const next = applyLunaEclipse(G, ctx.currentPlayer, shootCardIds, targetID);
             if (next === null) return INVALID_MOVE;
@@ -2084,7 +2107,7 @@ export const InceptionCityGame = {
         playGaiaShift: {
           move: ({ G, ctx }: MoveCtx, picks: Record<string, -1 | 1>) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!picks || typeof picks !== 'object') return INVALID_MOVE;
             const next = applyGaiaShift(G, ctx.currentPlayer, picks);
             if (next === null) return INVALID_MOVE;
@@ -2098,7 +2121,7 @@ export const InceptionCityGame = {
         playDarwinEvolution: {
           move: ({ G, ctx }: MoveCtx, returnCards: CardID[]) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(returnCards)) return INVALID_MOVE;
             const next = applyDarwinEvolution(G, ctx.currentPlayer, returnCards);
             if (next === null) return INVALID_MOVE;
@@ -2112,7 +2135,7 @@ export const InceptionCityGame = {
         playShadeFollow: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyShadeFollow(G, ctx.currentPlayer);
             if (next === null) return INVALID_MOVE;
             return incrementMoveCounter(next);
@@ -2125,7 +2148,7 @@ export const InceptionCityGame = {
         playForgerExchange: {
           move: ({ G, ctx }: MoveCtx, exchange: ForgerExchange) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyForgerExchange(G, ctx.currentPlayer, exchange);
             if (next === null) return INVALID_MOVE;
             return incrementMoveCounter(next);
@@ -2139,7 +2162,7 @@ export const InceptionCityGame = {
         playForgerExchangeSingle: {
           move: ({ G, ctx, random }: MoveCtx, targetID: string, returnedCardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const target = G.players[targetID];
             if (!target || !target.isAlive) return INVALID_MOVE;
             if (target.hand.length === 0) return INVALID_MOVE;
@@ -2162,7 +2185,8 @@ export const InceptionCityGame = {
         playLibraBalance: {
           move: ({ G, ctx }: MoveCtx, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingLibra) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove || G.pendingLibra)
+              return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetID];
             if (!self || !target) return INVALID_MOVE;
@@ -2254,7 +2278,7 @@ export const InceptionCityGame = {
         playArchitectMaze: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetID];
             if (!self || !target) return INVALID_MOVE;
@@ -2287,7 +2311,7 @@ export const InceptionCityGame = {
         playApolloWorship: {
           move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             // 用 D6 注入随机性（保证 BGIO 确定性）
             const pickIdx = random.D6() - 1;
             const next = applyApolloWorship(G, ctx.currentPlayer, targetID, pickIdx);
@@ -2302,7 +2326,7 @@ export const InceptionCityGame = {
         playMartyrSacrifice: {
           move: ({ G, ctx, random }: MoveCtx, direction: 'increase' | 'decrease') => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player) return INVALID_MOVE;
             // 取本人当前层"原始"心锁数为 cap：使用 PLAYER_COUNT_CONFIGS 的初始值
@@ -2326,7 +2350,7 @@ export const InceptionCityGame = {
         playAthenaAwe: {
           move: ({ G, ctx }: MoveCtx, shownHandIds: CardID[], targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(shownHandIds)) return INVALID_MOVE;
             const next = applyAthenaAwe(G, ctx.currentPlayer, shownHandIds, targetID);
             if (next === null) return INVALID_MOVE;
@@ -2340,7 +2364,7 @@ export const InceptionCityGame = {
         playChemistRefine: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyChemistRefine(G, ctx.currentPlayer, discardCardId);
             if (next === null) return INVALID_MOVE;
             return next;
@@ -2353,7 +2377,7 @@ export const InceptionCityGame = {
         playLordOfWarBlackMarket: {
           move: ({ G, ctx }: MoveCtx, discardIds: CardID[], pickFromDiscard: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(discardIds)) return INVALID_MOVE;
             const next = applyLordOfWarBlackMarket(
               G,
@@ -2372,7 +2396,7 @@ export const InceptionCityGame = {
         playPaprikSalvation: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyPaprikSalvation(G, ctx.currentPlayer, discardCardId, targetID);
             if (next === null) return INVALID_MOVE;
             return next;
@@ -2385,7 +2409,7 @@ export const InceptionCityGame = {
         playTouristAssist: {
           move: ({ G, ctx }: MoveCtx, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyTouristAssist(G, ctx.currentPlayer, targetPlayerID);
             if (next === null) return INVALID_MOVE;
             return next;
@@ -2890,17 +2914,47 @@ function applyShootVariant(
         };
       }
     }
-    // 相邻层移动（1<->2, 2<->3, 3<->4；4 向下，1 向上）
-    // 射手·禁足：可令目标不移动
+    // 相邻层选择（1<->2, 2<->3, 3<->4；L1/L4 唯一相邻层自动移动；L2/L3 两选一 → 挂起）
+    // 规则：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
+    // 射手·禁足：opts.preventMove 令目标不移动
     if (!opts.preventMove) {
-      const cur = target.currentLayer;
-      const dir = cur >= 4 ? -1 : 1;
-      const nl = Math.max(1, Math.min(4, cur + dir));
-      s = movePlayerToLayer(s, targetPlayerID, nl);
+      const cur = s.players[targetPlayerID]!.currentLayer;
+      const choices = computeShootMoveChoices(cur);
+      if (choices.length === 1) {
+        // L1→[2] / L4→[3]：唯一相邻层，自动移动 + 继续触发 onAfterShoot
+        s = movePlayerToLayer(s, targetPlayerID, choices[0]!);
+      } else if (choices.length >= 2) {
+        // L2/L3：挂起由发动方（ctx.currentPlayer）选择；onAfterShoot 推迟到 resolveShootMove
+        s = {
+          ...s,
+          pendingShootMove: {
+            shooterID: ctx.currentPlayer,
+            targetPlayerID,
+            cardId,
+            extraOnMove: opts.extraOnMove,
+            choices,
+          },
+        };
+        return incrementMoveCounter(s);
+      }
+      // choices.length === 0（理论不会发生，因为 layer 必在 1..4）：兜底不移动
     }
   }
 
   // abilities registry：SHOOT 结算完成后触发 onAfterShoot passive（处女·完美监听 roll=6）
+  //   注意：choices.length>=2 的挂起分支已在上方 return，此处仅覆盖 kill / miss / L1L4 自动移动 / preventMove 情形
   s = dispatchPassives(s, 'onAfterShoot').state;
   return incrementMoveCounter(s);
+}
+
+/**
+ * 计算 SHOOT 命中 move 时，目标可去的相邻层列表（排除迷失层 0）。
+ *   L1 → [2] | L4 → [3] | L2 → [1,3] | L3 → [2,4]
+ *   对照：docs/manual/04-action-cards.md "移动到相邻的另一层梦境的效果不会让玩家进入迷失层"
+ */
+export function computeShootMoveChoices(currentLayer: number): number[] {
+  const adj: number[] = [];
+  if (currentLayer - 1 >= 1) adj.push(currentLayer - 1);
+  if (currentLayer + 1 <= 4) adj.push(currentLayer + 1);
+  return adj;
 }

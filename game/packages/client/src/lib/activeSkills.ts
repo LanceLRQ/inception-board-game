@@ -428,12 +428,14 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   SECRET_PASSAGE_TELEPORT,
   DARWIN_EVOLUTION,
   HALEY_IMPACT,
-  MASTER_DEAL_BRIBE,
+  // MASTER_DEAL_BRIBE / IMPERIAL_DEAL_BRIBE 已从主动技能注册表移除。
+  // 规则约束：贿赂派发只能在盗梦者【梦境窥视】或打开金币金库的响应窗口触发，
+  // 而非梦主回合主动发起。保留常量定义供未来响应窗口复用。
+  // 对照：docs/manual/03-game-flow.md §贿赂&背叛者
   LUNA_ECLIPSE,
   ATHENA_AWE,
   GAIA_SHIFT,
   LORD_OF_WAR_BLACK_MARKET,
-  IMPERIAL_DEAL_BRIBE,
   MARS_BATTLEFIELD_EXCHANGE,
   LIBRA_BALANCE,
   FORGER_EXCHANGE,

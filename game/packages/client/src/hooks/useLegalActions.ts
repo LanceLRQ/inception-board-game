@@ -53,13 +53,16 @@ export function computeLegalActions(state: MockMatchState | null): LegalActions 
   for (const card of hand) {
     const cardStr = card as string;
     if (cardStr.startsWith('action_shoot')) {
-      // SHOOT：目标 = 同层存活玩家
+      // SHOOT：默认目标 = 同层存活玩家；SHOOT·刺客之王（action_shoot_king）允许跨层
+      // 对照：docs/manual/04-action-cards.md SHOOT / SHOOT·刺客之王 使用目标
+      const sameLayerRequired = cardStr !== 'action_shoot_king';
       const targets = new Set<string>();
       for (const pid of state.playerOrder) {
         const p = state.players[pid];
         if (!p || pid === state.viewerID) continue;
         if (!p.isAlive) continue;
-        if (p.currentLayer === viewer.currentLayer) targets.add(pid);
+        if (sameLayerRequired && p.currentLayer !== viewer.currentLayer) continue;
+        targets.add(pid);
       }
       if (targets.size > 0) {
         playable.add(card);
