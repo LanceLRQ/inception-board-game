@@ -149,6 +149,7 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     endTurn: null,
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
+    removedFromGame: [],
   };
   return merge(base, overrides);
 }
@@ -276,6 +277,7 @@ export interface ActionCardSnapshot {
   layers: Record<string, Partial<LayerSetup>>;
   deckSize: number;
   discardPile: readonly CardID[];
+  removedFromGame: readonly CardID[];
   pendingUnlock: SetupState['pendingUnlock'];
   pendingGraft: SetupState['pendingGraft'];
   pendingResonance: SetupState['pendingResonance'];
@@ -316,6 +318,7 @@ export function pickRelevantState(state: SetupState): ActionCardSnapshot {
     layers,
     deckSize: state.deck.cards.length,
     discardPile: state.deck.discardPile,
+    removedFromGame: state.removedFromGame,
     pendingUnlock: state.pendingUnlock,
     pendingGraft: state.pendingGraft,
     pendingResonance: state.pendingResonance,

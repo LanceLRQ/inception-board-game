@@ -94,6 +94,8 @@ export function beginTurn(state: SetupState, playerID: string): SetupState {
     // 出牌追踪 · 每回合清零（对照：setup.ts playedCardsThisTurn 注释）
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
+    // 注意：不要在这里清空 removedFromGame —— 它是跨回合持久的"移出游戏"区，
+    // 仅由 setup 初始化一次，由 time_storm 等 move 追加
     players: {
       ...state.players,
       [playerID]: {

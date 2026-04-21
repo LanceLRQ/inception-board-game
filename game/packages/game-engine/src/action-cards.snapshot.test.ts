@@ -223,7 +223,7 @@ describe('行动牌快照回归 · 21 卡', () => {
   // -------------------------------------------------------------------------
   // 15. 时间风暴 · 弃牌库顶 10 张 + 该牌移出游戏
   // -------------------------------------------------------------------------
-  it('15. playTimeStorm · 牌库顶 10 张入弃牌堆', () => {
+  it('15. playTimeStorm · 牌库顶 10 张 + 本牌移出游戏', () => {
     const s = withHand(baseline(), 'p1', ['action_time_storm' as CardID]);
     const r = callMove(s, 'playTimeStorm', ['action_time_storm' as CardID]);
     expectMoveOk(r);
