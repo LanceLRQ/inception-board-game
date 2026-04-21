@@ -14,12 +14,20 @@ import { LayerMap } from '../LayerMap';
 import { ActiveSkillPanel } from '../ActiveSkillPanel';
 import { CardDetailModal } from '../CardDetailModal';
 import { CopyrightNotice } from '../CopyrightNotice';
-import { MasterNightmareDecisionBanner } from '../MasterNightmareDecisionBanner';
-import { UnlockResponseBanner } from '../UnlockResponseBanner';
-import { MasterPeekBribeBanner } from '../MasterPeekBribeBanner';
-import { ShooterLayerPickerBanner } from '../ShooterLayerPickerBanner';
-import { PeekerVaultRevealBanner } from '../PeekerVaultRevealBanner';
-import { MasterBribeInspectBanner } from '../MasterBribeInspectBanner';
+import { MasterNightmareDecisionDialog } from '../MasterNightmareDecisionDialog';
+import { UnlockResponseDialog } from '../UnlockResponseDialog';
+import { MasterPeekBribeDialog } from '../MasterPeekBribeDialog';
+import { ShooterLayerPickerDialog } from '../ShooterLayerPickerDialog';
+import { PeekerVaultRevealDialog } from '../PeekerVaultRevealDialog';
+import { MasterBribeInspectDialog } from '../MasterBribeInspectDialog';
+import { TargetPlayerPickerDialog } from '../TargetPlayerPickerDialog';
+import { TargetLayerPickerDialog } from '../TargetLayerPickerDialog';
+import { DreamTransitModeDialog } from '../DreamTransitModeDialog';
+import { ChessTransposeDialog } from '../ChessTransposeDialog';
+import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
+import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
+import { GraftResolverDialog } from '../GraftResolverDialog';
+import { toast } from '@/lib/toast';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
@@ -306,19 +314,22 @@ export function LocalMatchRuntime({
   const isChessMaster =
     humanCharacterId === 'dm_chess' && currentPlayerID === '0' && turnPhase === 'action';
 
-  const toggleChessPick = useCallback((idx: number) => {
-    setChessPick((prev) => {
-      if (prev.includes(idx)) return prev.filter((i) => i !== idx);
-      if (prev.length >= 2) return [prev[1]!, idx]; // 保留最后 2 个
-      return [...prev, idx];
-    });
-  }, []);
+  const toggleChessPick = useCallback(
+    (idx: number) => {
+      setChessPick((prev) => {
+        if (prev.includes(idx)) return prev.filter((i) => i !== idx);
+        if (prev.length >= 2) return [prev[1]!, idx]; // 保留最后 2 个
+        return [...prev, idx];
+      });
+    },
+    [setChessPick],
+  );
 
   const confirmChessTranspose = useCallback(async () => {
     if (chessPick.length !== 2) return;
     await makeMove('useChessTranspose', [chessPick[0], chessPick[1]]);
     setChessPick([]);
-  }, [chessPick, makeMove]);
+  }, [chessPick, makeMove, setChessPick]);
 
   // 贿赂派发：移除常驻主动 UI（违反规则）。
   // 规则：仅在盗梦者使用【梦境窥视】或打开金币金库时，梦主通过响应窗口决策派发。
@@ -326,13 +337,14 @@ export function LocalMatchRuntime({
   const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
   const playerLayer = (humanPlayer?.currentLayer as number) ?? 1;
 
-  // SHOOT 结算 toast：追踪 lastPlayedCardThisTurn 变化 + 玩家层位移，展示 3 秒通知
-  //   触发：action_shoot* 类牌打出后，任一玩家 currentLayer 变化（kill → 0；move → 相邻层）
-  //   用途：L1/L4 目标自动移动时，让玩家知道刚发生了什么（规则："UI 上要有通知"）
-  //   对照：docs/manual/04-action-cards.md SHOOT 解析
+  // SHOOT 结算事件通知 → 全局 Toast（按结果分级）
+  //   判定（对照 plans/2-1-3-1-2-ui-cozy-wave.md SHOOT Toast 分级表）：
+  //     - pendingShootMove != null → L2/L3 挂起中，不 toast（由 ShooterLayerPickerDialog 承担）
+  //     - 某玩家 currentLayer 从 N → 0 → kill → toast.error
+  //     - 某玩家 currentLayer 变化（非 0）→ move → toast.info
+  //     - 所有玩家 currentLayer 无变化 → miss → toast.warn
   const lastPlayedCard = (G?.lastPlayedCardThisTurn as string | null | undefined) ?? null;
-  const [shootNotice, setShootNotice] = useState<string | null>(null);
-  const shootNoticeTrackRef = useRef<{ card: string | null; layers: Record<string, number> }>({
+  const shootToastTrackRef = useRef<{ card: string | null; layers: Record<string, number> }>({
     card: null,
     layers: {},
   });
@@ -342,37 +354,34 @@ export function LocalMatchRuntime({
     for (const [id, p] of Object.entries(players ?? {})) {
       nextLayers[id] = (p.currentLayer as number) ?? 0;
     }
-    const prev = shootNoticeTrackRef.current;
+    const prev = shootToastTrackRef.current;
     const isShootCard =
       typeof lastPlayedCard === 'string' && lastPlayedCard.startsWith('action_shoot');
     const hasPendingShootMove =
       (G as unknown as { pendingShootMove?: unknown }).pendingShootMove != null;
 
-    let message: string | null = null;
     if (isShootCard && lastPlayedCard !== prev.card && !hasPendingShootMove) {
+      let fired: 'kill' | 'move' | null = null;
       for (const [id, layer] of Object.entries(nextLayers)) {
         const prevLayer = prev.layers[id];
         if (prevLayer !== undefined && prevLayer !== layer) {
           const name = (players?.[id]?.nickname as string | undefined) ?? `P${id}`;
-          message =
-            layer === 0
-              ? `${getCardName(lastPlayedCard)} 命中 · ${name} 被击杀`
-              : `${getCardName(lastPlayedCard)} 命中 · ${name} 被推至 L${layer}`;
+          if (layer === 0) {
+            toast.error(`${getCardName(lastPlayedCard)} 击杀 · ${name}`);
+            fired = 'kill';
+          } else {
+            toast.info(`${getCardName(lastPlayedCard)} 命中 · ${name} 被推至 L${layer}`);
+            fired = 'move';
+          }
           break;
         }
       }
+      if (!fired) {
+        toast.warn(`${getCardName(lastPlayedCard)} 未命中 · 目标无位移`);
+      }
     }
 
-    shootNoticeTrackRef.current = { card: lastPlayedCard, layers: nextLayers };
-
-    if (!message) return;
-    // 异步触发 setState，避免 effect 同步渲染级联（react-hooks/set-state-in-effect）
-    const raf = requestAnimationFrame(() => setShootNotice(message));
-    const timer = setTimeout(() => setShootNotice(null), 3000);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-    };
+    shootToastTrackRef.current = { card: lastPlayedCard, layers: nextLayers };
   }, [G, players, lastPlayedCard]);
 
   // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
@@ -885,139 +894,9 @@ export function LocalMatchRuntime({
             </>
           )}
 
-          {/* 需选目标玩家：SHOOT 等 */}
-          {turnPhase === 'action' && effectivePending?.needsTarget === 'player' && (
-            <div className="w-full rounded-md border border-primary/40 bg-primary/10 p-3">
-              <div className="mb-2 text-sm text-primary">
-                {t('localMatch.pickPlayerTarget', {
-                  card: getCardName(effectivePending.card),
-                })}
-              </div>
-
-              {/* 死亡宣言可选展示（仅 SHOOT 系列）*/}
-              {(() => {
-                const isShoot =
-                  effectivePending.move === 'playShoot' ||
-                  effectivePending.move === 'playShootKing' ||
-                  effectivePending.move === 'playShootArmor' ||
-                  effectivePending.move === 'playShootBurst' ||
-                  (effectivePending.dreamMode === 'shoot' &&
-                    effectivePending.move === 'playShootDreamTransit');
-                const decrees = humanHand.filter((c) => c.startsWith('action_death_decree_'));
-                if (!isShoot || decrees.length === 0) return null;
-                return (
-                  <div
-                    className="mb-2 flex flex-wrap items-center gap-2 text-[11px]"
-                    data-testid="decree-picker"
-                  >
-                    <span className="text-muted-foreground">
-                      {t('localMatch.decreeLabel', { defaultValue: '附加死亡宣言：' })}
-                    </span>
-                    {decrees.map((c) => (
-                      <button
-                        key={`decree-${c}`}
-                        type="button"
-                        onClick={() => toggleDecree(c)}
-                        className={cn(
-                          'rounded-full border px-2 py-0.5',
-                          decreePick === c
-                            ? 'border-amber-400 bg-amber-500/30 text-amber-400'
-                            : 'border-border bg-card hover:border-amber-400/60',
-                        )}
-                        data-testid={`decree-${c}`}
-                      >
-                        {getCardName(c)}
-                      </button>
-                    ))}
-                    {decreePick && (
-                      <button
-                        type="button"
-                        onClick={() => setDecreePick(null)}
-                        className="rounded-full border border-muted px-2 py-0.5 text-muted-foreground"
-                      >
-                        {t('localMatch.decreeClear', { defaultValue: '取消宣言' })}
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* SHOOT 目标同层/跨层约束：
-                    action_shoot_king → 跨层合法（刺客之王）
-                    其他 action_shoot* → 仅同层合法
-                  对照：docs/manual/04-action-cards.md SHOOT 变体使用目标 */}
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(players ?? {})
-                  .filter(([id, p]) => id !== '0' && (p.isAlive as boolean))
-                  .map(([id, p]) => {
-                    const card = effectivePending.card as string;
-                    const isShootCard = card.startsWith('action_shoot');
-                    const sameLayerRequired = isShootCard && card !== 'action_shoot_king';
-                    const targetLayer = (p.currentLayer as number) ?? 1;
-                    const crossLayer = targetLayer !== playerLayer;
-                    const disabled = sameLayerRequired && crossLayer;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        disabled={disabled}
-                        title={disabled ? '该 SHOOT 仅限同层目标' : undefined}
-                        onClick={() => {
-                          if (disabled) return;
-                          void confirmPlayTargetPlayer(id);
-                        }}
-                        className="rounded-full bg-destructive px-3 py-1 text-xs text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                        data-testid={`target-player-${id}`}
-                      >
-                        AI {id}
-                        {disabled ? ` · L${targetLayer}（跨层）` : ''}
-                      </button>
-                    );
-                  })}
-                <button
-                  type="button"
-                  onClick={() => {
-                    cancelPlay();
-                    setDecreePick(null);
-                  }}
-                  className="rounded-full border border-muted px-3 py-1 text-xs text-muted-foreground"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 需选目标层：穿梭剂 */}
-          {turnPhase === 'action' && effectivePending?.needsTarget === 'layer' && (
-            <div className="w-full rounded-md border border-primary/40 bg-primary/10 p-3">
-              <div className="mb-2 text-sm text-primary">
-                {t('localMatch.pickLayerTarget', {
-                  card: getCardName(effectivePending.card),
-                })}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[1, 2, 3, 4].map((layer) => (
-                  <button
-                    key={layer}
-                    type="button"
-                    onClick={() => void confirmPlayTargetLayer(layer)}
-                    className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground"
-                    data-testid={`target-layer-${layer}`}
-                  >
-                    L{layer}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={cancelPlay}
-                  className="rounded-full border border-muted px-3 py-1 text-xs text-muted-foreground"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </div>
-          )}
+          {/* 目标玩家 / 目标层选择已迁至全局 Dialog（TargetPlayerPickerDialog /
+              TargetLayerPickerDialog），挂载在本组件末尾的 Dialog 集群区。
+              对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 5 */}
           {turnPhase === 'discard' && overHand === 0 && (
             <button
               type="button"
@@ -1052,231 +931,11 @@ export function LocalMatchRuntime({
           常驻主动派发 UI 已移除；决策入口走 MasterPeekBribeBanner 等响应式组件。
           对照：docs/manual/03-game-flow.md §贿赂&背叛者 / 04-action-cards.md 梦境窥视 */}
 
-      {/* 棋局·易位：梦主专属主动技能 */}
-      {isChessMaster && !effectivePending && vaultsRaw && (
-        <div
-          className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs"
-          data-testid="chess-transpose-panel"
-        >
-          <div className="mb-2 font-medium text-amber-400">
-            {t('localMatch.chessTranspose', { defaultValue: '棋局·易位：选择 2 个金库交换' })}
-          </div>
-          <div className="mb-2 flex flex-wrap gap-2">
-            {vaultsRaw.map((v, idx) => {
-              const opened = v.isOpened as boolean;
-              const layer = v.layer as number;
-              const picked = chessPick.includes(idx);
-              return (
-                <button
-                  key={`${v.id as string}`}
-                  type="button"
-                  disabled={opened}
-                  onClick={() => toggleChessPick(idx)}
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[11px]',
-                    opened
-                      ? 'border-muted bg-muted text-muted-foreground opacity-50'
-                      : picked
-                        ? 'border-amber-400 bg-amber-500/30 text-amber-400'
-                        : 'border-border bg-card hover:border-amber-400/60',
-                  )}
-                  data-testid={`vault-${idx}`}
-                >
-                  {opened ? '已开' : `金库 L${layer}`}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            disabled={chessPick.length !== 2}
-            onClick={() => void confirmChessTranspose()}
-            className="rounded-full bg-amber-500 px-3 py-1 text-[11px] text-black disabled:opacity-50"
-            data-testid="chess-confirm"
-          >
-            {t('localMatch.chessConfirm', { defaultValue: '确认交换' })}
-          </button>
-        </div>
-      )}
-
-      {/* SHOOT·梦境穿梭剂 mode 选择 */}
-      {dreamTransitPicker && (
-        <div
-          className="mb-4 rounded-md border border-indigo-500/40 bg-indigo-500/5 p-3 text-xs"
-          data-testid="dream-transit-mode-picker"
-        >
-          <div className="mb-2 font-medium text-indigo-400">
-            {t('localMatch.dreamTransitPick', {
-              defaultValue: 'SHOOT·梦境穿梭剂：选择结算方式',
-            })}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => chooseDreamMode('shoot')}
-              className="rounded-full bg-indigo-500 px-3 py-1 text-[11px] text-white"
-              data-testid="dream-mode-shoot"
-            >
-              {t('localMatch.dreamModeShoot', { defaultValue: '以 SHOOT 结算' })}
-            </button>
-            <button
-              type="button"
-              onClick={() => chooseDreamMode('transit')}
-              className="rounded-full bg-indigo-400 px-3 py-1 text-[11px] text-white"
-              data-testid="dream-mode-transit"
-            >
-              {t('localMatch.dreamModeTransit', { defaultValue: '以 穿梭剂 结算' })}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDreamTransitPicker(null)}
-              className="rounded-full border border-muted px-3 py-1 text-[11px] text-muted-foreground"
-            >
-              {t('common.cancel')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 万有引力：多目标选择 */}
-      {gravityPicker && players && (
-        <div
-          className="mb-4 rounded-md border border-violet-500/40 bg-violet-500/5 p-3 text-xs"
-          data-testid="gravity-targets-picker"
-        >
-          <div className="mb-2 font-medium text-violet-400">
-            {t('localMatch.gravityPickTargets', {
-              defaultValue: '万有引力：选 1-2 名玩家（不含自己）',
-            })}
-          </div>
-          <div className="mb-2 flex flex-wrap gap-2">
-            {Object.entries(players)
-              .filter(([id, p]) => id !== '0' && (p.isAlive as boolean))
-              .map(([id]) => {
-                const picked = gravityPicker.targets.includes(id);
-                return (
-                  <button
-                    key={`grav-tgt-${id}`}
-                    type="button"
-                    onClick={() => toggleGravityTarget(id)}
-                    className={cn(
-                      'rounded-full border px-2 py-0.5 text-[11px]',
-                      picked
-                        ? 'border-violet-400 bg-violet-500/30 text-violet-400'
-                        : 'border-border bg-card hover:border-violet-400/60',
-                    )}
-                    data-testid={`grav-target-${id}`}
-                  >
-                    AI {id}
-                  </button>
-                );
-              })}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={gravityPicker.targets.length < 1}
-              onClick={() => void confirmGravity()}
-              className="rounded-full bg-violet-500 px-3 py-1 text-[11px] text-black disabled:opacity-50"
-              data-testid="gravity-confirm"
-            >
-              {t('localMatch.gravityConfirm', { defaultValue: '确认打出' })}
-            </button>
-            <button
-              type="button"
-              onClick={() => setGravityPicker(null)}
-              className="rounded-full border border-muted px-3 py-1 text-[11px] text-muted-foreground"
-            >
-              {t('common.cancel')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 万有引力：人类 bonder 的池挑选器 */}
-      {isHumanGravityBonder && pendingGravity && (
-        <div
-          className="mb-4 rounded-md border border-violet-500/40 bg-violet-500/5 p-3 text-xs"
-          data-testid="gravity-pool-picker"
-        >
-          <div className="mb-2 font-medium text-violet-400">
-            {t('localMatch.gravityPoolPick', {
-              defaultValue: '万有引力：轮流挑选',
-              picker:
-                pendingGravity.pickOrder[
-                  pendingGravity.pickCursor % pendingGravity.pickOrder.length
-                ],
-            })}{' '}
-            ·{' '}
-            {(() => {
-              const picker =
-                pendingGravity.pickOrder[
-                  pendingGravity.pickCursor % pendingGravity.pickOrder.length
-                ];
-              return picker === '0' ? t('localMatch.you') : `AI ${picker}`;
-            })()}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {pendingGravity.pool.map((c, idx) => (
-              <button
-                key={`grav-pool-${idx}-${c}`}
-                type="button"
-                onClick={() => void pickGravityCard(c)}
-                className="rounded-full border border-violet-400/60 bg-card px-2 py-0.5 text-[11px] hover:bg-violet-500/10"
-                data-testid={`grav-pool-${idx}`}
-              >
-                {getCardName(c)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 嫁接结算：选 2 张返牌库顶 */}
-      {isHumanGraftPending && (
-        <div
-          className="mb-4 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-xs"
-          data-testid="graft-resolver"
-        >
-          <div className="mb-2 font-medium text-emerald-400">
-            {t('localMatch.graftTitle', {
-              defaultValue: '嫁接：选 2 张手牌放回牌库顶（第 1 张位于最顶）',
-            })}
-          </div>
-          <div className="mb-2 flex flex-wrap gap-2">
-            {humanHand.map((card, idx) => {
-              const picked = effectiveGraftPick.includes(card);
-              const order = effectiveGraftPick.indexOf(card) + 1;
-              return (
-                <button
-                  key={`graft-pick-${idx}-${card}`}
-                  type="button"
-                  onClick={() => toggleGraftPick(card)}
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[11px]',
-                    picked
-                      ? 'border-emerald-400 bg-emerald-500/30 text-emerald-400'
-                      : 'border-border bg-card hover:border-emerald-400/60',
-                  )}
-                  data-testid={`graft-card-${idx}`}
-                >
-                  {picked && <span className="mr-1 text-[10px]">#{order}</span>}
-                  {getCardName(card)}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            disabled={effectiveGraftPick.length !== 2}
-            onClick={() => void confirmGraft()}
-            className="rounded-full bg-emerald-500 px-3 py-1 text-[11px] text-black disabled:opacity-50"
-            data-testid="graft-confirm"
-          >
-            {t('localMatch.graftConfirm', { defaultValue: '确认放回' })}
-          </button>
-        </div>
-      )}
+      {/* P2 内联 picker 面板（棋局·易位 / 梦境穿梭剂 mode / 万有引力 / 嫁接）
+          均已迁至 Dialog（ChessTransposeDialog / DreamTransitModeDialog /
+          GravityTargetPickerDialog / GravityPoolPickerDialog / GraftResolverDialog），
+          挂载在本组件末尾的 Dialog 集群区。
+          对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 5 */}
 
       {players && (
         <div className="space-y-2">
@@ -1324,38 +983,28 @@ export function LocalMatchRuntime({
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      {/* 梦魇决策提示 · 盗梦者开金币金库后梦主 3 选 1（对照 docs/manual/03-game-flow.md:94-102） */}
-      <MasterNightmareDecisionBanner
+      {/* 响应类 Dialog 群（互斥业务保证同时只会有一个 open） · 对照 plans/2-1-3-1-2-ui-cozy-wave.md */}
+      <MasterNightmareDecisionDialog
         G={G as never}
         currentPlayerID={currentPlayerID}
         dreamMasterID={dreamMasterID}
         makeMove={makeMove}
       />
-
-      {/* W19-B F4 · 解封响应 banner：其他玩家打解封时人类响应者的抵消/跳过入口 */}
-      <UnlockResponseBanner
+      <UnlockResponseDialog
         G={G as never}
         viewerPlayerID="0"
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         makeMove={makeMove}
       />
-
-      {/* W19-B F9 · 梦境窥视派贿赂决策 banner（梦主端）*/}
-      <MasterPeekBribeBanner
+      <MasterPeekBribeDialog
         G={G as never}
         viewerPlayerID="0"
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         makeMove={makeMove}
       />
-
-      {/* W19-B F9 · 盗梦者金库查看 banner（peeker 端，私密展示 playerView 授权内容）*/}
-      <PeekerVaultRevealBanner G={G as never} viewerPlayerID="0" makeMove={makeMove} />
-
-      {/* W19-B F10 · 梦主查看盗梦者贿赂牌 banner（梦境窥视 效果②）*/}
-      <MasterBribeInspectBanner G={G as never} viewerPlayerID="0" makeMove={makeMove} />
-
-      {/* SHOOT 发动方选层 banner（对照：docs/manual/04-action-cards.md SHOOT 解析）*/}
-      <ShooterLayerPickerBanner
+      <PeekerVaultRevealDialog G={G as never} viewerPlayerID="0" makeMove={makeMove} />
+      <MasterBribeInspectDialog G={G as never} viewerPlayerID="0" makeMove={makeMove} />
+      <ShooterLayerPickerDialog
         G={G as never}
         viewerPlayerID="0"
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
@@ -1363,17 +1012,147 @@ export function LocalMatchRuntime({
         makeMove={makeMove}
       />
 
-      {/* SHOOT 结算轻量 toast · L1/L4 自动移动 / 击杀后的通知
-          3 秒后自动消失；对应规则 "UI 上要有通知" */}
-      {shootNotice && (
-        <div
-          role="status"
-          data-testid="shoot-move-notice"
-          className="mt-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-xs text-orange-900 dark:text-orange-200"
-        >
-          {shootNotice}
-        </div>
-      )}
+      {/* 出牌时选目标玩家（SHOOT / KICK / 念力牵引 / 共鸣 / shift 等） */}
+      <TargetPlayerPickerDialog
+        pending={
+          isHumanTurn && turnPhase === 'action' && effectivePending?.needsTarget === 'player'
+            ? { card: effectivePending.card, move: effectivePending.move }
+            : null
+        }
+        viewerPlayerID="0"
+        viewerLayer={playerLayer}
+        players={
+          (players as unknown as
+            | Record<string, { isAlive: boolean; currentLayer: number; nickname?: string }>
+            | undefined) ?? {}
+        }
+        cardNameOf={(cardId) => getCardName(cardId)}
+        onPick={(id) => void confirmPlayTargetPlayer(id)}
+        onCancel={() => {
+          cancelPlay();
+          setDecreePick(null);
+        }}
+        decreeSlot={(() => {
+          if (!effectivePending) return null;
+          const isShoot =
+            effectivePending.move === 'playShoot' ||
+            effectivePending.move === 'playShootKing' ||
+            effectivePending.move === 'playShootArmor' ||
+            effectivePending.move === 'playShootBurst' ||
+            (effectivePending.dreamMode === 'shoot' &&
+              effectivePending.move === 'playShootDreamTransit');
+          const decrees = humanHand.filter((c) => c.startsWith('action_death_decree_'));
+          if (!isShoot || decrees.length === 0) return null;
+          return (
+            <div
+              className="mb-2 flex flex-wrap items-center gap-2 text-[11px]"
+              data-testid="decree-picker"
+            >
+              <span className="text-muted-foreground">
+                {t('localMatch.decreeLabel', { defaultValue: '附加死亡宣言：' })}
+              </span>
+              {decrees.map((c) => (
+                <button
+                  key={`decree-${c}`}
+                  type="button"
+                  onClick={() => toggleDecree(c)}
+                  className={cn(
+                    'rounded-full border px-2 py-0.5',
+                    decreePick === c
+                      ? 'border-amber-400 bg-amber-500/30 text-amber-400'
+                      : 'border-border bg-card hover:border-amber-400/60',
+                  )}
+                  data-testid={`decree-${c}`}
+                >
+                  {getCardName(c)}
+                </button>
+              ))}
+              {decreePick && (
+                <button
+                  type="button"
+                  onClick={() => setDecreePick(null)}
+                  className="rounded-full border border-muted px-2 py-0.5 text-muted-foreground"
+                >
+                  {t('localMatch.decreeClear', { defaultValue: '取消宣言' })}
+                </button>
+              )}
+            </div>
+          );
+        })()}
+      />
+
+      {/* 出牌时选目标层（穿梭剂 / 梦境窥视 / 梦魇解封 等） */}
+      <TargetLayerPickerDialog
+        pending={
+          isHumanTurn && turnPhase === 'action' && effectivePending?.needsTarget === 'layer'
+            ? { card: effectivePending.card, move: effectivePending.move }
+            : null
+        }
+        viewerLayer={playerLayer}
+        cardNameOf={(cardId) => getCardName(cardId)}
+        onPick={(layer) => void confirmPlayTargetLayer(layer)}
+        onCancel={cancelPlay}
+      />
+
+      {/* SHOOT·梦境穿梭剂 mode 选择 */}
+      <DreamTransitModeDialog
+        open={dreamTransitPicker != null}
+        onChoose={(mode) => chooseDreamMode(mode)}
+        onCancel={() => setDreamTransitPicker(null)}
+      />
+
+      {/* 棋局·易位（梦主专属） */}
+      <ChessTransposeDialog
+        open={isChessMaster && !effectivePending && !!vaultsRaw}
+        vaults={(vaultsRaw ?? []).map((v) => ({
+          id: v.id as string,
+          layer: v.layer as number,
+          isOpened: v.isOpened as boolean,
+        }))}
+        pickedIndices={chessPick}
+        onToggle={toggleChessPick}
+        onConfirm={() => void confirmChessTranspose()}
+        onCancel={() => setChessPick([])}
+      />
+
+      {/* 万有引力 · 多目标选择 */}
+      <GravityTargetPickerDialog
+        open={gravityPicker != null && players != null}
+        viewerPlayerID="0"
+        options={Object.entries(players ?? {}).map(([id, p]) => ({
+          id,
+          name: (p.nickname as string | undefined) ?? `AI ${id}`,
+          isAlive: p.isAlive as boolean,
+        }))}
+        selected={gravityPicker?.targets ?? []}
+        onToggle={toggleGravityTarget}
+        onConfirm={() => void confirmGravity()}
+        onCancel={() => setGravityPicker(null)}
+      />
+
+      {/* 万有引力 · 池挑选（人类 bonder） */}
+      <GravityPoolPickerDialog
+        open={isHumanGravityBonder && pendingGravity != null}
+        pool={pendingGravity?.pool ?? []}
+        currentPicker={
+          pendingGravity?.pickOrder?.[
+            (pendingGravity?.pickCursor ?? 0) % Math.max(1, pendingGravity?.pickOrder?.length ?? 1)
+          ] ?? '0'
+        }
+        viewerPlayerID="0"
+        cardNameOf={(cardId) => getCardName(cardId)}
+        onPick={(c) => void pickGravityCard(c)}
+      />
+
+      {/* 嫁接 · 选 2 张返牌库顶 */}
+      <GraftResolverDialog
+        open={isHumanGraftPending}
+        hand={humanHand}
+        picked={effectiveGraftPick}
+        cardNameOf={(cardId) => getCardName(cardId)}
+        onToggle={toggleGraftPick}
+        onConfirm={() => void confirmGraft()}
+      />
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
       <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />
