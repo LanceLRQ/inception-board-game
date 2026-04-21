@@ -142,13 +142,15 @@ export interface SetupState {
     targetLayer: number;
   } | null;
   // 梦境窥视 · 私密展示态（playerView 授权分支消费）
-  //   仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容；其他玩家视角仍看见 "hidden"
-  //   生命周期：masterPeekBribeDecision 或 playPeek 贿赂池空分支挂起 → peekerAcknowledge 清空
-  peekReveal: {
-    peekerID: string;
-    revealKind: 'vault';
-    vaultLayer: number;
-  } | null;
+  //   revealKind='vault'：效果①（盗梦者使用），仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容
+  //   revealKind='bribe'：效果②（梦主使用，W19-B F10），仅对 peekerID(=梦主) 视角透传
+  //                     targetThiefID 持有的贿赂牌内容（为未来梦主隐私收紧预留授权入口）
+  //   生命周期：playPeek / masterPeekBribeDecision / playPeekMaster 挂起 → peekerAcknowledge 清空
+  //   对照：docs/manual/04-action-cards.md 梦境窥视 效果①/效果②
+  peekReveal:
+    | { peekerID: string; revealKind: 'vault'; vaultLayer: number }
+    | { peekerID: string; revealKind: 'bribe'; targetThiefID: string }
+    | null;
   // 天秤·平衡：bonder 把所有手牌交给 target；target 分两份；bonder 选 1 份取走
   // 对照：docs/manual/05-dream-thieves.md 天秤
   pendingLibra: {

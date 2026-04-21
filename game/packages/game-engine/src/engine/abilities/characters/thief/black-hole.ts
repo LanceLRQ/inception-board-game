@@ -50,6 +50,7 @@ export const blackHoleLevy: AbilityDefinition = {
     if (Object.keys(picks).length < otherIds.length) {
       const withWindow = openResponseWindow(state, {
         sourceAbilityID: this.id,
+        sourceType: 'skill',
         responders: otherIds,
         timeoutMs: 30_000,
         validResponseAbilityIDs: ['generic_pick_card'],

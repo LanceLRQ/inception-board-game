@@ -398,3 +398,229 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
     });
   });
 });
+
+// -----------------------------------------------------------------------------
+// OOT-03 · 梦境窥视 效果② · 梦主查看一名盗梦者的所有贿赂牌（W19-B F10）
+// 对照：docs/manual/04-action-cards.md 梦境窥视 效果②
+//   "仅梦主使用，查看一名盗梦者的所有贿赂牌。"
+//   使用目标："一名已被贿赂的盗梦者"
+//
+// 流程：
+//   1. playPeekMaster(cardId, targetThiefID) — 梦主打出
+//      - 校验：currentPlayer === dreamMasterID
+//      - 校验：target.isAlive && target.faction === 'thief'
+//      - 校验：target 持有至少 1 张贿赂牌（bribePool.some(b => b.heldBy === target)）
+//      - 弃牌 + recordCardPlayed + 挂 peekReveal { revealKind: 'bribe', targetThiefID }
+//   2. peekerAcknowledge() — 梦主确认查看完毕 → 清 peekReveal + moveCounter + 1
+//
+// playerView 授权（filterBribes）：当 peekReveal.revealKind='bribe' 且 viewerID===peekerID
+//   时，targetThiefID 持有的贿赂牌 status / originalOwnerId 保留透传（为未来梦主隐私
+//   收紧预留入口；当前梦主默认全可见，此授权分支幂等）。
+// -----------------------------------------------------------------------------
+
+describe('OOT-03 · 梦境窥视效果② 梦主查看贿赂牌（F10 red test）', () => {
+  /** 场景：pM 梦主手持 PEEK_CARD；p2 盗梦者已持 1 张 dealt 贿赂 */
+  function sceneMasterPeek(): SetupState {
+    const base = sceneBeforePeek();
+    const s = {
+      ...base,
+      currentPlayerID: 'pM',
+      players: {
+        ...base.players,
+        p1: { ...base.players.p1!, hand: [] },
+        pM: { ...base.players.pM!, hand: [PEEK_CARD] },
+      },
+    };
+    return withBribes(s, [
+      { id: 'bribe-fail-1', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
+      { id: 'bribe-deal-1', status: 'inPool', heldBy: null, originalOwnerId: null },
+    ]);
+  }
+
+  describe('A · playPeekMaster 校验与状态转移', () => {
+    it('非梦主调用 → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = {
+        ...s0,
+        players: { ...s0.players, p1: { ...s0.players.p1!, hand: [PEEK_CARD] } },
+      };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'p1' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('梦主已死 → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = {
+        ...s0,
+        players: { ...s0.players, pM: { ...s0.players.pM!, isAlive: false, deathTurn: 1 } },
+      };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('手中无 action_dream_peek → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = { ...s0, players: { ...s0.players, pM: { ...s0.players.pM!, hand: [] } } };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('cardId 不是 action_dream_peek → INVALID_MOVE', () => {
+      const s = sceneMasterPeek();
+      const r = callMove(s, 'playPeekMaster', ['action_shoot' as CardID, 'p2'], {
+        currentPlayer: 'pM',
+      });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('target 不存在 → INVALID_MOVE', () => {
+      const s = sceneMasterPeek();
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'pX'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('target 是梦主自己 → INVALID_MOVE（不能指向梦主）', () => {
+      const s = sceneMasterPeek();
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'pM'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('target 已死 → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = {
+        ...s0,
+        players: { ...s0.players, p2: { ...s0.players.p2!, isAlive: false, deathTurn: 1 } },
+      };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('target faction 已转为 master（DEAL 背叛者）→ INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = {
+        ...s0,
+        players: { ...s0.players, p2: { ...s0.players.p2!, faction: 'master' as const } },
+      };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('target 未持有任何贿赂牌 → INVALID_MOVE（规则："已被贿赂的盗梦者"）', () => {
+      const s0 = sceneMasterPeek();
+      const s = {
+        ...s0,
+        bribePool: s0.bribePool.map((b) =>
+          b.id === 'bribe-fail-1'
+            ? { ...b, heldBy: null, originalOwnerId: null, status: 'inPool' as const }
+            : b,
+        ),
+      };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('已有 pendingPeekDecision → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = { ...s0, pendingPeekDecision: { peekerID: 'p1', targetLayer: 2 } };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('已有 peekReveal → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s = {
+        ...s0,
+        peekReveal: { peekerID: 'p1', revealKind: 'vault' as const, vaultLayer: 2 },
+      };
+      const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+
+    it('成功：弃牌 + 挂 peekReveal.bribe + targetThiefID', () => {
+      const s0 = sceneMasterPeek();
+      const r = callMove(s0, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).not.toBe('INVALID_MOVE');
+      const s = r as SetupState;
+      expect(s.peekReveal).toEqual({
+        peekerID: 'pM',
+        revealKind: 'bribe',
+        targetThiefID: 'p2',
+      });
+      expect(s.pendingPeekDecision).toBeNull();
+      // 梦主手牌少 1 张
+      expect(s.players.pM!.hand).toEqual([]);
+      // action_dream_peek 进弃牌堆
+      expect(s.deck.discardPile).toContain(PEEK_CARD);
+    });
+  });
+
+  describe('B · peekerAcknowledge 对 bribe 分支适用', () => {
+    it('peekReveal.bribe 挂起时 pM 本人调用 → 成功清理', () => {
+      const s0 = sceneMasterPeek();
+      const s1 = callMove(s0, 'playPeekMaster', [PEEK_CARD, 'p2'], {
+        currentPlayer: 'pM',
+      }) as SetupState;
+      const r = callMove(s1, 'peekerAcknowledge', [], { currentPlayer: 'pM' });
+      expect(r).not.toBe('INVALID_MOVE');
+      const s = r as SetupState;
+      expect(s.peekReveal).toBeNull();
+    });
+
+    it('peekReveal.bribe 挂起时其他玩家调用 → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s1 = callMove(s0, 'playPeekMaster', [PEEK_CARD, 'p2'], {
+        currentPlayer: 'pM',
+      }) as SetupState;
+      const r = callMove(s1, 'peekerAcknowledge', [], { currentPlayer: 'p1' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+  });
+
+  describe('C · endActionPhase 阻断（bribe 分支）', () => {
+    it('peekReveal.bribe 挂起时 endActionPhase → INVALID_MOVE', () => {
+      const s0 = sceneMasterPeek();
+      const s1 = callMove(s0, 'playPeekMaster', [PEEK_CARD, 'p2'], {
+        currentPlayer: 'pM',
+      }) as SetupState;
+      const r = callMove(s1, 'endActionPhase', [], { currentPlayer: 'pM' });
+      expect(r).toBe('INVALID_MOVE');
+    });
+  });
+
+  describe('D · playerView 授权（filterBribes 分支）', () => {
+    /** 构造 peekReveal.bribe 已挂起状态：pM 正在查看 p2 的贿赂 */
+    function stateWithBribeReveal(): SetupState {
+      const base = sceneMasterPeek();
+      return {
+        ...base,
+        peekReveal: { peekerID: 'pM', revealKind: 'bribe', targetThiefID: 'p2' },
+      };
+    }
+
+    it('peekerID(pM) 视角：p2 持有的 bribe status 可见', () => {
+      const s = stateWithBribeReveal();
+      const view = filterFor(s, 'pM');
+      const b = view.bribePool.find((x) => x.id === 'bribe-fail-1')!;
+      expect(b.heldBy).toBe('p2');
+      expect(b.status).toBe('dealt');
+    });
+
+    it('其他盗梦者视角：p2 的 bribe 不因 peekReveal.bribe 而额外暴露', () => {
+      const s = stateWithBribeReveal();
+      const view = filterFor(s, 'p1');
+      // p1 仍看到 bribe-fail-1 的 heldBy（持有人本身公开），但 originalOwnerId 隐藏
+      const b = view.bribePool.find((x) => x.id === 'bribe-fail-1')!;
+      expect(b.heldBy).toBe('p2');
+      // 非持有人非梦主视角：originalOwnerId 应被过滤
+      expect(b.originalOwnerId).toBeNull();
+    });
+
+    it('观战者视角：peekReveal.bribe 不改变观战可见性', () => {
+      const s = stateWithBribeReveal();
+      const view = filterFor(s, null);
+      const b = view.bribePool.find((x) => x.id === 'bribe-fail-1')!;
+      // 观战看到持有人但不看 originalOwnerId
+      expect(b.originalOwnerId).toBeNull();
+    });
+  });
+});

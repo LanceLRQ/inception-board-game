@@ -40,6 +40,7 @@ const MOVES_BY_PHASE: Record<string, string[]> = {
     'useChessTranspose',
     'masterDealBribe',
     'playPeek',
+    'playPeekMaster',
     'playGraft',
     'resolveGraft',
     'playTimeStorm',
@@ -98,6 +99,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   useChessTranspose: 97,
   masterDealBribe: 98,
   playPeek: 99,
+  playPeekMaster: 230, // W19-B F10：梦主效果② 默认低优先（Bot L0 不主动使用）
   playGraft: 100,
   playTimeStorm: 101,
   playResonance: 102,
@@ -403,8 +405,10 @@ function autoPlayBots(): void {
       return;
     }
 
+    // W19-B F10：peekReveal 兼容 revealKind='vault'（效果①）与 'bribe'（效果②）
     const pr = state.G.peekReveal as
       | { peekerID: string; revealKind: 'vault'; vaultLayer: number }
+      | { peekerID: string; revealKind: 'bribe'; targetThiefID: string }
       | null
       | undefined;
     if (pr) {
@@ -414,7 +418,7 @@ function autoPlayBots(): void {
       }
       const curIdx = parseInt(currentPlayer, 10);
       const curClient = clients[curIdx] ?? humanClient;
-      logAI(`bot peeker ${pr.peekerID} auto acknowledge`, { vaultLayer: pr.vaultLayer });
+      logAI(`bot peeker ${pr.peekerID} auto acknowledge`, { pr });
       try {
         getMoves(curClient)['peekerAcknowledge']?.();
       } catch (err) {

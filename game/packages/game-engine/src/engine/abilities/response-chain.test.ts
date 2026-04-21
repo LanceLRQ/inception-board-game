@@ -10,6 +10,7 @@ import {
   getActiveWindow,
   getParentWindow,
   getWindowDepth,
+  getWindowSourceType,
 } from './response-chain.js';
 import type { PendingResponse } from './types.js';
 import { createTestState } from '../../testing/fixtures.js';
@@ -29,6 +30,38 @@ describe('openResponseWindow', () => {
     expect(next.pendingResponseWindow!.sourceAbilityID).toBe('action_unlock');
     expect(next.pendingResponseWindow!.responders).toEqual(['p2', 'p3']);
     expect(next.pendingResponseWindow!.responded).toEqual([]);
+  });
+
+  // W19-B F14 · sourceType metadata
+  it('透传 sourceType 到 ResponseWindowState', () => {
+    const s = createTestState();
+    const next = openResponseWindow(s, {
+      sourceAbilityID: 'action_unlock_effect_1',
+      sourceType: 'unlock',
+      responders: ['p2'],
+      timeoutMs: 30000,
+      validResponseAbilityIDs: [],
+      onTimeout: 'resolve',
+    });
+    expect(next.pendingResponseWindow!.sourceType).toBe('unlock');
+    expect(getWindowSourceType(next)).toBe('unlock');
+  });
+
+  it('未设置 sourceType 时 getWindowSourceType 返回 null（向后兼容）', () => {
+    const s = createTestState();
+    const next = openResponseWindow(s, {
+      sourceAbilityID: 'legacy_source',
+      responders: ['p2'],
+      timeoutMs: 30000,
+      validResponseAbilityIDs: [],
+      onTimeout: 'resolve',
+    });
+    expect(getWindowSourceType(next)).toBeNull();
+  });
+
+  it('无活跃窗口时 getWindowSourceType 返回 null', () => {
+    const s = createTestState();
+    expect(getWindowSourceType(s)).toBeNull();
   });
 });
 

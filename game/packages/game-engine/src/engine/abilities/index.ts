@@ -15,6 +15,7 @@ export type {
   AbilityContext,
   PendingShootContext,
   PendingResponse,
+  ResponseWindowSourceType,
   ApplyResult,
   TriggerNextEntry,
   GameEvent,
@@ -35,6 +36,10 @@ export {
   respondToWindow,
   isWindowComplete,
   handleTimeout,
+  getActiveWindow,
+  getParentWindow,
+  getWindowDepth,
+  getWindowSourceType,
 } from './response-chain.js';
 export type { ResponseWindowState } from './response-chain.js';
 export {

@@ -18,6 +18,7 @@ import { MasterNightmareDecisionBanner } from '../MasterNightmareDecisionBanner'
 import { UnlockResponseBanner } from '../UnlockResponseBanner';
 import { MasterPeekBribeBanner } from '../MasterPeekBribeBanner';
 import { PeekerVaultRevealBanner } from '../PeekerVaultRevealBanner';
+import { MasterBribeInspectBanner } from '../MasterBribeInspectBanner';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 export type BGIOState = {
@@ -1342,6 +1343,9 @@ export function LocalMatchRuntime({
 
       {/* W19-B F9 · 盗梦者金库查看 banner（peeker 端，私密展示 playerView 授权内容）*/}
       <PeekerVaultRevealBanner G={G as never} viewerPlayerID="0" makeMove={makeMove} />
+
+      {/* W19-B F10 · 梦主查看盗梦者贿赂牌 banner（梦境窥视 效果②）*/}
+      <MasterBribeInspectBanner G={G as never} viewerPlayerID="0" makeMove={makeMove} />
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
       <CardDetailModal cardId={previewCard} onClose={() => setPreviewCard(null)} />

@@ -1179,6 +1179,7 @@ export const InceptionCityGame = {
             if (responders.length > 0) {
               s = openResponseWindow(s, {
                 sourceAbilityID: 'action_unlock_effect_1',
+                sourceType: 'unlock',
                 responders,
                 timeoutMs: 30_000,
                 validResponseAbilityIDs: ['action_unlock_effect_2'],
@@ -1491,8 +1492,47 @@ export const InceptionCityGame = {
           },
           client: false,
         },
+        // 打出梦境窥视 · 效果②（梦主使用）
+        // 对照：docs/manual/04-action-cards.md 梦境窥视 效果②
+        //   "仅梦主使用，查看一名盗梦者的所有贿赂牌。"
+        //   使用目标："一名已被贿赂的盗梦者"
+        //   W19-B F10：梦主对一名已被贿赂的盗梦者打出此牌，弃牌后挂 peekReveal.bribe；
+        //              peeker=梦主自己；由 peekerAcknowledge 清理（复用）。
+        playPeekMaster: {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID, targetThiefID: string) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (cardId !== 'action_dream_peek') return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const master = G.players[ctx.currentPlayer];
+            if (!master || !master.isAlive) return INVALID_MOVE;
+            if (!master.hand.includes(cardId)) return INVALID_MOVE;
+            // 目标校验：target 存在 / 非梦主自身 / 在世 / 盗梦者阵营 / 已持贿赂
+            if (targetThiefID === ctx.currentPlayer) return INVALID_MOVE;
+            const target = G.players[targetThiefID];
+            if (!target || !target.isAlive) return INVALID_MOVE;
+            if (target.faction !== 'thief') return INVALID_MOVE;
+            const hasBribe = G.bribePool.some((b) => b.heldBy === targetThiefID);
+            if (!hasBribe) return INVALID_MOVE;
+            // 防重入
+            if (G.pendingPeekDecision) return INVALID_MOVE;
+            if (G.peekReveal) return INVALID_MOVE;
+
+            let s = discardCard(G, ctx.currentPlayer, cardId);
+            s = {
+              ...s,
+              peekReveal: {
+                peekerID: ctx.currentPlayer,
+                revealKind: 'bribe',
+                targetThiefID,
+              },
+            };
+            return recordCardPlayed(s, cardId);
+          },
+          client: false,
+        },
         // 盗梦者确认查看完毕 → 清 peekReveal + moveCounter+1
         //   W19-B F8：必须由 peekerID 本人调用。
+        //   W19-B F10：对 revealKind='bribe' 分支同样适用（peeker=梦主）。
         peekerAcknowledge: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!G.peekReveal) return INVALID_MOVE;

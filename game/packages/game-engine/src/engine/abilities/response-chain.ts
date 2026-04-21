@@ -7,12 +7,14 @@
 // 外部消费者仍通过 state.pendingResponseWindow 读取当前（栈顶）窗口 — 向后兼容。
 
 import type { SetupState } from '../../setup.js';
-import type { PendingResponse } from './types.js';
+import type { PendingResponse, ResponseWindowSourceType } from './types.js';
 
 /** 响应窗口状态（挂载到 SetupState 上；parentWindow 形成链表表达嵌套栈） */
 export interface ResponseWindowState {
   /** 触发的来源能力 ID（如 "action_unlock"） */
   sourceAbilityID: string;
+  /** 响应窗口来源类别（W19-B F14 · 可选 metadata，便于 UI/Bot 区分） */
+  sourceType?: ResponseWindowSourceType;
   /** 等待响应的玩家列表 */
   responders: string[];
   /** 已响应的玩家（含 pass/act） */
@@ -32,6 +34,7 @@ export function openResponseWindow(state: SetupState, pending: PendingResponse):
   const parent = state.pendingResponseWindow ?? null;
   const window: ResponseWindowState = {
     sourceAbilityID: pending.sourceAbilityID,
+    sourceType: pending.sourceType,
     responders: pending.responders,
     responded: [],
     timeoutMs: pending.timeoutMs,
@@ -126,4 +129,12 @@ export function getWindowDepth(state: SetupState): number {
     cur = cur.parentWindow ?? null;
   }
   return depth;
+}
+
+/**
+ * W19-B F14 · 获取当前响应窗口的 sourceType（便于 UI/Bot 按类别分派）
+ *   未设置 → null（向后兼容旧窗口）
+ */
+export function getWindowSourceType(state: SetupState): ResponseWindowSourceType | null {
+  return state.pendingResponseWindow?.sourceType ?? null;
 }

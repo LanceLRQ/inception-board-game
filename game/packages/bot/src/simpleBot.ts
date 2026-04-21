@@ -46,6 +46,13 @@ const MOVE_PRIORITY: Record<string, number> = {
   respondCancelUnlock: 1, // 响应类按下方逻辑
   passResponse: 2,
   resolveUnlock: 3,
+  // W19-B F12 · 梦境窥视三段式 move 注册
+  //   peekerAcknowledge / masterPeekBribeDecision：挂起态必推进，优先级 0
+  //   playPeek / playPeekMaster：主动打出类，低优先级（不主动选）
+  peekerAcknowledge: 0,
+  masterPeekBribeDecision: 0,
+  playPeek: 80,
+  playPeekMaster: 85,
 };
 
 /**
