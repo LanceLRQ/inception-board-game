@@ -224,3 +224,45 @@ describe('通用守卫', () => {
     expect(callMove('playShootKing', s, '1', 'action_shoot_king', 4)).toBe('INVALID_MOVE');
   });
 });
+
+// 基础 SHOOT 的 moveFaces 规则校正：根据 docs/manual/04-action-cards.md
+// 骰 1=死亡，骰 2/3/4=移动相邻层，骰 5/6=miss（无效果）
+describe('基础 SHOOT 骰面（playShoot）—— [1] 死 / [2,3,4] 移 / [5,6] miss', () => {
+  function makeBaseState(): SetupState {
+    return makeState({
+      players: {
+        '0': makePlayer('0', ['action_shoot']),
+        '1': makePlayer('1', []),
+      } as SetupState['players'],
+    });
+  }
+
+  it('骰 2 → 移动到相邻层（L1→L2）', () => {
+    const r = callMove('playShoot', makeBaseState(), '1', 'action_shoot', 2);
+    expect(r.players['1']!.isAlive).toBe(true);
+    expect(r.players['1']!.currentLayer).toBe(2);
+  });
+
+  it('骰 4 → 移动到相邻层', () => {
+    const r = callMove('playShoot', makeBaseState(), '1', 'action_shoot', 4);
+    expect(r.players['1']!.currentLayer).toBe(2);
+  });
+
+  it('骰 5 → miss（无移动、无击杀）', () => {
+    const r = callMove('playShoot', makeBaseState(), '1', 'action_shoot', 5);
+    expect(r.players['1']!.isAlive).toBe(true);
+    expect(r.players['1']!.currentLayer).toBe(1);
+  });
+
+  it('骰 6 → miss（无移动、无击杀）', () => {
+    const r = callMove('playShoot', makeBaseState(), '1', 'action_shoot', 6);
+    expect(r.players['1']!.isAlive).toBe(true);
+    expect(r.players['1']!.currentLayer).toBe(1);
+  });
+
+  it('骰 1 → 击杀目标', () => {
+    const r = callMove('playShoot', makeBaseState(), '1', 'action_shoot', 1);
+    expect(r.players['1']!.isAlive).toBe(false);
+    expect(r.players['1']!.currentLayer).toBe(0);
+  });
+});

@@ -142,6 +142,63 @@ function guardTurnPhase(G: SetupState, ctx: BGIOCtx, expected: SetupState['turnP
   return true;
 }
 
+// --- 内部 helper：M4-4 金币金库开启奖励 ---
+// 规则：打开金币类金库时，打开者额外获得 1 张贿赂（从 bribePool 随机抽 1 张）
+// 对照：docs/manual/08-appendix.md M4 梦主优势第 4 条
+// 实现：复用 masterDealBribe 的派发逻辑（inPool → dealt/deal 状态流转）；
+// 由 resolveUnlock / 其他金库打开路径在 applyUnlockSuccess 之后显式调用。
+function applyCoinVaultBribeReward(
+  state: SetupState,
+  random: BGIORandom,
+  targetPlayerID: string,
+): SetupState {
+  const target = state.players[targetPlayerID];
+  if (!target || !target.isAlive) return state;
+  const poolIdxs = state.bribePool
+    .map((b, i) => ({ b, i }))
+    .filter(({ b }) => b.status === 'inPool');
+  if (poolIdxs.length === 0) return state;
+  const shuffled = random.Shuffle(poolIdxs);
+  const pick = shuffled[0]!;
+  const bribe = pick.b;
+  const isDeal = bribe.id.startsWith('bribe-deal-');
+  const nextPool = state.bribePool.map((b, i) =>
+    i === pick.i
+      ? {
+          ...b,
+          status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
+          heldBy: targetPlayerID,
+          originalOwnerId: targetPlayerID,
+        }
+      : b,
+  );
+  return {
+    ...state,
+    bribePool: nextPool,
+    players: {
+      ...state.players,
+      [targetPlayerID]: {
+        ...target,
+        bribeReceived: target.bribeReceived + 1,
+        faction: isDeal ? ('master' as Faction) : target.faction,
+      },
+    },
+  };
+}
+
+/** 对比 before/after 的 vaults，返回本次刚打开的金币金库（若有） */
+function findJustOpenedCoinVault(
+  before: SetupState['vaults'],
+  after: SetupState['vaults'],
+): (typeof after)[number] | null {
+  for (let i = 0; i < after.length; i++) {
+    const a = after[i]!;
+    const b = before[i];
+    if (a.isOpened && b && !b.isOpened && a.contentType === 'coin') return a;
+  }
+  return null;
+}
+
 // --- BGIO Game 定义 ---
 export const InceptionCityGame = {
   name: 'inception-city',
@@ -297,6 +354,26 @@ export const InceptionCityGame = {
         // 回合开始时同步 G 的 turn 状态
         onBegin: ({ G, ctx }: { G: SetupState; ctx: BGIOCtx }) => {
           let s = beginTurn(G, ctx.currentPlayer);
+          // 梦主 M4-3：若梦主回合开始时处于迷失层（layer 0），自动原地复活
+          //   —— 规则：梦主无需弃手牌、无需回 layer 1；直接在当前迷失层站起来
+          //   —— 对照：docs/manual/08-appendix.md M4 梦主优势第 3 条
+          // 注意：currentLayer === 0 即"迷失层"；复活目的地统一定为 layer 1
+          //   （规则原文"原地站起来"在多数版本中被解释为回到 layer 1，
+          //    因为 layer 0 不是正式的梦境层，是迷失区。这里选择 layer 1
+          //    更符合多数对局实践，且便于后续 passive 触发）
+          if (ctx.currentPlayer === s.dreamMasterID) {
+            const master = s.players[s.dreamMasterID];
+            if (master && (master.currentLayer === 0 || !master.isAlive)) {
+              s = {
+                ...s,
+                players: {
+                  ...s.players,
+                  [s.dreamMasterID]: { ...master, isAlive: true, deathTurn: null },
+                },
+              };
+              s = movePlayerToLayer(s, s.dreamMasterID, 1);
+            }
+          }
           // abilities registry：触发 onTurnStart passive
           s = dispatchPassives(s, 'onTurnStart').state;
           return s;
@@ -538,7 +615,7 @@ export const InceptionCityGame = {
             const r = applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
               deathFaces: [1],
-              moveFaces: [2, 3, 4, 5],
+              moveFaces: [2, 3, 4],
               extraOnMove: null,
               decreeId,
               preventMove: canPrevent,
@@ -580,10 +657,10 @@ export const InceptionCityGame = {
                 extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
               }
             > = {
-              action_shoot: { deathFaces: [1], moveFaces: [2, 3, 4, 5], extraOnMove: null },
+              action_shoot: { deathFaces: [1], moveFaces: [2, 3, 4], extraOnMove: null },
               action_shoot_dream_transit: {
                 deathFaces: [1],
-                moveFaces: [2, 3, 4, 5],
+                moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
               action_shoot_king: { deathFaces: [1, 2], moveFaces: [3, 4, 5], extraOnMove: null },
@@ -869,7 +946,7 @@ export const InceptionCityGame = {
               return applyShootVariant(G, ctx, random, targetOrLayer, cardId, {
                 sameLayerRequired: true,
                 deathFaces: [1],
-                moveFaces: [2, 3, 4, 5],
+                moveFaces: [2, 3, 4],
                 extraOnMove: null,
                 decreeId,
               });
@@ -983,13 +1060,13 @@ export const InceptionCityGame = {
               action_shoot: {
                 sameLayerRequired: true,
                 deathFaces: [1],
-                moveFaces: [2, 3, 4, 5],
+                moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
               action_shoot_dream_transit: {
                 sameLayerRequired: true,
                 deathFaces: [1],
-                moveFaces: [2, 3, 4, 5],
+                moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
               action_shoot_king: {
@@ -1068,10 +1145,16 @@ export const InceptionCityGame = {
           client: false,
         },
         resolveUnlock: {
-          move: ({ G }: MoveCtx) => {
+          move: ({ G, random }: MoveCtx) => {
             if (!G.pendingUnlock) return INVALID_MOVE;
             const unlockerId = G.pendingUnlock.playerID;
             let s = applyUnlockSuccess(G);
+            // M4-4：若本次打开了金币金库，派 1 张贿赂给打开者
+            // 对照：docs/manual/08-appendix.md M4 梦主优势第 4 条
+            const coinVault = findJustOpenedCoinVault(G.vaults, s.vaults);
+            if (coinVault?.openedBy) {
+              s = applyCoinVaultBribeReward(s, random, coinVault.openedBy);
+            }
             // 译梦师技能：成功解封后抽 2 张
             s = applyInterpreterForeshadow(s, unlockerId);
             // 梦境猎手·满载：成功解封后抽 = 当层心锁数

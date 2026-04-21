@@ -86,7 +86,7 @@ describe('playShootSudger（第 1 步：掷双骰存 pending）', () => {
         targetPlayerID: 'p2',
         cardId: 'action_shoot' as CardID,
         deathFaces: [1],
-        moveFaces: [2, 3, 4, 5],
+        moveFaces: [2, 3, 4],
         extraOnMove: null,
       },
     };
@@ -138,11 +138,12 @@ describe('resolveSudgerPick（第 2 步：选 A/B + SHOOT 结算）', () => {
     expect(r.players.p1!.hand).not.toContain('action_shoot');
   });
 
-  it('选 B（骰值 5）→ move target 到相邻层', () => {
+  it('选 B（骰值 3）→ move target 到相邻层', () => {
     let s = setupSudger();
+    // 规则 04-action-cards.md：基础 SHOOT 只有 [2,3,4] 是 move，5/6 为 miss
     s = callMove(s, 'playShootSudger', ['p2', 'action_shoot'], {
       currentPlayer: 'p1',
-      rolls: [1, 5],
+      rolls: [1, 3], // A=1(death), B=3(move)
     }) as typeof s;
     const r = callMove(s, 'resolveSudgerPick', ['B'], { currentPlayer: 'p1' });
     expectMoveOk(r);

@@ -2308,9 +2308,9 @@ export function applyImperialCityWorldShoot(
   if (shooterID === targetID) return null;
   if (target.faction !== 'thief') return null;
   if (target.bribeReceived > 0) return null;
-  // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4,5]
+  // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4]（规则 04-action-cards.md SHOOT 章）
   const modifiedRoll = Math.max(1, roll - 3);
-  const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4, 5]);
+  const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
   if (result === 'kill') {
     let s = movePlayerToLayer(state, targetID, 0);
     s = {
@@ -2497,7 +2497,7 @@ export function applyVenusMirrorWorld(
     s = movePlayerToLayer(s, targetID, 0);
   } else {
     // SHOOT 效果：普通骰面 [1] 死 [2-4] 移 [5-6] miss
-    const result = resolveShootCustom(roll, [1], [2, 3, 4, 5]);
+    const result = resolveShootCustom(roll, [1], [2, 3, 4]);
     if (result === 'kill') {
       const tp = s.players[targetID]!;
       const handover = tp.hand.slice(0, 2);
