@@ -179,11 +179,12 @@ describe('行动牌快照回归 · 21 卡', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 11. 梦境窥视 · 弃牌（MVP 简化）
+  // 11. 梦境窥视 · 效果①三段式（W19-B F5）
+  //   默认 bribePool=[]（baseline 未配），走"无负担窥视"分支 → 直接挂 peekReveal
   // -------------------------------------------------------------------------
-  it('11. playPeek · 窥视层 1（含 v-secret）', () => {
-    const s = withHand(baseline(), 'p1', ['action_peek' as CardID]);
-    const r = callMove(s, 'playPeek', ['action_peek' as CardID, 1]);
+  it('11. playPeek · 窥视层 1（贿赂池空 → 直接挂 peekReveal）', () => {
+    const s = withHand(baseline(), 'p1', ['action_dream_peek' as CardID]);
+    const r = callMove(s, 'playPeek', ['action_dream_peek' as CardID, 1]);
     expectMoveOk(r);
     expect(pickRelevantState(r)).toMatchSnapshot();
   });

@@ -132,6 +132,23 @@ export interface SetupState {
   // 响应窗口（能力系统）
   // 对照：plans/design/02-game-rules-spec.md §2.4.2
   pendingResponseWindow: import('./engine/abilities/response-chain.js').ResponseWindowState | null;
+  // 梦境窥视 · 梦主决策等待态
+  //   规则：盗梦者使用【梦境窥视】效果①时，梦主先决定是否给 1 张贿赂牌 → 然后盗梦者查看金库
+  //   对照：docs/manual/04-action-cards.md 梦境窥视 效果① / plans/report/phase3-out-of-turn-interaction-review.md OOT-02
+  //   生命周期：playPeek 挂起（若贿赂池有可派牌） → masterPeekBribeDecision 清空
+  //   若贿赂池已派完 → playPeek 跳过该步，直接设置 peekReveal
+  pendingPeekDecision: {
+    peekerID: string;
+    targetLayer: number;
+  } | null;
+  // 梦境窥视 · 私密展示态（playerView 授权分支消费）
+  //   仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容；其他玩家视角仍看见 "hidden"
+  //   生命周期：masterPeekBribeDecision 或 playPeek 贿赂池空分支挂起 → peekerAcknowledge 清空
+  peekReveal: {
+    peekerID: string;
+    revealKind: 'vault';
+    vaultLayer: number;
+  } | null;
   // 天秤·平衡：bonder 把所有手牌交给 target；target 分两份；bonder 选 1 份取走
   // 对照：docs/manual/05-dream-thieves.md 天秤
   pendingLibra: {
@@ -352,6 +369,8 @@ export function createInitialState(options: {
     pendingGravity: null,
     shiftSnapshot: null,
     pendingResponseWindow: null,
+    pendingPeekDecision: null,
+    peekReveal: null,
     pendingLibra: null,
     pendingSudgerRolls: null,
     mazeState: null,

@@ -142,6 +142,8 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     pendingGravity: null,
     shiftSnapshot: null,
     pendingResponseWindow: null,
+    pendingPeekDecision: null,
+    peekReveal: null,
     pendingLibra: null,
     mazeState: null,
     winner: null,

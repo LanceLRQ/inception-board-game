@@ -70,7 +70,7 @@ export function filterFor(
   return {
     ...state,
     players: filterPlayers(state.players, viewerID, isMaster, isSpectator),
-    vaults: filterVaults(state.vaults, isMaster),
+    vaults: filterVaults(state.vaults, isMaster, state.peekReveal, viewerID, isSpectator),
     bribePool: filterBribes(state.bribePool, viewerID, isMaster, isSpectator),
     deck: filterDeck(state.deck),
     _filteredFor: viewerID ?? '__spectator__',
@@ -115,13 +115,35 @@ function filterPlayers(
 }
 
 // === L2 · 金库过滤 ===
+//
+// W19-B F7：新增 peekReveal 授权分支 — 当 viewerID === peekReveal.peekerID 且
+//   peekReveal.revealKind='vault' 且 peekReveal.vaultLayer === v.layer 时，
+//   对该 viewer 透传该层 vault 的 contentType（等同"私密窥视授权"）。
+//   对照：docs/manual/04-action-cards.md 梦境窥视 效果①"查看任意一层梦境的金库"
+//
+// 优先级：isOpened（全员公开） > isMaster（始终可见） > revealThisVault（peeker 授权） > hidden。
+// 观战者不受 peekReveal 影响（始终隐藏未开金库内容）。
 
-function filterVaults(vaults: VaultSetup[], isMaster: boolean): FilteredVault[] {
-  return vaults.map((v) => ({
-    ...v,
-    // 未开金库：盗梦者不可见内容；梦主可见全部；已开可见
-    contentType: v.isOpened || isMaster ? v.contentType : ('hidden' as const),
-  }));
+function filterVaults(
+  vaults: VaultSetup[],
+  isMaster: boolean,
+  peekReveal: SetupState['peekReveal'],
+  viewerID: string | null,
+  isSpectator: boolean,
+): FilteredVault[] {
+  return vaults.map((v) => {
+    const revealThisVault =
+      !isSpectator &&
+      peekReveal !== null &&
+      peekReveal.revealKind === 'vault' &&
+      peekReveal.peekerID === viewerID &&
+      peekReveal.vaultLayer === v.layer;
+    const visible = v.isOpened || isMaster || revealThisVault;
+    return {
+      ...v,
+      contentType: visible ? v.contentType : ('hidden' as const),
+    };
+  });
 }
 
 // === L3 · 贿赂过滤 ===

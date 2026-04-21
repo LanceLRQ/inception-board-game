@@ -67,6 +67,8 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     winReason: null,
     endTurn: null,
     pendingResponseWindow: null,
+    pendingPeekDecision: null,
+    peekReveal: null,
     pendingLibra: null,
     mazeState: null,
     playedCardsThisTurn: [],

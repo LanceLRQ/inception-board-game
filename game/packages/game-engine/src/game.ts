@@ -105,6 +105,11 @@ import {
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
+import {
+  openResponseWindow,
+  respondToWindow,
+  passOnResponse,
+} from './engine/abilities/response-chain.js';
 import type { CardID, Faction, Layer } from '@icgame/shared';
 
 export type { SetupState } from './setup.js';
@@ -197,6 +202,24 @@ function findJustOpenedCoinVault(
     if (a.isOpened && b && !b.isOpened && a.contentType === 'coin') return a;
   }
   return null;
+}
+
+// --- 内部 helper：解封成功完整副作用链 ---
+// W19-B F3：由 passResponse（全员 pass）与 resolveUnlock（兜底）共享。
+// 顺序：applyUnlockSuccess → M4-4 金币金库贿赂奖励 → 译梦师抽 2 → 梦境猎手·满载 → onUnlock passive。
+// 对照：docs/manual/04-action-cards.md 解封 + docs/manual/08-appendix.md M4-4
+function resolveUnlockFull(G: SetupState, random: BGIORandom): SetupState {
+  if (!G.pendingUnlock) return G;
+  const unlockerId = G.pendingUnlock.playerID;
+  let s = applyUnlockSuccess(G);
+  const coinVault = findJustOpenedCoinVault(G.vaults, s.vaults);
+  if (coinVault?.openedBy) {
+    s = applyCoinVaultBribeReward(s, random, coinVault.openedBy);
+  }
+  s = applyInterpreterForeshadow(s, unlockerId);
+  s = applyExtractorBounty(s, unlockerId);
+  s = dispatchPassives(s, 'onUnlock').state;
+  return s;
 }
 
 // --- BGIO Game 定义 ---
@@ -1107,8 +1130,10 @@ export const InceptionCityGame = {
           },
           client: false,
         },
-        // 打出解封 - 盗梦者解锁同层心锁
+        // 打出解封 - 盗梦者解锁同层心锁（效果①）
         // 对照：docs/manual/04-action-cards.md 解封
+        // W19-B F3：playUnlock 成功后即刻打开响应窗口（对照：§解封 使用时机②
+        //   "任意玩家使用【解封】的效果①时"），允许其他玩家出效果②抵消
         playUnlock: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -1140,27 +1165,35 @@ export const InceptionCityGame = {
                 cardId,
               },
             };
+            // 打开响应窗口：responders = 其他存活玩家（含梦主）
+            const responders = s.playerOrder.filter((id) => {
+              const p = s.players[id];
+              return !!p && p.isAlive && id !== ctx.currentPlayer;
+            });
+            if (responders.length > 0) {
+              s = openResponseWindow(s, {
+                sourceAbilityID: 'action_unlock_effect_1',
+                responders,
+                timeoutMs: 30_000,
+                validResponseAbilityIDs: ['action_unlock_effect_2'],
+                onTimeout: 'resolve',
+              });
+            }
             return recordCardPlayed(s, cardId);
           },
           client: false,
         },
+        // resolveUnlock：兜底入口 - 在响应窗口未接入或 bot 直接推进时可用。
+        // W19-B F3：正常流程下由 passResponse 在"全员 pass"时自动触发 resolveUnlockFull。
+        //   该 move 仍保留：供 bot/无响应窗口场景 fallback；会强制关闭可能残留的窗口。
         resolveUnlock: {
           move: ({ G, random }: MoveCtx) => {
             if (!G.pendingUnlock) return INVALID_MOVE;
-            const unlockerId = G.pendingUnlock.playerID;
-            let s = applyUnlockSuccess(G);
-            // M4-4：若本次打开了金币金库，派 1 张贿赂给打开者
-            // 对照：docs/manual/08-appendix.md M4 梦主优势第 4 条
-            const coinVault = findJustOpenedCoinVault(G.vaults, s.vaults);
-            if (coinVault?.openedBy) {
-              s = applyCoinVaultBribeReward(s, random, coinVault.openedBy);
-            }
-            // 译梦师技能：成功解封后抽 2 张
-            s = applyInterpreterForeshadow(s, unlockerId);
-            // 梦境猎手·满载：成功解封后抽 = 当层心锁数
-            s = applyExtractorBounty(s, unlockerId);
-            // abilities registry：运行 onUnlock passive（空间女王·交错 等）
-            s = dispatchPassives(s, 'onUnlock').state;
+            // 强制退栈：若仍挂着响应窗口（兜底路径），回退到父窗口或 null
+            let s: SetupState = G.pendingResponseWindow
+              ? { ...G, pendingResponseWindow: G.pendingResponseWindow.parentWindow ?? null }
+              : G;
+            s = resolveUnlockFull(s, random);
             return s;
           },
           client: false,
@@ -1222,15 +1255,54 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 响应解封效果②：抵消一张正在结算的【解封】。
+        // 对照：docs/manual/04-action-cards.md §解封 效果②
+        // W19-B F2：补齐 responder 校验 + 持卡校验 + 弃牌 + 关闭响应窗口。
+        //   签名：respondCancelUnlock(responderID?)；未传参时 fallback 到 ctx.currentPlayer
+        //   （兼容 bot 原无参调用；真实 BGIO 场景应由 unlocker 代理调用时显式传 responderID）
         respondCancelUnlock: {
-          move: ({ G }: MoveCtx) => {
+          move: ({ G, ctx }: MoveCtx, responderID?: string) => {
+            const rid = responderID ?? ctx.currentPlayer;
             if (!G.pendingUnlock) return INVALID_MOVE;
-            return applyUnlockCancel(G);
+            const w = G.pendingResponseWindow;
+            if (!w) return INVALID_MOVE;
+            if (w.sourceAbilityID !== 'action_unlock_effect_1') return INVALID_MOVE;
+            if (!w.responders.includes(rid)) return INVALID_MOVE;
+            if (w.responded.includes(rid)) return INVALID_MOVE;
+            const responder = G.players[rid];
+            if (!responder || !responder.isAlive) return INVALID_MOVE;
+            const unlockCard = 'action_unlock' as CardID;
+            if (!responder.hand.includes(unlockCard)) return INVALID_MOVE;
+            // 弃响应者 1 张【解封】
+            let s = discardCard(G, rid, unlockCard);
+            // 关闭响应窗口（栈式回退到 parentWindow / null）
+            const close = respondToWindow(s, rid, 'action_unlock_effect_2');
+            s = close.state;
+            // 撤销解封：pendingUnlock → null（不减心锁，不加 successfulUnlocksThisTurn）
+            s = applyUnlockCancel(s);
+            return s;
           },
           client: false,
         },
+        // pass 响应：表示自己不出效果②抵消。
+        // W19-B F2：校验 responder 合法 & 未重复 pass；全员 pass 时自动进入 resolveUnlockFull。
+        //   签名：passResponse(responderID?)；未传参 fallback 到 ctx.currentPlayer
         passResponse: {
-          move: ({ G }: MoveCtx) => G,
+          move: ({ G, ctx, random }: MoveCtx, responderID?: string) => {
+            const rid = responderID ?? ctx.currentPlayer;
+            const w = G.pendingResponseWindow;
+            if (!w) return INVALID_MOVE;
+            if (!w.responders.includes(rid)) return INVALID_MOVE;
+            if (w.responded.includes(rid)) return INVALID_MOVE;
+            // 本次 pass 后是否所有 responder 都已响应
+            const isLastPass = w.responded.length + 1 >= w.responders.length;
+            let s = passOnResponse(G, rid);
+            // 全员 pass 且源是解封效果① → 自动结算为"解封成功"（含译梦师/M4-4 等副作用）
+            if (isLastPass && w.sourceAbilityID === 'action_unlock_effect_1' && s.pendingUnlock) {
+              s = resolveUnlockFull(s, random);
+            }
+            return s;
+          },
           client: false,
         },
         // 打出梦境穿梭剂 - 移动到相邻层
@@ -1308,21 +1380,119 @@ export const InceptionCityGame = {
           },
           client: false,
         },
-        // 打出梦境窥视 - 查看任意一层金库内容（MVP 简化：仅弃牌；UI 端从 state 自显示）
-        // 对照：docs/manual/04-action-cards.md 梦境窥视
+        // 打出梦境窥视 · 效果①（盗梦者使用）
+        // 对照：docs/manual/04-action-cards.md 梦境窥视 · 解析
+        //   三段式：playPeek → [梦主决策是否派贿赂] → [盗梦者私密查看金库]
+        //   W19-B F5：改 MVP 占位为完整三段式。贿赂池有可派牌 → 挂 pendingPeekDecision；
+        //             贿赂池已派完（无 inPool）→ 跳过决策，直接挂 peekReveal（无负担窥视）。
         playPeek: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (cardId !== 'action_dream_peek') return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
+            // 效果①仅盗梦者；梦主效果②通过独立 move 处理（F10 待实装）
+            if (player.faction !== 'thief') return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
             if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
-            // 该层必须有未开金库才值得窥视（否则拒绝）
             const hasVault = G.vaults.some((v) => v.layer === targetLayer);
             if (!hasVault) return INVALID_MOVE;
+            // 防重入
+            if (G.pendingPeekDecision) return INVALID_MOVE;
+            if (G.peekReveal) return INVALID_MOVE;
+
             let s = discardCard(G, ctx.currentPlayer, cardId);
-            s = incrementMoveCounter(s);
-            return s;
+            const hasInPoolBribe = s.bribePool.some((b) => b.status === 'inPool');
+            if (hasInPoolBribe) {
+              // 挂起等梦主 masterPeekBribeDecision 决策
+              s = {
+                ...s,
+                pendingPeekDecision: { peekerID: ctx.currentPlayer, targetLayer },
+              };
+            } else {
+              // 无负担窥视：直接挂 peekReveal
+              s = {
+                ...s,
+                peekReveal: {
+                  peekerID: ctx.currentPlayer,
+                  revealKind: 'vault',
+                  vaultLayer: targetLayer,
+                },
+              };
+            }
+            return recordCardPlayed(s, cardId);
+          },
+          client: false,
+        },
+        // 梦主决策是否派 1 张贿赂给窥视者（回合外 move，不 guard turnPhase）
+        // 对照：docs/manual/04-action-cards.md 梦境窥视 · 解析
+        //   "梦主先决定是否让该盗梦者抽取 1 张贿赂牌，然后该盗梦者再查看任意一层梦境的金库"
+        //   W19-B F6：deal=true 随机派 1 张（命中 DEAL 转阵营）；deal=false 或 inPool=0 → 跳过派发。
+        //   两分支终态一致：清 pendingPeekDecision + 挂 peekReveal（由 peeker 通过 peekerAcknowledge 消费）。
+        masterPeekBribeDecision: {
+          move: ({ G, ctx, random }: MoveCtx, deal: boolean) => {
+            if (!G.pendingPeekDecision) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const { peekerID, targetLayer } = G.pendingPeekDecision;
+            const peeker = G.players[peekerID];
+            if (!peeker) return INVALID_MOVE;
+
+            let s: SetupState = G;
+            if (deal) {
+              const poolIdxs = G.bribePool
+                .map((b, i) => ({ b, i }))
+                .filter(({ b }) => b.status === 'inPool');
+              // inPool=0 竞态：当作 skip 处理（不改 bribePool / bribeReceived）
+              if (poolIdxs.length > 0) {
+                const shuffled = random.Shuffle(poolIdxs);
+                const pick = shuffled[0]!;
+                const bribe = pick.b;
+                const isDeal = bribe.id.startsWith('bribe-deal-');
+                const nextPool = G.bribePool.map((b, i) =>
+                  i === pick.i
+                    ? {
+                        ...b,
+                        status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
+                        heldBy: peekerID,
+                        originalOwnerId: peekerID,
+                      }
+                    : b,
+                );
+                s = {
+                  ...G,
+                  bribePool: nextPool,
+                  players: {
+                    ...G.players,
+                    [peekerID]: {
+                      ...peeker,
+                      bribeReceived: peeker.bribeReceived + 1,
+                      faction: isDeal ? ('master' as Faction) : peeker.faction,
+                    },
+                  },
+                };
+              }
+            }
+            // 清 pending + 挂 peekReveal（peeker 私密查看）
+            return {
+              ...s,
+              pendingPeekDecision: null,
+              peekReveal: {
+                peekerID,
+                revealKind: 'vault',
+                vaultLayer: targetLayer,
+              },
+            };
+          },
+          client: false,
+        },
+        // 盗梦者确认查看完毕 → 清 peekReveal + moveCounter+1
+        //   W19-B F8：必须由 peekerID 本人调用。
+        peekerAcknowledge: {
+          move: ({ G, ctx }: MoveCtx) => {
+            if (!G.peekReveal) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.peekReveal.peekerID) return INVALID_MOVE;
+            const s: SetupState = { ...G, peekReveal: null };
+            return incrementMoveCounter(s);
           },
           client: false,
         },

@@ -3,12 +3,12 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
 // 迁移链：按版本号顺序排列
-const MIGRATIONS: Map<number, Migration> = new Map([
+const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
   // v1 → v2：添加 pendingLibra（天秤）+ mazeState（筑梦师·迷宫）字段
   [
     2,
@@ -16,6 +16,15 @@ const MIGRATIONS: Map<number, Migration> = new Map([
       ...state,
       pendingLibra: state.pendingLibra ?? null,
       mazeState: state.mazeState ?? null,
+    }),
+  ],
+  // v2 → v3：添加 pendingPeekDecision / peekReveal（梦境窥视三段式 W19-B F5/F8）
+  [
+    3,
+    (state) => ({
+      ...state,
+      pendingPeekDecision: state.pendingPeekDecision ?? null,
+      peekReveal: state.peekReveal ?? null,
     }),
   ],
 ]);

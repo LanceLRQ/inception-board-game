@@ -151,6 +151,8 @@ describe('嫁接 · 直接调用 move 函数（纯单元）', () => {
       winReason: null,
       endTurn: null,
       pendingResponseWindow: null,
+      pendingPeekDecision: null,
+      peekReveal: null,
       pendingLibra: null,
       mazeState: null,
       playedCardsThisTurn: [],
