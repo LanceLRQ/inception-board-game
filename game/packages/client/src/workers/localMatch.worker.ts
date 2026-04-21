@@ -428,15 +428,17 @@ function autoPlayBots(): void {
         logAI('waiting human master peek bribe decision (UI not yet wired)', { ppd });
         return;
       }
-      const curIdx = parseInt(currentPlayer, 10);
-      const curClient = clients[curIdx] ?? humanClient;
+      // 必须用梦主自己的 client 发 move —— engine guard: ctx.currentPlayer === G.dreamMasterID
+      // 盗梦者回合挂起时若用 clients[currentPlayer] 会报 INVALID_MOVE
+      const masterIdx = parseInt(masterID, 10);
+      const masterClient = clients[masterIdx] ?? humanClient;
       logMove(`auto-master(${masterID})`, 'masterPeekBribeDecision', {
         deal: false,
         peekerID: ppd.peekerID,
         reason: 'bot master L0 默认 skip 避免浪费贿赂池',
       });
       try {
-        getMoves(curClient)['masterPeekBribeDecision']?.(false);
+        getMoves(masterClient)['masterPeekBribeDecision']?.(false);
       } catch (err) {
         console.warn('[ai/worker] auto masterPeekBribeDecision failed', err);
       }
@@ -455,13 +457,14 @@ function autoPlayBots(): void {
         logAI('waiting human peeker ack (UI not yet wired)', { pr });
         return;
       }
-      const curIdx = parseInt(currentPlayer, 10);
-      const curClient = clients[curIdx] ?? humanClient;
+      // 必须用 peeker 自己的 client 发 move —— engine guard: ctx.currentPlayer === peekReveal.peekerID
+      const peekerIdx = parseInt(pr.peekerID, 10);
+      const peekerClient = clients[peekerIdx] ?? humanClient;
       logMove(`auto-peeker(${pr.peekerID})`, 'peekerAcknowledge', {
         revealKind: pr.revealKind,
       });
       try {
-        getMoves(curClient)['peekerAcknowledge']?.();
+        getMoves(peekerClient)['peekerAcknowledge']?.();
       } catch (err) {
         console.warn('[ai/worker] auto peekerAcknowledge failed', err);
       }
