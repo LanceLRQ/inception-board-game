@@ -428,17 +428,18 @@ function autoPlayBots(): void {
         logAI('waiting human master peek bribe decision (UI not yet wired)', { ppd });
         return;
       }
-      // 必须用梦主自己的 client 发 move —— engine guard: ctx.currentPlayer === G.dreamMasterID
-      // 盗梦者回合挂起时若用 clients[currentPlayer] 会报 INVALID_MOVE
-      const masterIdx = parseInt(masterID, 10);
-      const masterClient = clients[masterIdx] ?? humanClient;
+      // 用当前 active player（= 盗梦者回合 currentPlayer）的 client 代发 —— BGIO 要求
+      // active player；engine masterPeekBribeDecision 已放宽 guard，接受任一 client 代发
+      // （参考 passResponse 范式：回合外 move 不 guard ctx.currentPlayer）
+      const curIdx = parseInt(currentPlayer, 10);
+      const curClient = clients[curIdx] ?? humanClient;
       logMove(`auto-master(${masterID})`, 'masterPeekBribeDecision', {
         deal: false,
         peekerID: ppd.peekerID,
         reason: 'bot master L0 默认 skip 避免浪费贿赂池',
       });
       try {
-        getMoves(masterClient)['masterPeekBribeDecision']?.(false);
+        getMoves(curClient)['masterPeekBribeDecision']?.(false);
       } catch (err) {
         console.warn('[ai/worker] auto masterPeekBribeDecision failed', err);
       }
@@ -457,14 +458,16 @@ function autoPlayBots(): void {
         logAI('waiting human peeker ack (UI not yet wired)', { pr });
         return;
       }
-      // 必须用 peeker 自己的 client 发 move —— engine guard: ctx.currentPlayer === peekReveal.peekerID
-      const peekerIdx = parseInt(pr.peekerID, 10);
-      const peekerClient = clients[peekerIdx] ?? humanClient;
+      // peekerAcknowledge 用当前 active player 的 client 代发：
+      // 1) peeker=盗梦者 时（效果①）：其回合内 currentPlayer=peekerID → guard 通过
+      // 2) peeker=梦主 时（效果②）：梦主回合内 currentPlayer=peekerID → guard 通过
+      const curIdx = parseInt(currentPlayer, 10);
+      const curClient = clients[curIdx] ?? humanClient;
       logMove(`auto-peeker(${pr.peekerID})`, 'peekerAcknowledge', {
         revealKind: pr.revealKind,
       });
       try {
-        getMoves(peekerClient)['peekerAcknowledge']?.();
+        getMoves(curClient)['peekerAcknowledge']?.();
       } catch (err) {
         console.warn('[ai/worker] auto peekerAcknowledge failed', err);
       }

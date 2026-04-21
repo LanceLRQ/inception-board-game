@@ -216,11 +216,18 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
       expect(r).toBe('INVALID_MOVE');
     });
 
-    it('调用者非梦主 → INVALID_MOVE', () => {
+    it('回合外响应 move：不 guard ctx.currentPlayer（由当前 active client 代发；联机模式身份校验交给 net/ws）', () => {
+      // 规则：BGIO 的 ctx.currentPlayer 指当前回合玩家（盗梦者），而非 move 调用者；
+      //   因此移除 `ctx.currentPlayer === dreamMasterID` 的伪身份校验，改由 pendingPeekDecision
+      //   本身作为凭证。参考 passResponse 范式。
       const s0 = withStandardBribes(sceneBeforePeek());
       const s1 = callMove(s0, 'playPeek', [PEEK_CARD, 2], { currentPlayer: 'p1' }) as SetupState;
       const r = callMove(s1, 'masterPeekBribeDecision', [true], { currentPlayer: 'p1' });
-      expect(r).toBe('INVALID_MOVE');
+      // 放宽后：允许通过；terminal state 必须清 pending + 挂 peekReveal
+      expect(r).not.toBe('INVALID_MOVE');
+      const s = r as SetupState;
+      expect(s.pendingPeekDecision).toBeNull();
+      expect(s.peekReveal).not.toBeNull();
     });
 
     it('skip 分支：不派贿赂，清 pendingPeekDecision，挂 peekReveal', () => {

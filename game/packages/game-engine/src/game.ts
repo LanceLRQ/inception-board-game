@@ -1462,7 +1462,11 @@ export const InceptionCityGame = {
         masterPeekBribeDecision: {
           move: ({ G, ctx, random }: MoveCtx, deal: boolean) => {
             if (!G.pendingPeekDecision) return INVALID_MOVE;
-            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            // 回合外响应 move：不 guard ctx.currentPlayer（BGIO 中 ctx.currentPlayer 指当前回合玩家，
+            //   而非 move 调用者；盗梦者回合触发 peek 挂起时 currentPlayer=盗梦者，梦主代发此
+            //   决策时仍然用当前 active client 发起，身份由 pendingPeekDecision 本身作为凭证）。
+            //   参考 passResponse 范式。联机模式下的身份校验由 net/ws 网关在转发前处理。
+            void ctx; // 保留 ctx 以便未来做 playerID 校验（服务端场景）
             const { peekerID, targetLayer } = G.pendingPeekDecision;
             const peeker = G.players[peekerID];
             if (!peeker) return INVALID_MOVE;
