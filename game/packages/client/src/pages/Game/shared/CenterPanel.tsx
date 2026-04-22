@@ -5,9 +5,8 @@
 //
 // 梦境层固定按 4→1 排序（顶层数字大、底层数字小，贴合梦境越深层数越小的物理直觉）。
 
-import { HeartLockIndicator } from '../../../components/HeartLockIndicator/index.js';
-import { LayerBadge } from '../../../components/LayerBadge/index.js';
 import { GameCard } from '../../../components/GameCard/index.js';
+import { diceSvgPath } from '../../../components/Dice3D/index.js';
 import { getCardImageUrl } from '../../../lib/cardImages.js';
 import { cn } from '../../../lib/utils.js';
 import type { MockMatchState, MockVault } from '../../../hooks/useMockMatch.js';
@@ -44,9 +43,14 @@ function VaultCell({
       </div>
     );
   }
-  // 金库卡面：未翻开一律背面；已翻开按 contentType 选对应 vault 卡图
-  const cardId = vault.isOpened ? `vault_${vault.contentType}` : '__back__';
-  const imageUrl = vault.isOpened ? getCardImageUrl(cardId) : undefined;
+  // 金库卡面：未翻开用金库背面图；已翻开按 contentType 映射到 shared 注册的 vault 卡 ID
+  const vaultCardMap: Record<string, string> = {
+    secret: 'vault_secret',
+    coin: 'vault_gold',
+    empty: 'vault_back',
+  };
+  const cardId = vault.isOpened ? (vaultCardMap[vault.contentType] ?? 'vault_back') : 'vault_back';
+  const imageUrl = getCardImageUrl(cardId);
   return (
     <button
       type="button"
@@ -104,20 +108,41 @@ export function CenterPanel({
               data-testid={`layer-row-${layerNum}`}
               data-focus={isFocus || undefined}
             >
-              {/* 层徽 */}
-              <LayerBadge layer={layerNum} size="md" />
+              {/* 层徽（使用梦境层卡图） */}
+              <GameCard
+                cardId={`dream_${layerNum}`}
+                imageUrl={getCardImageUrl(`dream_${layerNum}`)}
+                size="sm"
+                orientation="portrait"
+                disableDetail
+                aria-label={`梦境层 ${layerNum}`}
+              />
 
               {/* 金库 */}
               <VaultCell vault={vault} onOpenVault={onOpenVault} />
 
-              {/* 心锁 + 梦魇 */}
+              {/* 心锁（蓝色骰面，静态不掷）+ 梦魇 */}
               <div className="flex min-w-0 flex-1 flex-col gap-1 lg:w-full lg:flex-none lg:items-center">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground">心锁</span>
-                  <HeartLockIndicator
-                    count={layerState?.heartLockValue ?? 0}
-                    max={Math.max(layerState?.heartLockValue ?? 0, 5)}
-                  />
+                  {(() => {
+                    const hl = layerState?.heartLockValue ?? 0;
+                    const clamped = Math.max(0, Math.min(hl, 6));
+                    return clamped === 0 ? (
+                      <div
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-semibold text-blue-500/40 ring-1 ring-blue-500/20"
+                        aria-hidden="true"
+                      >
+                        0
+                      </div>
+                    ) : (
+                      <img
+                        src={diceSvgPath('blue', clamped)}
+                        alt={`心锁 ${clamped} 点`}
+                        draggable={false}
+                        className="h-8 w-8 select-none drop-shadow-sm"
+                      />
+                    );
+                  })()}
                 </div>
                 {layerState?.nightmareRevealed && (
                   <span className="text-[9px] text-red-400">⚠ 梦魇已揭露</span>
@@ -175,7 +200,13 @@ export function CenterPanel({
           aria-label={`可用牌堆（剩余 ${state.deckCount} 张${canDraw ? '，点击摸牌' : ''}）`}
         >
           <div className="relative">
-            <GameCard cardId="__back__" size="sm" orientation="portrait" disableDetail />
+            <GameCard
+              cardId="action_back"
+              imageUrl={getCardImageUrl('action_back')}
+              size="sm"
+              orientation="portrait"
+              disableDetail
+            />
             <span className="absolute -right-1 -top-1 rounded-full bg-indigo-600 px-1 text-[9px] text-indigo-50 shadow">
               {state.deckCount}
             </span>

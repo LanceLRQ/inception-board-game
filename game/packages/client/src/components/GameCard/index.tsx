@@ -78,7 +78,8 @@ export function GameCard({
   // 图片加载失败 → 降级占位（ADR-042 §6.17.8）
   const [imageFailed, setImageFailed] = useState(false);
   const handleImageError = useCallback(() => setImageFailed(true), []);
-  const shouldShowImage = !isBack && imageUrl && !imageFailed && !isPlaceholderMode();
+  // 当 cardId 为背面但调用方传了 imageUrl（如阵营通用卡背），也应展示图片
+  const shouldShowImage = imageUrl && !imageFailed && !isPlaceholderMode();
 
   // 长按/双击/键盘统一走 useCardPressDetail；onLongPress 未传时自动 disableDetail
   const detailDisabled = disableDetail ?? !onLongPress;
@@ -103,7 +104,7 @@ export function GameCard({
       )}
       style={{ perspective: '600px' }}
       variants={cardFlip}
-      animate={isBack ? 'back' : 'front'}
+      animate={isBack && !imageUrl ? 'back' : 'front'}
       onPointerDown={handlers.onPointerDown}
       onPointerMove={handlers.onPointerMove}
       onPointerUp={handlers.onPointerUp}
@@ -117,18 +118,18 @@ export function GameCard({
       aria-label={rest['aria-label']}
       whileTap={playable ? { scale: 0.95 } : undefined}
     >
-      {isBack ? (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-800 to-indigo-950">
-          <span className="text-indigo-400/60 text-lg font-bold">ICO</span>
-        </div>
-      ) : shouldShowImage ? (
+      {shouldShowImage ? (
         <img
           src={imageUrl}
-          alt={rest['aria-label'] ?? cardId}
+          alt={rest['aria-label'] ?? cardId ?? 'card'}
           onError={handleImageError}
           loading="lazy"
           className="h-full w-full object-cover"
         />
+      ) : isBack ? (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-800 to-indigo-950">
+          <span className="text-indigo-400/60 text-lg font-bold">ICO</span>
+        </div>
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 p-1">
           <span
