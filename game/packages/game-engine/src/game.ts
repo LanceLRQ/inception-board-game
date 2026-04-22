@@ -2968,8 +2968,14 @@ function applyShootVariant(
   // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
   const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const baseRoll = random.D6();
+  // D 批次：M4 卡宾枪全局化 —— 梦主使用 SHOOT 时目标骰 -1（基线梦主优势）
+  // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪道具；§111 印证 M4 先于效果处理
+  // 仅在"未被角色技能重写骰值"的通用路径生效，不影响灵雕师 override / 天蝎毒针等特殊处理
+  //   （这些路径的 shooter 都是盗梦者，M4 本来就不触发）
+  const shooterIsMaster = shooter.faction === 'master';
+  const postM4Roll = applyM4CarbineModifier(shooterIsMaster, baseRoll);
 
-  // 记录原始骰值供客户端骰子动画使用
+  // 记录原始骰值供客户端骰子动画使用（展示未修饰的真实 D6 结果）
   const s0 = { ...preShootState, lastShootRoll: baseRoll };
 
   // === 角色 SHOOT 修饰链 ===
@@ -3002,21 +3008,18 @@ function applyShootVariant(
     }
   } else if (opts.dicePreModifier) {
     // hook：哈雷·冲击附带 -2 修饰（仅由解封触发的免费 SHOOT 使用）
+    // 哈雷为盗梦者，postM4Roll === baseRoll；保持原 dicePreModifier 输入
     const finalRoll = opts.dicePreModifier(baseRoll);
     result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
   } else {
-    result = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
+    // 通用路径：使用 M4 修饰后骰值（梦主 SHOOT 时 -1，盗梦者 SHOOT 时恒等）
+    result = resolveShootCustom(postM4Roll, deathFaces, opts.moveFaces);
   }
 
   // 木星·雷霆：梦主使用 SHOOT 类，目标骰 < 梦主层 → 直接击杀
-  // 对照：cards-data.json dm_jupiter_peak 雷霆
-  // B4 修复：manual §50 明示"叠加梦主 M4 卡宾枪投骰结果 -1 效果"
-  // → 雷霆判定使用 M4 修饰后的骰值（梦主 SHOOT 时 -1），对齐 manual 示例
-  //   （4 层梦主 vs 3 层盗梦者，掷 1/2/3/4 均被击杀；未修饰仅 1/2/3 击杀）
+  // 对照：cards-data.json dm_jupiter_peak 雷霆 + manual §50 "叠加 M4 -1"
   if (result !== 'kill') {
-    const shooterIsMaster = shooter.faction === 'master';
-    const jupiterRoll = applyM4CarbineModifier(shooterIsMaster, baseRoll);
-    if (shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, jupiterRoll)) {
+    if (shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, postM4Roll)) {
       result = 'kill';
     }
   }
