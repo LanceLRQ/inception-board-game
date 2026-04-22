@@ -3,7 +3,7 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -34,6 +34,15 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     (state) => ({
       ...state,
       pendingShootMove: state.pendingShootMove ?? null,
+    }),
+  ],
+  // v4 → v5：添加 pendingAriesChoice（白羊·星尘 onKilled 响应窗口简化版）
+  //   对照：docs/manual/05-dream-thieves.md 白羊
+  [
+    5,
+    (state) => ({
+      ...state,
+      pendingAriesChoice: state.pendingAriesChoice ?? null,
     }),
   ],
 ]);

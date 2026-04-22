@@ -62,7 +62,14 @@ import {
   isTerroristCrossLayerActive,
   type ForgerExchange,
   applyGeminiSync,
+  applyGeminiChoice,
   applyLunaEclipse,
+  applyLunaFullMoon,
+  applyPiscesBlessing,
+  canAriesStardustTrigger,
+  findAliveAriesID,
+  applyAriesStardustDiscard,
+  applyAriesStardustReveal,
   applyGaiaShift,
   applyDarwinEvolution,
   isAquariusUnlimitedActive,
@@ -97,6 +104,8 @@ import {
   applyVenusMirrorWorld,
   getMidsummerExtraDraws,
   getMidsummerWorldThiefBonus,
+  getCancerAuraBonus,
+  isCancerShelterActive,
   isMazeBlocked,
   applyBlackSwanTour,
   applyVenusDouble,
@@ -408,6 +417,10 @@ export const InceptionCityGame = {
           if (s.mazeState && G.turnNumber >= s.mazeState.untilTurnNumber) {
             s = { ...s, mazeState: null };
           }
+          // 白羊·星尘：回合末未消费的 pending 强制清空，防卡死
+          if (s.pendingAriesChoice) {
+            s = { ...s, pendingAriesChoice: null };
+          }
           // 冥王星地狱世界观：盗梦者回合结束时手牌≥6 → 入迷失层
           // 对照：cards-data.json dm_pluto_hell 世界观
           if (isPlutoHellWorldActive(s)) {
@@ -437,8 +450,14 @@ export const InceptionCityGame = {
             // 对照：docs/manual/06-dream-master.md 盛夏
             const midsummerMasterBonus = isMaster ? getMidsummerExtraDraws(G) : 0;
             const midsummerThiefBonus = isThief ? getMidsummerWorldThiefBonus(G) : 0;
+            // 巨蟹·气场：与活着的巨蟹同层（含自己）→ 抽牌 +1（迷失层不触发）
+            // 对照：docs/manual/05-dream-thieves.md 巨蟹
+            const cancerAuraBonus = getCancerAuraBonus(G, G.currentPlayerID);
             const totalDraw =
-              (plutoOverride ?? BASE_DRAW_COUNT) + midsummerMasterBonus + midsummerThiefBonus;
+              (plutoOverride ?? BASE_DRAW_COUNT) +
+              midsummerMasterBonus +
+              midsummerThiefBonus +
+              cancerAuraBonus;
             let s = drawCards(G, G.currentPlayerID, totalDraw);
             const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
             const drawn = afterHand.slice(beforeHand.length);
@@ -2108,6 +2127,98 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 双子·抉择（skill_1）：梦主在更小层时，掷 2 骰抽 (r1+r2) 张 → 翻面
+        // 对照：docs/manual/05-dream-thieves.md 双子 83-89 行
+        playGeminiChoice: {
+          move: ({ G, ctx, random }: MoveCtx) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
+            const roll1 = random.D6();
+            const roll2 = random.D6();
+            const next = applyGeminiChoice(G, ctx.currentPlayer, roll1, roll2);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
+        // 露娜·满月（skill_1）：弃 2 张非 SHOOT → 复活任意数量玩家至当前层 → 翻面
+        // 对照：docs/manual/05-dream-thieves.md 露娜 21-25 行
+        playLunaFullMoon: {
+          move: ({ G, ctx }: MoveCtx, discardCardIds: CardID[], reviveIDs: string[]) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
+            if (!Array.isArray(discardCardIds) || !Array.isArray(reviveIDs)) return INVALID_MOVE;
+            const next = applyLunaFullMoon(G, ctx.currentPlayer, discardCardIds, reviveIDs);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
+        // 双鱼·洗礼（skill_1）：+1 相邻层 + 可选复活 1 人到新层 → 翻面
+        // 对照：docs/manual/05-dream-thieves.md 双鱼 55-60 行
+        playPiscesBlessing: {
+          move: ({ G, ctx }: MoveCtx, reviveID: string | null) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
+            const next = applyPiscesBlessing(G, ctx.currentPlayer, reviveID ?? null);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
+        // 白羊·星尘（skill_0）· 发动分支：翻开受害者所在层梦魇并执行效果
+        // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
+        // 约束：只能由 pendingAriesChoice.ariesID 本人发起；梦魇效果后清除 nightmareId 并记入 usedNightmareIds
+        playAriesStardustActivate: {
+          move: ({ G, ctx, random }: MoveCtx, params?: Record<string, unknown>) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingAriesChoice;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.ariesID) return INVALID_MOVE;
+            const ls = G.layers[pending.victimLayer];
+            if (!ls || !ls.nightmareId || ls.nightmareRevealed) return INVALID_MOVE;
+            const nid = ls.nightmareId;
+            // 先翻开 + 清 pending
+            const s = applyAriesStardustReveal(G);
+            if (s === null) return INVALID_MOVE;
+            // 执行梦魇效果
+            const afterEffect = applyNightmareEffect(s, pending.victimLayer, nid, random, params);
+            if (afterEffect === INVALID_MOVE) return INVALID_MOVE;
+            // 清除梦魇并记入已发动
+            return {
+              ...afterEffect,
+              layers: {
+                ...afterEffect.layers,
+                [pending.victimLayer]: {
+                  ...afterEffect.layers[pending.victimLayer]!,
+                  nightmareId: null,
+                  nightmareRevealed: false,
+                  nightmareTriggered: true,
+                },
+              },
+              usedNightmareIds: [...afterEffect.usedNightmareIds, nid],
+            };
+          },
+          client: false,
+        },
+
+        // 白羊·星尘（skill_0）· 弃牌分支：弃该层未翻梦魇（联动闪耀抽牌计数）
+        playAriesStardustDiscard: {
+          move: ({ G, ctx }: MoveCtx) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingAriesChoice;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.ariesID) return INVALID_MOVE;
+            const next = applyAriesStardustDiscard(G);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
         // 盖亚·大地：令同层其余玩家移到 ±1 层（限 2 次/回合）
         // 对照：docs/manual/05-dream-thieves.md 盖亚
         playGaiaShift: {
@@ -2485,8 +2596,11 @@ export const InceptionCityGame = {
           move: ({ G, ctx, events }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'discard')) return INVALID_MOVE;
             // 手牌未超限则允许跳过
+            // 巨蟹·庇佑：与活着的巨蟹同层 → 无手牌上限（不拦截小丑罚则）
+            // 对照：docs/manual/05-dream-thieves.md 巨蟹「庇佑」
             const player = G.players[ctx.currentPlayer];
-            if (player && player.hand.length > 5) return INVALID_MOVE;
+            const sheltered = isCancerShelterActive(G, ctx.currentPlayer);
+            if (player && player.hand.length > 5 && !sheltered) return INVALID_MOVE;
             // 小丑·赌博罚则：armed 已过期且手牌 > 0 → 不得跳过（必须走 doDiscard 全弃）
             if (
               player &&
@@ -2895,7 +3009,23 @@ function applyShootVariant(
         },
       },
     };
+    // 白羊·星尘 onKilled 响应（简化 pending，P4 W20.5 可替换为完整响应栈）
+    // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
+    // 注：在 movePlayerToLayer(..., 0) 之前捕获原所在层 —— 但此处 target 已被 isAlive=false 前已被处理，
+    // tp.currentLayer 仍在原层（isAlive 修改时未动 currentLayer，后续 movePlayerToLayer 才移走）
+    const victimLayer = tp.currentLayer;
     s = movePlayerToLayer(s, targetPlayerID, 0);
+    if (canAriesStardustTrigger(s, targetPlayerID, victimLayer)) {
+      const ariesID = findAliveAriesID(s)!;
+      s = {
+        ...s,
+        pendingAriesChoice: {
+          ariesID,
+          victimLayer,
+          victimID: targetPlayerID,
+        },
+      };
+    }
     // abilities registry：击杀后触发 onKilled passive（射手·心锁等待此时机）
     s = dispatchPassives(s, 'onKilled').state;
   } else if (result === 'move') {

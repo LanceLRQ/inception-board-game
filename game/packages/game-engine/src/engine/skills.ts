@@ -1219,6 +1219,37 @@ export function applyGeminiSync(
   return s;
 }
 
+// === 双子 · 抉择（skill_1）===
+// 出牌阶段：梦主层 < self 层时，掷 2 骰 → 从牌库顶抽 (骰 1 + 骰 2) 张 → 翻面
+// 对照：docs/manual/05-dream-thieves.md 双子 83-89 行
+export const GEMINI_CHOICE_SKILL_ID = 'thief_gemini.skill_1';
+
+export function applyGeminiChoice(
+  state: SetupState,
+  selfID: string,
+  roll1: number,
+  roll2: number,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_gemini') return null;
+  if (!player.isAlive) return null;
+  if (player.currentLayer < 1) return null;
+  const master = state.players[state.dreamMasterID];
+  if (!master) return null;
+  if (master.currentLayer >= player.currentLayer) return null;
+  if (!canUseSkill(player, GEMINI_CHOICE_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  if (roll1 < 1 || roll1 > 6 || roll2 < 1 || roll2 > 6) return null;
+
+  let s = markSkillUsed(state, selfID, GEMINI_CHOICE_SKILL_ID);
+  const drawN = roll1 + roll2;
+  if (drawN > 0) {
+    s = drawCards(s, selfID, drawN);
+  }
+  // 翻面（skill_0 + skill_1 共用翻面机制；任一用过后均翻面）
+  s = flipCharacter(s, selfID);
+  return s;
+}
+
 // === 双鱼 · 闪避 ===
 // 成为 SHOOT 目标时，可移到数字更小相邻层忽略 SHOOT 效果 → 翻面
 // 接入：在 applyShootVariant 前置 hook 检查（被动）
@@ -1239,6 +1270,46 @@ export function applyPiscesEvade(state: SetupState, selfID: string): SetupState 
   if (!player || !canPiscesEvade(player)) return null;
   let s = markSkillUsed(state, selfID, PISCES_SKILL_ID);
   s = movePlayerToLayer(s, selfID, (player.currentLayer - 1) as Layer);
+  s = flipCharacter(s, selfID);
+  return s;
+}
+
+// === 双鱼 · 洗礼（skill_1）===
+// 出牌阶段：移到数字更大的相邻层 + 可选复活 1 玩家到新层 → 翻面
+// 对照：docs/manual/05-dream-thieves.md 双鱼 55-60 行
+// 规则：在 L4 无法启动；迷失层也不能启动；复活为可选（reviveID=null 代表仅移动+翻面）
+export const PISCES_BLESSING_SKILL_ID = 'thief_pisces.skill_1';
+
+export function applyPiscesBlessing(
+  state: SetupState,
+  selfID: string,
+  reviveID: string | null,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_pisces') return null;
+  if (!player.isAlive) return null;
+  if (player.currentLayer < 1 || player.currentLayer >= 4) return null;
+  if (!canUseSkill(player, PISCES_BLESSING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  const newLayer = (player.currentLayer + 1) as Layer;
+  let s = markSkillUsed(state, selfID, PISCES_BLESSING_SKILL_ID);
+  s = movePlayerToLayer(s, selfID, newLayer);
+
+  if (reviveID !== null) {
+    const target = s.players[reviveID];
+    if (!target || target.isAlive) return null;
+    if (reviveID === selfID) return null;
+    // 复活到双鱼新所在层
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [reviveID]: { ...target, isAlive: true, deathTurn: null },
+      },
+    };
+    s = movePlayerToLayer(s, reviveID, newLayer);
+  }
+
   s = flipCharacter(s, selfID);
   return s;
 }
@@ -1301,6 +1372,66 @@ export function applyLunaEclipse(
     },
   };
   s = movePlayerToLayer(s, targetID, 0);
+  // 翻面
+  s = flipCharacter(s, selfID);
+  return s;
+}
+
+// === 露娜 · 满月（skill_1）===
+// 出牌阶段：弃 2 张"非 SHOOT 类"手牌 → 复活任意数量（含 0）玩家到自己所在层 → 翻面
+// 对照：docs/manual/05-dream-thieves.md 露娜 21-25 行
+// 规则：复活数量可为 0，仅用来触发翻面（manual 明允）
+export const LUNA_FULL_MOON_SKILL_ID = 'thief_luna.skill_1';
+
+export function applyLunaFullMoon(
+  state: SetupState,
+  selfID: string,
+  discardCardIds: readonly CardID[],
+  reviveIDs: readonly string[],
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_luna') return null;
+  if (!player.isAlive) return null;
+  if (player.currentLayer < 1) return null;
+  if (!canUseSkill(player, LUNA_FULL_MOON_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  if (discardCardIds.length !== 2) return null;
+  // 两张都必须是非 SHOOT 类牌
+  for (const cid of discardCardIds) {
+    if (isShootClassCard(cid)) return null;
+  }
+  // multiset 校验手牌持有
+  const handCopy = [...player.hand];
+  for (const cid of discardCardIds) {
+    const idx = handCopy.indexOf(cid);
+    if (idx === -1) return null;
+    handCopy.splice(idx, 1);
+  }
+  // 校验 reviveIDs：必须死亡、非自己、互不重复
+  const seen = new Set<string>();
+  for (const rid of reviveIDs) {
+    if (rid === selfID) return null;
+    if (seen.has(rid)) return null;
+    seen.add(rid);
+    const target = state.players[rid];
+    if (!target || target.isAlive) return null;
+  }
+
+  let s = markSkillUsed(state, selfID, LUNA_FULL_MOON_SKILL_ID);
+  // 弃 2 张非 SHOOT
+  s = {
+    ...s,
+    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
+    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...discardCardIds] },
+  };
+  // 逐个复活到自己所在层
+  for (const rid of reviveIDs) {
+    const rp = s.players[rid]!;
+    s = {
+      ...s,
+      players: { ...s.players, [rid]: { ...rp, isAlive: true, deathTurn: null } },
+    };
+    s = movePlayerToLayer(s, rid, player.currentLayer as Layer);
+  }
   // 翻面
   s = flipCharacter(s, selfID);
   return s;
@@ -1546,6 +1677,115 @@ export function getMidsummerExtraDraws(state: SetupState): number {
 /** 盛夏世界观：盗梦者抽牌额外 +N（默认 +1） */
 export function getMidsummerWorldThiefBonus(state: SetupState): number {
   return getMasterCharacterID(state) === 'dm_midsummer' ? 1 : 0;
+}
+
+// === 白羊 · 星尘（skill_0）===
+// onKilled 简化响应窗口：盗梦者被击杀时，白羊可选择"发动或弃掉该玩家所在层的未翻梦魇牌"
+// 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
+// 规则：只能二选一，不能保留；白羊自己被击杀时同样可触发（victim=self 时白羊已死，由规则自动跳过）
+// 本批次实装：纯函数 + pendingAriesChoice 简化 pending；SHOOT 击杀路径同步接入挂起
+// 对照 plan：plans/report/skill-development-status.md 批次 A · A5
+
+export const ARIES_STARDUST_SKILL_ID = 'thief_aries.skill_0';
+
+/** 找唯一活着的白羊（返回 playerID 或 null） */
+export function findAliveAriesID(state: SetupState): string | null {
+  for (const pid of state.playerOrder) {
+    const p = state.players[pid];
+    if (p && p.isAlive && p.characterId === 'thief_aries') return pid;
+  }
+  return null;
+}
+
+/** 白羊·星尘 触发条件：白羊存活、被击杀者在非迷失层、该层存在未翻梦魇牌 */
+export function canAriesStardustTrigger(
+  state: SetupState,
+  victimID: string,
+  victimLayerBeforeDeath: number,
+): boolean {
+  const ariesID = findAliveAriesID(state);
+  if (!ariesID) return false;
+  if (ariesID === victimID) return false; // 白羊自己被击杀时不触发（规则保守实现）
+  if (victimLayerBeforeDeath < 1) return false;
+  const ls = state.layers[victimLayerBeforeDeath as Layer];
+  if (!ls) return false;
+  if (!ls.nightmareId) return false;
+  if (ls.nightmareRevealed) return false;
+  return true;
+}
+
+/** 白羊·星尘 · 弃掉分支：将该层未翻梦魇牌弃入 usedNightmareIds（联动闪耀）并清空 pending */
+export function applyAriesStardustDiscard(state: SetupState): SetupState | null {
+  const pending = state.pendingAriesChoice;
+  if (!pending) return null;
+  const ls = state.layers[pending.victimLayer as Layer];
+  if (!ls || !ls.nightmareId || ls.nightmareRevealed) return null;
+  const nid = ls.nightmareId;
+  return {
+    ...state,
+    layers: {
+      ...state.layers,
+      [pending.victimLayer]: {
+        ...ls,
+        nightmareId: null,
+        nightmareTriggered: true,
+      },
+    },
+    usedNightmareIds: [...state.usedNightmareIds, nid],
+    pendingAriesChoice: null,
+  };
+}
+
+/** 白羊·星尘 · 发动分支的准备：翻开梦魇 + 清 pending（梦魇效果的实际分发由 game.ts move 层执行） */
+export function applyAriesStardustReveal(state: SetupState): SetupState | null {
+  const pending = state.pendingAriesChoice;
+  if (!pending) return null;
+  const ls = state.layers[pending.victimLayer as Layer];
+  if (!ls || !ls.nightmareId || ls.nightmareRevealed) return null;
+  return {
+    ...state,
+    layers: {
+      ...state.layers,
+      [pending.victimLayer]: {
+        ...ls,
+        nightmareRevealed: true,
+      },
+    },
+    pendingAriesChoice: null,
+  };
+}
+
+// === 巨蟹 · 气场 + 庇佑（纯被动）===
+// 对照：docs/manual/05-dream-thieves.md 巨蟹（90-99 行）
+// 气场：所在层所有玩家抽牌阶段 +1（强制性）
+// 庇佑：所在层所有玩家无手牌上限（弃牌阶段检验）
+// 规则：迷失层(0)不触发；巨蟹自己也享受（manual "所在层的所有玩家"含自己）
+
+export const CANCER_AURA_SKILL_ID = 'thief_cancer.skill_0';
+export const CANCER_SHELTER_SKILL_ID = 'thief_cancer.skill_1';
+
+/** 判断指定玩家当前是否与活着的巨蟹同层（含自己是巨蟹的情形），迷失层/死亡状态不计 */
+function isSameLayerAsAliveCancer(state: SetupState, playerID: string): boolean {
+  const p = state.players[playerID];
+  if (!p || !p.isAlive) return false;
+  if (p.currentLayer < 1) return false;
+  const layerInfo = state.layers[p.currentLayer as Layer];
+  if (!layerInfo) return false;
+  for (const pid of layerInfo.playersInLayer) {
+    const other = state.players[pid];
+    if (other && other.isAlive && other.characterId === 'thief_cancer') return true;
+  }
+  return false;
+}
+
+/** 巨蟹·气场：同层抽牌 +1（同层且巨蟹活着、非迷失层） */
+export function getCancerAuraBonus(state: SetupState, playerID: string): number {
+  return isSameLayerAsAliveCancer(state, playerID) ? 1 : 0;
+}
+
+/** 巨蟹·庇佑：同层玩家无手牌上限（弃牌阶段检验） */
+export function isCancerShelterActive(state: SetupState, playerID: string): boolean {
+  return isSameLayerAsAliveCancer(state, playerID);
 }
 
 // === 黑洞 (梦主版) · 倒流 + 世界观 ===

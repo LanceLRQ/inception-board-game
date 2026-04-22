@@ -190,6 +190,17 @@ export interface SetupState {
     /** 解除时机：被困者的"下个回合 turnNumber"，到达 turnEnd 后清除 */
     untilTurnNumber: number;
   } | null;
+  /**
+   * 白羊·星尘：盗梦者被击杀时，若白羊存活且被击杀者所在层有未翻梦魇，
+   * 则挂起白羊的"发动 or 弃"选择；在 playAriesStardustActivate/Discard 或 turn.onEnd 清空。
+   * 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
+   * 说明：本批次为简化 pending（非完整响应窗口栈），P4 W20.5 可被框架替换。
+   */
+  pendingAriesChoice: {
+    ariesID: string;
+    victimLayer: number;
+    victimID: string;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -392,6 +403,7 @@ export function createInitialState(options: {
     pendingSudgerRolls: null,
     pendingShootMove: null,
     mazeState: null,
+    pendingAriesChoice: null,
     winner: null,
     winReason: null,
     endTurn: null,
