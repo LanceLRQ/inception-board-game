@@ -289,6 +289,9 @@ export const InceptionCityGame = {
               'dm_uranus_firmament',
               'dm_pluto_hell',
               'dm_mars_battlefield',
+              // C1 · 水星·航路：世界观（+1 fail 贿赂）+ 逆流 SHOOT 响应已接入
+              // 注：非 SHOOT 类牌的逆流响应依赖完整响应窗口（并入 P2）
+              'dm_mercury_route',
             ];
             const thiefPool: CardID[] = [
               'thief_pointman',
