@@ -28,6 +28,7 @@ import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
 import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
 import { ShootDiceOverlay } from '../ShootDiceOverlay';
+import { RuntimeStage } from './RuntimeStage';
 import { toast } from '@/lib/toast';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
@@ -637,15 +638,34 @@ export function LocalMatchRuntime({
         </div>
       )}
 
-      {layerViews.length > 0 && (
-        <LayerMap
-          layers={layerViews}
-          players={playerViews}
-          humanPlayerId="0"
-          dreamMasterId={dreamMasterID}
-          currentPlayerId={currentPlayerID}
-          onCardPreview={setPreviewCard}
-        />
+      {/* 新 UI 围坐/星穹行动轴（ADR-043）· 只做视觉展示；选目标仍走下方 Dialog 群 */}
+      {G && ctx && (
+        <div className="mb-4">
+          <RuntimeStage
+            G={G as Record<string, unknown>}
+            ctx={ctx as Record<string, unknown>}
+            humanPlayerID="0"
+          />
+        </div>
+      )}
+
+      {/* LayerMap 旧视图：收起为"梦主层总览"次要视图（仅梦主人类时保留可读信息） */}
+      {layerViews.length > 0 && humanFaction === 'master' && (
+        <details className="mb-4 rounded-md border border-border bg-card/40 p-2 text-xs">
+          <summary className="cursor-pointer text-muted-foreground">
+            层级总览（旧视图 · 详细心锁/金库清单）
+          </summary>
+          <div className="mt-2">
+            <LayerMap
+              layers={layerViews}
+              players={playerViews}
+              humanPlayerId="0"
+              dreamMasterId={dreamMasterID}
+              currentPlayerId={currentPlayerID}
+              onCardPreview={setPreviewCard}
+            />
+          </div>
+        </details>
       )}
 
       {humanPlayer && (
@@ -954,42 +974,49 @@ export function LocalMatchRuntime({
           挂载在本组件末尾的 Dialog 集群区。
           对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 5 */}
 
+      {/* 玩家紧凑列表（旧视图）：收起为次要信息；主要展示由 RuntimeStage 承载 */}
       {players && (
-        <div className="space-y-2">
-          {Object.entries(players).map(([id, p]) => {
-            const cid = typeof p.characterId === 'string' ? p.characterId : '';
-            const isMaster = id === dreamMasterID;
-            // 任何玩家都值得一个头像占位：已揭示用真实图，未揭示用阵营对应背面图
-            return (
-              <div
-                key={id}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg border px-3 py-2 text-sm',
-                  id === currentPlayerID ? 'border-primary bg-primary/5' : 'border-border bg-card',
-                  id === '0' && 'ring-1 ring-primary/30',
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => cid && setPreviewCard(cid)}
-                  className="flex-shrink-0 transition-transform hover:scale-110 disabled:cursor-default"
-                  aria-label={`查看 ${cid || '未揭示角色'}`}
-                  data-testid={`player-avatar-${id}`}
-                  disabled={!cid}
+        <details className="rounded-md border border-border bg-card/40 p-2 text-xs">
+          <summary className="cursor-pointer text-muted-foreground">
+            玩家明细（阵营/层/手牌数 紧凑列表）
+          </summary>
+          <div className="mt-2 space-y-1">
+            {Object.entries(players).map(([id, p]) => {
+              const cid = typeof p.characterId === 'string' ? p.characterId : '';
+              const isMaster = id === dreamMasterID;
+              return (
+                <div
+                  key={id}
+                  className={cn(
+                    'flex items-center gap-2 rounded px-2 py-1',
+                    id === currentPlayerID ? 'bg-primary/10' : 'bg-background',
+                    id === '0' && 'ring-1 ring-primary/30',
+                  )}
                 >
-                  <PlayerMiniAvatar characterId={cid} isMaster={isMaster} />
-                </button>
-                <span className="font-medium">{id === '0' ? t('localMatch.you') : `AI ${id}`}</span>
-                <span className="text-xs text-muted-foreground">{String(p.faction)}</span>
-                <span className="text-xs text-muted-foreground">L{String(p.currentLayer)}</span>
-                {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {t('localMatch.cards')}：{(p.hand as unknown[])?.length ?? 0}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                  <button
+                    type="button"
+                    onClick={() => cid && setPreviewCard(cid)}
+                    className="flex-shrink-0 transition-transform hover:scale-110 disabled:cursor-default"
+                    aria-label={`查看 ${cid || '未揭示角色'}`}
+                    data-testid={`player-avatar-${id}`}
+                    disabled={!cid}
+                  >
+                    <PlayerMiniAvatar characterId={cid} isMaster={isMaster} />
+                  </button>
+                  <span className="font-medium">
+                    {id === '0' ? t('localMatch.you') : `AI ${id}`}
+                  </span>
+                  <span className="text-muted-foreground">{String(p.faction)}</span>
+                  <span className="text-muted-foreground">L{String(p.currentLayer)}</span>
+                  {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}
+                  <span className="ml-auto text-muted-foreground">
+                    {t('localMatch.cards')}：{(p.hand as unknown[])?.length ?? 0}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </details>
       )}
 
       {!gameState && (

@@ -8,7 +8,10 @@ import { useCallback, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ThiefBoard } from './ThiefBoard/index.js';
 import { MasterBoard } from './MasterBoard/index.js';
+import { MatchTable } from './Table/MatchTable.js';
+import { MatchTrack } from './Track/MatchTrack.js';
 import { useMockMatch } from '../../hooks/useMockMatch.js';
+import { useMediaQuery } from '../../hooks/useMediaQuery.js';
 import type { PlayIntent } from '../../hooks/useGameActions.js';
 import { CopyrightNotice } from '../../components/CopyrightNotice/index.js';
 import { LocalMatchRuntime } from '../../components/LocalMatchRuntime/index.js';
@@ -53,6 +56,8 @@ function GameMockView() {
   const [search] = useSearchParams();
   const viewAs = search.get('as') === 'master' ? 'master' : 'thief';
   const withPendingUnlock = search.get('pending') === '1';
+  // Feature flag：?legacyUi=1 走旧 ThiefBoard/MasterBoard 一个 Sprint 降级期（ADR-043）
+  const useLegacyUI = search.get('legacyUi') === '1';
 
   const state = useMockMatch({ viewAs, withPendingUnlock });
   const [lastIntent, setLastIntent] = useState<Required<PlayIntent> | null>(null);
@@ -62,14 +67,26 @@ function GameMockView() {
   }, []);
 
   const isMaster = state.players[state.viewerID]?.faction === 'master';
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+
+  let Board;
+  if (useLegacyUI) {
+    Board = isMaster ? (
+      <MasterBoard state={state} onDispatch={handleDispatch} />
+    ) : (
+      <ThiefBoard state={state} onDispatch={handleDispatch} />
+    );
+  } else {
+    Board = isDesktop ? (
+      <MatchTable state={state} onDispatch={handleDispatch} />
+    ) : (
+      <MatchTrack state={state} onDispatch={handleDispatch} />
+    );
+  }
 
   return (
     <>
-      {isMaster ? (
-        <MasterBoard state={state} onDispatch={handleDispatch} />
-      ) : (
-        <ThiefBoard state={state} onDispatch={handleDispatch} />
-      )}
+      {Board}
       {lastIntent && (
         <div
           className="fixed left-1/2 top-20 z-[60] -translate-x-1/2 rounded-md border border-primary/40 bg-card/90 px-3 py-1.5 text-xs text-primary shadow-md"

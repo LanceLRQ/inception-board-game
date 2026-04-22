@@ -36,3 +36,32 @@ export const cardFlip: Variants = {
   front: { rotateY: 0 },
   back: { rotateY: 180 },
 };
+
+/**
+ * 当前行动玩家的脉冲光（金色）
+ * 用于 PlayerSeat / RailSlot / ActionDock 外框
+ * 对照：plans/design/06c-match-table-layout.md §7.2
+ */
+export const activeTurnPulse: Variants = {
+  idle: { boxShadow: '0 0 0 0 rgba(250, 204, 21, 0)' },
+  active: {
+    boxShadow: [
+      '0 0 0 0 rgba(250, 204, 21, 0)',
+      '0 0 0 6px rgba(250, 204, 21, 0.4)',
+      '0 0 0 0 rgba(250, 204, 21, 0)',
+    ],
+    transition: { duration: 1.8, repeat: Infinity, ease: 'easeInOut' },
+  },
+};
+
+/** 围坐 Seat 入场：按角度方向做微偏移淡入 */
+export const seatEnter: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+};
+
+/** 行动轴 Slot 从左侧滑入 */
+export const railSlotEnter: Variants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+};

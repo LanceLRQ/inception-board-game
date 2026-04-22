@@ -73,6 +73,53 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **服务端优先**：所有涉及隐藏信息的判定一律服务端执行，客户端只做展示
 - **UI 图标规范**：UI 层**禁止**使用 emoji 字符作为图标，所有图标必须使用 `lucide-react` 组件；注释/文档/测试中的 emoji 标记（如 `🤖` 徽章）不受此限制
 
+## 对局界面多路径地图（⚠️ 改 UI 前必读）
+
+**对局界面（Match UI）有三条并行渲染路径，任何视觉/布局改动都必须同步评估是否需要三路同改：**
+
+| 路径 | 入口 URL | 驱动组件 | 状态源 | 用途 |
+|------|---------|---------|-------|------|
+| **A · 本地真实对局** | `/local` / `?friend=1` | `components/LocalMatchRuntime/index.tsx` | BGIO Worker（`workers/localMatch.worker.ts`）真实 engine | 主战场：人机对战、好友房本地模式 |
+| **B · Mock 调试视图** | `/game/:matchId` 非 friend 模式 | `pages/Game/index.tsx → GameMockView` | `hooks/useMockMatch.ts`（静态 mock） | 开发调试、UI 走查、视角切换（`?as=master` / `?pending=1`） |
+| **C · 旧降级 UI** | 任一路径 + `?legacyUi=1` | `pages/Game/{ThiefBoard,MasterBoard}` | 同上 | 新 UI 上线后的应急降级通道 |
+
+**核心组件（所有路径共用）：**
+
+- `components/PlayerSeat/` — PC 围坐座位节点（≥1024px）
+- `components/ActionDock/` — 底部操作栏
+- `components/TargetPickerDialog/` — 统一目标选择弹层（按 playerOrder + 角色卡面）
+- `components/GameCard/` — 卡牌渲染（`orientation` + 长按/双击查看详情）
+- `components/CardDetailModal/` — 详情弹窗（`disableFlip` 控制翻面）
+- `components/LayerBadge/` — 梦境层徽
+- `hooks/useCardPressDetail.ts` — 长按 2000ms / PC 双击 / 键盘统一交互
+- `hooks/useMediaQuery.ts` — PC/移动视口分派
+- `pages/Game/Table/` — PC 围坐椭圆舞台（`TableStage` / `MatchTable` / `seatLayout`）
+- `pages/Game/Track/` — 移动端星穹铁道行动轴（`TurnOrderRail` / `MatchTrack` / `MasterPanelCollapsible` / `turnOrder`）
+- `pages/Game/shared/` — 双路径复用（`CenterPanel` 中央桌面 / `MasterConsole` 梦主控制台）
+
+**LocalMatchRuntime 接入新 UI 的方式：**
+
+- 适配器 `components/LocalMatchRuntime/bgioAdapter.ts` 把 BGIO `G/ctx` 转为 `MockMatchState` 供新 UI 复用
+- `components/LocalMatchRuntime/RuntimeStage.tsx` 做视口分派（PC → `TableStage` / 移动 → `TurnOrderRail`），仅负责**展示层**
+- LocalMatchRuntime 自己的 Dialog 群（TargetPlayerPickerDialog、ShooterLayerPickerDialog、嫁接/万有引力/棋局易位等）**保留原样**——新 UI 的 `TargetPickerDialog` 仅服务于 Mock 调试路径
+
+**改 UI 时的自检清单：**
+
+1. 访问 `/local`（路径 A）确认新视觉生效
+2. 访问 `/game/debug?as=master`（路径 B）确认 mock 路径生效
+3. 访问任一路径 + `?legacyUi=1`（路径 C）确认降级通道仍可用
+4. PC 1280×800 + 移动 iPhone 12（390×844）两个视口都要走查
+5. 如果改动影响状态结构（`MockMatchState` / BGIO `G`），务必同步更新 `bgioAdapter.ts` + 测试
+
+**交互硬规范：**
+
+- 长按阈值：`lib/interactionConfig.ts` 的 `LONG_PRESS_MS = 2000ms`（PC + 移动端统一）
+- 金库牌 / 梦境层卡 **不触发**长按/双击详情（图案已明显）
+- 金库翻开后的详情 **禁止翻面**（背面属游戏机密，`CardDetailModal.disableFlip = true`）
+- 选目标统一走 `TargetPickerDialog` 弹层，Seat / RailSlot **只看不选**
+
+---
+
 ## 日志规范
 
 **所有日志必须走统一 logger，禁止散落 `console.*`（降级 / 第三方透传除外）：**

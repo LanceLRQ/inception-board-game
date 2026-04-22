@@ -12,24 +12,48 @@ import { getCardName, getCharacterSkillSummary } from '../../lib/cards';
 export interface CardDetailModalProps {
   cardId: CardID | null;
   onClose: () => void;
+  /**
+   * 禁用翻面：传 true 时隐藏翻面按钮 + F 键无响应。
+   * 用于金库等"正面已公开但背面是游戏机密"的卡种
+   * （对照：plans/design/06c-match-table-layout.md §6.2）
+   */
+  disableFlip?: boolean;
+}
+
+/**
+ * 纯函数：判定是否应渲染翻面按钮 / 响应 F 键。
+ * 条件：卡牌本身有背面图 && 未被显式禁用。
+ */
+export function shouldShowFlipButton(cardId: CardID | null, disableFlip?: boolean): boolean {
+  if (!cardId) return false;
+  if (disableFlip) return false;
+  return hasCardBackImage(cardId);
 }
 
 /** 内部内容组件：以 cardId 作为 React key 挂载，自然每次打开都重置状态 */
-function ModalContent({ cardId, onClose }: { cardId: CardID; onClose: () => void }) {
+function ModalContent({
+  cardId,
+  onClose,
+  disableFlip = false,
+}: {
+  cardId: CardID;
+  onClose: () => void;
+  disableFlip?: boolean;
+}) {
   const [showBack, setShowBack] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-      if ((e.key === 'f' || e.key === 'F') && hasCardBackImage(cardId)) {
+      if (!disableFlip && (e.key === 'f' || e.key === 'F') && hasCardBackImage(cardId)) {
         setShowBack((v) => !v);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cardId, onClose]);
+  }, [cardId, onClose, disableFlip]);
 
-  const hasBack = hasCardBackImage(cardId);
+  const hasBack = shouldShowFlipButton(cardId, disableFlip);
   const displayUrl = showBack ? getCardBackImageUrl(cardId) : getCardImageUrl(cardId);
   const summary = getCharacterSkillSummary(cardId);
   const displayName = getCardName(cardId);
@@ -133,10 +157,12 @@ function ModalContent({ cardId, onClose }: { cardId: CardID; onClose: () => void
   );
 }
 
-export function CardDetailModal({ cardId, onClose }: CardDetailModalProps) {
+export function CardDetailModal({ cardId, onClose, disableFlip }: CardDetailModalProps) {
   return (
     <AnimatePresence>
-      {cardId && <ModalContent key={cardId} cardId={cardId} onClose={onClose} />}
+      {cardId && (
+        <ModalContent key={cardId} cardId={cardId} onClose={onClose} disableFlip={disableFlip} />
+      )}
     </AnimatePresence>
   );
 }
