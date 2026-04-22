@@ -1,89 +1,189 @@
-// CenterPanel - 桌面中央共享区域（金库 + 心锁 + 焦点层 + 响应窗口入口）
-// 对照：plans/design/06c-match-table-layout.md §5（供 TableStage / MatchTrack 共用）
+// CenterPanel - 桌面中央共享区域
+// 布局（对照主人提供的示意图 / 06c-match-table-layout.md §5）：
+//   顶部 4 行：L4 → L1，每行一层，包含「层徽 · 金库（金库牌正/背面）· 心锁」
+//   底部一行：用过的牌（弃牌堆） · 可用牌堆（背面 + 剩余数量；当前玩家回合点击摸牌）
+//
+// 梦境层固定按 4→1 排序（顶层数字大、底层数字小，贴合梦境越深层数越小的物理直觉）。
 
 import { HeartLockIndicator } from '../../../components/HeartLockIndicator/index.js';
 import { LayerBadge } from '../../../components/LayerBadge/index.js';
+import { GameCard } from '../../../components/GameCard/index.js';
+import { getCardImageUrl } from '../../../lib/cardImages.js';
 import { cn } from '../../../lib/utils.js';
-import type { MockMatchState } from '../../../hooks/useMockMatch.js';
+import type { MockMatchState, MockVault } from '../../../hooks/useMockMatch.js';
 
 export interface CenterPanelProps {
   state: MockMatchState;
-  /** 焦点层：盗梦者视角通常是 viewer.currentLayer；梦主可切换 */
+  /** 焦点层：用于高亮当前 viewer / 梦主操作的层（不决定布局顺序，仅作视觉强调） */
   focusLayer: number;
   /** 点击金库（尚未接入；占位回调） */
   onOpenVault?: (vaultId: string) => void;
+  /** 点击弃牌堆 */
+  onOpenDiscard?: () => void;
+  /** 当前玩家回合点击摸牌堆 */
+  onDrawDeck?: () => void;
+  /** viewer 是否可摸牌（当前回合 + draw/action 阶段） */
+  canDraw?: boolean;
   className?: string;
 }
 
-export function CenterPanel({ state, focusLayer, onOpenVault, className }: CenterPanelProps) {
-  const layerState = state.layers[focusLayer];
-  const vaultsHere = state.vaults.filter((v) => v.layer === focusLayer);
-  const playersHere = layerState?.playersInLayer ?? [];
+/** 梦境层固定 4→1 排序 */
+const LAYER_ORDER = [4, 3, 2, 1] as const;
 
+function VaultCell({
+  vault,
+  onOpenVault,
+}: {
+  vault: MockVault | undefined;
+  onOpenVault?: (vaultId: string) => void;
+}) {
+  if (!vault) {
+    return (
+      <div className="flex h-[68px] w-12 items-center justify-center rounded border border-dashed border-slate-700 text-[9px] text-muted-foreground">
+        无金库
+      </div>
+    );
+  }
+  // 金库卡面：未翻开一律背面；已翻开按 contentType 选对应 vault 卡图
+  const cardId = vault.isOpened ? `vault_${vault.contentType}` : '__back__';
+  const imageUrl = vault.isOpened ? getCardImageUrl(cardId) : undefined;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenVault?.(vault.id)}
+      className="transition-transform hover:scale-105"
+      data-testid={`vault-cell-${vault.id}`}
+      aria-label={vault.isOpened ? `金库（${vault.contentType}）` : '金库（未翻开）'}
+    >
+      <GameCard
+        cardId={cardId}
+        imageUrl={imageUrl}
+        size="sm"
+        orientation="portrait"
+        disableDetail // 金库牌按 06c §6 规则不触发长按/双击详情
+      />
+    </button>
+  );
+}
+
+export function CenterPanel({
+  state,
+  focusLayer,
+  onOpenVault,
+  onOpenDiscard,
+  onDrawDeck,
+  canDraw,
+  className,
+}: CenterPanelProps) {
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-2xl border-2 border-indigo-500/40',
-        'bg-gradient-to-br from-indigo-900/60 to-slate-900/80 p-4 shadow-xl',
+        'flex flex-col gap-2 rounded-2xl border-2 border-indigo-500/40',
+        'bg-gradient-to-br from-indigo-900/60 to-slate-900/80 p-3 shadow-xl',
         className,
       )}
       data-testid="center-panel"
     >
-      {/* 层号 + 心锁 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <LayerBadge layer={focusLayer} size="lg" />
-          <div className="flex flex-col">
-            <span className="text-xs text-indigo-300">焦点层</span>
-            <span className="text-xs text-muted-foreground">
-              {layerState?.nightmareRevealed ? '梦魇已揭露' : '梦境平稳'}
-            </span>
-          </div>
-        </div>
-        <HeartLockIndicator
-          count={layerState?.heartLockValue ?? 0}
-          max={Math.max(layerState?.heartLockValue ?? 0, 5)}
-        />
+      {/* 梦境层数：移动端纵排（L4 顶、L1 底）/ PC 横排（L4 左 → L1 右） */}
+      <div className="flex flex-col gap-1.5 lg:flex-row lg:gap-2">
+        {LAYER_ORDER.map((layerNum) => {
+          const layerState = state.layers[layerNum];
+          const vault = state.vaults.find((v) => v.layer === layerNum);
+          const isFocus = focusLayer === layerNum;
+
+          return (
+            <div
+              key={layerNum}
+              className={cn(
+                'flex items-center gap-3 rounded-lg border px-2 py-1.5',
+                'lg:flex-1 lg:flex-col lg:items-center lg:gap-2 lg:py-2',
+                isFocus
+                  ? 'border-yellow-400/60 bg-yellow-400/5 shadow-[0_0_8px_rgba(250,204,21,0.25)]'
+                  : 'border-indigo-500/20 bg-slate-900/40',
+              )}
+              data-testid={`layer-row-${layerNum}`}
+              data-focus={isFocus || undefined}
+            >
+              {/* 层徽 */}
+              <LayerBadge layer={layerNum} size="md" />
+
+              {/* 金库 */}
+              <VaultCell vault={vault} onOpenVault={onOpenVault} />
+
+              {/* 心锁 + 梦魇 */}
+              <div className="flex min-w-0 flex-1 flex-col gap-1 lg:w-full lg:flex-none lg:items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">心锁</span>
+                  <HeartLockIndicator
+                    count={layerState?.heartLockValue ?? 0}
+                    max={Math.max(layerState?.heartLockValue ?? 0, 5)}
+                  />
+                </div>
+                {layerState?.nightmareRevealed && (
+                  <span className="text-[9px] text-red-400">⚠ 梦魇已揭露</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* 同层玩家 */}
-      {playersHere.length > 0 && (
-        <div className="flex flex-wrap gap-1 text-[10px]">
-          <span className="text-muted-foreground">同层：</span>
-          {playersHere.map((pid) => (
-            <span key={pid} className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-indigo-200">
-              {state.players[pid]?.nickname ?? pid}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* 底部：弃牌堆 + 可用牌堆 */}
+      <div className="mt-1 flex items-stretch justify-around gap-3 border-t border-indigo-500/20 pt-2">
+        {/* 用过的牌（弃牌堆） */}
+        <button
+          type="button"
+          onClick={onOpenDiscard}
+          className="flex flex-col items-center gap-1 transition-transform hover:scale-105"
+          data-testid="discard-pile"
+          aria-label={`弃牌堆（${state.discardPile.length} 张）`}
+        >
+          <div className="relative">
+            {state.discardPile.length === 0 ? (
+              <div className="flex h-[68px] w-12 items-center justify-center rounded border border-dashed border-slate-700 text-[9px] text-muted-foreground">
+                空
+              </div>
+            ) : (
+              <GameCard
+                cardId={state.discardPile[state.discardPile.length - 1] ?? null}
+                imageUrl={getCardImageUrl(state.discardPile[state.discardPile.length - 1])}
+                size="sm"
+                orientation="portrait"
+                disableDetail
+              />
+            )}
+            {state.discardPile.length > 0 && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-slate-800 px-1 text-[9px] text-slate-200 shadow">
+                {state.discardPile.length}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-muted-foreground">用过的牌</span>
+        </button>
 
-      {/* 金库 */}
-      <div className="flex flex-wrap gap-1.5">
-        <span className="text-[10px] text-muted-foreground">金库：</span>
-        {vaultsHere.length === 0 ? (
-          <span className="text-[10px] text-muted-foreground">（本层无金库）</span>
-        ) : (
-          vaultsHere.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => onOpenVault?.(v.id)}
-              className={cn(
-                'rounded border px-1.5 py-0.5 text-[10px]',
-                v.isOpened
-                  ? v.contentType === 'secret'
-                    ? 'border-purple-500 bg-purple-500/20 text-purple-200'
-                    : v.contentType === 'coin'
-                      ? 'border-amber-500 bg-amber-500/20 text-amber-200'
-                      : 'border-slate-500 bg-slate-700 text-slate-300'
-                  : 'border-slate-600 bg-slate-800 text-slate-400',
-              )}
-            >
-              {v.isOpened ? v.contentType : '???'}
-            </button>
-          ))
-        )}
+        {/* 可用牌堆（背面 + 剩余数量） */}
+        <button
+          type="button"
+          onClick={canDraw ? onDrawDeck : undefined}
+          disabled={!canDraw}
+          className={cn(
+            'flex flex-col items-center gap-1 transition-transform',
+            canDraw ? 'hover:scale-105 cursor-pointer' : 'cursor-not-allowed opacity-80',
+          )}
+          data-testid="deck-pile"
+          data-can-draw={canDraw || undefined}
+          aria-label={`可用牌堆（剩余 ${state.deckCount} 张${canDraw ? '，点击摸牌' : ''}）`}
+        >
+          <div className="relative">
+            <GameCard cardId="__back__" size="sm" orientation="portrait" disableDetail />
+            <span className="absolute -right-1 -top-1 rounded-full bg-indigo-600 px-1 text-[9px] text-indigo-50 shadow">
+              {state.deckCount}
+            </span>
+          </div>
+          <span className="text-[10px] text-muted-foreground">
+            {canDraw ? '可摸牌' : '可用牌堆'}
+          </span>
+        </button>
       </div>
     </div>
   );

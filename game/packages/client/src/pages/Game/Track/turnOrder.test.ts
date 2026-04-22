@@ -26,7 +26,7 @@ function makePlayers(ids: string[]): Record<string, MockPlayer> {
 }
 
 describe('computeRailSlots', () => {
-  it('viewer 是盗梦者：梦主在首位，其他盗梦者按 playerOrder', () => {
+  it('viewer 是盗梦者：梦主在首位，其余盗梦者（含 viewer 自己）按 playerOrder 接在后面', () => {
     const slots = computeRailSlots({
       playerOrder: ['T1', 'T2', 'M', 'T3'],
       players: makePlayers(['T1', 'T2', 'M', 'T3']),
@@ -34,12 +34,13 @@ describe('computeRailSlots', () => {
       masterID: 'M',
       currentPlayerID: 'T2',
     });
-    expect(slots.map((s) => s.id)).toEqual(['M', 'T2', 'T3']);
+    expect(slots.map((s) => s.id)).toEqual(['M', 'T1', 'T2', 'T3']);
     expect(slots[0]!.isMaster).toBe(true);
+    expect(slots.find((s) => s.id === 'T1')!.isViewer).toBe(true);
     expect(slots.find((s) => s.id === 'T2')!.isCurrent).toBe(true);
   });
 
-  it('viewer 是梦主：Rail 不含梦主 slot，直接从盗梦者开始', () => {
+  it('viewer 是梦主：Rail 不重复放梦主 slot，按 playerOrder 展开', () => {
     const slots = computeRailSlots({
       playerOrder: ['T1', 'T2', 'M', 'T3'],
       players: makePlayers(['T1', 'T2', 'M', 'T3']),
@@ -47,11 +48,12 @@ describe('computeRailSlots', () => {
       masterID: 'M',
       currentPlayerID: 'M',
     });
-    expect(slots.map((s) => s.id)).toEqual(['T1', 'T2', 'T3']);
-    expect(slots.every((s) => !s.isMaster)).toBe(true);
+    expect(slots.map((s) => s.id)).toEqual(['T1', 'T2', 'M', 'T3']);
+    expect(slots.find((s) => s.id === 'M')!.isViewer).toBe(true);
+    expect(slots.find((s) => s.id === 'M')!.isMaster).toBe(true);
   });
 
-  it('viewer 永远不出现在 Rail', () => {
+  it('viewer 也会出现在 Rail（方便查看自身顺序）', () => {
     const slots = computeRailSlots({
       playerOrder: ['T1', 'T2', 'T3', 'M'],
       players: makePlayers(['T1', 'T2', 'T3', 'M']),
@@ -59,7 +61,8 @@ describe('computeRailSlots', () => {
       masterID: 'M',
       currentPlayerID: 'T1',
     });
-    expect(slots.map((s) => s.id)).not.toContain('T2');
+    expect(slots.map((s) => s.id)).toContain('T2');
+    expect(slots.find((s) => s.id === 'T2')!.isViewer).toBe(true);
   });
 
   it('index 按 slot 顺序递增', () => {
@@ -70,7 +73,7 @@ describe('computeRailSlots', () => {
       masterID: 'M',
       currentPlayerID: 'T3',
     });
-    expect(slots.map((s) => s.index)).toEqual([0, 1, 2]);
+    expect(slots.map((s) => s.index)).toEqual([0, 1, 2, 3]);
   });
 
   it('isCurrent 标志只标记当前玩家', () => {
@@ -84,5 +87,18 @@ describe('computeRailSlots', () => {
     const current = slots.filter((s) => s.isCurrent);
     expect(current).toHaveLength(1);
     expect(current[0]!.id).toBe('M');
+  });
+
+  it('isViewer 只标记 viewer 自己', () => {
+    const slots = computeRailSlots({
+      playerOrder: ['T1', 'T2', 'M'],
+      players: makePlayers(['T1', 'T2', 'M']),
+      viewerID: 'T2',
+      masterID: 'M',
+      currentPlayerID: 'T1',
+    });
+    const viewers = slots.filter((s) => s.isViewer);
+    expect(viewers).toHaveLength(1);
+    expect(viewers[0]!.id).toBe('T2');
   });
 });

@@ -22,9 +22,9 @@ export interface ComputeRailSlotsOpts {
 
 /**
  * 计算移动端行动轴 slot 序列：
- *   - viewer 是盗梦者时：梦主放在首位，其余盗梦者按 playerOrder 接在后面
- *   - viewer 是梦主时：不放梦主 slot，直接从 playerOrder 中的盗梦者开始
- *   - viewer 本身始终不出现在 Rail（由底部 ActionDock 承载）
+ *   - viewer 是盗梦者时：梦主放在首位，其余盗梦者（含 viewer 自己）按 playerOrder 接在后面
+ *   - viewer 是梦主时：不再重复放梦主 slot，直接按 playerOrder 走
+ *   - viewer 自己也出现在 Rail（方便查看自己在顺序中的位置），仅通过 `isViewer` 标志位做视觉强调
  */
 export function computeRailSlots(opts: ComputeRailSlotsOpts): RailSlotData[] {
   const { playerOrder, viewerID, masterID, currentPlayerID } = opts;
@@ -37,14 +37,13 @@ export function computeRailSlots(opts: ComputeRailSlotsOpts): RailSlotData[] {
   }
 
   for (const pid of playerOrder) {
-    if (pid === viewerID) continue;
     if (pid === masterID && !isViewerMaster) continue; // 已放首位
     orderedIds.push(pid);
   }
 
   return orderedIds.map((id, index) => ({
     id,
-    isViewer: false,
+    isViewer: id === viewerID,
     isMaster: id === masterID,
     isCurrent: id === currentPlayerID,
     index,

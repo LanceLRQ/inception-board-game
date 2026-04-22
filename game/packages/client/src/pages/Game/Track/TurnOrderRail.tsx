@@ -14,7 +14,7 @@ import { cn } from '../../../lib/utils.js';
 import { GameCard } from '../../../components/GameCard/index.js';
 import { LayerBadge } from '../../../components/LayerBadge/index.js';
 import { activeTurnPulse, railSlotEnter } from '../../../styles/animations.js';
-import { getCardImageUrl } from '../../../lib/cardImages.js';
+import { getCardImageUrl, GENERIC_BACK_IMAGES } from '../../../lib/cardImages.js';
 import { computeRailSlots } from './turnOrder.js';
 import type { MockMatchState } from '../../../hooks/useMockMatch.js';
 
@@ -55,10 +55,14 @@ export function TurnOrderRail({ state, onOpenDetail, className }: TurnOrderRailP
       {slots.map((slot) => {
         const p = state.players[slot.id];
         if (!p) return null;
-        const characterCardId = p.isRevealed || slot.isMaster ? p.characterId || null : null;
-        const cardId = characterCardId ?? '__back__';
+        // viewer 自己的身份对自己永远可见；其他玩家按 isRevealed/isMaster 决定是否翻明
+        const revealChar = slot.isViewer || p.isRevealed || slot.isMaster;
+        const characterCardId = revealChar ? p.characterId || null : null;
         const orientation = slot.isMaster ? 'landscape' : 'portrait';
-        const imageUrl = characterCardId ? getCardImageUrl(characterCardId) : undefined;
+        // 未翻明 → 使用通用阵营背面图（盗梦者/梦主各自的真实卡背）
+        const fallbackBack = slot.isMaster ? GENERIC_BACK_IMAGES.master : GENERIC_BACK_IMAGES.thief;
+        const cardId = characterCardId ?? '__back__';
+        const imageUrl = characterCardId ? getCardImageUrl(characterCardId) : fallbackBack;
 
         return (
           <motion.div
@@ -67,12 +71,14 @@ export function TurnOrderRail({ state, onOpenDetail, className }: TurnOrderRailP
             className={cn(
               'flex flex-col items-center gap-1 px-1',
               slot.isCurrent && 'scale-105',
+              slot.isViewer && 'ring-1 ring-primary/60 rounded-lg',
               !p.isAlive && 'opacity-40',
             )}
             variants={railSlotEnter}
             initial="hidden"
             animate="visible"
             data-testid={`rail-slot-${slot.id}`}
+            data-viewer={slot.isViewer || undefined}
           >
             <motion.div
               className="rounded-md"
@@ -85,7 +91,7 @@ export function TurnOrderRail({ state, onOpenDetail, className }: TurnOrderRailP
                 orientation={orientation}
                 size="sm"
                 onLongPress={() => onOpenDetail(cardId)}
-                aria-label={`${p.nickname}${slot.isMaster ? '（梦主）' : ''}`}
+                aria-label={`${p.nickname}${slot.isMaster ? '（梦主）' : ''}${slot.isViewer ? '（你）' : ''}`}
               />
             </motion.div>
             <LayerBadge layer={p.currentLayer} size="sm" />
@@ -93,10 +99,14 @@ export function TurnOrderRail({ state, onOpenDetail, className }: TurnOrderRailP
             <span
               className={cn(
                 'max-w-[56px] truncate text-[9px]',
-                slot.isMaster ? 'text-red-300' : 'text-foreground',
+                slot.isMaster
+                  ? 'text-red-300'
+                  : slot.isViewer
+                    ? 'text-primary font-semibold'
+                    : 'text-foreground',
               )}
             >
-              {p.nickname}
+              {slot.isViewer ? `${p.nickname}（你）` : p.nickname}
             </span>
           </motion.div>
         );
