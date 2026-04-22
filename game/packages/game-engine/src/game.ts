@@ -292,6 +292,9 @@ export const InceptionCityGame = {
               // C1 · 水星·航路：世界观（+1 fail 贿赂）+ 逆流 SHOOT 响应已接入
               // 注：非 SHOOT 类牌的逆流响应依赖完整响应窗口（并入 P2）
               'dm_mercury_route',
+              // C2 · 金星·镜界：重影技能（applyVenusDouble + useVenusDouble）+ 镜界世界观（applyVenusMirrorWorld）
+              //   均已完整实装并通过 mercury-joker-swan.test.ts / venus-mirror-world.test.ts 覆盖
+              'dm_venus_mirror',
             ];
             const thiefPool: CardID[] = [
               'thief_pointman',

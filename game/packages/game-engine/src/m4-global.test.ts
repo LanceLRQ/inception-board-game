@@ -6,7 +6,7 @@
 //       盗梦者 SHOOT 保持原骰值（M4 不触发）
 
 import { describe, expect, it } from 'vitest';
-import type { CardID, Layer } from '@icgame/shared';
+import type { CardID } from '@icgame/shared';
 import type { SetupState } from './setup.js';
 import { callMove } from './testing/fixtures.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
@@ -21,25 +21,6 @@ function setHand(state: SetupState, playerID: string, hand: CardID[]): SetupStat
   const p = state.players[playerID];
   if (!p) return state;
   return { ...state, players: { ...state.players, [playerID]: { ...p, hand } } };
-}
-
-function setLayer(state: SetupState, playerID: string, layer: Layer): SetupState {
-  const p = state.players[playerID];
-  if (!p) return state;
-  const oldL = p.currentLayer;
-  if (oldL === layer) return state;
-  const fromL = state.layers[oldL];
-  const toL = state.layers[layer];
-  if (!fromL || !toL) return state;
-  return {
-    ...state,
-    players: { ...state.players, [playerID]: { ...p, currentLayer: layer } },
-    layers: {
-      ...state.layers,
-      [oldL]: { ...fromL, playersInLayer: fromL.playersInLayer.filter((id) => id !== playerID) },
-      [layer]: { ...toL, playersInLayer: [...toL.playersInLayer, playerID] },
-    },
-  };
 }
 
 describe('M4 卡宾枪全局化（批次 D）', () => {
