@@ -69,6 +69,10 @@ export function adaptBGIOtoMockState(opts: AdaptBGIOtoMockStateOpts): MockMatchS
     isOpened: !!v.isOpened,
   }));
 
+  const rawDeck = G.deck as { cards?: CardID[]; discardPile?: CardID[] } | undefined;
+  const deckCount = rawDeck?.cards?.length ?? 0;
+  const discardPile = rawDeck?.discardPile ?? [];
+
   const pendingUnlockRaw = G.pendingUnlock as
     | { playerID: string; layer: number; cardId: CardID }
     | null
@@ -86,8 +90,8 @@ export function adaptBGIOtoMockState(opts: AdaptBGIOtoMockStateOpts): MockMatchS
     playerOrder,
     layers,
     vaults,
-    deckCount: 0,
-    discardPile: [],
+    deckCount,
+    discardPile,
     pendingUnlock: pendingUnlockRaw ?? null,
   };
 }

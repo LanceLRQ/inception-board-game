@@ -5,11 +5,14 @@
 //
 // 梦境层固定按 4→1 排序（顶层数字大、底层数字小，贴合梦境越深层数越小的物理直觉）。
 
+import { useState } from 'react';
 import { GameCard } from '../../../components/GameCard/index.js';
 import { diceSvgPath } from '../../../components/Dice3D/index.js';
 import { getCardImageUrl } from '../../../lib/cardImages.js';
+import { getCardName } from '../../../lib/cards.js';
 import { cn } from '../../../lib/utils.js';
 import type { MockMatchState, MockVault } from '../../../hooks/useMockMatch.js';
+import type { CardID } from '@icgame/shared';
 
 export interface CenterPanelProps {
   state: MockMatchState;
@@ -79,6 +82,11 @@ export function CenterPanel({
   canDraw,
   className,
 }: CenterPanelProps) {
+  const [showDiscard, setShowDiscard] = useState(false);
+
+  // 弃牌历史弹层：最后打出的在最顶
+  const discardList: CardID[] = [...state.discardPile].reverse();
+
   return (
     <div
       className={cn(
@@ -155,10 +163,13 @@ export function CenterPanel({
 
       {/* 底部：弃牌堆 + 可用牌堆 */}
       <div className="mt-1 flex items-stretch justify-around gap-3 border-t border-indigo-500/20 pt-2">
-        {/* 用过的牌（弃牌堆） */}
+        {/* 用过的牌（弃牌堆）—— 点击打开历史弹层 */}
         <button
           type="button"
-          onClick={onOpenDiscard}
+          onClick={() => {
+            if (state.discardPile.length > 0) setShowDiscard(true);
+            onOpenDiscard?.();
+          }}
           className="flex flex-col items-center gap-1 transition-transform hover:scale-105"
           data-testid="discard-pile"
           aria-label={`弃牌堆（${state.discardPile.length} 张）`}
@@ -216,6 +227,62 @@ export function CenterPanel({
           </span>
         </button>
       </div>
+
+      {/* 弃牌历史弹层：最后打出的在最顶 */}
+      {showDiscard && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setShowDiscard(false)}
+          data-testid="discard-history-overlay"
+        >
+          <div
+            className="relative mx-4 max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl border border-indigo-500/30 bg-slate-900 p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-foreground">
+                过牌历史（{discardList.length} 张）
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowDiscard(false)}
+                className="rounded-full p-1 text-muted-foreground hover:bg-slate-700 hover:text-foreground"
+                aria-label="关闭"
+              >
+                ✕
+              </button>
+            </div>
+            {discardList.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">暂无弃牌</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {discardList.map((cardId, i) => (
+                  <div
+                    key={`${cardId}-${i}`}
+                    className="flex items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 px-2 py-1.5"
+                  >
+                    <GameCard
+                      cardId={cardId}
+                      imageUrl={getCardImageUrl(cardId)}
+                      size="sm"
+                      orientation="portrait"
+                      disableDetail
+                    />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-foreground">
+                        {getCardName(cardId)}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground">
+                        第 {discardList.length - i} 张
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
