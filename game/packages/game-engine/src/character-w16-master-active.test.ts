@@ -329,6 +329,21 @@ describe('W16-B · 冥王星·地狱（dm_pluto_hell）·业火', () => {
     expect(r).toBeNull();
   });
 
+  // B5 · 前置检查：无手牌<2 的盗梦者时拒绝发动（不浪费弃牌）
+  // 对照：docs/manual/06-dream-master.md 冥王星·地狱 §30 "不产生效果的技能不能无故启动"
+  it('无手牌<2 的盗梦者 → null（不消耗弃牌 / 不标 skillUsed）', () => {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+    s = setHand(s, 'pM', ['action_kick' as CardID]);
+    // 所有盗梦者手牌 >= 2 → 不应允许发动
+    s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_unlock' as CardID]);
+    s = setHand(s, 'p2', ['action_unlock' as CardID, 'action_unlock' as CardID]);
+    const r = applyPlutoBurning(s, 'pM', 'action_kick');
+    expect(r).toBeNull();
+    // 母 state 未被修改：弃牌堆不含 action_kick、master 手牌仍有 action_kick
+    expect(s.deck.discardPile).not.toContain('action_kick');
+    expect(s.players.pM!.hand).toContain('action_kick');
+  });
+
   it('move usePlutoBurning：成功调用', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setActionPhase(s);

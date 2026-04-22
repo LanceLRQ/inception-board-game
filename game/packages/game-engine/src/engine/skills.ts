@@ -240,6 +240,51 @@ export function applyChemistRefine(
   return s;
 }
 
+// === 药剂师 · 注射（skill_1）===
+// 对照：docs/manual/05-dream-thieves.md 药剂师 278 行
+// 出牌阶段：弃 1 张手牌中的梦境穿梭剂 → 令同层另一玩家移动到相邻层（应用穿梭剂效果）
+// 规则：manual 未写回合限（无次数限制）；target 必须存活且非 self；穿梭剂只能移到相邻层
+
+export const CHEMIST_INJECT_SKILL_ID = 'thief_chemist.skill_1';
+
+export function applyChemistInject(
+  state: SetupState,
+  selfID: string,
+  targetID: string,
+  toLayer: Layer,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_chemist') return null;
+  if (!player.isAlive) return null;
+  if (player.currentLayer < 1) return null;
+  if (selfID === targetID) return null;
+  const target = state.players[targetID];
+  if (!target || !target.isAlive) return null;
+  if (target.currentLayer !== player.currentLayer) return null;
+  // 目标层必须有效（1-4）
+  if (toLayer < 1 || toLayer > 4) return null;
+  // 穿梭剂只能移到相邻层（从 target 当前层出发）
+  if (Math.abs(target.currentLayer - toLayer) !== 1) return null;
+  // 手牌必须有 action_dream_transit
+  const idx = player.hand.indexOf('action_dream_transit' as CardID);
+  if (idx === -1) return null;
+
+  // 弃穿梭剂
+  const newHand = [...player.hand];
+  newHand.splice(idx, 1);
+  let s: SetupState = {
+    ...state,
+    players: { ...state.players, [selfID]: { ...player, hand: newHand } },
+    deck: {
+      ...state.deck,
+      discardPile: [...state.deck.discardPile, 'action_dream_transit' as CardID],
+    },
+  };
+  // target 移动
+  s = movePlayerToLayer(s, targetID, toLayer);
+  return s;
+}
+
 // === 战争之王 · 黑市 ===
 // 对照：docs/manual/05-dream-thieves.md 战争之王
 // 出牌阶段：弃 2 张手牌 → 弃牌堆任意 1 张到手牌。回合限 1 次。
@@ -444,6 +489,17 @@ export const FORTRESS_SKILL_ID = 'dm_fortress.skill_0';
 
 /** 要塞世界观：掷骰结果 -1 */
 export function applyFortressDiceModifier(roll: number): number {
+  return Math.max(1, roll - 1);
+}
+
+/**
+ * M4 卡宾枪：梦主对盗梦者使用 SHOOT 类牌时，目标玩家掷骰结果 -1。
+ * 对照：docs/manual/03-game-flow.md §80-81 "M4卡宾枪是1个特殊效果道具..."
+ * 对照：docs/manual/05-dream-thieves.md §111 "梦主SHOOT盗梦者不会触发处女·完美"（印证 M4 必须先于 processing）
+ * 本批次（B4）只用于 shouldJupiterThunderKill 对齐 manual §50 示例；其余 master SHOOT 行为待后续统一接入。
+ */
+export function applyM4CarbineModifier(shooterIsMaster: boolean, roll: number): number {
+  if (!shooterIsMaster) return roll;
   return Math.max(1, roll - 1);
 }
 
@@ -1559,6 +1615,59 @@ export function isAquariusUnlimitedActive(player: PlayerSetup): boolean {
   return true;
 }
 
+/**
+ * 水瓶·凝聚可触发次数：本回合已打出的牌按 name 分组，每 2 张同名贡献 1 次触发额度
+ * 扣除已使用的触发次数后即为剩余额度
+ * 对照：docs/manual/05-dream-thieves.md 水瓶 46-50 行
+ * 注：manual "金星·镜界复制不算"由 applyVenusMirrorWorld 不调用 recordCardPlayed 自然实现
+ */
+export function availableAquariusCoherence(state: SetupState, selfID: string): number {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_aquarius') return 0;
+  if (!player.isAlive) return 0;
+  const played = state.playedCardsThisTurn ?? [];
+  const counts: Record<string, number> = {};
+  for (const c of played) counts[c] = (counts[c] ?? 0) + 1;
+  let pairs = 0;
+  for (const n of Object.values(counts)) pairs += Math.floor(n / 2);
+  const used = player.skillUsedThisTurn[AQUARIUS_REUSE_SKILL_ID] ?? 0;
+  return Math.max(0, pairs - used);
+}
+
+/**
+ * 水瓶·凝聚：从弃牌堆选 1 张"本回合未使用过的牌"收入手牌
+ * 要求：availableAquariusCoherence > 0；pickCardId 在弃牌堆；pickCardId 不在 playedCardsThisTurn
+ */
+export function applyAquariusCoherence(
+  state: SetupState,
+  selfID: string,
+  pickCardId: CardID,
+): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_aquarius') return null;
+  if (!player.isAlive) return null;
+  if (availableAquariusCoherence(state, selfID) <= 0) return null;
+  // pick 必须在弃牌堆
+  const idx = state.deck.discardPile.lastIndexOf(pickCardId);
+  if (idx === -1) return null;
+  // pick 必须本回合内未使用过
+  const played = state.playedCardsThisTurn ?? [];
+  if (played.includes(pickCardId)) return null;
+
+  const newDiscard = [...state.deck.discardPile];
+  newDiscard.splice(idx, 1);
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [selfID]: { ...player, hand: [...player.hand, pickCardId] },
+    },
+    deck: { ...state.deck, discardPile: newDiscard },
+  };
+  s = markSkillUsed(s, selfID, AQUARIUS_REUSE_SKILL_ID);
+  return s;
+}
+
 // === 格林射线 · 移转（纯函数） ===
 // 弃 1 梦境穿梭剂 + 1 SHOOT → 移到任意层 + 执行 SHOOT 效果
 export const GREEN_RAY_SKILL_ID = 'thief_green_ray.skill_0';
@@ -2090,6 +2199,14 @@ export function applyPlutoBurning(
   const idx = master.hand.indexOf(discardCardId);
   if (idx === -1) return null;
 
+  // 前置检查：必须存在至少 1 名手牌<2 的存活盗梦者（manual §30 "不产生效果的技能不能无故启动"）
+  // 对照：docs/manual/06-dream-master.md 冥王星·地狱 详述
+  const preTargets = state.playerOrder.filter((pid) => {
+    const p = state.players[pid];
+    return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;
+  });
+  if (preTargets.length === 0) return null;
+
   // 弃 1
   const newHand = [...master.hand];
   newHand.splice(idx, 1);
@@ -2106,7 +2223,7 @@ export function applyPlutoBurning(
   };
   s = markSkillUsed(s, masterID, PLUTO_BURNING_SKILL_ID);
 
-  // 所有手牌<2 的存活盗梦者抽 2
+  // 所有手牌<2 的存活盗梦者抽 2（再次快照防止中途状态漂移）
   const targets = s.playerOrder.filter((pid) => {
     const p = s.players[pid];
     return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;

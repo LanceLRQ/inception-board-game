@@ -19,6 +19,7 @@ import {
   isJupiterPeakWorldActive,
   isJupiterPeakLayerOK,
   shouldJupiterThunderKill,
+  applyM4CarbineModifier,
   applySaturnDecree,
   canSaturnFreeMove,
   findMasterID,
@@ -302,6 +303,32 @@ describe('W16-A · 木星·巅峰（dm_jupiter_peak）', () => {
 
   it('雷霆：梦主在迷失层 → 不触发', () => {
     expect(shouldJupiterThunderKill('dm_jupiter_peak', 0, 1)).toBe(false);
+  });
+});
+
+// B4 · M4 卡宾枪 dice modifier（与 shouldJupiterThunderKill 组合使用）
+// 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪 + 05-dream-thieves.md §111
+describe('M4 卡宾枪 · dice modifier', () => {
+  it('梦主身份 → 骰 -1（clamp [1,6]）', () => {
+    expect(applyM4CarbineModifier(true, 6)).toBe(5);
+    expect(applyM4CarbineModifier(true, 4)).toBe(3);
+    expect(applyM4CarbineModifier(true, 1)).toBe(1); // clamp 下限
+  });
+
+  it('非梦主（盗梦者自杀或贿赂盗梦者 SHOOT）→ 不修饰', () => {
+    expect(applyM4CarbineModifier(false, 6)).toBe(6);
+    expect(applyM4CarbineModifier(false, 1)).toBe(1);
+  });
+
+  it('木星·雷霆 + M4 叠加（manual §50 示例）：4 层梦主 vs 3 层盗梦者掷 4 → 击杀', () => {
+    // 旧版：baseRoll=4 → shouldJupiterThunderKill('dm_jupiter_peak', 4, 4) = false（不击杀）
+    // 新版：applyM4CarbineModifier(true, 4) = 3，shouldJupiterThunderKill(..., 3) = true（击杀）
+    const finalRoll = applyM4CarbineModifier(true, 4);
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 4, finalRoll)).toBe(true);
+    // 对比：骰 5 → M4 后 4，仍然 ≥ 4 层 → 不击杀
+    expect(shouldJupiterThunderKill('dm_jupiter_peak', 4, applyM4CarbineModifier(true, 5))).toBe(
+      false,
+    );
   });
 });
 

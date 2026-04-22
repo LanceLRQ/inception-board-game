@@ -1552,7 +1552,7 @@ describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
     expect(r!.players[mid]!.hand.length).toBe(0);
   });
 
-  it('冥王星梦主 + 盗梦者手牌≥2 → 不抽（阈值守卫）', () => {
+  it('冥王星梦主 + 盗梦者手牌≥2 → null（B5 前置检查：不产生效果的技能不能无故启动）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     const mid = findMasterID(s)!;
     s = setHand(s, mid, ['action_unlock' as CardID]);
@@ -1561,10 +1561,8 @@ describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
     s = setHand(s, 'p2', ['c' as CardID, 'd' as CardID]);
     s = { ...s, deck: { cards: Array(10).fill('action_kick') as CardID[], discardPile: [] } };
     const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
-    expect(r).not.toBeNull();
-    // 手牌保持 2
-    expect(r!.players.p1!.hand.length).toBe(2);
-    expect(r!.players.p2!.hand.length).toBe(2);
+    // 对照：docs/manual/06-dream-master.md 冥王星·地狱 §30
+    expect(r).toBeNull();
   });
 
   it('冥王星梦主 + 手牌无指定弃 → null', () => {

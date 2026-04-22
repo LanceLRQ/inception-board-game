@@ -37,6 +37,8 @@ import {
   applyLeoKingdom,
   isCapricornusRhythmActive,
   applyChemistRefine,
+  applyChemistInject,
+  applyAquariusCoherence,
   applyLordOfWarBlackMarket,
   applyPaprikSalvation,
   applyScorpiusPoison,
@@ -79,6 +81,7 @@ import {
   isJupiterPeakWorldActive,
   isJupiterPeakLayerOK,
   shouldJupiterThunderKill,
+  applyM4CarbineModifier,
   canImperialPickBribe,
   applySecretPassageTeleport,
   applyUranusPower,
@@ -2489,6 +2492,32 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 水瓶·凝聚（skill_0）：每用过 2 张同名牌可从弃牌堆取 1 张本回合未用过的牌入手
+        // 对照：docs/manual/05-dream-thieves.md 水瓶 46-50 行
+        playAquariusCoherence: {
+          move: ({ G, ctx }: MoveCtx, pickCardId: CardID) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
+            const next = applyAquariusCoherence(G, ctx.currentPlayer, pickCardId);
+            if (next === null) return INVALID_MOVE;
+            return next;
+          },
+          client: false,
+        },
+
+        // 药剂师·注射（skill_1）：对同层玩家代打 1 张梦境穿梭剂
+        // 对照：docs/manual/05-dream-thieves.md 药剂师 278 行
+        playChemistInject: {
+          move: ({ G, ctx }: MoveCtx, targetID: string, toLayer: number) => {
+            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
+            const next = applyChemistInject(G, ctx.currentPlayer, targetID, toLayer as Layer);
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter(next);
+          },
+          client: false,
+        },
+
         // 战争之王·黑市：弃 2 手牌 → 弃牌堆任 1 张入手
         // 对照：docs/manual/05-dream-thieves.md 战争之王
         playLordOfWarBlackMarket: {
@@ -2978,11 +3007,15 @@ function applyShootVariant(
 
   // 木星·雷霆：梦主使用 SHOOT 类，目标骰 < 梦主层 → 直接击杀
   // 对照：cards-data.json dm_jupiter_peak 雷霆
-  if (
-    result !== 'kill' &&
-    shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, baseRoll)
-  ) {
-    result = 'kill';
+  // B4 修复：manual §50 明示"叠加梦主 M4 卡宾枪投骰结果 -1 效果"
+  // → 雷霆判定使用 M4 修饰后的骰值（梦主 SHOOT 时 -1），对齐 manual 示例
+  //   （4 层梦主 vs 3 层盗梦者，掷 1/2/3/4 均被击杀；未修饰仅 1/2/3 击杀）
+  if (result !== 'kill') {
+    const shooterIsMaster = shooter.faction === 'master';
+    const jupiterRoll = applyM4CarbineModifier(shooterIsMaster, baseRoll);
+    if (shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, jupiterRoll)) {
+      result = 'kill';
+    }
   }
 
   let s = discardCard(preState, ctx.currentPlayer, cardId);
