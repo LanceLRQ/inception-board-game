@@ -976,13 +976,14 @@ export const InceptionCityGame = {
             if (mode === 'shoot') {
               // 目标为玩家 ID
               if (typeof targetOrLayer !== 'string') return INVALID_MOVE;
-              return applyShootVariant(G, ctx, random, targetOrLayer, cardId, {
+              const r = applyShootVariant(G, ctx, random, targetOrLayer, cardId, {
                 sameLayerRequired: true,
                 deathFaces: [1],
                 moveFaces: [2, 3, 4],
                 extraOnMove: null,
                 decreeId,
               });
+              return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
             } else if (mode === 'transit') {
               // 自己移动到相邻层
               if (typeof targetOrLayer !== 'number') return INVALID_MOVE;
@@ -1250,6 +1251,7 @@ export const InceptionCityGame = {
             // 但 applyShootVariant 校验 cardId 必须在手中，这里需要绕过。
             // 简化：直接结算骰值 + 应用效果（不通过 applyShootVariant）
             const rawRoll = random.D6();
+            s = { ...s, lastShootRoll: rawRoll };
             const finalRoll = applyHaleyImpact(rawRoll);
             const shootResult =
               finalRoll === 1 ? 'kill' : finalRoll >= 2 && finalRoll <= 5 ? 'move' : 'miss';
@@ -2821,12 +2823,15 @@ function applyShootVariant(
   const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const baseRoll = random.D6();
 
+  // 记录原始骰值供客户端骰子动画使用
+  const s0 = { ...preShootState, lastShootRoll: baseRoll };
+
   // === 角色 SHOOT 修饰链 ===
   // W12 Tier B: 天蝎·毒针 / 金牛·号角
   // W13 Tier A: 灵雕师·雕琢（最高优先级，override 不可改）
   // hook 注入: opts.diceModifierHint 用于哈雷·冲击的免费 SHOOT
   let result: 'kill' | 'move' | 'miss';
-  let preState: SetupState = preShootState;
+  let preState: SetupState = s0;
 
   // 灵雕师·雕琢：override 模式，直接用 target 手牌数当骰值
   if (shooter.characterId === 'thief_soul_sculptor') {

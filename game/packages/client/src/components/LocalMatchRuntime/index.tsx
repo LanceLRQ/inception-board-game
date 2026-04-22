@@ -27,6 +27,7 @@ import { ChessTransposeDialog } from '../ChessTransposeDialog';
 import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
 import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
+import { ShootDiceOverlay } from '../ShootDiceOverlay';
 import { toast } from '@/lib/toast';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
@@ -337,50 +338,66 @@ export function LocalMatchRuntime({
   const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
   const playerLayer = (humanPlayer?.currentLayer as number) ?? 1;
 
-  // SHOOT 结算事件通知 → 全局 Toast（按结果分级）
+  // SHOOT 结算 → 骰子动画 + Toast（按结果分级）
+  //   流程：检测到 SHOOT 牌打出 + lastShootRoll 有值 → 显示 ShootDiceOverlay
+  //   骰子动画完成后 → Toast 通知结果
   //   判定（对照 plans/2-1-3-1-2-ui-cozy-wave.md SHOOT Toast 分级表）：
   //     - pendingShootMove != null → L2/L3 挂起中，不 toast（由 ShooterLayerPickerDialog 承担）
   //     - 某玩家 currentLayer 从 N → 0 → kill → toast.error
   //     - 某玩家 currentLayer 变化（非 0）→ move → toast.info
   //     - 所有玩家 currentLayer 无变化 → miss → toast.warn
   const lastPlayedCard = (G?.lastPlayedCardThisTurn as string | null | undefined) ?? null;
+  const lastShootRoll = (G?.lastShootRoll as number | null | undefined) ?? null;
+  const [shootDiceRoll, setShootDiceRoll] = useState<number | null>(null);
   const shootToastTrackRef = useRef<{ card: string | null; layers: Record<string, number> }>({
     card: null,
     layers: {},
   });
+
+  // 检测新的 SHOOT 牌打出 → 启动骰子动画
   useEffect(() => {
     if (!G) return;
+    const isShootCard =
+      typeof lastPlayedCard === 'string' && lastPlayedCard.startsWith('action_shoot');
+    const prev = shootToastTrackRef.current;
+    if (isShootCard && lastPlayedCard !== prev.card && lastShootRoll != null) {
+      setShootDiceRoll(lastShootRoll);
+    }
+  }, [G, lastPlayedCard, lastShootRoll]);
+
+  // 骰子动画完成回调 → 显示 Toast
+  const handleDiceComplete = useCallback(() => {
+    setShootDiceRoll(null);
+    if (!G || !lastPlayedCard) return;
     const nextLayers: Record<string, number> = {};
     for (const [id, p] of Object.entries(players ?? {})) {
       nextLayers[id] = (p.currentLayer as number) ?? 0;
     }
     const prev = shootToastTrackRef.current;
-    const isShootCard =
-      typeof lastPlayedCard === 'string' && lastPlayedCard.startsWith('action_shoot');
     const hasPendingShootMove =
       (G as unknown as { pendingShootMove?: unknown }).pendingShootMove != null;
-
-    if (isShootCard && lastPlayedCard !== prev.card && !hasPendingShootMove) {
-      let fired: 'kill' | 'move' | null = null;
-      for (const [id, layer] of Object.entries(nextLayers)) {
-        const prevLayer = prev.layers[id];
-        if (prevLayer !== undefined && prevLayer !== layer) {
-          const name = (players?.[id]?.nickname as string | undefined) ?? `P${id}`;
-          if (layer === 0) {
-            toast.error(`${getCardName(lastPlayedCard)} 击杀 · ${name}`);
-            fired = 'kill';
-          } else {
-            toast.info(`${getCardName(lastPlayedCard)} 命中 · ${name} 被推至 L${layer}`);
-            fired = 'move';
-          }
-          break;
+    if (hasPendingShootMove) {
+      shootToastTrackRef.current = { card: lastPlayedCard, layers: nextLayers };
+      return;
+    }
+    let fired: 'kill' | 'move' | null = null;
+    for (const [id, layer] of Object.entries(nextLayers)) {
+      const prevLayer = prev.layers[id];
+      if (prevLayer !== undefined && prevLayer !== layer) {
+        const name = (players?.[id]?.nickname as string | undefined) ?? `P${id}`;
+        if (layer === 0) {
+          toast.error(`${getCardName(lastPlayedCard)} 击杀 · ${name}`);
+          fired = 'kill';
+        } else {
+          toast.info(`${getCardName(lastPlayedCard)} 命中 · ${name} 被推至 L${layer}`);
+          fired = 'move';
         }
-      }
-      if (!fired) {
-        toast.warn(`${getCardName(lastPlayedCard)} 未命中 · 目标无位移`);
+        break;
       }
     }
-
+    if (!fired) {
+      toast.warn(`${getCardName(lastPlayedCard)} 未命中 · 目标无位移`);
+    }
     shootToastTrackRef.current = { card: lastPlayedCard, layers: nextLayers };
   }, [G, players, lastPlayedCard]);
 
@@ -982,6 +999,9 @@ export function LocalMatchRuntime({
       )}
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+      {/* SHOOT 骰子动画浮层 */}
+      <ShootDiceOverlay roll={shootDiceRoll} onComplete={handleDiceComplete} />
 
       {/* 响应类 Dialog 群（互斥业务保证同时只会有一个 open） · 对照 plans/2-1-3-1-2-ui-cozy-wave.md */}
       <MasterNightmareDecisionDialog

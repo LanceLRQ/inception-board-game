@@ -100,6 +100,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
     removedFromGame: [],
+    lastShootRoll: null,
   };
   return { ...base, ...overrides } as SetupState;
 }
@@ -127,6 +128,33 @@ describe('resolveShootCustom 骰面表', () => {
     expect(resolveShootCustom(2, [1, 2], [3, 4, 5])).toBe('kill');
     expect(resolveShootCustom(4, [1, 2], [3, 4, 5])).toBe('move');
     expect(resolveShootCustom(6, [1, 2], [3, 4, 5])).toBe('miss');
+  });
+});
+
+describe('lastShootRoll 记录', () => {
+  it('SHOOT 结算后写入原始骰值', () => {
+    const s = makeState({
+      players: {
+        '0': makePlayer('0', ['action_shoot']),
+        '1': makePlayer('1', ['action_unlock']),
+      } as SetupState['players'],
+    });
+    const r = callMove('playShoot', s, '1', 'action_shoot', 3);
+    expect(r).not.toBe('INVALID_MOVE');
+    expect(r.lastShootRoll).toBe(3);
+  });
+
+  it('不同骰值分别记录', () => {
+    const s = makeState({
+      players: {
+        '0': makePlayer('0', ['action_shoot']),
+        '1': makePlayer('1', ['action_unlock']),
+      } as SetupState['players'],
+    });
+    const r1 = callMove('playShoot', { ...s }, '1', 'action_shoot', 6);
+    expect(r1.lastShootRoll).toBe(6);
+    const r2 = callMove('playShoot', { ...s }, '1', 'action_shoot', 1);
+    expect(r2.lastShootRoll).toBe(1);
   });
 });
 

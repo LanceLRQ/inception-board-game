@@ -201,6 +201,8 @@ export interface SetupState {
   playedCardsThisTurn: CardID[];
   /** 最近一次打出的行动牌 cardId（便于 O(1) 查询；同 playedCardsThisTurn 末元素） */
   lastPlayedCardThisTurn: CardID | null;
+  /** 最近一次 SHOOT 类行动牌的原始骰值（1-6），供客户端骰子动画使用；非 SHOOT 回合为 null */
+  lastShootRoll: number | null;
   /**
    * 移出游戏的牌堆（不入弃牌堆，无法被药剂师 / 火星·战场世界观等回收）。
    * 对照：docs/manual/04-action-cards.md 时间风暴 "使用后此牌移出游戏"
@@ -395,6 +397,7 @@ export function createInitialState(options: {
     endTurn: null,
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
+    lastShootRoll: null,
     removedFromGame: [],
   };
 }

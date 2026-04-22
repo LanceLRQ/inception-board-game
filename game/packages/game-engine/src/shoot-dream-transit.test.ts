@@ -86,6 +86,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
     removedFromGame: [],
+    lastShootRoll: null,
   };
   base.layers[1]!.playersInLayer = ['0', '1'];
   return { ...base, ...overrides } as SetupState;

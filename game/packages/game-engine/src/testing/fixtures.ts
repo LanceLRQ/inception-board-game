@@ -151,6 +151,7 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     endTurn: null,
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
+    lastShootRoll: null,
     removedFromGame: [],
   };
   return merge(base, overrides);

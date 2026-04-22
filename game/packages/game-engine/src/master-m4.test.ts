@@ -107,6 +107,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
     removedFromGame: [],
+    lastShootRoll: null,
   };
   return { ...base, ...overrides } as SetupState;
 }
