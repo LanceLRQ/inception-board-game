@@ -5,6 +5,8 @@
 // 端点：
 //   GET /replays/:id            - 元信息（match info + event count）
 //   GET /replays/:id/events     - 全量事件（cursor 分页 + viewer 视角过滤）
+//   GET /replays/:id/range      - 步进切片（[from,to] 闭区间 + viewer 视角过滤）
+//   GET /replays/:id/frames     - 帧总览（minMC/maxMC/totalFrames，播放器进度条用）
 //   GET /replays/:id/download   - 导出（JSON 全量）
 //
 // 视角过滤策略：
@@ -88,6 +90,26 @@ export function alignFilteredWithMeta(
   return out;
 }
 
+/**
+ * 纯函数：根据 from/to 构造 Prisma where 子句的 moveCounter 范围条件。
+ * - from === undefined → 不限下界
+ * - to === undefined → 不限上界
+ * - 闭区间 [from, to]
+ */
+export function buildRangeWhere(
+  matchId: string,
+  from?: number,
+  to?: number,
+): { matchId: string; moveCounter?: { gte?: number; lte?: number } } {
+  const where: { matchId: string; moveCounter?: { gte?: number; lte?: number } } = { matchId };
+  if (from !== undefined || to !== undefined) {
+    where.moveCounter = {};
+    if (from !== undefined) where.moveCounter.gte = from;
+    if (to !== undefined) where.moveCounter.lte = to;
+  }
+  return where;
+}
+
 // GET /replays/:id - 回放元信息
 router.get('/replays/:id', async (ctx) => {
   const { id } = ctx.params;
@@ -163,6 +185,88 @@ router.get('/replays/:id/events', async (ctx) => {
     viewerID,
     totalBeforeFilter: data.length,
     totalAfterFilter: filteredWithMeta.length,
+  };
+});
+
+// GET /replays/:id/range - 步进切片
+//   query: from / to / viewerID
+//     - from / to: moveCounter 闭区间。任一可省略表示不限边界。
+//     - 用法：跳到第 N 帧 → from=N&to=N；前进 N 帧 → from=cur+1&to=cur+N
+//   返回：data[] + hasPrev / hasNext + 视角过滤统计
+router.get('/replays/:id/range', async (ctx) => {
+  const { id } = ctx.params;
+  const fromRaw = ctx.query.from;
+  const toRaw = ctx.query.to;
+  const from = typeof fromRaw === 'string' ? Number.parseInt(fromRaw, 10) : undefined;
+  const to = typeof toRaw === 'string' ? Number.parseInt(toRaw, 10) : undefined;
+  if (from !== undefined && Number.isNaN(from))
+    throw new AppError('VALIDATION_ERROR', 'from must be int');
+  if (to !== undefined && Number.isNaN(to))
+    throw new AppError('VALIDATION_ERROR', 'to must be int');
+  if (from !== undefined && to !== undefined && from > to)
+    throw new AppError('VALIDATION_ERROR', 'from must be <= to');
+
+  const viewerID = (ctx.query.viewerID as string | undefined) ?? null;
+
+  const match = await prisma.match.findUnique({
+    where: { id },
+    include: { matchPlayers: true },
+  });
+  if (!match) throw new AppError('NOT_FOUND', 'Replay not found');
+
+  const masterPlayer = match.matchPlayers.find((mp) => mp.role === 'master');
+  const dreamMasterID = masterPlayer ? String(masterPlayer.seat) : '';
+
+  const events = await prisma.matchEvent.findMany({
+    where: buildRangeWhere(id!, from, to),
+    orderBy: { moveCounter: 'asc' },
+  });
+
+  // 同时查总帧数边界，给前端 hasPrev/hasNext 信号
+  const [minEvt, maxEvt] = await Promise.all([
+    prisma.matchEvent.findFirst({ where: { matchId: id! }, orderBy: { moveCounter: 'asc' } }),
+    prisma.matchEvent.findFirst({ where: { matchId: id! }, orderBy: { moveCounter: 'desc' } }),
+  ]);
+
+  const entries = rowsToEventLogEntries(events);
+  const filtered = filterEventLog(entries, viewerID, dreamMasterID);
+  const filteredWithMeta = alignFilteredWithMeta(events, filtered);
+
+  const firstMC = events[0]?.moveCounter;
+  const lastMC = events[events.length - 1]?.moveCounter;
+  const hasPrev = minEvt !== null && firstMC !== undefined && firstMC > minEvt.moveCounter;
+  const hasNext = maxEvt !== null && lastMC !== undefined && lastMC < maxEvt.moveCounter;
+
+  ctx.body = {
+    data: filteredWithMeta,
+    from: from ?? null,
+    to: to ?? null,
+    hasPrev,
+    hasNext,
+    viewerID,
+    totalBeforeFilter: events.length,
+    totalAfterFilter: filteredWithMeta.length,
+  };
+});
+
+// GET /replays/:id/frames - 帧总览（播放器进度条初始化用）
+//   返回：{ minMoveCounter, maxMoveCounter, totalFrames }
+//   不做视角过滤（统计原始事件总数；视角下事件子集需要拉 /events 后客户端计算）
+router.get('/replays/:id/frames', async (ctx) => {
+  const { id } = ctx.params;
+  const match = await prisma.match.findUnique({ where: { id } });
+  if (!match) throw new AppError('NOT_FOUND', 'Replay not found');
+
+  const [minEvt, maxEvt, total] = await Promise.all([
+    prisma.matchEvent.findFirst({ where: { matchId: id }, orderBy: { moveCounter: 'asc' } }),
+    prisma.matchEvent.findFirst({ where: { matchId: id }, orderBy: { moveCounter: 'desc' } }),
+    prisma.matchEvent.count({ where: { matchId: id } }),
+  ]);
+
+  ctx.body = {
+    minMoveCounter: minEvt?.moveCounter ?? null,
+    maxMoveCounter: maxEvt?.moveCounter ?? null,
+    totalFrames: total,
   };
 });
 

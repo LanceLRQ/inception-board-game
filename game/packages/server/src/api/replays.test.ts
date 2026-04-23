@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { filterEventLog } from '@icgame/game-engine';
-import { rowsToEventLogEntries, alignFilteredWithMeta } from './replays.js';
+import { rowsToEventLogEntries, alignFilteredWithMeta, buildRangeWhere } from './replays.js';
 
 const NOW = new Date('2026-04-23T12:00:00Z');
 
@@ -93,6 +93,44 @@ describe('replays · alignFilteredWithMeta', () => {
   it('空 rows → 空数组', () => {
     const result = alignFilteredWithMeta([], rowsToEventLogEntries([]));
     expect(result).toEqual([]);
+  });
+});
+
+describe('replays · buildRangeWhere', () => {
+  it('未传 from/to → 仅 matchId 条件', () => {
+    expect(buildRangeWhere('m1')).toEqual({ matchId: 'm1' });
+  });
+
+  it('仅 from → moveCounter.gte', () => {
+    expect(buildRangeWhere('m1', 5)).toEqual({ matchId: 'm1', moveCounter: { gte: 5 } });
+  });
+
+  it('仅 to → moveCounter.lte', () => {
+    expect(buildRangeWhere('m1', undefined, 10)).toEqual({
+      matchId: 'm1',
+      moveCounter: { lte: 10 },
+    });
+  });
+
+  it('from + to → 闭区间', () => {
+    expect(buildRangeWhere('m1', 5, 10)).toEqual({
+      matchId: 'm1',
+      moveCounter: { gte: 5, lte: 10 },
+    });
+  });
+
+  it('单帧 from === to', () => {
+    expect(buildRangeWhere('m1', 7, 7)).toEqual({
+      matchId: 'm1',
+      moveCounter: { gte: 7, lte: 7 },
+    });
+  });
+
+  it('from = 0 也走条件分支（不能因 falsy 误判为 undefined）', () => {
+    expect(buildRangeWhere('m1', 0, 3)).toEqual({
+      matchId: 'm1',
+      moveCounter: { gte: 0, lte: 3 },
+    });
   });
 });
 
