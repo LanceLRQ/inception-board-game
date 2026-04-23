@@ -61,6 +61,26 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['playShoot', 'playPeekMaster']);
       expect(choice).toBe('playShoot');
     });
+    // W20.5 · 处女·完美 三选一响应窗
+    it('endActionPhase 优先于 respondVirgoPerfect', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondVirgoPerfect']);
+      expect(choice).toBe('endActionPhase');
+    });
+  });
+
+  describe('W20.5 · 水瓶·凝聚优先级', () => {
+    it('playAquariusCoherence(7) 优先于 doDraw(10)', () => {
+      const choice = bot.play(null, ['doDraw', 'playAquariusCoherence']);
+      expect(choice).toBe('playAquariusCoherence');
+    });
+    it('playShoot(1) 仍优先于 playAquariusCoherence(7)', () => {
+      const choice = bot.play(null, ['playShoot', 'playAquariusCoherence']);
+      expect(choice).toBe('playShoot');
+    });
+    it('playUnlock(2) 仍优先于 playAquariusCoherence(7)', () => {
+      const choice = bot.play(null, ['playUnlock', 'playAquariusCoherence']);
+      expect(choice).toBe('playUnlock');
+    });
   });
 
   describe('playResponse', () => {

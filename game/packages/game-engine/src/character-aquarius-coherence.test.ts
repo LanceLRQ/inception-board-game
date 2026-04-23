@@ -11,6 +11,7 @@ import {
   AQUARIUS_REUSE_SKILL_ID,
 } from './engine/skills.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
+import { callMove } from './testing/fixtures.js';
 
 function setCharacter(state: SetupState, playerID: string, characterId: CardID): SetupState {
   const p = state.players[playerID];
@@ -132,5 +133,98 @@ describe('水瓶 · 凝聚 · 取牌', () => {
     // 第三次应拒绝
     const r3 = applyAquariusCoherence(r2!, 'p1', 'action_kick' as CardID);
     expect(r3).toBeNull();
+  });
+});
+
+// ============================================================================
+// W20.5 · BGIO move 集成测试（playAquariusCoherence）
+// 对照：game.ts:2503 playAquariusCoherence move 入口
+// ============================================================================
+
+describe('水瓶 · 凝聚 · BGIO move 集成', () => {
+  it('正确路径：调用 playAquariusCoherence 后弃牌堆 -1 + 手牌 +1', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock', 'action_unlock'] as CardID[]);
+    s = withDiscard(s, ['action_kick'] as CardID[]);
+    const handBefore = s.players.p1!.hand.length;
+    const discardBefore = s.deck.discardPile.length;
+
+    const result = callMove(s, 'playAquariusCoherence', ['action_kick' as CardID], {
+      currentPlayer: 'p1',
+    });
+    expect(result).not.toBe('INVALID_MOVE');
+    const next = result as SetupState;
+    expect(next.players.p1!.hand.length).toBe(handBefore + 1);
+    expect(next.deck.discardPile.length).toBe(discardBefore - 1);
+    expect(next.players.p1!.hand).toContain('action_kick');
+    // skill usage 已记录
+    expect(next.players.p1!.skillUsedThisTurn[AQUARIUS_REUSE_SKILL_ID]).toBe(1);
+  });
+
+  it('拒绝：turnPhase ≠ action（draw 阶段调用）', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock', 'action_unlock'] as CardID[]);
+    s = withDiscard(s, ['action_kick'] as CardID[]);
+    s = { ...s, turnPhase: 'draw' };
+    const result = callMove(s, 'playAquariusCoherence', ['action_kick' as CardID], {
+      currentPlayer: 'p1',
+    });
+    expect(result).toBe('INVALID_MOVE');
+  });
+
+  it('拒绝：availableAquariusCoherence=0（未达 2 张同名）', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock'] as CardID[]); // 仅 1 张
+    s = withDiscard(s, ['action_kick'] as CardID[]);
+    const result = callMove(s, 'playAquariusCoherence', ['action_kick' as CardID], {
+      currentPlayer: 'p1',
+    });
+    expect(result).toBe('INVALID_MOVE');
+  });
+
+  it('拒绝：pickCardId 不在弃牌堆', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock', 'action_unlock'] as CardID[]);
+    s = withDiscard(s, [] as CardID[]); // 弃牌堆空
+    const result = callMove(s, 'playAquariusCoherence', ['action_kick' as CardID], {
+      currentPlayer: 'p1',
+    });
+    expect(result).toBe('INVALID_MOVE');
+  });
+
+  it('拒绝：pickCardId 是本回合已用过的牌', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock', 'action_unlock'] as CardID[]);
+    s = withDiscard(s, ['action_unlock'] as CardID[]);
+    const result = callMove(s, 'playAquariusCoherence', ['action_unlock' as CardID], {
+      currentPlayer: 'p1',
+    });
+    expect(result).toBe('INVALID_MOVE');
+  });
+
+  it('拒绝：pendingShootMove 未消费时不得发动', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock', 'action_unlock'] as CardID[]);
+    s = withDiscard(s, ['action_kick'] as CardID[]);
+    s = {
+      ...s,
+      pendingShootMove: {
+        shooterID: 'p1',
+        targetPlayerID: 'p2',
+        cardId: 'action_shoot' as CardID,
+        extraOnMove: null,
+        choices: [1, 3],
+      },
+    };
+    const result = callMove(s, 'playAquariusCoherence', ['action_kick' as CardID], {
+      currentPlayer: 'p1',
+    });
+    expect(result).toBe('INVALID_MOVE');
   });
 });
