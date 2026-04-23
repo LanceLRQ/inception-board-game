@@ -85,6 +85,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     mazeState: null,
     pendingAriesChoice: null,
     pendingVirgoChoice: null,
+    pendingShootResponse: null,
     playedCardsThisTurn: [],
     lastPlayedCardThisTurn: null,
     removedFromGame: [],

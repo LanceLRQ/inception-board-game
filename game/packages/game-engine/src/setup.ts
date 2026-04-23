@@ -214,6 +214,28 @@ export interface SetupState {
     triggerRoll: number;
     shooterID: string;
   } | null;
+  /**
+   * SHOOT 响应窗口（pre-roll）：当 SHOOT 发动且目标可响应时挂起，等待目标决策。
+   * 当前消费方：双鱼·闪避（W20.5-C）。后续可扩展 恐怖分子·讹诈 等。
+   * 对照：docs/manual/05-dream-thieves.md 双鱼 / plans/tasks.md W20.5
+   * 生命周期：
+   *   - applyShootVariant 在 dispatchPassives(onBeforeShoot) 之后、随机 D6 之前检查
+   *   - target 是双鱼且 canPiscesEvade → 挂起本窗口 + 提前 return（未弃 SHOOT 卡）
+   *   - respondShootEvade：target 闪避（applyPiscesEvade + 弃 SHOOT 卡 + 触发 onAfterShoot）
+   *   - respondShootPass：target 放弃响应 → 重入 SHOOT 核心继续 D6 流程
+   * 序列化注意：dicePreModifier 是函数，不可序列化；该路径（哈雷免费 SHOOT）跳过窗口直走
+   */
+  pendingShootResponse: {
+    shooterID: string;
+    targetPlayerID: string;
+    cardId: CardID;
+    sameLayerRequired: boolean;
+    deathFaces: number[];
+    moveFaces: number[];
+    extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
+    decreeId?: CardID;
+    preventMove?: boolean;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -418,6 +440,7 @@ export function createInitialState(options: {
     mazeState: null,
     pendingAriesChoice: null,
     pendingVirgoChoice: null,
+    pendingShootResponse: null,
     winner: null,
     winReason: null,
     endTurn: null,

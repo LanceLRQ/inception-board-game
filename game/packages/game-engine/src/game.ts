@@ -118,6 +118,8 @@ import {
   applyVirgoDrawTwo,
   applyVirgoTeleport,
   type VirgoPerfectChoice,
+  canPiscesEvade,
+  applyPiscesEvade,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
@@ -438,6 +440,11 @@ export const InceptionCityGame = {
           if (s.pendingVirgoChoice) {
             s = { ...s, pendingVirgoChoice: null };
           }
+          // 双鱼·闪避：回合末未决定强制清空（视为放弃响应，防卡死）
+          //   注：理想情况是回合末不应有该 pending（应在打 SHOOT 当下消费完）；保险兜底
+          if (s.pendingShootResponse) {
+            s = { ...s, pendingShootResponse: null };
+          }
           // 冥王星地狱世界观：盗梦者回合结束时手牌≥6 → 入迷失层
           // 对照：cards-data.json dm_pluto_hell 世界观
           if (isPlutoHellWorldActive(s)) {
@@ -636,6 +643,8 @@ export const InceptionCityGame = {
             if (G.peekReveal) return INVALID_MOVE;
             // 处女·完美 三选一未决定不得结束行动阶段
             if (G.pendingVirgoChoice) return INVALID_MOVE;
+            // 双鱼·闪避响应窗未决定不得结束行动阶段
+            if (G.pendingShootResponse) return INVALID_MOVE;
             // 共鸣归还：弃牌阶段前将 bonder 的全部手牌给予 target
             // 若 target 已进入迷失层（layer 0）或死亡则保留手牌
             // 对照：docs/manual/04-action-cards.md 共鸣 解析
@@ -2238,6 +2247,68 @@ export const InceptionCityGame = {
           client: false,
         },
 
+        // 双鱼·闪避（skill_0）· SHOOT 响应窗口
+        //   pendingShootResponse 由 applyShootVariant 在 pre-roll 阶段挂起；本 move 由目标双鱼消费
+        //   evade 分支：移到 currentLayer-1 + 翻面 + 弃 SHOOT 卡 + onAfterShoot passive
+        //   pass 分支：放弃响应 → 重入 applyShootVariant（skipPiscesCheck=true）继续骰
+        // 仅 pendingShootResponse.targetPlayerID 本人可发起；回合外 move 不 guard turnPhase
+        respondShootEvade: {
+          move: ({ G, ctx, random }: MoveCtx) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingShootResponse;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.targetPlayerID) return INVALID_MOVE;
+            const target = G.players[pending.targetPlayerID];
+            if (!target || !canPiscesEvade(target)) return INVALID_MOVE;
+
+            // 1) 执行闪避（移层 + 翻面 + 标记技能已用）
+            let s = applyPiscesEvade(G, pending.targetPlayerID);
+            if (s === null) return INVALID_MOVE;
+            // 2) shooter 弃 SHOOT 卡（避免免费再用）
+            s = discardCard(s, pending.shooterID, pending.cardId);
+            // 3) 清空 pending + 触发 onAfterShoot（处女·完美等监听者）
+            s = { ...s, pendingShootResponse: null };
+            s = dispatchPassives(s, 'onAfterShoot').state;
+            // void random 防止未使用警告（保持签名一致）
+            void random;
+            return incrementMoveCounter(s);
+          },
+          client: false,
+        },
+
+        respondShootPass: {
+          move: ({ G, ctx, random }: MoveCtx) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingShootResponse;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.targetPlayerID) return INVALID_MOVE;
+
+            // 重入 applyShootVariant：复用原 SHOOT 参数 + skipPiscesCheck=true
+            // 关键：先清空 pending，再以 shooter 身份重入
+            const cleared = { ...G, pendingShootResponse: null };
+            const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
+            const result = applyShootVariant(
+              cleared,
+              shooterCtx,
+              random,
+              pending.targetPlayerID,
+              pending.cardId,
+              {
+                sameLayerRequired: pending.sameLayerRequired,
+                deathFaces: pending.deathFaces,
+                moveFaces: pending.moveFaces,
+                extraOnMove: pending.extraOnMove,
+                decreeId: pending.decreeId,
+                preventMove: pending.preventMove,
+                skipPiscesCheck: true,
+              },
+            );
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            return result;
+          },
+          client: false,
+        },
+
         // 处女·完美（skill_0）· 三选一响应窗
         // 对照：docs/manual/05-dream-thieves.md 处女 / plans/tasks.md W20.5
         // 触发：dispatchPassives(onAfterShoot) 在 lastShootRoll===6 时挂起 pendingVirgoChoice
@@ -2985,6 +3056,12 @@ interface ShootVariantOpts {
   dicePreModifier?: (baseRoll: number) => number;
   /** 射手·禁足：SHOOT 结果为 move 时阻止目标移动 */
   preventMove?: boolean;
+  /**
+   * 跳过 Pisces 闪避响应窗口检查。
+   * - 默认 false：首次进入 applyShootVariant 时会检查 target 是否为可闪避双鱼
+   * - true：respondShootPass move 重入时设置；防止响应窗口循环开启
+   */
+  skipPiscesCheck?: boolean;
 }
 
 /** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用 + 死亡宣言
@@ -3024,6 +3101,32 @@ function applyShootVariant(
   const decreeCheck = validateDecree(G, ctx.currentPlayer, opts.decreeId);
   if (decreeCheck === 'INVALID') return INVALID_MOVE;
   const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
+
+  // W20.5-C · Pisces 闪避响应窗口（pre-roll）
+  // 限制：dicePreModifier 路径（哈雷免费 SHOOT，函数不可序列化）跳过窗口
+  // skipPiscesCheck=true 由 respondShootPass move 重入时设置
+  if (
+    !opts.skipPiscesCheck &&
+    !opts.dicePreModifier &&
+    !G.pendingShootResponse &&
+    canPiscesEvade(target)
+  ) {
+    return {
+      ...G,
+      pendingShootResponse: {
+        shooterID: ctx.currentPlayer,
+        targetPlayerID,
+        cardId,
+        sameLayerRequired: opts.sameLayerRequired,
+        deathFaces: opts.deathFaces,
+        moveFaces: opts.moveFaces,
+        extraOnMove: opts.extraOnMove,
+        decreeId: opts.decreeId,
+        preventMove: opts.preventMove,
+      },
+    };
+  }
+
   // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
   const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const baseRoll = random.D6();

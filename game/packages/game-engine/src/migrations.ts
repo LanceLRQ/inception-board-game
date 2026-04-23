@@ -3,7 +3,7 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -52,6 +52,15 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     (state) => ({
       ...state,
       pendingVirgoChoice: state.pendingVirgoChoice ?? null,
+    }),
+  ],
+  // v6 → v7：添加 pendingShootResponse（SHOOT pre-roll 响应窗口；当前消费方双鱼·闪避 W20.5-C）
+  //   对照：docs/manual/05-dream-thieves.md 双鱼 / plans/tasks.md W20.5
+  [
+    7,
+    (state) => ({
+      ...state,
+      pendingShootResponse: state.pendingShootResponse ?? null,
     }),
   ],
 ]);

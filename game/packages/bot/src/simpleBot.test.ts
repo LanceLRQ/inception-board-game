@@ -66,6 +66,15 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondVirgoPerfect']);
       expect(choice).toBe('endActionPhase');
     });
+    // W20.5-C · 双鱼·闪避 SHOOT 响应窗
+    it('endActionPhase 优先于 respondShootEvade', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondShootEvade']);
+      expect(choice).toBe('endActionPhase');
+    });
+    it('endActionPhase 优先于 respondShootPass', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondShootPass']);
+      expect(choice).toBe('endActionPhase');
+    });
   });
 
   describe('W20.5 · 水瓶·凝聚优先级', () => {
