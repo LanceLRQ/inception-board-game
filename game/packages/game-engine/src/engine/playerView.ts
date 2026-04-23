@@ -67,11 +67,16 @@ export function filterFor(
   const isSpectator = opts.spectator === true || viewerID === null;
   const isMaster = !isSpectator && viewerID === state.dreamMasterID;
 
+  // 皇城梦主特殊豁免：is master + characterId='dm_imperial_city'
+  // 对照：docs/manual/06-dream-master.md 161 行 "可以随时查看所有未派出的贿赂牌，但不能查看已给予盗梦者的贿赂牌"
+  const isImperialMaster =
+    isMaster && viewerID !== null && state.players[viewerID]?.characterId === 'dm_imperial_city';
+
   return {
     ...state,
     players: filterPlayers(state.players, viewerID, isMaster, isSpectator),
     vaults: filterVaults(state.vaults, isMaster, state.peekReveal, viewerID, isSpectator),
-    bribePool: filterBribes(state.bribePool, viewerID, isMaster, isSpectator),
+    bribePool: filterBribes(state.bribePool, viewerID, isMaster, isSpectator, isImperialMaster),
     deck: filterDeck(state.deck),
     _filteredFor: viewerID ?? '__spectator__',
   };
@@ -153,9 +158,29 @@ function filterBribes(
   viewerID: string | null,
   isMaster: boolean,
   isSpectator: boolean,
+  isImperialMaster: boolean = false,
 ): FilteredBribe[] {
   return bribes.map((b) => {
     const isHolder = !isSpectator && viewerID !== null && b.heldBy === viewerID;
+    // 皇城梦主特殊：可见 inPool 内容，但已派发（dealt/deal/shattered）对其隐藏
+    // 对照：docs/manual/06-dream-master.md 161 行
+    if (isImperialMaster) {
+      // 已派发的贿赂（dealt/deal/shattered）：皇城梦主不可见 status
+      // 持有人公开（heldBy 公开），但不知道 deal/fail/shattered 哪种
+      if (b.status !== 'inPool') {
+        const isImperialHolder = b.heldBy === viewerID;
+        // 例外：自己持有的贿赂仍可见（实际皇城是梦主，不会持有贿赂；防御性写法）
+        return {
+          ...b,
+          status: isImperialHolder ? b.status : ('dealt' as const),
+          heldBy: b.heldBy,
+          originalOwnerId: isImperialHolder ? b.originalOwnerId : null,
+        };
+      }
+      // inPool 状态：皇城可见全部内容
+      return { ...b };
+    }
+
     // 梦主 + 持有者：可见 status
     // 其他玩家：只见 inPool/dealt，看不到最终 deal/shattered
     const canSeeStatus = isMaster || isHolder;

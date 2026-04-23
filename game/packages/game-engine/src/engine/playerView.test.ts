@@ -81,6 +81,49 @@ describe('PlayerView', () => {
       expect(f.vaults[0]!.contentType).toBe('secret');
       expect(f.vaults[2]!.contentType).toBe('coin');
     });
+
+    // W20 加固：peekReveal 授权边界
+    it('peekReveal · peeker 仅可见对应层 vault，其他层仍隐藏', () => {
+      let s = makeState();
+      s = {
+        ...s,
+        peekReveal: { peekerID: 'T1', revealKind: 'vault', vaultLayer: 1 },
+      };
+      const f = filterFor(s, 'T1');
+      expect(f.vaults[0]!.contentType).toBe('secret'); // L1 授权可见
+      expect(f.vaults[2]!.contentType).toBe('hidden'); // L3 仍隐藏
+    });
+
+    it('peekReveal · 非 peeker 不受影响（仍隐藏）', () => {
+      let s = makeState();
+      s = {
+        ...s,
+        peekReveal: { peekerID: 'T1', revealKind: 'vault', vaultLayer: 1 },
+      };
+      const f = filterFor(s, 'T2');
+      expect(f.vaults[0]!.contentType).toBe('hidden');
+    });
+
+    it('peekReveal · 观战者不受 peekReveal 影响', () => {
+      let s = makeState();
+      s = {
+        ...s,
+        peekReveal: { peekerID: 'T1', revealKind: 'vault', vaultLayer: 1 },
+      };
+      const f = filterFor(s, null);
+      expect(f.vaults[0]!.contentType).toBe('hidden');
+    });
+
+    it('peekReveal · revealKind=bribe 不影响 vault 可见性', () => {
+      let s = makeState();
+      s = {
+        ...s,
+        peekReveal: { peekerID: 'M', revealKind: 'bribe', targetThiefID: 'T1' },
+      };
+      // M 是梦主本来就能看，测 T2 视角更纯
+      const f2 = filterFor(s, 'T2');
+      expect(f2.vaults[0]!.contentType).toBe('hidden');
+    });
   });
 
   // === L3 贿赂 ===
@@ -104,6 +147,67 @@ describe('PlayerView', () => {
       expect(b3.status).toBe('dealt');
       const b4 = f.bribePool.find((b) => b.id === 'b4')!;
       expect(b4.status).toBe('dealt');
+    });
+  });
+
+  // === L3 贿赂 · 皇城梦主特殊豁免（W20） ===
+  // 对照：docs/manual/06-dream-master.md 161 行
+  // 规则：皇城梦主可见 inPool 内容，但已派发（dealt/deal/shattered）对其隐藏
+  describe('L3 bribe filter · imperial master 豁免', () => {
+    function makeImperialState(): SetupState {
+      const s = makeState();
+      return {
+        ...s,
+        players: {
+          ...s.players,
+          M: { ...s.players.M!, characterId: 'dm_imperial_city' as CardID },
+        },
+      };
+    }
+
+    it('皇城梦主仍可见 inPool 详情', () => {
+      const f = filterFor(makeImperialState(), 'M');
+      const b1 = f.bribePool.find((b) => b.id === 'b1')!;
+      expect(b1.status).toBe('inPool');
+    });
+
+    it('皇城梦主对已派发 dealt 状态不可见真实 status（脱敏为 dealt）', () => {
+      const f = filterFor(makeImperialState(), 'M');
+      const b3 = f.bribePool.find((b) => b.id === 'b3')!;
+      // b3 真实 status='deal'，皇城应看不到（脱敏）
+      expect(b3.status).toBe('dealt');
+    });
+
+    it('皇城梦主对 shattered 状态也不可见', () => {
+      const f = filterFor(makeImperialState(), 'M');
+      const b4 = f.bribePool.find((b) => b.id === 'b4')!;
+      expect(b4.status).toBe('dealt'); // 脱敏
+    });
+
+    it('皇城梦主对 originalOwnerId 已派发的不可见', () => {
+      const f = filterFor(makeImperialState(), 'M');
+      const b3 = f.bribePool.find((b) => b.id === 'b3')!;
+      expect(b3.originalOwnerId).toBeNull();
+    });
+
+    it('已派发贿赂的 heldBy 仍公开（持有人本身公开）', () => {
+      const f = filterFor(makeImperialState(), 'M');
+      const b3 = f.bribePool.find((b) => b.id === 'b3')!;
+      expect(b3.heldBy).toBe('T2');
+    });
+
+    it('普通梦主（非皇城）仍可见 deal/shattered 状态（向后兼容）', () => {
+      const f = filterFor(makeState(), 'M');
+      const b3 = f.bribePool.find((b) => b.id === 'b3')!;
+      expect(b3.status).toBe('deal');
+      const b4 = f.bribePool.find((b) => b.id === 'b4')!;
+      expect(b4.status).toBe('shattered');
+    });
+
+    it('盗梦者视角不受皇城豁免影响（仍按通用规则）', () => {
+      const f = filterFor(makeImperialState(), 'T1');
+      const b1 = f.bribePool.find((b) => b.id === 'b1')!;
+      expect(b1.status).toBe('hidden');
     });
   });
 
