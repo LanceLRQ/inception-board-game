@@ -62,6 +62,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   // W20.5-C · 双鱼·闪避 SHOOT 响应窗（同上：响应类 999 不主动选；由 worker 代发）
   respondShootEvade: 999,
   respondShootPass: 999,
+  // W20.5-D · 恐怖分子·狂热 SHOOT 响应窗（同上）
+  respondTerroristDiscard: 999,
+  respondTerroristAccept: 999,
   // W20.5 · 水瓶·凝聚（playAquariusCoherence）
   //   主动技能：本回合每打 2 张同名牌产生 1 次触发额度，从弃牌堆收 1 张未用过的牌
   //   优先级 7：高于 doDraw(10) 但低于 SHOOT/Unlock 类（让 bot 优先打出 SHOOT 凑同名 pair 再回收）

@@ -272,14 +272,28 @@ describe('恐怖分子 · 远程（thief_terrorist）', () => {
     expect(isTerroristCrossLayerActive(s.players.p1!)).toBe(false);
   });
 
-  it('集成：跨层 SHOOT 通过校验', () => {
+  it('集成：跨层 SHOOT 通过校验（W20.5-D 后挂起 Terrorist 响应窗口）', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_terrorist' as CardID);
     s = setHand(s, 'p1', ['action_shoot'] as CardID[]);
     s = setLayer(s, 'p2', 3 as Layer);
+    // W20.5-D：恐怖分子 SHOOT 现在会挂起 Terrorist 响应窗口（target 选弃牌或承受 -1）
     const r = callMove(s, 'playShoot', ['p2', 'action_shoot' as CardID], { rolls: [1] });
     expectMoveOk(r);
-    expect(r.players.p2!.isAlive).toBe(false);
+    expect(r.pendingShootResponse).not.toBeNull();
+    expect(r.pendingShootResponse!.responseType).toBe('terrorist');
+    // p2 仍存活（pre-roll 挂起）
+    expect(r.players.p2!.isAlive).toBe(true);
+    // target 接受惩罚 → 重入 SHOOT，rolls=[1] kill 直接命中
+    const r2 = callMove(r, 'respondTerroristAccept', [], {
+      currentPlayer: 'p2',
+      rolls: [1],
+    });
+    expectMoveOk(r2);
+    // 1-1=0，miss（不在 deathFaces=[1] 也不在 moveFaces=[2,3,4]）
+    expect(r2.players.p2!.isAlive).toBe(true);
+    // 验证 -1 惩罚生效：原 rolls=[1] 应 kill；现在因 -1=0 → miss
+    expect(r2.pendingShootResponse).toBeNull();
   });
 });
 

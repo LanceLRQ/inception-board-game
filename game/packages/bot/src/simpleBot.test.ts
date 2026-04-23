@@ -75,6 +75,15 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondShootPass']);
       expect(choice).toBe('endActionPhase');
     });
+    // W20.5-D · 恐怖分子·狂热
+    it('endActionPhase 优先于 respondTerroristDiscard', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondTerroristDiscard']);
+      expect(choice).toBe('endActionPhase');
+    });
+    it('endActionPhase 优先于 respondTerroristAccept', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondTerroristAccept']);
+      expect(choice).toBe('endActionPhase');
+    });
   });
 
   describe('W20.5 · 水瓶·凝聚优先级', () => {

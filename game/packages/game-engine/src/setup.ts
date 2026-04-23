@@ -235,6 +235,12 @@ export interface SetupState {
     extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
     decreeId?: CardID;
     preventMove?: boolean;
+    /**
+     * 响应类型：
+     *   - 'pisces'：双鱼·闪避（W20.5-C 默认值，向后兼容；可省略）
+     *   - 'terrorist'：恐怖分子·狂热（W20.5-D；target 必须弃 1 张否则骰 -1）
+     */
+    responseType?: 'pisces' | 'terrorist';
   } | null;
   winner: Faction | null;
   winReason: string | null;

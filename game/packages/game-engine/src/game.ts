@@ -2257,6 +2257,8 @@ export const InceptionCityGame = {
             if (G.phase !== 'playing') return INVALID_MOVE;
             const pending = G.pendingShootResponse;
             if (!pending) return INVALID_MOVE;
+            // 仅 Pisces 响应类型可消费
+            if (pending.responseType && pending.responseType !== 'pisces') return INVALID_MOVE;
             if (ctx.currentPlayer !== pending.targetPlayerID) return INVALID_MOVE;
             const target = G.players[pending.targetPlayerID];
             if (!target || !canPiscesEvade(target)) return INVALID_MOVE;
@@ -2281,10 +2283,12 @@ export const InceptionCityGame = {
             if (G.phase !== 'playing') return INVALID_MOVE;
             const pending = G.pendingShootResponse;
             if (!pending) return INVALID_MOVE;
+            // 仅 Pisces 响应类型可消费
+            if (pending.responseType && pending.responseType !== 'pisces') return INVALID_MOVE;
             if (ctx.currentPlayer !== pending.targetPlayerID) return INVALID_MOVE;
 
             // 重入 applyShootVariant：复用原 SHOOT 参数 + skipPiscesCheck=true
-            // 关键：先清空 pending，再以 shooter 身份重入
+            // Terrorist 检查仍可触发（如 Pisces 同时被 Terrorist SHOOT，pass 后进入 Terrorist 窗）
             const cleared = { ...G, pendingShootResponse: null };
             const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
             const result = applyShootVariant(
@@ -2301,6 +2305,87 @@ export const InceptionCityGame = {
                 decreeId: pending.decreeId,
                 preventMove: pending.preventMove,
                 skipPiscesCheck: true,
+              },
+            );
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            return result;
+          },
+          client: false,
+        },
+
+        // 恐怖分子·狂热（skill_1）· SHOOT 响应窗口
+        //   pendingShootResponse.responseType='terrorist' 由 applyShootVariant 挂起
+        //   discard 分支：target 弃 1 张手牌 → 重入 SHOOT（无 -1 惩罚）
+        //   accept 分支：target 拒绝弃牌 → 重入 SHOOT（terroristPenalty=true，骰 -1）
+        // 对照：docs/manual/05-dream-thieves.md 恐怖分子 狂热 247 行
+        respondTerroristDiscard: {
+          move: ({ G, ctx, random }: MoveCtx, cardId: CardID) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingShootResponse;
+            if (!pending) return INVALID_MOVE;
+            if (pending.responseType !== 'terrorist') return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.targetPlayerID) return INVALID_MOVE;
+            const target = G.players[pending.targetPlayerID];
+            if (!target) return INVALID_MOVE;
+            // 校验 cardId 在 target 手中
+            if (!target.hand.includes(cardId)) return INVALID_MOVE;
+
+            // 1) target 弃 1 张
+            let s = discardCard(G, pending.targetPlayerID, cardId);
+            // 2) 清空 pending + 重入 SHOOT（无惩罚）
+            s = { ...s, pendingShootResponse: null };
+            const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
+            const result = applyShootVariant(
+              s,
+              shooterCtx,
+              random,
+              pending.targetPlayerID,
+              pending.cardId,
+              {
+                sameLayerRequired: pending.sameLayerRequired,
+                deathFaces: pending.deathFaces,
+                moveFaces: pending.moveFaces,
+                extraOnMove: pending.extraOnMove,
+                decreeId: pending.decreeId,
+                preventMove: pending.preventMove,
+                skipPiscesCheck: true,
+                skipTerroristCheck: true,
+                terroristPenalty: false,
+              },
+            );
+            if (result === INVALID_MOVE) return INVALID_MOVE;
+            return result;
+          },
+          client: false,
+        },
+
+        respondTerroristAccept: {
+          move: ({ G, ctx, random }: MoveCtx) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingShootResponse;
+            if (!pending) return INVALID_MOVE;
+            if (pending.responseType !== 'terrorist') return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.targetPlayerID) return INVALID_MOVE;
+
+            // 清空 pending + 重入 SHOOT（terroristPenalty=true）
+            const cleared = { ...G, pendingShootResponse: null };
+            const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
+            const result = applyShootVariant(
+              cleared,
+              shooterCtx,
+              random,
+              pending.targetPlayerID,
+              pending.cardId,
+              {
+                sameLayerRequired: pending.sameLayerRequired,
+                deathFaces: pending.deathFaces,
+                moveFaces: pending.moveFaces,
+                extraOnMove: pending.extraOnMove,
+                decreeId: pending.decreeId,
+                preventMove: pending.preventMove,
+                skipPiscesCheck: true,
+                skipTerroristCheck: true,
+                terroristPenalty: true,
               },
             );
             if (result === INVALID_MOVE) return INVALID_MOVE;
@@ -3062,6 +3147,16 @@ interface ShootVariantOpts {
    * - true：respondShootPass move 重入时设置；防止响应窗口循环开启
    */
   skipPiscesCheck?: boolean;
+  /**
+   * 跳过 Terrorist 狂热响应窗口检查。
+   * - true：respondTerroristDiscard/Accept move 重入时设置
+   */
+  skipTerroristCheck?: boolean;
+  /**
+   * 恐怖分子·狂热触发后未弃牌的惩罚：D6 后 baseRoll -1
+   * 仅在 respondTerroristAccept 重入时设为 true
+   */
+  terroristPenalty?: boolean;
 }
 
 /** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用 + 死亡宣言
@@ -3123,13 +3218,44 @@ function applyShootVariant(
         extraOnMove: opts.extraOnMove,
         decreeId: opts.decreeId,
         preventMove: opts.preventMove,
+        responseType: 'pisces',
+      },
+    };
+  }
+
+  // W20.5-D · Terrorist 狂热响应窗口（pre-roll，Pisces 之后）
+  // 触发：shooter 是恐怖分子（被动技能 skill_1）→ target 必须弃 1 张否则骰 -1
+  // 对照：docs/manual/05-dream-thieves.md 恐怖分子 狂热 247 行
+  // 限制：dicePreModifier 路径同样跳过（哈雷免费 SHOOT 等特殊路径不挂窗）
+  if (
+    !opts.skipTerroristCheck &&
+    !opts.dicePreModifier &&
+    !G.pendingShootResponse &&
+    shooter.characterId === 'thief_terrorist' &&
+    target.isAlive
+  ) {
+    return {
+      ...G,
+      pendingShootResponse: {
+        shooterID: ctx.currentPlayer,
+        targetPlayerID,
+        cardId,
+        sameLayerRequired: opts.sameLayerRequired,
+        deathFaces: opts.deathFaces,
+        moveFaces: opts.moveFaces,
+        extraOnMove: opts.extraOnMove,
+        decreeId: opts.decreeId,
+        preventMove: opts.preventMove,
+        responseType: 'terrorist',
       },
     };
   }
 
   // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
   const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
-  const baseRoll = random.D6();
+  const rawD6 = random.D6();
+  // W20.5-D · 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1（不 floor，可能产生 0 → miss）
+  const baseRoll = opts.terroristPenalty ? rawD6 - 1 : rawD6;
   // D 批次：M4 卡宾枪全局化 —— 梦主使用 SHOOT 时目标骰 -1（基线梦主优势）
   // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪道具；§111 印证 M4 先于效果处理
   // 仅在"未被角色技能重写骰值"的通用路径生效，不影响灵雕师 override / 天蝎毒针等特殊处理
@@ -3138,7 +3264,8 @@ function applyShootVariant(
   const postM4Roll = applyM4CarbineModifier(shooterIsMaster, baseRoll);
 
   // 记录原始骰值供客户端骰子动画使用（展示未修饰的真实 D6 结果）
-  const s0 = { ...preShootState, lastShootRoll: baseRoll };
+  // lastShootRoll 记录原始 D6（1-6）供动画展示；resolution 用修饰后 baseRoll
+  const s0 = { ...preShootState, lastShootRoll: rawD6 };
 
   // === 角色 SHOOT 修饰链 ===
   // W12 Tier B: 天蝎·毒针 / 金牛·号角
