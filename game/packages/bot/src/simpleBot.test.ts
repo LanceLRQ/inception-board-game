@@ -84,6 +84,11 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondTerroristAccept']);
       expect(choice).toBe('endActionPhase');
     });
+    // W20.5-E · 雅典娜·急智
+    it('endActionPhase 优先于 useAthenaWit', () => {
+      const choice = bot.play(null, ['endActionPhase', 'useAthenaWit']);
+      expect(choice).toBe('endActionPhase');
+    });
   });
 
   describe('W20.5 · 水瓶·凝聚优先级', () => {

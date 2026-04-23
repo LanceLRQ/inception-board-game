@@ -70,6 +70,10 @@ const MOVE_PRIORITY: Record<string, number> = {
   //   优先级 7：高于 doDraw(10) 但低于 SHOOT/Unlock 类（让 bot 优先打出 SHOOT 凑同名 pair 再回收）
   //   实际可用性由 engine availableAquariusCoherence(state, playerID) 守卫，bot 看到合法即触发
   playAquariusCoherence: 7,
+  // W20.5-E · 雅典娜·急智（useAthenaWit）回合外主动 move
+  //   优先级 999：bot 自己回合 engine 会拒（已 guard "非 currentPlayerID 才能用"）
+  //   他人回合的接入由 worker 顶部分支检测后专用代发；此处 999 防 SimpleBot 主动选
+  useAthenaWit: 999,
 };
 
 /**
