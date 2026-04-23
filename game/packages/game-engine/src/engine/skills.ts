@@ -866,7 +866,8 @@ export function applyAthenaAwe(
 // ============================================================================
 
 // === 处女 · 完美 ===
-// 当任意玩家掷出 6 时可触发：复活一位玩家 / 抽 2 张 / 移到任意层
+// 当任意玩家掷出 6 时可触发：复活一位己方角色 / 抽 2 张 / 移到任意层
+// 对照：docs/manual/05-dream-thieves.md 处女
 export const VIRGO_SKILL_ID = 'thief_virgo.skill_0';
 
 export type VirgoPerfectChoice = 'revive' | 'draw_two' | 'teleport';
@@ -874,6 +875,75 @@ export type VirgoPerfectChoice = 'revive' | 'draw_two' | 'teleport';
 /** 处女完美触发条件：任意玩家骰 6 */
 export function isVirgoPerfectTriggered(rawRoll: number): boolean {
   return rawRoll === 6;
+}
+
+/**
+ * 处女·完美 · 选项一：复活一位己方阵营死亡角色
+ *  - virgo 必须存活
+ *  - target 必须死亡且阵营=thief（己方）
+ *  - target 复活到 L1（梦境入口）+ deathTurn=null + isAlive=true
+ *  - target 复活后手牌清空（与 paprik 复活时把手牌交给救援者不同；处女只是单纯复活）
+ */
+export function applyVirgoResurrect(
+  state: SetupState,
+  virgoID: string,
+  targetID: string,
+): SetupState | null {
+  const virgo = state.players[virgoID];
+  if (!virgo || virgo.characterId !== 'thief_virgo') return null;
+  if (!virgo.isAlive) return null;
+  if (virgoID === targetID) return null;
+
+  const target = state.players[targetID];
+  if (!target) return null;
+  if (target.isAlive) return null;
+  if (target.faction !== 'thief') return null;
+
+  let s: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [targetID]: {
+        ...target,
+        isAlive: true,
+        deathTurn: null,
+        hand: [],
+      },
+    },
+  };
+  // 复活到 L1（梦境入口）
+  s = movePlayerToLayer(s, targetID, 1 as Layer);
+  return s;
+}
+
+/**
+ * 处女·完美 · 选项二：从牌库顶抽 2 张
+ *  - virgo 必须存活
+ *  - 牌库不足时抽到尽（drawCards 已处理）
+ */
+export function applyVirgoDrawTwo(state: SetupState, virgoID: string): SetupState | null {
+  const virgo = state.players[virgoID];
+  if (!virgo || virgo.characterId !== 'thief_virgo') return null;
+  if (!virgo.isAlive) return null;
+  return drawCards(state, virgoID, 2);
+}
+
+/**
+ * 处女·完美 · 选项三：传送到任一梦境层（1-4，不含迷失层 0）
+ *  - virgo 必须存活
+ *  - layer 必须 1-4
+ *  - 不限相邻
+ */
+export function applyVirgoTeleport(
+  state: SetupState,
+  virgoID: string,
+  layer: number,
+): SetupState | null {
+  const virgo = state.players[virgoID];
+  if (!virgo || virgo.characterId !== 'thief_virgo') return null;
+  if (!virgo.isAlive) return null;
+  if (!Number.isInteger(layer) || layer < 1 || layer > 4) return null;
+  return movePlayerToLayer(state, virgoID, layer as Layer);
 }
 
 // === 筑梦师 · 迷宫 ===

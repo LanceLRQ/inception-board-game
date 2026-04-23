@@ -201,6 +201,19 @@ export interface SetupState {
     victimLayer: number;
     victimID: string;
   } | null;
+  /**
+   * 处女·完美：任意玩家骰出 6 时挂起处女的"三选一"决策窗口
+   *   3 个选项：复活己方死者 / 抽 2 张 / 传送任一层
+   * 对照：docs/manual/05-dream-thieves.md 处女
+   * 生命周期：dispatchPassives(onAfterShoot) 检测到处女且骰=6 时挂起；
+   *           respondVirgoPerfect(choice, params) 消费并清空。
+   * 与 pendingShootMove 关系：pendingShootMove 优先（先选层），关闭后 onAfterShoot 触发本窗。
+   */
+  pendingVirgoChoice: {
+    virgoID: string;
+    triggerRoll: number;
+    shooterID: string;
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -404,6 +417,7 @@ export function createInitialState(options: {
     pendingShootMove: null,
     mazeState: null,
     pendingAriesChoice: null,
+    pendingVirgoChoice: null,
     winner: null,
     winReason: null,
     endTurn: null,

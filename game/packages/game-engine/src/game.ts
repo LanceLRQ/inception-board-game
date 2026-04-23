@@ -114,6 +114,10 @@ import {
   applyVenusDouble,
   applyMercuryReverse,
   jokerDrawCount,
+  applyVirgoResurrect,
+  applyVirgoDrawTwo,
+  applyVirgoTeleport,
+  type VirgoPerfectChoice,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
@@ -430,6 +434,10 @@ export const InceptionCityGame = {
           if (s.pendingAriesChoice) {
             s = { ...s, pendingAriesChoice: null };
           }
+          // 处女·完美：回合末未决定强制清空（视为放弃技能，防卡死）
+          if (s.pendingVirgoChoice) {
+            s = { ...s, pendingVirgoChoice: null };
+          }
           // 冥王星地狱世界观：盗梦者回合结束时手牌≥6 → 入迷失层
           // 对照：cards-data.json dm_pluto_hell 世界观
           if (isPlutoHellWorldActive(s)) {
@@ -626,6 +634,8 @@ export const InceptionCityGame = {
             if (G.pendingResponseWindow) return INVALID_MOVE;
             if (G.pendingPeekDecision) return INVALID_MOVE;
             if (G.peekReveal) return INVALID_MOVE;
+            // 处女·完美 三选一未决定不得结束行动阶段
+            if (G.pendingVirgoChoice) return INVALID_MOVE;
             // 共鸣归还：弃牌阶段前将 bonder 的全部手牌给予 target
             // 若 target 已进入迷失层（layer 0）或死亡则保留手牌
             // 对照：docs/manual/04-action-cards.md 共鸣 解析
@@ -2224,6 +2234,52 @@ export const InceptionCityGame = {
             const next = applyAriesStardustDiscard(G);
             if (next === null) return INVALID_MOVE;
             return next;
+          },
+          client: false,
+        },
+
+        // 处女·完美（skill_0）· 三选一响应窗
+        // 对照：docs/manual/05-dream-thieves.md 处女 / plans/tasks.md W20.5
+        // 触发：dispatchPassives(onAfterShoot) 在 lastShootRoll===6 时挂起 pendingVirgoChoice
+        // 约束：
+        //   - 仅 pendingVirgoChoice.virgoID 本人可发起（回合外 move，不 guard turnPhase）
+        //   - choice='revive' 需 targetID 参数（己方死亡角色）
+        //   - choice='draw_two' 无参
+        //   - choice='teleport' 需 layer 参数（1-4）
+        //   - choice='skip'  允许跳过（放弃技能）
+        // 任意分支结束后清空 pendingVirgoChoice + incrementMoveCounter
+        respondVirgoPerfect: {
+          move: (
+            { G, ctx }: MoveCtx,
+            choice: VirgoPerfectChoice | 'skip',
+            params?: { targetID?: string; layer?: number },
+          ) => {
+            if (G.phase !== 'playing') return INVALID_MOVE;
+            const pending = G.pendingVirgoChoice;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== pending.virgoID) return INVALID_MOVE;
+
+            if (choice === 'skip') {
+              return incrementMoveCounter({ ...G, pendingVirgoChoice: null });
+            }
+
+            let next: SetupState | null;
+            if (choice === 'revive') {
+              const targetID = params?.targetID;
+              if (typeof targetID !== 'string') return INVALID_MOVE;
+              next = applyVirgoResurrect(G, pending.virgoID, targetID);
+            } else if (choice === 'draw_two') {
+              next = applyVirgoDrawTwo(G, pending.virgoID);
+            } else if (choice === 'teleport') {
+              const layer = params?.layer;
+              if (typeof layer !== 'number') return INVALID_MOVE;
+              next = applyVirgoTeleport(G, pending.virgoID, layer);
+            } else {
+              return INVALID_MOVE;
+            }
+
+            if (next === null) return INVALID_MOVE;
+            return incrementMoveCounter({ ...next, pendingVirgoChoice: null });
           },
           client: false,
         },

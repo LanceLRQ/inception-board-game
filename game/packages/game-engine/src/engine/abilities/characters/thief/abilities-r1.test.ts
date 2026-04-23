@@ -96,67 +96,65 @@ describe('R1 · createDefaultRegistry', () => {
 // 处女 · 完美
 // ==========================================================================
 
-describe('R1 · 处女·完美', () => {
-  it('canActivate ok：角色匹配 + roll=6', () => {
+describe('R1 · 处女·完美 (W20.5 实装)', () => {
+  it('canActivate ok：角色匹配 + lastShootRoll=6', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_virgo');
-    const ctx = ctxFor(s, 'p1', {
-      pendingShoot: {
-        shooterID: 'p2',
-        targetID: 'p1',
-        cardID: 'action_shoot',
-        baseRoll: 6,
-        modifiers: [],
-      },
-    });
+    s = { ...s, lastShootRoll: 6 };
+    const ctx = ctxFor(s, 'p1');
     expect(virgoPerfect.canActivate(s, ctx).ok).toBe(true);
   });
 
   it('roll≠6 → 不可发动', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_virgo');
-    const ctx = ctxFor(s, 'p1', {
-      pendingShoot: {
-        shooterID: 'p2',
-        targetID: 'p1',
-        cardID: 'action_shoot',
-        baseRoll: 5,
-        modifiers: [],
-      },
-    });
+    s = { ...s, lastShootRoll: 5 };
+    const ctx = ctxFor(s, 'p1');
     const r = virgoPerfect.canActivate(s, ctx);
     expect(r.ok).toBe(false);
     expect(r.reason).toBe('condition_not_met');
   });
 
   it('非处女角色 → 不可发动', () => {
-    const s = scenarioStartOfGame3p();
-    const ctx = ctxFor(s, 'p1', {
-      pendingShoot: {
-        shooterID: 'p2',
-        targetID: 'p1',
-        cardID: 'action_shoot',
-        baseRoll: 6,
-        modifiers: [],
-      },
-    });
+    const s = { ...scenarioStartOfGame3p(), lastShootRoll: 6 };
+    const ctx = ctxFor(s, 'p1');
     expect(virgoPerfect.canActivate(s, ctx).ok).toBe(false);
   });
 
-  it('无 pendingShoot → 不可发动', () => {
+  it('无 lastShootRoll → 不可发动', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_virgo');
     const ctx = ctxFor(s, 'p1');
     expect(virgoPerfect.canActivate(s, ctx).ok).toBe(false);
   });
 
-  it('apply 当前为 no-op（R3 实装）', () => {
+  it('已挂起 pendingVirgoChoice → 不重入', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_virgo');
+    s = {
+      ...s,
+      lastShootRoll: 6,
+      pendingVirgoChoice: { virgoID: 'p1', triggerRoll: 6, shooterID: 'p2' },
+    };
+    const ctx = ctxFor(s, 'p1');
+    const r = virgoPerfect.canActivate(s, ctx);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('already_pending');
+  });
+
+  it('apply 挂起 pendingVirgoChoice + 触发事件', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_virgo');
+    s = { ...s, lastShootRoll: 6, currentPlayerID: 'p2' };
     const ctx = ctxFor(s, 'p1');
     const r = virgoPerfect.apply(s, ctx, {});
-    expect(r.state).toBe(s);
-    expect(r.events).toEqual([]);
+    expect(r.state).not.toBeNull();
+    expect(r.state!.pendingVirgoChoice).toEqual({
+      virgoID: 'p1',
+      triggerRoll: 6,
+      shooterID: 'p2',
+    });
+    expect(r.events.map((e) => e.type)).toContain('virgo_perfect_pending');
   });
 });
 

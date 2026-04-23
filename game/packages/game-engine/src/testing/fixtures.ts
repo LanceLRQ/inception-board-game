@@ -147,6 +147,7 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     pendingLibra: null,
     mazeState: null,
     pendingAriesChoice: null,
+    pendingVirgoChoice: null,
     winner: null,
     winReason: null,
     endTurn: null,

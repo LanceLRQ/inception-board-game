@@ -3,7 +3,7 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -43,6 +43,15 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     (state) => ({
       ...state,
       pendingAriesChoice: state.pendingAriesChoice ?? null,
+    }),
+  ],
+  // v5 → v6：添加 pendingVirgoChoice（处女·完美 onAfterShoot roll=6 三选一响应窗口）
+  //   对照：docs/manual/05-dream-thieves.md 处女 / plans/tasks.md W20.5
+  [
+    6,
+    (state) => ({
+      ...state,
+      pendingVirgoChoice: state.pendingVirgoChoice ?? null,
     }),
   ],
 ]);
