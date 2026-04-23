@@ -3,11 +3,12 @@
 // 对照：plans/tasks.md W21 回放系统 启动 batch
 //
 // 端点：
-//   GET /replays/:id            - 元信息（match info + event count）
-//   GET /replays/:id/events     - 全量事件（cursor 分页 + viewer 视角过滤）
-//   GET /replays/:id/range      - 步进切片（[from,to] 闭区间 + viewer 视角过滤）
-//   GET /replays/:id/frames     - 帧总览（minMC/maxMC/totalFrames，播放器进度条用）
-//   GET /replays/:id/download   - 导出（JSON 全量）
+//   GET  /replays/:id            - 元信息（match info + event count）
+//   GET  /replays/:id/events     - 全量事件（cursor 分页 + viewer 视角过滤）
+//   GET  /replays/:id/range      - 步进切片（[from,to] 闭区间 + viewer 视角过滤）
+//   GET  /replays/:id/frames     - 帧总览（minMC/maxMC/totalFrames，播放器进度条用）
+//   GET  /replays/:id/download   - 导出（JSON 全量）
+//   POST /replays/:id/share      - 创建分享短链（base58 + TTL；复用 ShortLinkService）
 //
 // 视角过滤策略：
 //   - viewerID 通过 query param 显式传入（暂不强制 auth；对局结束后回放视为公开）
@@ -18,10 +19,18 @@
 // 复用：filterEventLog（@icgame/game-engine）
 
 import Router from '@koa/router';
+import { z } from 'zod';
 import { filterEventLog, type EventLogEntry } from '@icgame/game-engine';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
+import { authMiddleware } from '../middleware/auth.js';
+import {
+  ShortLinkService,
+  type ShortLinkRecord,
+  type ShortLinkStore,
+  type ShortLinkTargetType,
+} from '../services/ShortLinkService.js';
 
 const router = new Router();
 
@@ -310,6 +319,131 @@ router.get('/replays/:id/download', async (ctx) => {
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
   };
+});
+
+// === 短链分享：复用 ShortLinkService（targetType='replay'）===
+//
+// 设计：
+//   - 此处建立模块内 ShortLinkStore（与 api/shortLink.ts 中的实现等价）
+//     之所以不抽公共模块，是为了保持 ShortLinkService 单测可注入 InMemoryStore
+//     的灵活性；后续若需统一可独立成 infra/shortLinkPrismaStore.ts
+//   - TTL 默认走 ShortLinkService 的 7 天默认；调用方可显式覆盖
+//   - 创建前先验证 match 存在（防止生成指向不存在 replay 的死链）
+
+const replayShortLinkStore: ShortLinkStore = {
+  async findByCode(code: string): Promise<ShortLinkRecord | null> {
+    const row = await prisma.shortLink.findUnique({ where: { code } });
+    if (!row) return null;
+    return {
+      code: row.code,
+      targetType: row.targetType as ShortLinkTargetType,
+      targetId: row.targetId,
+      createdByPlayerId: row.createdByPlayerId,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+      hitCount: row.hitCount,
+      lastHitAt: row.lastHitAt,
+    };
+  },
+  async save(input) {
+    const row = await prisma.shortLink.create({
+      data: {
+        code: input.code,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        createdByPlayerId: input.createdByPlayerId,
+        createdAt: input.createdAt,
+        expiresAt: input.expiresAt,
+      },
+    });
+    return {
+      code: row.code,
+      targetType: row.targetType as ShortLinkTargetType,
+      targetId: row.targetId,
+      createdByPlayerId: row.createdByPlayerId,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+      hitCount: row.hitCount,
+      lastHitAt: row.lastHitAt,
+    };
+  },
+  async recordHit(code) {
+    await prisma.shortLink
+      .update({ where: { code }, data: { hitCount: { increment: 1 }, lastHitAt: new Date() } })
+      .catch(() => {});
+  },
+  async exists(code) {
+    return (await prisma.shortLink.count({ where: { code } })) > 0;
+  },
+};
+
+const replayShortLinkService = new ShortLinkService(replayShortLinkStore);
+
+/**
+ * 纯函数：拼接完整分享 URL。
+ * - baseUrl 末尾是否带 / 都兼容
+ * - 始终走 /r/<code> 短链路由（与 api/shortLink.ts 保持一致）
+ */
+export function buildShareUrl(baseUrl: string, code: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '');
+  return `${trimmed}/r/${code}`;
+}
+
+/**
+ * 业务函数：创建一条 replay 类型短链。
+ * - 先校验 match 存在（防死链）
+ * - 复用注入的 ShortLinkService（便于单测用 InMemoryStore）
+ * - 返回完整 URL + 元信息
+ */
+export async function createReplayShareLink(
+  matchId: string,
+  matchExists: (id: string) => Promise<boolean>,
+  service: ShortLinkService,
+  baseUrl: string,
+  createdByPlayerId: string | null,
+  expiresInMs?: number,
+): Promise<{ code: string; url: string; expiresAt: Date | null; createdAt: Date }> {
+  if (!(await matchExists(matchId))) {
+    throw new AppError('NOT_FOUND', 'Replay not found');
+  }
+  const record = await service.create({
+    targetType: 'replay',
+    targetId: matchId,
+    createdByPlayerId,
+    ...(expiresInMs !== undefined ? { expiresInMs } : {}),
+  });
+  return {
+    code: record.code,
+    url: buildShareUrl(baseUrl, record.code),
+    expiresAt: record.expiresAt,
+    createdAt: record.createdAt,
+  };
+}
+
+// POST /replays/:id/share - 创建分享短链
+//   body: { expiresInMs?: number }
+//   返回：{ code, url, expiresAt, createdAt }
+const shareSchema = z.object({
+  expiresInMs: z.number().int().nonnegative().optional(),
+});
+
+router.post('/replays/:id/share', authMiddleware, async (ctx) => {
+  const { id } = ctx.params;
+  const body = shareSchema.parse(ctx.request.body ?? {});
+  const { playerId } = ctx.state.player;
+
+  const baseUrl = process.env.PUBLIC_BASE_URL ?? `${ctx.protocol}://${ctx.host}`;
+  const result = await createReplayShareLink(
+    id!,
+    async (mid) => (await prisma.match.count({ where: { id: mid } })) > 0,
+    replayShortLinkService,
+    baseUrl,
+    playerId,
+    body.expiresInMs,
+  );
+
+  ctx.status = 201;
+  ctx.body = result;
 });
 
 export { router as replaysRouter };
