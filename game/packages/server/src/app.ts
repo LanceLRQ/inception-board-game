@@ -10,6 +10,7 @@ import { playersRouter } from './api/players.js';
 import { matchesRouter } from './api/matches.js';
 import { replaysRouter } from './api/replays.js';
 import { reportsRouter } from './api/reports.js';
+import { adminRouter } from './api/admin.js';
 import { chatRouter } from './api/chat.js';
 import { shortLinkRouter } from './api/shortLink.js';
 
@@ -44,6 +45,10 @@ export function createApp(): Koa {
 
   app.use(reportsRouter.routes());
   app.use(reportsRouter.allowedMethods());
+
+  // 运营面板（W22-B Sprint 2）
+  app.use(adminRouter.routes());
+  app.use(adminRouter.allowedMethods());
 
   app.use(replaysRouter.routes());
   app.use(replaysRouter.allowedMethods());

@@ -18,6 +18,7 @@ import {
   type ReputationStore,
 } from '../services/ReputationService.js';
 import { ReportService, VALID_REPORT_REASONS } from '../services/ReportService.js';
+import { PrismaReportArchive } from '../services/PrismaReportArchive.js';
 
 const router = new Router();
 
@@ -57,7 +58,9 @@ const reputationStore: ReputationStore = {
 };
 
 const reputationService = new ReputationService(reputationStore);
-const reportService = new ReportService(reputationService);
+// W22-B Sprint 2：注入 PrismaReportArchive 让举报落库（失败仅 warn，不阻塞主流程）
+const reportArchive = new PrismaReportArchive(prisma);
+const reportService = new ReportService(reputationService, { archive: reportArchive });
 
 // === 路由 ===
 

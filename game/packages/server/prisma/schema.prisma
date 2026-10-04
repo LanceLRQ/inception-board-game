@@ -251,6 +251,29 @@ model PlayerAchievement {
   @@map("player_achievements")
 }
 
+/// 举报记录（W22-B · 运营审核面板数据源）
+/// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+model Report {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  matchId              String    @map("match_id") @db.VarChar(64)
+  reporterId           String    @map("reporter_id") @db.VarChar(64)
+  targetId             String    @map("target_id") @db.VarChar(64)
+  reason               String    @db.VarChar(20)
+  description          String?   @db.VarChar(500)
+  status               String    @default("pending") @db.VarChar(20)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt           DateTime? @map("resolved_at") @db.Timestamptz
+  resolvedByOperatorId String?   @map("resolved_by_operator_id") @db.VarChar(64)
+  notes                String?   @db.VarChar(500)
+
+  @@index([status, createdAt(sort: Desc)], map: "idx_reports_status_created")
+  @@index([matchId], map: "idx_reports_match")
+  @@index([targetId], map: "idx_reports_target")
+  @@index([reporterId], map: "idx_reports_reporter")
+  @@index([createdAt(sort: Desc)], map: "idx_reports_created")
+  @@map("reports")
+}
+
 /// 系列赛
 model Series {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
