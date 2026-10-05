@@ -1,7 +1,8 @@
-// LobbyService 测试 - mock Redis + Prisma
+// LobbyService 测试 - mock Redis + Prisma + 对局服务
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type { RoomState } from './LobbyService.js';
+import { AppError } from '../infra/errors.js';
 
 // --- Mock Redis ---
 function createMockRedis() {
@@ -19,6 +20,12 @@ function createMockRedis() {
         return Promise.resolve(1);
       },
       exists: (key: string) => Promise.resolve(store.has(key) ? 1 : 0),
+      // 只支持 SET key value EX seconds NX
+      set: vi.fn((key: string, val: string, ..._opts: unknown[]) => {
+        if (store.has(key)) return Promise.resolve(null);
+        store.set(key, val);
+        return Promise.resolve('OK');
+      }),
     },
   };
 }
@@ -58,10 +65,12 @@ function makePlayer(id: string, nickname?: string) {
 
 describe('LobbyService', () => {
   let service: LobbyService;
+  let matches: { createFromRoom: Mock<(room: RoomState) => Promise<string>> };
 
   beforeEach(() => {
     mock = createMockRedis();
-    service = new LobbyService();
+    matches = { createFromRoom: vi.fn(async (room: RoomState) => room.id) };
+    service = new LobbyService({ matches });
     vi.clearAllMocks();
   });
 
@@ -234,45 +243,49 @@ describe('LobbyService', () => {
   });
 
   describe('startGame', () => {
-    it('starts game with 3+ players', async () => {
+    /** 建一个房主为 P1、共 count 名玩家的房间（直接写入存储） */
+    async function roomWith(count: number): Promise<RoomState> {
       prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
       const room = await service.createRoom('P1');
-
-      // 添加额外玩家到 store
       const stored = mock.store.get(`ico:room:${room.code}`)!;
       const state: RoomState = JSON.parse(stored);
-      state.players.push(
-        {
-          playerId: 'P2',
-          nickname: 'B',
-          avatarSeed: '2',
-          seat: 1,
+      for (let i = 1; i < count; i++) {
+        state.players.push({
+          playerId: `P${i + 1}`,
+          nickname: `N${i + 1}`,
+          avatarSeed: String(i),
+          seat: i,
           isBot: false,
           joinedAt: Date.now(),
-        },
-        {
-          playerId: 'P3',
-          nickname: 'C',
-          avatarSeed: '3',
-          seat: 2,
-          isBot: false,
-          joinedAt: Date.now(),
-        },
-      );
+        });
+      }
       mock.store.set(`ico:room:${room.code}`, JSON.stringify(state));
+      return state;
+    }
 
-      prismaMock.match.create.mockResolvedValue({ id: room.id });
+    it('starts game with 4+ players', async () => {
+      const room = await roomWith(4);
 
       const matchId = await service.startGame(room.code, 'P1');
       expect(matchId).toBe(room.id);
-      expect(prismaMock.match.create).toHaveBeenCalledOnce();
+      expect(matches.createFromRoom).toHaveBeenCalledOnce();
+      expect(matches.createFromRoom.mock.calls[0]![0].id).toBe(room.id);
+      expect(prismaMock.match.create).not.toHaveBeenCalled();
+      expect((await service.getRoom(room.code))!.status).toBe('playing');
     });
 
-    it('throws when fewer than 3 players', async () => {
-      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
-      const room = await service.createRoom('P1');
+    it('starts a game with robots filling the seats', async () => {
+      const room = await roomWith(1);
+      await service.fillAI(room.code, 'P1', 3);
+      await expect(service.startGame(room.code, 'P1')).resolves.toBe(room.id);
+    });
 
-      await expect(service.startGame(room.code, 'P1')).rejects.toThrow('至少需要 3 名玩家');
+    it('throws when fewer than 4 players', async () => {
+      const room = await roomWith(3);
+
+      await expect(service.startGame(room.code, 'P1')).rejects.toThrow('至少需要 4 名玩家');
+      expect(matches.createFromRoom).not.toHaveBeenCalled();
+      expect((await service.getRoom(room.code))!.status).toBe('waiting');
     });
 
     it('throws when requester is not owner', async () => {
@@ -280,6 +293,76 @@ describe('LobbyService', () => {
       const room = await service.createRoom('P1');
 
       await expect(service.startGame(room.code, 'PX')).rejects.toThrow('只有房主');
+    });
+
+    it('throws when the room does not exist or already started', async () => {
+      await expect(service.startGame('XXXXXX', 'P1')).rejects.toThrow('房间不存在');
+
+      const room = await roomWith(4);
+      await service.startGame(room.code, 'P1');
+      await expect(service.startGame(room.code, 'P1')).rejects.toMatchObject({
+        code: 'ROOM_STARTED',
+      });
+    });
+
+    it('keeps the room waiting, releases the lock and rethrows when the match cannot be created', async () => {
+      const room = await roomWith(4);
+      const failure = new AppError('CONFLICT', '该对局已存在');
+      matches.createFromRoom.mockRejectedValueOnce(failure);
+
+      await expect(service.startGame(room.code, 'P1')).rejects.toBe(failure);
+      expect((await service.getRoom(room.code))!.status).toBe('waiting');
+      expect(mock.store.has(`ico:room:${room.code}:starting`)).toBe(false);
+
+      // 锁已释放，可以重试
+      await expect(service.startGame(room.code, 'P1')).resolves.toBe(room.id);
+    });
+
+    it('takes a short start lock: SET NX EX 10', async () => {
+      const room = await roomWith(4);
+      await service.startGame(room.code, 'P1');
+      expect(mock.redis.set).toHaveBeenCalledWith(
+        `ico:room:${room.code}:starting`,
+        '1',
+        'EX',
+        10,
+        'NX',
+      );
+    });
+
+    it('creates only one match when two starts race', async () => {
+      const room = await roomWith(4);
+      let release: () => void = () => {};
+      matches.createFromRoom.mockImplementationOnce(
+        (r: RoomState) =>
+          new Promise<string>((resolve) => {
+            release = () => resolve(r.id);
+          }),
+      );
+
+      const first = service.startGame(room.code, 'P1');
+      const second = service.startGame(room.code, 'P1');
+      await expect(second).rejects.toMatchObject({ code: 'CONFLICT', message: '正在开始' });
+      release();
+      await expect(first).resolves.toBe(room.id);
+      expect(matches.createFromRoom).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws INTERNAL_ERROR when no match service is wired', async () => {
+      const bare = new LobbyService();
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await bare.createRoom('P1');
+      const stored: RoomState = JSON.parse(mock.store.get(`ico:room:${room.code}`)!);
+      for (let i = 1; i < 4; i++) {
+        stored.players.push({ ...stored.players[0]!, playerId: `P${i + 1}`, seat: i });
+      }
+      mock.store.set(`ico:room:${room.code}`, JSON.stringify(stored));
+
+      await expect(bare.startGame(room.code, 'P1')).rejects.toMatchObject({
+        code: 'INTERNAL_ERROR',
+        message: '对局服务未就绪',
+      });
+      expect((await bare.getRoom(room.code))!.status).toBe('waiting');
     });
   });
 

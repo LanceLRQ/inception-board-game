@@ -5,7 +5,8 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { healthRouter } from './api/health.js';
 import { identityRouter } from './api/identity.js';
-import { roomsRouter } from './api/rooms.js';
+import { createRoomsRouter } from './api/rooms.js';
+import { LobbyService } from './services/LobbyService.js';
 import { playersRouter } from './api/players.js';
 import { matchesRouter } from './api/matches.js';
 import { replaysRouter } from './api/replays.js';
@@ -14,7 +15,11 @@ import { adminRouter } from './api/admin.js';
 import { chatRouter } from './api/chat.js';
 import { shortLinkRouter } from './api/shortLink.js';
 
-export function createApp(): Koa {
+export interface AppDeps {
+  lobby?: LobbyService;
+}
+
+export function createApp(deps: AppDeps = {}): Koa {
   const app = new Koa();
 
   // 全局中间件
@@ -34,6 +39,7 @@ export function createApp(): Koa {
   app.use(identityRouter.routes());
   app.use(identityRouter.allowedMethods());
 
+  const roomsRouter = createRoomsRouter(deps.lobby ?? new LobbyService());
   app.use(roomsRouter.routes());
   app.use(roomsRouter.allowedMethods());
 

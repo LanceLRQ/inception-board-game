@@ -297,4 +297,50 @@ describe('setup', () => {
       expect(setupOf({ rngSeed: 'two' })).not.toEqual(a);
     });
   });
+  describe('座位昵称与 Bot 座位', () => {
+    const setupOf = (n: number, data: Record<string, unknown>) =>
+      InceptionCityGame.setup({ ctx: { numPlayers: n } }, { rngSeed: 's', ...data });
+
+    it('两者都不给时沿用默认昵称，玩家全是真人', () => {
+      const g = setupOf(4, {});
+      expect(g.players['0']!.nickname).toBe('Player 1');
+      expect(Object.values(g.players).every((p) => p.type === 'human')).toBe(true);
+    });
+
+    it('按座位写入昵称', () => {
+      const g = setupOf(4, { nicknames: ['甲', '乙', '丙', 'x'.repeat(50)] });
+      expect(g.players['0']!.nickname).toBe('甲');
+      expect(g.players['3']!.nickname).toBe('x'.repeat(50));
+    });
+
+    it('昵称数组长度不等于人数、项不是字符串或长度不在 1-50 时抛错', () => {
+      expect(() => setupOf(4, { nicknames: ['a', 'b', 'c'] })).toThrow(/nicknames/);
+      expect(() => setupOf(4, { nicknames: ['a', 'b', 'c', 'd', 'e'] })).toThrow(/nicknames/);
+      expect(() => setupOf(4, { nicknames: 'abcd' })).toThrow(/nicknames/);
+      expect(() => setupOf(4, { nicknames: ['a', 'b', 'c', 1] })).toThrow(/nicknames/);
+      expect(() => setupOf(4, { nicknames: ['a', 'b', 'c', ''] })).toThrow(/nicknames/);
+      expect(() => setupOf(4, { nicknames: ['a', 'b', 'c', 'x'.repeat(51)] })).toThrow(/nicknames/);
+    });
+
+    it('botSeats 对应的玩家 type 为 bot', () => {
+      const g = setupOf(5, { botSeats: ['1', '4'] });
+      expect(g.players['1']!.type).toBe('bot');
+      expect(g.players['4']!.type).toBe('bot');
+      expect(g.players['0']!.type).toBe('human');
+    });
+
+    it('botSeats 不是数组、含越界 / 非字符串 / 重复项时抛错', () => {
+      expect(() => setupOf(4, { botSeats: '1' })).toThrow(/botSeats/);
+      expect(() => setupOf(4, { botSeats: ['4'] })).toThrow(/botSeats/);
+      expect(() => setupOf(4, { botSeats: ['-1'] })).toThrow(/botSeats/);
+      expect(() => setupOf(4, { botSeats: [1] })).toThrow(/botSeats/);
+      expect(() => setupOf(4, { botSeats: ['1', '1'] })).toThrow(/botSeats/);
+      expect(() => setupOf(4, { botSeats: ['01'] })).toThrow(/botSeats/);
+    });
+
+    it('空的 botSeats 合法', () => {
+      const g = setupOf(4, { botSeats: [] });
+      expect(Object.values(g.players).every((p) => p.type === 'human')).toBe(true);
+    });
+  });
 });

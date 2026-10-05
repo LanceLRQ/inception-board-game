@@ -1,0 +1,503 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { AppError } from '../infra/errors.js';
+import { BotManager } from '../services/BotManager.js';
+import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
+import { FakeTimers } from '../testing/fakeTimers.js';
+import { InMemoryMatchArchive } from './MatchArchive.js';
+import { InMemoryMatchStore, type MatchSnapshot } from './MatchStore.js';
+import { FINISHED_ROOM_LINGER_MS, MatchService, type MatchServiceDeps } from './MatchService.js';
+import type { TimingConfig } from './scheduling.js';
+
+const { log } = vi.hoisted(() => ({
+  log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+vi.mock('../infra/logger.js', () => ({ logger: log }));
+
+const timing: TimingConfig = { botStepDelayMs: 10, pendingTimeoutMs: 5_000, turnTimeoutMs: 20_000 };
+const SEED = 'ab'.repeat(32);
+
+function makeRoom(n: number, humans: readonly number[] = [], id = 'room-1'): RoomState {
+  const players: RoomPlayer[] = Array.from({ length: n }, (_, i) => ({
+    playerId: humans.includes(i) ? `acct-${i}` : `bot-${i}`,
+    nickname: humans.includes(i) ? `真人${i}` : `AI${i}`,
+    avatarSeed: 's',
+    seat: i,
+    isBot: !humans.includes(i),
+    joinedAt: 0,
+  }));
+  return {
+    id,
+    code: 'ABCDEF',
+    ownerPlayerId: 'acct-0',
+    maxPlayers: 10,
+    ruleVariant: 'classic',
+    exCardsEnabled: false,
+    expansionEnabled: false,
+    status: 'waiting',
+    players,
+    createdAt: 0,
+    expiresAt: 0,
+  };
+}
+
+interface Harness {
+  svc: MatchService;
+  store: InMemoryMatchStore;
+  archive: InMemoryMatchArchive;
+  bot: BotManager;
+  timers: FakeTimers;
+  onStep: ReturnType<typeof vi.fn>;
+  onSeatsChanged: ReturnType<typeof vi.fn>;
+  onGameOver: ReturnType<typeof vi.fn>;
+}
+
+function makeHarness(
+  patch: Partial<MatchServiceDeps> = {},
+  shared: { store?: InMemoryMatchStore; archive?: InMemoryMatchArchive } = {},
+): Harness {
+  const timers = new FakeTimers();
+  const store = shared.store ?? new InMemoryMatchStore();
+  const archive = shared.archive ?? new InMemoryMatchArchive();
+  const bot = new BotManager({ now: timers.now });
+  const onStep = vi.fn();
+  const onSeatsChanged = vi.fn();
+  const onGameOver = vi.fn();
+  const svc = new MatchService({
+    store,
+    archive,
+    bot,
+    timing,
+    timers,
+    randomSeed: () => SEED,
+    onStep,
+    onSeatsChanged,
+    onGameOver,
+    ...patch,
+  });
+  return { svc, store, archive, bot, timers, onStep, onSeatsChanged, onGameOver };
+}
+
+/** 一直触发计时器，直到没有计时器、步数用尽或 stop 返回 true */
+async function drain(h: Harness, id: string, stop: () => boolean = () => false): Promise<void> {
+  for (let i = 0; i < 20_000; i++) {
+    await h.svc.get(id)?.idle();
+    if (stop() || !h.timers.fireNext()) break;
+  }
+  await h.svc.get(id)?.idle();
+}
+
+async function fireSteps(h: Harness, id: string, count: number): Promise<void> {
+  for (let i = 0; i < count; i++) {
+    await h.svc.get(id)!.idle();
+    h.timers.fireNext();
+  }
+  await h.svc.get(id)!.idle();
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('MatchService 建局', () => {
+  it('建局后返回 matchID（等于房间 id），能取到房间，并写入快照与归档', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 2]));
+    expect(id).toBe('room-1');
+
+    const room = h.svc.get(id);
+    expect(room).not.toBeNull();
+    expect(room!.seats().map((s) => s.seat)).toEqual(['0', '1', '2', '3', '4']);
+
+    expect(await h.store.listActive()).toEqual([id]);
+    const snap = await h.store.load(id);
+    expect(snap!.roomCode).toBe('ABCDEF');
+    expect(snap!.state.stateID).toBe(0);
+    expect(snap!.setup.numPlayers).toBe(5);
+    expect(h.archive.started.has(id)).toBe(true);
+  });
+
+  it('座位昵称与 Bot 座位传进了引擎状态', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    const g = h.svc.get(id)!.current().G;
+    expect(g.players['0']!.nickname).toBe('真人0');
+    expect(g.players['0']!.type).toBe('human');
+    expect(g.players['1']!.type).toBe('bot');
+    expect(g.rngSeed).toBe(SEED);
+  });
+
+  it('人数不在 4-10 时抛 CONFLICT 且不留痕迹', async () => {
+    const h = makeHarness();
+    for (const n of [3, 11]) {
+      const err = await h.svc.createFromRoom(makeRoom(n, [0], `r${n}`)).catch((e) => e);
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.code).toBe('CONFLICT');
+      expect(err.message).toBe('需要 4–10 名玩家');
+      expect(h.svc.get(`r${n}`)).toBeNull();
+    }
+    expect(await h.store.listActive()).toEqual([]);
+  });
+
+  it('同一个 id 已有房间时抛 CONFLICT，并发的两次只成功一次', async () => {
+    const h = makeHarness();
+    await h.svc.createFromRoom(makeRoom(4, [0]));
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
+
+    const h2 = makeHarness();
+    const results = await Promise.allSettled([
+      h2.svc.createFromRoom(makeRoom(4, [0], 'dup')),
+      h2.svc.createFromRoom(makeRoom(4, [0], 'dup')),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+  });
+
+  it('默认种子是 64 位十六进制，两局不同', async () => {
+    const h = makeHarness({ randomSeed: undefined });
+    await h.svc.createFromRoom(makeRoom(4, [0], 'a'));
+    await h.svc.createFromRoom(makeRoom(4, [0], 'b'));
+    const a = (await h.store.load('a'))!.setup.seed;
+    const b = (await h.store.load('b'))!.setup.seed;
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(b).toMatch(/^[0-9a-f]{64}$/);
+    expect(a).not.toBe(b);
+    expect((await h.store.load('a'))!.setup.setupData.rngSeed).toBe(a);
+  });
+
+  it('store.create 失败：建局失败，注册表、Bot 管理器、归档都不留条目', async () => {
+    const h = makeHarness();
+    vi.spyOn(h.store, 'create').mockRejectedValue(new Error('redis down'));
+    const register = vi.spyOn(h.bot, 'registerMatch');
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).rejects.toThrow('redis down');
+    expect(h.svc.get('room-1')).toBeNull();
+    expect(register).not.toHaveBeenCalled();
+    expect(h.archive.started.size).toBe(0);
+    // 失败后同一个 id 还能再建
+    vi.mocked(h.store.create).mockRestore();
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).resolves.toBe('room-1');
+  });
+
+  it('archive.recordStart 失败只记 ERROR，不让建局失败', async () => {
+    const h = makeHarness();
+    vi.spyOn(h.archive, 'recordStart').mockRejectedValue(new Error('pg down'));
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).resolves.toBe('room-1');
+    expect(h.svc.get('room-1')).not.toBeNull();
+    expect(log.error).toHaveBeenCalled();
+  });
+
+  it('建局时向 Bot 管理器登记对局', async () => {
+    const h = makeHarness();
+    const register = vi.spyOn(h.bot, 'registerMatch');
+    await h.svc.createFromRoom(makeRoom(4, [0]));
+    expect(register).toHaveBeenCalledWith('room-1');
+  });
+});
+
+describe('MatchService.seatOf', () => {
+  it('只认真人座位', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(5, [1, 3]));
+    expect(h.svc.seatOf(id, 'acct-1')).toBe('1');
+    expect(h.svc.seatOf(id, 'acct-3')).toBe('3');
+    expect(h.svc.seatOf(id, 'bot-0')).toBeNull();
+    expect(h.svc.seatOf(id, 'nobody')).toBeNull();
+    expect(h.svc.seatOf(id, '')).toBeNull();
+    expect(h.svc.seatOf('missing', 'acct-1')).toBeNull();
+  });
+});
+
+describe('MatchService 对局过程', () => {
+  it('每一步先写归档再调 onStep；归档失败只记 ERROR', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    const order: string[] = [];
+    const append = vi.spyOn(h.archive, 'appendStep').mockImplementation(async (row) => {
+      order.push(`archive:${row.stateID}`);
+    });
+    h.onStep.mockImplementation((_id, out) => {
+      order.push(`step:${out.state.stateID}`);
+    });
+    await fireSteps(h, id, 3);
+    expect(order.slice(0, 4)).toEqual(['archive:1', 'step:1', 'archive:2', 'step:2']);
+    expect(h.onStep.mock.calls[0]![0]).toBe(id);
+
+    append.mockRejectedValue(new Error('pg down'));
+    h.onStep.mockClear();
+    log.error.mockClear();
+    await fireSteps(h, id, 2);
+    expect(h.onStep.mock.calls.length).toBeGreaterThan(0);
+    expect(log.error).toHaveBeenCalled();
+  });
+
+  it('归档行带请求与完整事件，快照版本随之前进', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await fireSteps(h, id, 3);
+    const rows = await h.archive.listSteps(id);
+    expect(rows.map((r) => r.stateID)).toEqual(rows.map((_, i) => i + 1));
+    expect(rows[0]!.request.move).toBeTypeOf('string');
+    expect((await h.store.load(id))!.state.stateID).toBe(rows.length);
+  });
+
+  it('房间用座位号向 Bot 管理器询问接管状态，并在 seatsChanged 时通知', async () => {
+    const h = makeHarness();
+    const asked = vi.spyOn(h.bot, 'isBotControlled');
+    const id = await h.svc.createFromRoom(makeRoom(4, [0, 1]));
+    expect(asked).toHaveBeenCalledWith(id, '0');
+    expect(asked).toHaveBeenCalledWith(id, '1');
+    expect(asked).not.toHaveBeenCalledWith(id, 'acct-0');
+
+    const reschedule = vi.spyOn(h.svc.get(id)!, 'reschedule');
+    h.svc.seatsChanged(id);
+    expect(reschedule).toHaveBeenCalledTimes(1);
+    expect(h.onSeatsChanged).toHaveBeenCalledWith(id);
+  });
+
+  it('接管事件触发房间重新排程并通知座位变化', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0, 1]));
+    const reschedule = vi.spyOn(h.svc.get(id)!, 'reschedule');
+    h.bot.onDisconnect(id, '0');
+    h.timers.t += 61_000;
+    h.bot.tick();
+    expect(h.bot.isBotControlled(id, '0')).toBe(true);
+    expect(reschedule).toHaveBeenCalled();
+    expect(h.onSeatsChanged).toHaveBeenCalledWith(id);
+  });
+
+  it('seatsChanged 对不存在的对局不抛错也不通知', () => {
+    const h = makeHarness();
+    h.svc.seatsChanged('nope');
+    expect(h.onSeatsChanged).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchService 对局结束', () => {
+  it('全 Bot 房间打完：各调用一次 recordFinish / store.finish / disposeMatch / onGameOver，房间延迟移除', async () => {
+    const h = makeHarness();
+    const recordFinish = vi.spyOn(h.archive, 'recordFinish');
+    const finish = vi.spyOn(h.store, 'finish');
+    const dispose = vi.spyOn(h.bot, 'disposeMatch');
+    const id = await h.svc.createFromRoom(makeRoom(5));
+    const room = h.svc.get(id)!;
+    const close = vi.spyOn(room, 'close');
+
+    await drain(h, id, () => h.onGameOver.mock.calls.length > 0);
+    expect(recordFinish).toHaveBeenCalledTimes(1);
+    expect(finish).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledWith(id);
+    expect(h.onGameOver).toHaveBeenCalledTimes(1);
+    expect(h.onGameOver.mock.calls[0]![0]).toBe(id);
+    expect(h.archive.finished.has(id)).toBe(true);
+    expect(await h.store.listActive()).toEqual([]);
+
+    // 延迟一小段时间才移除，让最后一条消息发完
+    expect(h.svc.get(id)).toBe(room);
+    expect(h.timers.pending().some((p) => p.at === h.timers.now() + FINISHED_ROOM_LINGER_MS)).toBe(
+      true,
+    );
+    h.timers.t += FINISHED_ROOM_LINGER_MS;
+    await drain(h, id);
+    expect(h.svc.get(id)).toBeNull();
+    expect(close).toHaveBeenCalled();
+    expect(recordFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('结束流程每一步失败只记 ERROR 并继续后面的', async () => {
+    const h = makeHarness();
+    vi.spyOn(h.archive, 'recordFinish').mockRejectedValue(new Error('pg'));
+    const finish = vi.spyOn(h.store, 'finish').mockRejectedValue(new Error('redis'));
+    const dispose = vi.spyOn(h.bot, 'disposeMatch').mockImplementation(() => {
+      throw new Error('bot');
+    });
+    h.onGameOver.mockRejectedValue(new Error('gateway'));
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await drain(h, id, () => h.onGameOver.mock.calls.length > 0);
+    expect(finish).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(h.onGameOver).toHaveBeenCalledTimes(1);
+    expect(log.error.mock.calls.length).toBeGreaterThanOrEqual(4);
+    // 即使每步都失败，房间仍会被移除
+    await drain(h, id);
+    expect(h.svc.get(id)).toBeNull();
+  });
+});
+
+describe('MatchService 快照写入失败', () => {
+  it('写快照冲突：记 ERROR、释放 Bot 登记、移出注册表，不调 store.finish，快照留在活跃集合里', async () => {
+    const h = makeHarness();
+    const finish = vi.spyOn(h.store, 'finish');
+    const dispose = vi.spyOn(h.bot, 'disposeMatch');
+    vi.spyOn(h.store, 'save').mockResolvedValue('conflict');
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await drain(h, id, () => h.svc.get(id) === null);
+    expect(h.svc.get(id)).toBeNull();
+    expect(dispose).toHaveBeenCalledWith(id);
+    expect(finish).not.toHaveBeenCalled();
+    expect(await h.store.listActive()).toEqual([id]);
+    expect(log.error).toHaveBeenCalled();
+  });
+
+  it('写快照抛错同样处理', async () => {
+    const h = makeHarness();
+    vi.spyOn(h.store, 'save').mockRejectedValue(new Error('redis down'));
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await drain(h, id, () => h.svc.get(id) === null);
+    expect(h.svc.get(id)).toBeNull();
+    expect(await h.store.listActive()).toEqual([id]);
+  });
+
+  it('persist 用计时器的 now 作为更新时间', async () => {
+    const h = makeHarness();
+    const save = vi.spyOn(h.store, 'save');
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await fireSteps(h, id, 1);
+    expect(save).toHaveBeenCalled();
+    expect(save.mock.calls[0]![0]).toBe(id);
+    expect(save.mock.calls[0]![2]).toBe(0);
+    expect(save.mock.calls[0]![3]).toBe(h.timers.now());
+  });
+});
+
+describe('MatchService.restoreAll', () => {
+  it('新进程从同一个存储恢复：版本号一致、能继续打完', async () => {
+    const first = makeHarness();
+    const id = await first.svc.createFromRoom(makeRoom(5, [2]));
+    await fireSteps(first, id, 12);
+    const stateID = first.svc.get(id)!.current().stateID;
+    expect(stateID).toBeGreaterThan(0);
+    first.svc.shutdown();
+
+    const second = makeHarness({}, { store: first.store, archive: first.archive });
+    const result = await second.svc.restoreAll();
+    expect(result).toEqual({ restored: 1, failed: [] });
+    const room = second.svc.get(id)!;
+    expect(room.current().stateID).toBe(stateID);
+    expect(second.svc.seatOf(id, 'acct-2')).toBe('2');
+
+    // 全是 Bot 的座位会自己继续，真人座位到截止时间由服务端代发
+    await drain(second, id, () => second.onGameOver.mock.calls.length > 0);
+    expect(second.onGameOver).toHaveBeenCalledTimes(1);
+    expect(room.current().ctx.gameover).toBeDefined();
+  });
+
+  it('坏快照被跳过并计入 failed，且不从活跃集合里移除', async () => {
+    const h = makeHarness();
+    const good = await h.svc.createFromRoom(makeRoom(4, [], 'good'));
+    h.svc.shutdown();
+
+    const base = (await h.store.load(good))!;
+    const put = async (id: string, patch: Partial<MatchSnapshot> | unknown): Promise<void> => {
+      await h.store.create({ ...base, matchID: id, ...(patch as object) });
+    };
+    await put('bad-state', { state: { G: 1 } });
+    await put('empty-seats', { seats: [] });
+    await put('no-seats', { seats: undefined });
+    const listActive = h.store.listActive.bind(h.store);
+    vi.spyOn(h.store, 'listActive').mockImplementation(async () => [
+      ...(await listActive()),
+      'ghost',
+    ]);
+
+    const second = makeHarness({}, { store: h.store, archive: h.archive });
+    const result = await second.svc.restoreAll();
+    expect(result.restored).toBe(1);
+    expect([...result.failed].sort()).toEqual(['bad-state', 'empty-seats', 'ghost', 'no-seats']);
+    expect(second.svc.get('good')).not.toBeNull();
+    expect(second.svc.get('bad-state')).toBeNull();
+    expect(await listActive()).toContain('bad-state');
+    expect(log.error).toHaveBeenCalled();
+  });
+
+  it('已在注册表里的对局跳过', async () => {
+    const h = makeHarness();
+    await h.svc.createFromRoom(makeRoom(4, [0]));
+    expect(await h.svc.restoreAll()).toEqual({ restored: 0, failed: [] });
+  });
+
+  it('快照里已是结束状态：走结束流程，不建房间', async () => {
+    const first = makeHarness();
+    const stubbed = vi.spyOn(first.store, 'finish').mockResolvedValue(undefined);
+    const id = await first.svc.createFromRoom(makeRoom(4));
+    await drain(first, id, () => first.onGameOver.mock.calls.length > 0);
+    first.svc.shutdown();
+    stubbed.mockRestore();
+    expect(await first.store.listActive()).toEqual([id]);
+
+    const second = makeHarness({}, { store: first.store, archive: new InMemoryMatchArchive() });
+    const recordFinish = vi.spyOn(second.archive, 'recordFinish');
+    const finish = vi.spyOn(second.store, 'finish');
+    const dispose = vi.spyOn(second.bot, 'disposeMatch');
+    const result = await second.svc.restoreAll();
+    expect(result.failed).toEqual([]);
+    expect(second.svc.get(id)).toBeNull();
+    expect(recordFinish).toHaveBeenCalledTimes(1);
+    expect(finish).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledWith(id);
+    expect(second.onGameOver).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MatchService.shutdown', () => {
+  it('关闭所有房间、清掉全部计时器、清空注册表，不动存储', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    const other = await h.svc.createFromRoom(makeRoom(4, [], 'other'));
+    const room = h.svc.get(id)!;
+    const close = vi.spyOn(room, 'close');
+    h.svc.shutdown();
+    expect(close).toHaveBeenCalled();
+    expect(h.svc.get(id)).toBeNull();
+    expect(h.svc.get(other)).toBeNull();
+    expect(h.timers.pending()).toHaveLength(0);
+    expect(await h.store.listActive()).toEqual([id, other]);
+    expect(await h.store.load(id)).not.toBeNull();
+  });
+
+  it('结束后等待移除期间 shutdown：延迟移除计时器也被清掉', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await drain(h, id, () => h.onGameOver.mock.calls.length > 0);
+    expect(h.timers.pending().length).toBeGreaterThan(0);
+    h.svc.shutdown();
+    expect(h.timers.pending()).toHaveLength(0);
+  });
+
+  it('shutdown 之后不再响应接管事件', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    h.svc.shutdown();
+    h.onSeatsChanged.mockClear();
+    h.bot.onDisconnect(id, '0');
+    h.timers.t += 61_000;
+    h.bot.tick();
+    expect(h.onSeatsChanged).not.toHaveBeenCalled();
+  });
+});
+
+describe('种子保密', () => {
+  it('种子不出现在日志参数里，也不出现在公开方法的返回值里', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(5, [1]));
+    await fireSteps(h, id, 10);
+    h.svc.seatsChanged(id);
+    const restored = await makeHarness({}, { store: h.store, archive: h.archive }).svc.restoreAll();
+    await drain(h, id, () => h.onGameOver.mock.calls.length > 0);
+
+    const logged = [log.info, log.debug, log.warn, log.error]
+      .flatMap((fn) => fn.mock.calls)
+      .map((args) => JSON.stringify(args));
+    expect(logged.length).toBeGreaterThan(0);
+    expect(logged.some((s) => s.includes(SEED))).toBe(false);
+
+    const returned = JSON.stringify([id, h.svc.seatOf(id, 'acct-1'), restored]);
+    expect(returned.includes(SEED)).toBe(false);
+    expect(JSON.stringify(h.onSeatsChanged.mock.calls).includes(SEED)).toBe(false);
+
+    // 种子只在存储快照里
+    expect((await h.store.load(id))!.setup.seed).toBe(SEED);
+    expect(h.archive.started.get(id)!.setup.seed).toBe(SEED);
+  });
+});

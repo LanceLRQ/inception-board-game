@@ -303,6 +303,8 @@ export function createInitialState(options: {
   playerCount: number;
   playerIds: string[];
   nicknames: string[];
+  /** 由 Bot 操作的座位号；不给则全是真人 */
+  botSeats?: string[];
   rngSeed: string;
   ruleVariant?: string;
   exCardsEnabled?: boolean;
@@ -314,6 +316,7 @@ export function createInitialState(options: {
   }
 
   const { playerIds, nicknames, rngSeed } = options;
+  const botSeats = options.botSeats ?? [];
 
   // 初始化玩家
   const players: Record<string, PlayerSetup> = {};
@@ -324,7 +327,7 @@ export function createInitialState(options: {
       id,
       nickname: nicknames[i] ?? `Player ${i + 1}`,
       avatarSeed: i ?? 0,
-      type: 'human',
+      type: botSeats.includes(id) ? 'bot' : 'human',
       faction: 'thief',
       characterId: '' as CardID,
       isRevealed: false,

@@ -1,12 +1,15 @@
-// 大厅服务：房间创建/加入/踢人/开始（参照设计文档 §7.3.2.3）
+// 大厅服务：房间创建/加入/踢人/开始
+//
+// 开始游戏时由对局服务建立权威对局，成功后房间才进入 playing；
+// 开始锁保证同一房间并发两次开始只会建一局。
 
 import crypto from 'crypto';
-import { Redis } from 'ioredis';
 import { createRedisClient } from '../infra/redis.js';
 import { RedisKeys, RedisTTL } from '../infra/redisKeys.js';
-import { prisma } from '../infra/postgres.js';
+import { prisma as defaultPrisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { logger } from '../infra/logger.js';
+import type { MatchService } from '../match/MatchService.js';
 
 // 避开 0/O/1/I 的可用字符集
 const ROOM_CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -35,11 +38,44 @@ export interface RoomPlayer {
   joinedAt: number;
 }
 
-export class LobbyService {
-  private redis: Redis;
+/** 开始锁的有效期（秒）：覆盖一次建局的耗时，进程崩溃后自动释放 */
+const START_LOCK_SECONDS = 10;
+/** 房间可开始游戏的最少人数 */
+const MIN_START_PLAYERS = 4;
 
-  constructor() {
-    this.redis = createRedisClient();
+/** LobbyService 实际用到的 Redis 命令 */
+export interface LobbyRedis {
+  get(key: string): Promise<string | null>;
+  setex(key: string, seconds: number, value: string): Promise<unknown>;
+  set(key: string, value: string, ex: 'EX', seconds: number, nx: 'NX'): Promise<string | null>;
+  del(key: string): Promise<unknown>;
+  exists(key: string): Promise<number>;
+}
+
+/** LobbyService 实际用到的 Prisma 查询 */
+export interface LobbyPrisma {
+  player: {
+    findUnique(args: {
+      where: { id: string };
+    }): Promise<{ nickname: string; avatarSeed: string } | null>;
+  };
+}
+
+export interface LobbyDeps {
+  redis?: LobbyRedis;
+  prisma?: LobbyPrisma;
+  matches?: Pick<MatchService, 'createFromRoom'>;
+}
+
+export class LobbyService {
+  private readonly redis: LobbyRedis;
+  private readonly prisma: LobbyPrisma;
+  private readonly matches: Pick<MatchService, 'createFromRoom'> | undefined;
+
+  constructor(deps: LobbyDeps = {}) {
+    this.redis = deps.redis ?? createRedisClient();
+    this.prisma = deps.prisma ?? defaultPrisma;
+    this.matches = deps.matches;
   }
 
   private generateRoomCode(): string {
@@ -64,7 +100,7 @@ export class LobbyService {
     const now = Date.now();
     const id = crypto.randomUUID();
 
-    const owner = await prisma.player.findUnique({ where: { id: ownerId } });
+    const owner = await this.prisma.player.findUnique({ where: { id: ownerId } });
     if (!owner) throw new AppError('NOT_FOUND', 'Player not found');
 
     const room: RoomState = {
@@ -107,7 +143,7 @@ export class LobbyService {
       return room;
     }
 
-    const player = await prisma.player.findUnique({ where: { id: playerId } });
+    const player = await this.prisma.player.findUnique({ where: { id: playerId } });
     if (!player) throw new AppError('NOT_FOUND', 'Player not found');
 
     const seat = this.nextAvailableSeat(room);
@@ -166,26 +202,26 @@ export class LobbyService {
     const room = await this.getRoom(code);
     if (!room) throw new AppError('NOT_FOUND', '房间不存在或已过期');
     if (room.ownerPlayerId !== requesterId) throw new AppError('FORBIDDEN', '只有房主才能开始');
-    if (room.players.length < 3) throw new AppError('CONFLICT', '至少需要 3 名玩家');
+    if (room.players.length < MIN_START_PLAYERS) {
+      throw new AppError('CONFLICT', `至少需要 ${MIN_START_PLAYERS} 名玩家`);
+    }
     if (room.status !== 'waiting') throw new AppError('ROOM_STARTED', '游戏已开始');
+    if (!this.matches) throw new AppError('INTERNAL_ERROR', '对局服务未就绪');
 
-    room.status = 'playing';
-    await this.saveRoom(room);
+    const lockKey = RedisKeys.roomStarting(code);
+    const locked = await this.redis.set(lockKey, '1', 'EX', START_LOCK_SECONDS, 'NX');
+    if (locked !== 'OK') throw new AppError('CONFLICT', '正在开始');
 
-    // 创建 Match 记录
-    const match = await prisma.match.create({
-      data: {
-        id: room.id,
-        roomId: room.id,
-        ruleVariant: room.ruleVariant,
-        exEnabled: room.exCardsEnabled,
-        expansionEnabled: room.expansionEnabled,
-        playerCount: room.players.length,
-      },
-    });
-
-    logger.info({ roomId: room.id, matchId: match.id }, 'Game started');
-    return match.id;
+    try {
+      const matchId = await this.matches.createFromRoom(room);
+      room.status = 'playing';
+      await this.saveRoom(room);
+      logger.info({ roomId: room.id, matchId }, 'Game started');
+      return matchId;
+    } catch (err) {
+      await this.redis.del(lockKey);
+      throw err;
+    }
   }
 
   async getRoom(code: string): Promise<RoomState | null> {

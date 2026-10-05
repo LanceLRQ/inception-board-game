@@ -5,40 +5,10 @@ import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/g
 import { nextAutoAction } from '@icgame/bot';
 import { MatchRoom, type RoomDeps, type RoomSeat, type StepOutput } from './MatchRoom.js';
 import type { TimingConfig } from './scheduling.js';
+import { FakeTimers } from '../testing/fakeTimers.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 const timing: TimingConfig = { botStepDelayMs: 10, pendingTimeoutMs: 5_000, turnTimeoutMs: 20_000 };
-
-/** 按虚拟时间推进的计时器 */
-class FakeTimers {
-  t = 1_000;
-  private seq = 0;
-  private readonly items = new Map<number, { at: number; cb: () => void }>();
-  now = (): number => this.t;
-  setTimeout = (cb: () => void, ms: number): unknown => {
-    const id = ++this.seq;
-    this.items.set(id, { at: this.t + ms, cb });
-    return id;
-  };
-  clearTimeout = (h: unknown): void => {
-    this.items.delete(h as number);
-  };
-  pending(): { at: number }[] {
-    return [...this.items.values()].map((i) => ({ at: i.at }));
-  }
-  /** 触发最早的计时器；没有返回 false */
-  fireNext(): boolean {
-    let best: [number, { at: number; cb: () => void }] | null = null;
-    for (const entry of this.items) {
-      if (best === null || entry[1].at < best[1].at) best = entry;
-    }
-    if (best === null) return false;
-    this.items.delete(best[0]);
-    this.t = Math.max(this.t, best[1].at);
-    best[1].cb();
-    return true;
-  }
-}
 
 function makeSeats(n: number, humans: readonly string[] = []): RoomSeat[] {
   return Array.from({ length: n }, (_, i) => {
@@ -435,6 +405,58 @@ describe('MatchRoom 提交', () => {
     });
     expect(r).toEqual({ ok: false, code: 'internal_error' });
     expect(h.room.current()).toBe(before);
+    expect(h.timers.pending()).toHaveLength(0);
+  });
+
+  it('persist 冲突或抛错时各调用一次 onFatal，并带上原因', async () => {
+    for (const [patch, reason] of [
+      [{ persist: async () => 'conflict' as const }, 'persist_conflict'],
+      [
+        {
+          persist: async () => {
+            throw new Error('redis down');
+          },
+        },
+        'persist_error',
+      ],
+    ] as const) {
+      const onFatal = vi.fn();
+      const h = makeHarness(
+        5,
+        ['0', '1', '2', '3', '4'],
+        { ...patch, onFatal },
+        stateAfterSetup(5),
+      );
+      h.room.start();
+      const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+      const move = { move: action.move, args: action.args };
+      await h.room.submit(action.playerID, { ...move, intentId: 'x' });
+      await h.room.submit(action.playerID, { ...move, intentId: 'y' });
+      expect(onFatal).toHaveBeenCalledTimes(1);
+      expect(onFatal).toHaveBeenCalledWith(reason);
+    }
+  });
+
+  it('onFatal 本身抛错不影响房间关闭', async () => {
+    const h = makeHarness(
+      5,
+      ['0', '1', '2', '3', '4'],
+      {
+        persist: async () => 'conflict',
+        onFatal: () => {
+          throw new Error('boom');
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    const r = await h.room.submit(action.playerID, {
+      move: action.move,
+      args: action.args,
+      intentId: 'x',
+    });
+    expect(r).toEqual({ ok: false, code: 'internal_error' });
     expect(h.timers.pending()).toHaveLength(0);
   });
 

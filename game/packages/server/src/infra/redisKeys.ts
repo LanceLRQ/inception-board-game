@@ -12,6 +12,8 @@ export const RedisKeys = {
   // 自有业务
   playerSession: (playerId: string) => `${PREFIX}:session:player:${playerId}`,
   roomState: (roomCode: string) => `${PREFIX}:room:${roomCode}`,
+  // 房间开始游戏的短期锁，防止并发开始建出两局
+  roomStarting: (roomCode: string) => `${PREFIX}:room:${roomCode}:starting`,
   roomPlayers: (roomCode: string) => `${PREFIX}:room:${roomCode}:players`,
   shortLink: (code: string) => `${PREFIX}:link:${code}`,
   rateLimit: (key: string) => `${PREFIX}:ratelimit:${key}`,

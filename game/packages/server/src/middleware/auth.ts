@@ -9,11 +9,13 @@ export const authMiddleware: Middleware = async (ctx, next) => {
     throw new AppError('UNAUTHORIZED', 'Missing or invalid Authorization header');
   }
 
+  // 只把令牌校验放进 try：下游路由抛出的错误要原样交给错误处理中间件，不能被改写成 401
+  let payload: ReturnType<typeof verifyToken>;
   try {
-    const payload = verifyToken(token);
-    ctx.state.player = { playerId: payload.playerId, nickname: payload.nickname };
-    await next();
+    payload = verifyToken(token);
   } catch {
     throw new AppError('UNAUTHORIZED', 'Invalid or expired token');
   }
+  ctx.state.player = { playerId: payload.playerId, nickname: payload.nickname };
+  await next();
 };

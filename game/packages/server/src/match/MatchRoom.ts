@@ -42,6 +42,8 @@ export interface RoomDeps {
   onGameOver(state: MatchState<SetupState>): void | Promise<void>;
   /** 某个真人座位此刻是否由 Bot 接管 */
   isTakenOver(seat: string): boolean;
+  /** 房间因写快照失败而自行关闭时调用一次；它抛错不影响关闭 */
+  onFatal?(reason: 'persist_conflict' | 'persist_error'): void;
   timing: TimingConfig;
   timers: {
     setTimeout(cb: () => void, ms: number): unknown;
@@ -148,6 +150,18 @@ export class MatchRoom {
     this.closed = true;
     this.clearTimer();
     logger.info({ matchID: this.matchID, stateID: this.state.stateID }, 'room closed');
+  }
+
+  /** 因写快照失败而关闭：先关，再通知一次 */
+  private fatal(reason: 'persist_conflict' | 'persist_error'): void {
+    const alreadyClosed = this.closed;
+    this.close();
+    if (alreadyClosed) return;
+    try {
+      this.deps.onFatal?.(reason);
+    } catch (err) {
+      logger.error({ matchID: this.matchID, err }, 'onFatal failed');
+    }
   }
 
   /** 仅供测试：等队列（含排程之后新入队的任务）全部跑完 */
@@ -294,7 +308,7 @@ export class MatchRoom {
       persisted = await this.deps.persist(outcome.state, before.stateID);
     } catch (err) {
       logger.error({ matchID: this.matchID, err }, 'persist failed, closing room');
-      this.close();
+      this.fatal('persist_error');
       return { ok: false, code: 'internal_error' };
     }
     if (persisted !== 'ok') {
@@ -302,7 +316,7 @@ export class MatchRoom {
         { matchID: this.matchID, stateID: before.stateID },
         'persist conflict, closing room',
       );
-      this.close();
+      this.fatal('persist_conflict');
       return { ok: false, code: 'internal_error' };
     }
 
