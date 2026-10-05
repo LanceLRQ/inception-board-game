@@ -1,32 +1,33 @@
-// WebSocket 消息类型定义（参照设计文档 §7.4.2 / §7.4.3）
+// WebSocket 消息类型：对局消息来自引擎包，这里补上心跳、聊天与通知类消息
 
-// --- Client → Server ---
+import type { ClientMatchMessage, ServerMatchMessage } from '@icgame/game-engine';
+
+// --- 客户端 → 服务端 ---
 export type ClientMessage =
-  | { type: 'update'; args: [string, number, unknown, string] }
-  | { type: 'sync'; args: [string, string] }
-  | { type: 'chat'; args: [string, ChatPayload] }
+  | ClientMatchMessage
   | { type: 'icg:heartbeat'; at: number }
-  | { type: 'icg:reconnect'; lastEventSeq: number }
-  | { type: 'icg:ackIntent'; intentID: string }
-  | { type: 'icg:spectateStart'; matchID: string } // 观战（ADR-008 v1.2 已撤销，MVP 不实装；预留类型供后续复用）
   | { type: 'icg:chatBroadcast'; scope: ChatScope; message: string };
 
-// --- Server → Client ---
+// --- 服务端 → 客户端 ---
 export type ServerMessage =
-  | { type: 'update'; args: [string, unknown, unknown[]] }
-  | { type: 'sync'; args: [string, SyncInfo] }
-  | { type: 'matchData'; args: [string, unknown] }
-  | { type: 'icg:patch'; matchID: string; patch: unknown; eventSeq: number; serverTime: number }
-  | { type: 'icg:event'; matchID: string; event: MatchEventPayload }
-  | { type: 'icg:pendingResponse'; matchID: string; pendingResponse: unknown }
-  | { type: 'icg:playerJoin'; matchID: string; player: PlayerJoinPayload }
+  | ServerMatchMessage
   | { type: 'icg:playerLeave'; matchID: string; playerID: string; reason: LeaveReason }
   | { type: 'icg:aiTakeover'; matchID: string; playerID: string }
   | { type: 'icg:chatMessage'; matchID: string; message: ChatPayload }
   | { type: 'icg:error'; code: string; message: string };
 
+/**
+ * 可以对整局广播同一份内容的消息。
+ * 带对局状态或事件的消息（icg:state / icg:step / icg:moveResult）每个座位看到的不同，
+ * 只能按连接单独发送，所以不在此列。
+ */
+export type BroadcastableMessage = Exclude<
+  ServerMessage,
+  { type: 'icg:state' | 'icg:step' | 'icg:moveResult' }
+>;
+
 // --- 子类型 ---
-export type ChatScope = 'lobby' | 'room' | 'match' | 'spectator'; // 'spectator' 预留，观战未实装
+export type ChatScope = 'lobby' | 'room' | 'match' | 'spectator'; // 'spectator' 预留，观战未开放
 export type LeaveReason = 'disconnect' | 'voluntary' | 'kick' | 'timeout';
 
 export interface ChatPayload {
@@ -36,28 +37,7 @@ export interface ChatPayload {
   sentAt: number;
 }
 
-export interface SyncInfo {
-  state: unknown;
-  log: unknown[];
-  filtered: boolean;
-}
-
-export interface MatchEventPayload {
-  moveCounter: number;
-  eventKind: string;
-  payload: unknown;
-  timestamp: number;
-}
-
-export interface PlayerJoinPayload {
-  playerID: string;
-  nickname: string;
-  seat: number;
-}
-
 // 心跳 Redis Key
 export const WSKeys = {
   heartbeat: (matchId: string, playerId: string) => `ico:ws:hb:${matchId}:${playerId}`,
-  eventSeq: (matchId: string) => `ico:ws:seq:${matchId}`,
-  playerIntentAck: (matchId: string, playerId: string) => `ico:ws:ack:${matchId}:${playerId}`,
 } as const;

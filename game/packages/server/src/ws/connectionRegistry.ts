@@ -1,8 +1,7 @@
-// WS 连接注册表（MVP：单实例内存版，Phase 5 多实例改 Redis）
-// 对照：docs/_internal/design/07-backend-network.md §7.4.4 / §7.4.5
+// WS 连接注册表（单实例内存版）
 //
 // 职责：
-//   - socketId ↔ { playerID, matchID } 双向映射
+//   - socketId ↔ { playerID, matchID, seat } 双向映射
 //   - 支持按 matchID 广播、按 playerID 查 socket
 //   - 断开时清理映射
 
@@ -10,6 +9,8 @@ export interface ConnectionMeta {
   readonly socketId: string;
   readonly playerID: string;
   readonly matchID: string;
+  /** 握手鉴权得到的座位号 */
+  readonly seat: string;
   readonly connectedAt: number;
 }
 

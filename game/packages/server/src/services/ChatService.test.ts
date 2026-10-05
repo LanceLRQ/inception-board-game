@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ChatService } from './ChatService.js';
-import type { ServerMessage } from '../ws/types.js';
+import type { BroadcastableMessage } from '../ws/types.js';
 
 describe('ChatService', () => {
   let now: number;
-  let broadcasts: Array<{ matchID: string; msg: ServerMessage }>;
+  let broadcasts: Array<{ matchID: string; msg: BroadcastableMessage }>;
   let broadcaster: ReturnType<typeof vi.fn>;
   let chat: ChatService;
 
   beforeEach(() => {
     now = 1_000_000;
     broadcasts = [];
-    broadcaster = vi.fn((matchID: string, msg: ServerMessage) => {
+    broadcaster = vi.fn((matchID: string, msg: BroadcastableMessage) => {
       broadcasts.push({ matchID, msg });
     });
     chat = new ChatService(broadcaster as never, {

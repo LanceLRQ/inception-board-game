@@ -1,6 +1,5 @@
-// 心跳 + 断线检测（参照设计文档 §7.4.4）
+// 心跳 + 断线检测
 
-import { Redis } from 'ioredis';
 import { createRedisClient } from '../infra/redis.js';
 import { WSKeys } from './types.js';
 import { logger } from '../infra/logger.js';
@@ -8,12 +7,15 @@ import { logger } from '../infra/logger.js';
 const DISCONNECT_THRESHOLD_MS = 30_000; // 30s 无心跳标记断线
 const HB_KEY_TTL = 45; // Redis TTL 秒
 
-export class HeartbeatManager {
-  private redis: Redis;
+/** HeartbeatManager 实际用到的 Redis 命令 */
+export interface HeartbeatRedis {
+  get(key: string): Promise<string | null>;
+  setex(key: string, seconds: number, value: string): Promise<unknown>;
+  del(key: string): Promise<unknown>;
+}
 
-  constructor() {
-    this.redis = createRedisClient();
-  }
+export class HeartbeatManager {
+  constructor(private readonly redis: HeartbeatRedis = createRedisClient()) {}
 
   // 收到心跳，刷新 TTL
   async recordHeartbeat(matchId: string, playerId: string): Promise<void> {

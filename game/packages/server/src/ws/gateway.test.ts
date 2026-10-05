@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeInbound } from './gateway.js';
+import { SocketGateway, normalizeInbound } from './gateway.js';
+import type { ConnectionRegistry } from './connectionRegistry.js';
 
 describe('normalizeInbound', () => {
   describe('fully-formed ClientMessage passthrough', () => {
@@ -8,9 +9,9 @@ describe('normalizeInbound', () => {
       expect(normalizeInbound('icg:heartbeat', msg)).toEqual(msg);
     });
 
-    it('preserves ackIntent with intentID', () => {
-      const msg = { type: 'icg:ackIntent', intentID: 'intent-xyz' };
-      expect(normalizeInbound('icg:ackIntent', msg)).toEqual(msg);
+    it('preserves a chat broadcast message', () => {
+      const msg = { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' };
+      expect(normalizeInbound('icg:chatBroadcast', msg)).toEqual(msg);
     });
   });
 
@@ -28,45 +29,34 @@ describe('normalizeInbound', () => {
     });
   });
 
-  describe('reconnect fallback', () => {
-    it('parses lastEventSeq from raw payload', () => {
-      const result = normalizeInbound('icg:reconnect', { lastEventSeq: 42 });
-      expect(result).toEqual({ type: 'icg:reconnect', lastEventSeq: 42 });
-    });
-
-    it('defaults to 0 when lastEventSeq is missing', () => {
-      expect(normalizeInbound('icg:reconnect', {})).toEqual({
-        type: 'icg:reconnect',
-        lastEventSeq: 0,
-      });
-    });
-
-    it('coerces non-numeric lastEventSeq to 0', () => {
-      expect(normalizeInbound('icg:reconnect', { lastEventSeq: 'oops' })).toEqual({
-        type: 'icg:reconnect',
-        lastEventSeq: 0,
-      });
-    });
-  });
-
-  describe('ackIntent fallback', () => {
-    it('parses intentID from raw payload', () => {
-      expect(normalizeInbound('icg:ackIntent', { intentID: 'abc' })).toEqual({
-        type: 'icg:ackIntent',
-        intentID: 'abc',
-      });
-    });
-
-    it('returns null when intentID is empty/missing', () => {
-      expect(normalizeInbound('icg:ackIntent', {})).toBeNull();
-      expect(normalizeInbound('icg:ackIntent', { intentID: '' })).toBeNull();
-    });
-  });
-
   describe('unknown events', () => {
     it('returns null for unmapped event names', () => {
       expect(normalizeInbound('random-event', {})).toBeNull();
       expect(normalizeInbound('', null)).toBeNull();
+      expect(normalizeInbound('icg:reconnect', {})).toBeNull();
     });
+  });
+});
+
+describe('SocketGateway.broadcastToMatch', () => {
+  it('only accepts messages that do not carry per-seat match content', () => {
+    const registry = { getSocketsByMatch: () => [] } as unknown as ConnectionRegistry;
+    const gateway = new SocketGateway({
+      registry,
+      router: {} as never,
+      bot: {} as never,
+      heartbeat: {} as never,
+      moveGateway: {} as never,
+    });
+
+    gateway.broadcastToMatch('m1', { type: 'icg:aiTakeover', matchID: 'm1', playerID: '1' });
+    gateway.broadcastToMatch('m1', { type: 'icg:seats', matchID: 'm1', seats: [] });
+
+    // @ts-expect-error icg:state 带每个座位不同的视图，不能广播
+    gateway.broadcastToMatch('m1', { type: 'icg:state' });
+    // @ts-expect-error icg:step 带每个座位不同的视图与事件，不能广播
+    gateway.broadcastToMatch('m1', { type: 'icg:step' });
+    // @ts-expect-error icg:moveResult 只回给提交者，不能广播
+    gateway.broadcastToMatch('m1', { type: 'icg:moveResult' });
   });
 });

@@ -12,6 +12,7 @@ describe('ConnectionRegistry', () => {
     socketId,
     playerID,
     matchID,
+    seat: '0',
     connectedAt: Date.now(),
   });
 

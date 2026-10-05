@@ -1,29 +1,41 @@
-// Socket.io 网关 - 连接生命周期 + 消息派发 + 广播
-// 对照：docs/_internal/design/07-backend-network.md §7.4 WebSocket 协议
+// Socket.io 网关：连接生命周期 + 入站分发 + 按座位发送
 //
 // 职责：
 //   1. 从 HTTP server 挂载 Socket.io
-//   2. 连接时鉴权（JWT from handshake.auth.token）
-//   3. 注册 ConnectionRegistry，通知 BotManager.onReconnect
-//   4. 接收客户端消息 → WSMessageRouter → 回/广播
-//   5. 断开时 unregister + BotManager.onDisconnect
-//   6. 监听 BotManager.onTakeover → 广播 icg:aiTakeover
+//   2. 握手时校验令牌与对局成员身份，座位由此得出
+//   3. 登记连接，通知 BotManager 与对局服务座位的在线状态变化
+//   4. 对局消息交给 matchGateway，心跳与聊天交给 WSMessageRouter
+//   5. 每一步完成后，按每条连接的座位各发一份视图与事件
+//
+// 带对局状态的消息只能按连接单独发送；broadcastToMatch 只收与对局状态无关的消息。
 
 import type { Server as HttpServer } from 'node:http';
 import { Server as IOServer, type Socket } from 'socket.io';
-import type { ClientMessage, ServerMessage } from './types.js';
+import { parseClientMatchMessage } from '@icgame/game-engine';
+import type { BroadcastableMessage, ClientMessage, ServerMessage } from './types.js';
 import type { WSMessageRouter } from './messageRouter.js';
 import type { ConnectionRegistry } from './connectionRegistry.js';
 import type { BotManager } from '../services/BotManager.js';
+import type { MoveGateway } from '../services/MoveGateway.js';
 import type { HeartbeatManager } from './heartbeat.js';
+import type { MatchRoom, StepOutput } from '../match/MatchRoom.js';
+import type { MatchService } from '../match/MatchService.js';
 import { verifyToken } from '../infra/jwt.js';
 import { logger } from '../infra/logger.js';
+import {
+  authorizeHandshake,
+  handleMatchMessage,
+  seatInfos,
+  stateMessage,
+  stepMessage,
+} from './matchGateway.js';
 
 export interface GatewayDeps {
   readonly registry: ConnectionRegistry;
   readonly router: WSMessageRouter;
   readonly bot: BotManager;
   readonly heartbeat: HeartbeatManager;
+  readonly moveGateway: Pick<MoveGateway, 'accept' | 'commit'>;
 }
 
 export interface GatewayOptions {
@@ -35,12 +47,14 @@ export interface AuthenticatedSocketData {
   playerID: string;
   matchID: string;
   nickname: string;
+  seat: string;
 }
 
 const DEFAULT_PATH = '/ws';
 
 export class SocketGateway {
   private io: IOServer | null = null;
+  private matches: MatchService | null = null;
   private unsubscribeTakeover: (() => void) | null = null;
   private unsubscribeAbandon: (() => void) | null = null;
 
@@ -48,6 +62,11 @@ export class SocketGateway {
     private readonly deps: GatewayDeps,
     private readonly opts: GatewayOptions = {},
   ) {}
+
+  /** 对局服务与网关互相需要对方：先建网关，对局服务建好后绑定进来 */
+  bindMatches(matches: MatchService): void {
+    this.matches = matches;
+  }
 
   attach(httpServer: HttpServer): IOServer {
     const io = new IOServer(httpServer, {
@@ -58,27 +77,22 @@ export class SocketGateway {
     });
 
     io.use((socket, next) => {
-      try {
-        const auth = socket.handshake.auth as { token?: string; matchID?: string } | undefined;
-        if (!auth?.token || !auth?.matchID) {
-          return next(new Error('AUTH_REQUIRED'));
-        }
-        const payload = verifyToken(auth.token);
-        (socket.data as AuthenticatedSocketData) = {
-          playerID: payload.playerId,
-          matchID: auth.matchID,
-          nickname: payload.nickname,
-        };
-        next();
-      } catch (err) {
-        logger.warn({ err: (err as Error).message }, 'ws auth failed');
-        next(new Error('AUTH_INVALID'));
-      }
+      const matches = this.matches;
+      if (matches === null) return next(new Error('NOT_IN_MATCH'));
+      const result = authorizeHandshake(socket.handshake.auth, { verifyToken, matches });
+      if (!result.ok) return next(new Error(result.error));
+      (socket.data as AuthenticatedSocketData) = {
+        playerID: result.playerID,
+        matchID: result.matchID,
+        nickname: result.nickname,
+        seat: result.seat,
+      };
+      next();
     });
 
     io.on('connection', (socket) => this.onConnection(socket));
 
-    // 订阅 Bot 接管事件 → 广播到对局
+    // Bot 接管与硬关通知；BotManager 里的身份是座位号
     this.unsubscribeTakeover = this.deps.bot.onTakeover((matchID, record) => {
       this.broadcastToMatch(matchID, {
         type: 'icg:aiTakeover',
@@ -86,8 +100,6 @@ export class SocketGateway {
         playerID: record.playerID,
       });
     });
-
-    // 订阅硬关事件 → 广播 leave
     this.unsubscribeAbandon = this.deps.bot.onAbandon((matchID, playerID) => {
       this.broadcastToMatch(matchID, {
         type: 'icg:playerLeave',
@@ -109,68 +121,124 @@ export class SocketGateway {
     this.unsubscribeAbandon = null;
     if (this.io) {
       this.io.removeAllListeners();
-      this.io.close();
+      void this.io.close();
       this.io = null;
     }
   }
 
-  /** 广播到整个对局所有 socket */
-  broadcastToMatch(matchID: string, msg: ServerMessage): void {
-    if (!this.io) return;
-    const socketIds = this.deps.registry.getSocketsByMatch(matchID);
-    for (const sid of socketIds) {
-      this.io.to(sid).emit(msg.type, msg);
+  /** 广播到整个对局所有连接；只允许与对局状态无关的消息 */
+  broadcastToMatch(matchID: string, msg: BroadcastableMessage): void {
+    for (const sid of this.deps.registry.getSocketsByMatch(matchID)) {
+      this.emitTo(sid, msg);
     }
   }
 
   /** 发送到指定玩家（所有其设备） */
-  sendToPlayer(playerID: string, msg: ServerMessage): void {
-    if (!this.io) return;
-    const socketIds = this.deps.registry.getSocketsByPlayer(playerID);
-    for (const sid of socketIds) {
-      this.io.to(sid).emit(msg.type, msg);
+  sendToPlayer(playerID: string, msg: BroadcastableMessage): void {
+    for (const sid of this.deps.registry.getSocketsByPlayer(playerID)) {
+      this.emitTo(sid, msg);
     }
   }
 
+  /** 一步完成后：按每条连接的座位各发一份视图与事件 */
+  sendStep(matchID: string, output: StepOutput): void {
+    const room = this.matches?.get(matchID) ?? null;
+    if (room === null) return;
+    const seats = this.seatsOf(room);
+    for (const conn of this.deps.registry.listMatchConnections(matchID)) {
+      this.emitTo(conn.socketId, stepMessage(room, output, conn.seat, seats));
+    }
+  }
+
+  /** 座位在线或接管状态变了：给这局每条连接发最新座位表 */
+  sendSeats(matchID: string): void {
+    const room = this.matches?.get(matchID) ?? null;
+    if (room === null) return;
+    this.broadcastToMatch(matchID, {
+      type: 'icg:seats',
+      matchID,
+      seats: this.seatsOf(room),
+    });
+  }
+
+  private seatsOf(room: MatchRoom) {
+    const { registry, bot } = this.deps;
+    return seatInfos(room, {
+      isConnected: (seat) =>
+        registry.listMatchConnections(room.matchID).some((c) => c.seat === seat),
+      isTakenOver: (seat) => bot.isBotControlled(room.matchID, seat),
+    });
+  }
+
+  /** 按连接发送任意服务端消息 */
+  private emitTo(socketId: string, msg: ServerMessage): void {
+    this.io?.to(socketId).emit(msg.type, msg);
+  }
+
   private onConnection(socket: Socket): void {
-    const data = socket.data as AuthenticatedSocketData;
-    const { playerID, matchID, nickname } = data;
+    const matches = this.matches;
+    const { playerID, matchID, seat } = socket.data as AuthenticatedSocketData;
+    if (matches === null) {
+      socket.disconnect(true);
+      return;
+    }
 
     this.deps.registry.register({
       socketId: socket.id,
       playerID,
       matchID,
+      seat,
       connectedAt: Date.now(),
     });
 
-    // 通知 BotManager 玩家在线 → 回切 AI 接管
-    this.deps.bot.onReconnect(matchID, playerID);
-    void this.deps.heartbeat.recordHeartbeat(matchID, playerID);
-
-    logger.info({ socketId: socket.id, playerID, matchID }, 'ws connected');
-
-    this.broadcastToMatch(matchID, {
-      type: 'icg:playerJoin',
-      matchID,
-      player: { playerID, nickname, seat: -1 },
+    // 座位在线 → 回切 AI 接管，并让对局服务重新排程、通知座位表
+    this.deps.bot.onReconnect(matchID, seat);
+    this.deps.heartbeat.recordHeartbeat(matchID, playerID).catch((err: unknown) => {
+      logger.warn({ err, matchID }, 'heartbeat record failed');
     });
+    matches.seatsChanged(matchID);
+    logger.info({ socketId: socket.id, matchID, seat }, 'ws connected');
 
-    // 统一消息接收：客户端可 emit(type, payload) 或 emit('message', msg)
+    const room = matches.get(matchID);
+    if (room !== null) {
+      this.emitTo(socket.id, stateMessage(room, seat, this.seatsOf(room)));
+    }
+
     socket.onAny(async (event: string, payload: unknown) => {
       if (event === 'disconnect' || event === 'error') return;
-      const msg = this.normalizeInbound(event, payload);
-      if (!msg) return;
-
       try {
-        const result = await this.deps.router.route({ matchID, playerID }, msg);
-        if (result.reply) {
-          socket.emit(result.reply.type, result.reply);
+        const parsed = parseClientMatchMessage(event, payload);
+        if (parsed !== null) {
+          const out = await handleMatchMessage(
+            parsed,
+            { matchID, playerID, seat },
+            {
+              matches,
+              moveGateway: this.deps.moveGateway,
+              seatsFor: (r) => this.seatsOf(r),
+            },
+          );
+          socket.emit(out.type, out);
+          return;
         }
-        if (result.broadcast) {
-          this.broadcastToMatch(matchID, result.broadcast);
+        if (event === 'icg:move') {
+          // 形状不对的 move 也要有回应，而不是静默丢弃
+          socket.emit('icg:moveResult', {
+            type: 'icg:moveResult',
+            intentId: '',
+            ok: false,
+            code: 'not_object',
+          });
+          return;
         }
+
+        const msg = normalizeInbound(event, payload);
+        if (!msg) return;
+        const result = await this.deps.router.route({ matchID, playerID, seat }, msg);
+        if (result.reply) socket.emit(result.reply.type, result.reply);
+        if (result.broadcast) this.broadcastToMatch(matchID, result.broadcast);
       } catch (err) {
-        logger.error({ err, event, playerID, matchID }, 'ws route error');
+        logger.error({ err, event, matchID }, 'ws route error');
         socket.emit('icg:error', {
           type: 'icg:error',
           code: 'INTERNAL_ERROR',
@@ -181,25 +249,25 @@ export class SocketGateway {
 
     socket.on('disconnect', (reason) => {
       const meta = this.deps.registry.unregister(socket.id);
-      if (meta) {
-        this.deps.bot.onDisconnect(meta.matchID, meta.playerID);
-        this.broadcastToMatch(meta.matchID, {
-          type: 'icg:playerLeave',
-          matchID: meta.matchID,
-          playerID: meta.playerID,
-          reason: 'disconnect',
-        });
-      }
       logger.info({ socketId: socket.id, reason }, 'ws disconnected');
+      if (!meta) return;
+      const seatStillOnline = this.deps.registry
+        .listMatchConnections(meta.matchID)
+        .some((c) => c.seat === meta.seat);
+      if (seatStillOnline) return;
+      this.deps.bot.onDisconnect(meta.matchID, meta.seat);
+      this.broadcastToMatch(meta.matchID, {
+        type: 'icg:playerLeave',
+        matchID: meta.matchID,
+        playerID: meta.seat,
+        reason: 'disconnect',
+      });
+      matches.seatsChanged(meta.matchID);
     });
-  }
-
-  private normalizeInbound(event: string, payload: unknown): ClientMessage | null {
-    return normalizeInbound(event, payload);
   }
 }
 
-/** 把 onAny 的 (event, payload) 还原为 ClientMessage（导出供测试） */
+/** 把 onAny 的 (event, payload) 还原为心跳或聊天消息（导出供测试） */
 export function normalizeInbound(event: string, payload: unknown): ClientMessage | null {
   // 客户端可直接 emit(ClientMessage.type, message)，payload 即完整消息
   if (
@@ -212,25 +280,6 @@ export function normalizeInbound(event: string, payload: unknown): ClientMessage
   }
 
   // 兜底：根据 event 名字包装最小消息
-  switch (event) {
-    case 'icg:heartbeat':
-      return { type: 'icg:heartbeat', at: Date.now() };
-    case 'icg:reconnect': {
-      const seq =
-        payload && typeof payload === 'object' && 'lastEventSeq' in payload
-          ? Number((payload as { lastEventSeq: unknown }).lastEventSeq) || 0
-          : 0;
-      return { type: 'icg:reconnect', lastEventSeq: seq };
-    }
-    case 'icg:ackIntent': {
-      const id =
-        payload && typeof payload === 'object' && 'intentID' in payload
-          ? String((payload as { intentID: unknown }).intentID)
-          : '';
-      if (!id) return null;
-      return { type: 'icg:ackIntent', intentID: id };
-    }
-    default:
-      return null;
-  }
+  if (event === 'icg:heartbeat') return { type: 'icg:heartbeat', at: Date.now() };
+  return null;
 }

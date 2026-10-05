@@ -14,7 +14,7 @@ import {
   isPresetAvailableForFaction,
   type ChatPresetFaction,
 } from '@icgame/shared';
-import type { ServerMessage } from '../ws/types.js';
+import type { BroadcastableMessage } from '../ws/types.js';
 import { logger } from '../infra/logger.js';
 
 export interface SendChatInput {
@@ -50,7 +50,7 @@ export interface ChatServiceOptions {
   readonly now?: () => number;
 }
 
-export type ChatBroadcaster = (matchID: string, msg: ServerMessage) => void;
+export type ChatBroadcaster = (matchID: string, msg: BroadcastableMessage) => void;
 
 export class ChatService {
   /** key = `${matchID}:${senderID}`，value = 最近一次发送时间戳 */
