@@ -12,8 +12,12 @@ describe('withSettleGate 包装层', () => {
     probe: { move: ((a: { ctx: { currentPlayer: string } }) => a.ctx.currentPlayer) as never },
     resolveGraft: { move: (() => 'graft-resolved') as never },
   });
-  const call = (name: 'probe' | 'resolveGraft', args: Record<string, unknown>): unknown =>
-    (gated[name].move as unknown as (a: unknown) => unknown)(args);
+  const call = (
+    name: 'probe' | 'resolveGraft',
+    args: Record<string, unknown>,
+    ...rest: unknown[]
+  ): unknown =>
+    (gated[name].move as unknown as (a: unknown, ...r: unknown[]) => unknown)(args, ...rest);
 
   function state(): SetupState {
     const base = createTestState({ phase: 'playing', turnPhase: 'action' });
@@ -42,20 +46,40 @@ describe('withSettleGate 包装层', () => {
       pendingGraft: { playerID: other },
     } as unknown as SetupState;
     expect(
-      call('resolveGraft', {
-        G: withGraft,
-        ctx: { currentPlayer: s.currentPlayerID },
-        playerID: other,
-      }),
+      call(
+        'resolveGraft',
+        {
+          G: withGraft,
+          ctx: { currentPlayer: s.currentPlayerID },
+          playerID: other,
+        },
+        [],
+      ),
     ).toBe('graft-resolved');
     // 同一局面下回合主人不能代发
     expect(
-      call('resolveGraft', {
-        G: withGraft,
-        ctx: { currentPlayer: s.currentPlayerID },
-        playerID: s.currentPlayerID,
-      }),
+      call(
+        'resolveGraft',
+        {
+          G: withGraft,
+          ctx: { currentPlayer: s.currentPlayerID },
+          playerID: s.currentPlayerID,
+        },
+        [],
+      ),
     ).toBe(INVALID_MOVE);
+  });
+
+  it('行动权通过后参数形状不对仍被拒，没登记的 move 不看参数', () => {
+    const s = state();
+    const other = s.playerOrder.find((id) => id !== s.currentPlayerID)!;
+    const withGraft = { ...s, pendingGraft: { playerID: other } } as unknown as SetupState;
+    const context = { G: withGraft, ctx: { currentPlayer: s.currentPlayerID }, playerID: other };
+    expect(call('resolveGraft', context, [1, 2])).toBe(INVALID_MOVE);
+    expect(call('resolveGraft', context)).toBe(INVALID_MOVE);
+    expect(
+      call('probe', { G: s, ctx: { currentPlayer: 'x' }, playerID: s.currentPlayerID }, 99),
+    ).toBe(s.currentPlayerID);
   });
 
   it('上下文里没有 playerID 时退回用 ctx.currentPlayer 当发起者', () => {

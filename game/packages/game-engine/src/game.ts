@@ -3207,8 +3207,14 @@ function applyShootVariant(
   random: BGIORandom,
   targetPlayerID: string,
   cardId: CardID,
-  opts: ShootVariantOpts,
+  rawOpts: ShootVariantOpts,
 ): SetupState | typeof INVALID_MOVE {
+  // 客户端用 null 表示「没传」：统一成 undefined，免得 null 被写进待结算状态
+  const opts: ShootVariantOpts = {
+    ...rawOpts,
+    decreeId: rawOpts.decreeId ?? undefined,
+    preventMove: rawOpts.preventMove ?? undefined,
+  };
   const shooter = G.players[ctx.currentPlayer];
   const target = G.players[targetPlayerID];
   if (!shooter || !target) return INVALID_MOVE;
