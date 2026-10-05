@@ -151,21 +151,12 @@ describe('pickBotMove', () => {
     expect(pickBotMove(G, '1', legal)).toBe('endActionPhase');
   });
 
-  it('picks libra split then pick for the bonder', () => {
+  it('does not pick libra moves itself (autoAction settles libra before pickBotMove runs)', () => {
     const legal = legalMovesFor('playing', 'action');
-    const before = makeState({
+    const pending = makeState({
       pendingLibra: { bonderPlayerID: '2', targetPlayerID: '3', split: null },
     });
-    expect(pickBotMove(before, '2', legal)).toBe('resolveLibraSplit');
-    const after = makeState({
-      pendingLibra: {
-        bonderPlayerID: '2',
-        targetPlayerID: '3',
-        split: { pile1: ['a'] as CardID[], pile2: [] },
-      },
-    });
-    expect(pickBotMove(after, '2', legal)).toBe('resolveLibraPick');
-    expect(pickBotMove(before, '3', legal)).toBe('endActionPhase');
+    expect(pickBotMove(pending, '2', legal)).toBe('endActionPhase');
   });
 
   it('never picks pending-only moves without a pending state', () => {

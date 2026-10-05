@@ -105,6 +105,36 @@ describe('对局运行器 · 拒绝', () => {
     if (!res.ok) expect(res.reason).toBe('unknown_move');
   });
 
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+    '名字是原型链上的 %s：按未知 move 拒绝，而不是 move_error',
+    (name) => {
+      const s = start();
+      const res = applyMove(game, s, { playerID: '0', move: name, args: [] });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.reason).toBe('unknown_move');
+      expect(res.state).toBe(s);
+    },
+  );
+
+  it('状态缺 playerOrder 时行动权判定抛异常：返回 move_error，状态不变', () => {
+    const s = mustApply(start(), '0', 'completeSetup');
+    const damaged: MatchState<SetupState> = {
+      ...s,
+      G: { ...s.G, playerOrder: undefined } as unknown as SetupState,
+    };
+    const res = applyMove(game, damaged, {
+      playerID: damaged.ctx.currentPlayer,
+      move: 'doDraw',
+      args: [],
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.reason).toBe('move_error');
+      expect(res.error).toBeInstanceOf(Error);
+    }
+    expect(res.state).toBe(damaged);
+  });
+
   it('引擎判定非法：拒绝，版本号和随机数状态都不前进', () => {
     const s = mustApply(start(), '0', 'completeSetup');
     const res = applyMove(game, s, {

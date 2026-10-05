@@ -3,13 +3,11 @@
 import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
-import { SETTLE_MOVES, type BlockingField } from '../engine/settleGate.js';
+import { BLOCKING_FIELDS } from '../engine/actionRights.js';
 import { applyMove, createMatch, type GameDef, type MatchState } from './matchRunner.js';
 import { makeTestRng, pickLegalMove } from './moveFuzzer.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
-
-const settleFields = Object.keys(SETTLE_MOVES) as BlockingField[];
 
 function afterSetup(numPlayers: number, seed: string): MatchState<SetupState> {
   const s = createMatch(game, { numPlayers, setupData: { rngSeed: seed }, seed });
@@ -123,7 +121,7 @@ describe('待结算闸门 · 对局', () => {
           const cand = pickLegalMove(game, s, rnd, { preferSettle: false });
           if (!cand) {
             // 找不到任何合法 move：记下停在哪些待结算字段上
-            for (const field of settleFields) {
+            for (const field of BLOCKING_FIELDS) {
               if (s.G[field]) stalled.push(`${field} n=${n} k=${k} step=${step}`);
             }
             break;

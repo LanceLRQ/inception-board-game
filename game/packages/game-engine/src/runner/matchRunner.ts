@@ -100,6 +100,11 @@ export interface GameDef<G> {
    * 没有提供时快照里的 G 原样使用。
    */
   migrate?(G: unknown): G;
+  /**
+   * 状态形状校验：快照迁移之后调用，返回问题描述表示状态不可用，返回 null 表示通过。
+   * 只检查运行器和行动权判定依赖的基本形状，不检查规则层面的不变量。
+   */
+  validate?(G: G): string | null;
 }
 
 export interface MoveRequest {
@@ -181,7 +186,7 @@ type Step =
 const EMPTY_PHASE = {};
 
 function phaseOf<G>(game: GameDef<G>, phase: string | null): PhaseDef<G> {
-  return (phase !== null ? game.phases[phase] : undefined) ?? EMPTY_PHASE;
+  return phase !== null && Object.hasOwn(game.phases, phase) ? game.phases[phase]! : EMPTY_PHASE;
 }
 
 function defaultPlayOrder(numPlayers: number): string[] {
@@ -266,7 +271,7 @@ function runStep<G>(
       const arg = step.arg as { next?: string } | undefined;
       let phase: string | null;
       if (arg && typeof arg === 'object' && arg.next !== undefined) {
-        if (!(arg.next in game.phases)) return state;
+        if (!Object.hasOwn(game.phases, arg.next)) return state;
         phase = arg.next;
       } else {
         phase = phaseOf(game, step.from).next ?? null;
@@ -360,6 +365,7 @@ const GAME_KEYS = new Set([
   'endIf',
   'actionRights',
   'migrate',
+  'validate',
 ]);
 const PHASE_KEYS = new Set(['start', 'next', 'endIf', 'onBegin', 'onEnd', 'turn', 'moves']);
 const TURN_KEYS = new Set(['order', 'onBegin', 'onEnd']);
@@ -431,7 +437,8 @@ function invalidSnapshot(what: string): never {
 
 /**
  * 从已保存的快照恢复。状态本身就是普通对象，这里只校验运行器自己依赖的字段，
- * 对局状态 G 的内部结构由引擎负责；传入的 Game 定义有 migrate 时，用它迁移 G。
+ * 对局状态 G 的内部结构由引擎负责；传入的 Game 定义有 migrate 时，用它迁移 G，
+ * 有 validate 时再用它检查迁移后的 G 的基本形状。
  */
 export function matchFromSnapshot<G>(raw: unknown, game?: GameDef<G>): MatchState<G> {
   if (typeof raw !== 'object' || raw === null) invalidSnapshot('不是对象');
@@ -461,8 +468,10 @@ export function matchFromSnapshot<G>(raw: unknown, game?: GameDef<G>): MatchStat
   if (!Number.isInteger(s.stateID) || (s.stateID as number) < 0) invalidSnapshot('stateID');
   const match = s as MatchState<G>;
   // 传入 Game 定义且它带迁移钩子时，把旧版本的 G 升到当前版本；迁移失败的错误原样抛出
-  if (game?.migrate) return { ...match, G: game.migrate(match.G) };
-  return match;
+  const migrated: MatchState<G> = game?.migrate ? { ...match, G: game.migrate(match.G) } : match;
+  const problem = game?.validate?.(migrated.G);
+  if (problem) invalidSnapshot(problem);
+  return migrated;
 }
 
 export function applyMove<G>(
@@ -472,14 +481,22 @@ export function applyMove<G>(
   options: ApplyMoveOptions = {},
 ): MoveOutcome<G> {
   const { playerID, move, args } = request;
-  const def = phaseOf(game, state.ctx.phase).moves?.[move];
+  const moves = phaseOf(game, state.ctx.phase).moves;
+  // 按名字查表只认自有属性，避免 constructor、__proto__ 之类的名字命中原型链
+  const def = moves !== undefined && Object.hasOwn(moves, move) ? moves[move] : undefined;
   if (!def) return { ok: false, reason: 'unknown_move', state };
   if (state.ctx.gameover !== undefined) return { ok: false, reason: 'game_over', state };
 
   if (!state.ctx.playOrder.includes(playerID)) return { ok: false, reason: 'not_active', state };
-  const allowed = game.actionRights
-    ? game.actionRights({ G: state.G, ctx: state.ctx, playerID, move })
-    : playerID === state.ctx.currentPlayer;
+  let allowed: boolean;
+  try {
+    allowed = game.actionRights
+      ? game.actionRights({ G: state.G, ctx: state.ctx, playerID, move })
+      : playerID === state.ctx.currentPlayer;
+  } catch (error) {
+    // 状态形状不对时行动权判定也可能抛异常，与 move 本体抛异常同样处理
+    return { ok: false, reason: 'move_error', state, error };
+  }
   if (!allowed) return { ok: false, reason: 'not_active', state };
 
   const seeded = options.random ? null : seededRandom(state.rngState);

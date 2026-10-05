@@ -15,9 +15,9 @@ export const MOVES_BY_PHASE: Record<string, string[]> = {
     // 响应类 / 梦境窥视三段式中间态 move 不放进 action 白名单
     //   原因：本名单是 pickBotMove 的合法 move 来源；若包含响应类，
     //         Bot 会主动选中 → 引擎判定非法 move，污染日志。
-    //   正确路径：响应窗口 / pendingPeekDecision / peekReveal 由调度层专用代发，
-    //         不经过 pickBotMove。
-    //   被排除的 move（仅供调度层显式发起，不参与 pickBotMove）：
+    //   正确路径：响应窗口 / pendingPeekDecision / peekReveal 由自动行动判定
+    //         （autoAction）以响应者本人的名义发出，不经过 pickBotMove。
+    //   被排除的 move（仅由自动行动判定发起，不参与 pickBotMove）：
     //     - respondCancelUnlock / passResponse / resolveUnlock
     //     - masterPeekBribeDecision / peekerAcknowledge
     'playDreamTransit',
@@ -122,7 +122,7 @@ export const MOVE_PRIORITY: Record<string, number> = {
   resolveGraft: 0, // 必须优先结算 pendingGraft，才能推进流程
   resolveLibraSplit: 0, // pendingLibra step 2：优先处理
   resolveLibraPick: 0, // pendingLibra step 3：优先处理
-  // 响应窗口 / 梦境窥视回合外推进（由调度层代发，
+  // 响应窗口 / 梦境窥视回合外推进（由自动行动判定以行动者本人的名义发，
   //   不走 pickBotMove 路径；此处记录以保持白名单一致）
   respondCancelUnlock: 0,
   passResponse: 0,

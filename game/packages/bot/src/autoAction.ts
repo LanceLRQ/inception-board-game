@@ -92,11 +92,12 @@ export function nextAutoAction(
     };
   }
 
-  // SHOOT 响应窗口：被射击的目标是 Bot 时，放弃闪避 / 接受惩罚而不弃牌
+  // SHOOT 响应窗口：被射击的目标放弃闪避 / 接受惩罚而不弃牌，一律以目标本人的名义发。
+  // 界面还没有这个选择的入口，目标是真人时同样自动放弃（与处女、天秤一致），
+  // 否则这个阻塞型待结算会挡住后续所有 move，对局就此停住。
   const shoot = G.pendingShootResponse;
   if (shoot) {
     const target = shoot.targetPlayerID;
-    if (isHuman(target)) return null;
     if (shoot.responseType === 'terrorist') {
       return {
         playerID: target,

@@ -2562,8 +2562,8 @@ export const InceptionCityGame = {
         },
 
         // 天秤·平衡 step 2：target 提交分组
-        // 单机版放宽：不检查 ctx.currentPlayer，允许任一参与方代发（含 worker Bot
-        // 代 target 在 bonder 回合内补完）。split 合法性由 libraValidateSplit 守护。
+        // 发起者由行动权表限定为被要求分牌的 target，这里不再核对 ctx.currentPlayer。
+        // split 合法性由 libraValidateSplit 守护。
         resolveLibraSplit: {
           move: ({ G }: MoveCtx, pile1: CardID[], pile2: CardID[]) => {
             if (!isStringArray(pile1) || !isStringArray(pile2)) return INVALID_MOVE;
@@ -2586,7 +2586,7 @@ export const InceptionCityGame = {
 
         // 天秤·平衡 step 3：bonder 选哪份；执行后清空 pendingLibra
         // 天秤·平衡 step 3：bonder 选哪堆
-        // 单机版放宽：不检查 ctx.currentPlayer（理由同 step 2）。参与方由 pendingLibra 守护。
+        // 发起者由行动权表限定为发动者 bonder，这里不再核对 ctx.currentPlayer（理由同 step 2）。
         resolveLibraPick: {
           move: ({ G }: MoveCtx, pick: 'pile1' | 'pile2') => {
             const pl = G.pendingLibra;
@@ -2923,6 +2923,26 @@ export const InceptionCityGame = {
 
   // 恢复快照时把旧版本的对局状态迁移到当前版本
   migrate: (G) => migrateGameState(G as Record<string, unknown>),
+
+  // 恢复快照后检查对局状态的基本形状（只查行动权判定和流程依赖的字段，规则不变量由 invariants 负责）
+  validate(G) {
+    const order: unknown = G.playerOrder;
+    if (!Array.isArray(order) || order.length === 0 || order.some((id) => typeof id !== 'string')) {
+      return 'G.playerOrder 必须是非空的字符串数组';
+    }
+    const players: unknown = G.players;
+    if (typeof players !== 'object' || players === null || Array.isArray(players)) {
+      return 'G.players 必须是对象';
+    }
+    for (const id of order as string[]) {
+      if (!Object.hasOwn(players, id)) return `G.playerOrder 里的 ${id} 不在 G.players 中`;
+    }
+    if (typeof G.currentPlayerID !== 'string') return 'G.currentPlayerID 必须是字符串';
+    if (typeof G.dreamMasterID !== 'string') return 'G.dreamMasterID 必须是字符串';
+    if (typeof G.layers !== 'object' || G.layers === null) return '缺少 G.layers';
+    if (!Array.isArray(G.vaults)) return '缺少 G.vaults';
+    return null;
+  },
 } satisfies GameDef<SetupState>;
 
 function isAdjacent(from: number, to: number): boolean {

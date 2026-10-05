@@ -4,8 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
 import { createTestState } from '../testing/fixtures.js';
-import { SETTLE_MOVES } from './settleGate.js';
-import { RESTRICTED_MOVES, denyAction, listAwaiting } from './actionRights.js';
+import { BLOCKING_FIELDS, RESTRICTED_MOVES, denyAction, listAwaiting } from './actionRights.js';
 
 // 默认状态：玩家顺序 p1 p2 p3 p4 pM，回合主人 p1，梦主 pM
 const OWNER = 'p1';
@@ -374,6 +373,35 @@ describe('listAwaiting', () => {
 });
 
 describe('行动权表 · 一致性', () => {
+  describe('BLOCKING_FIELDS', () => {
+    it('不含重复项，也不含不阻塞的白羊待选择', () => {
+      expect(new Set(BLOCKING_FIELDS).size).toBe(BLOCKING_FIELDS.length);
+      expect(BLOCKING_FIELDS).not.toContain('pendingAriesChoice');
+    });
+
+    it('与行动权表里实际挡住行动的字段一致', () => {
+      const states = [
+        base({
+          ...graft,
+          ...gravity,
+          ...shootMove,
+          ...sudger,
+          ...libraBefore,
+          ...peekDecision,
+          ...peekReveal,
+          ...virgo,
+          ...shootResponse,
+          ...responseWindow,
+        }),
+        base(unlockOnly),
+      ];
+      const blocking = states.flatMap((st) => listAwaiting(st).filter((entry) => entry.blocking));
+      expect([...new Set(blocking.map((entry) => entry.field))].sort()).toEqual(
+        [...BLOCKING_FIELDS].sort(),
+      );
+    });
+  });
+
   const real = new Set(Object.keys(InceptionCityGame.phases.playing.moves));
 
   it('listAwaiting 用到的 move 都是引擎里真实存在的', () => {
@@ -402,20 +430,5 @@ describe('行动权表 · 一致性', () => {
       }
     }
     for (const move of RESTRICTED_MOVES) expect(real.has(move), move).toBe(true);
-  });
-
-  it('闸门里登记的每个结算 move，在行动权表里都有', () => {
-    for (const [field, moves] of Object.entries(SETTLE_MOVES)) {
-      for (const move of moves) {
-        expect(RESTRICTED_MOVES.has(move), `${field} → ${move}`).toBe(true);
-      }
-    }
-  });
-
-  it('行动权表里的阻塞型 move，闸门里都登记了（反向不漂移）', () => {
-    const gated = new Set<string>(Object.values(SETTLE_MOVES).flat());
-    for (const row of blockingRows) {
-      for (const move of row.moves) expect(gated.has(move), move).toBe(true);
-    }
   });
 });

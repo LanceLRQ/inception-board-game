@@ -18,6 +18,10 @@ function broken(patch: (s: Record<string, unknown>) => void): unknown {
   return raw;
 }
 
+function gOf(s: Record<string, unknown>): Record<string, unknown> {
+  return s.G as Record<string, unknown>;
+}
+
 function ctxOf(s: Record<string, unknown>): Record<string, unknown> {
   return s.ctx as Record<string, unknown>;
 }
@@ -47,6 +51,44 @@ describe('对局运行器 · 快照校验', () => {
     ['版本号为负', broken((s) => (s.stateID = -1)), 'stateID'],
   ])('%s：抛错并指出字段', (_label, raw, field) => {
     expect(() => matchFromSnapshot(raw)).toThrow(field);
+  });
+
+  describe('对局状态形状校验', () => {
+    const cases: [string, unknown, string][] = [
+      ['G 缺 playerOrder', broken((s) => delete gOf(s).playerOrder), 'playerOrder'],
+      ['G.players 是数组', broken((s) => (gOf(s).players = [])), 'players'],
+      [
+        'playerOrder 里有不在 players 里的 ID',
+        broken((s) => (gOf(s).playerOrder = ['0', '1', '2', '3', 'ghost'])),
+        'ghost',
+      ],
+      ['G 缺 dreamMasterID', broken((s) => delete gOf(s).dreamMasterID), 'dreamMasterID'],
+      ['G 缺 layers', broken((s) => delete gOf(s).layers), 'layers'],
+    ];
+
+    it.each(cases)('带 Game 定义：%s 时抛错并指出问题', (_label, raw, what) => {
+      expect(() => matchFromSnapshot<SetupState>(raw, game)).toThrow(
+        new RegExp(`对局快照无效：.*${what}`),
+      );
+    });
+
+    it.each(cases)('不带 Game 定义：%s 时不校验', (_label, raw) => {
+      expect(() => matchFromSnapshot<SetupState>(raw)).not.toThrow();
+    });
+
+    it('合法快照带 Game 定义通过校验', () => {
+      const s = valid();
+      expect(() =>
+        matchFromSnapshot<SetupState>(JSON.parse(JSON.stringify(s)), game),
+      ).not.toThrow();
+    });
+
+    it('钩子返回描述时抛错，描述原样带出', () => {
+      const custom: GameDef<SetupState> = { ...game, validate: () => '某某不对' };
+      expect(() =>
+        matchFromSnapshot<SetupState>(JSON.parse(JSON.stringify(valid())), custom),
+      ).toThrow('对局快照无效：某某不对');
+    });
   });
 
   describe('迁移旧版本状态', () => {

@@ -224,10 +224,31 @@ describe('nextAutoAction · 判定顺序', () => {
       });
     });
 
-    it('目标是真人：返回 null', () => {
-      const s = shootResponseState('pisces');
-      const target = s.G.pendingShootResponse!.targetPlayerID;
-      expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toBeNull();
+    it('目标是真人：同样以目标本人的名义自动放弃（界面没有这个选择的入口）', () => {
+      for (const [responseType, move] of [
+        ['pisces', 'respondShootPass'],
+        ['terrorist', 'respondTerroristAccept'],
+      ] as const) {
+        const s = shootResponseState(responseType);
+        const target = s.G.pendingShootResponse!.targetPlayerID;
+        expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toMatchObject({
+          playerID: target,
+          move,
+          args: [],
+        });
+      }
+    });
+
+    it('目标是真人：自动动作被运行器接受，待结算被清空', () => {
+      for (const responseType of ['pisces', 'terrorist'] as const) {
+        const s = shootResponseState(responseType);
+        const target = s.G.pendingShootResponse!.targetPlayerID;
+        const action = nextAutoAction(s, { humanPlayerIDs: [target] })!;
+        expect(action).not.toBeNull();
+        const res = applyMove(game, s, action);
+        expect(res.ok).toBe(true);
+        if (res.ok) expect(res.state.G.pendingShootResponse).toBeNull();
+      }
     });
 
     it('目标是 Bot：以目标本人的名义放弃闪避 / 接受惩罚，经运行器执行后待结算被清空', () => {

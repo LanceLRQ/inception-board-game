@@ -42,14 +42,6 @@ export function pickBotMove(G: SetupState, botID: string, legal: readonly string
     return 'resolveShootMove';
   }
 
-  // 天秤待结算：分牌由被要求分牌的目标发，挑牌由发动者发（行动权表）；
-  // 这里只按 bonder 的视角选 move 名，实际的自动结算走 autoAction
-  const pl = G.pendingLibra;
-  if (pl && pl.bonderPlayerID === botID) {
-    if (!pl.split && legal.includes('resolveLibraSplit')) return 'resolveLibraSplit';
-    if (pl.split && legal.includes('resolveLibraPick')) return 'resolveLibraPick';
-  }
-
   // 弃牌阶段：手牌超限必须走 doDiscard；否则 skipDiscard
   // 对照：game-engine skipDiscard 守卫（hand.length > HAND_LIMIT → 非法）
   const handLen = G.players[botID]?.hand?.length ?? 0;

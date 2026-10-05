@@ -47,7 +47,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   //   原因：play() 看到 legalMoves 含 respondCancelUnlock 就会因高优先级选中 →
   //         无 pendingResponseWindow / 不在 responders 时 engine 返回 INVALID_MOVE，
   //         污染日志且浪费循环。
-  //   正确路径：响应窗口由 worker 顶部分支专用代发（passResponse / respondCancelUnlock）
+  //   正确路径：响应窗口由自动行动判定以响应者本人的名义发出（passResponse / respondCancelUnlock）
   //   playResponse() 方法用 startsWith() 直接匹配，不依赖 MOVE_PRIORITY → 不受影响。
   respondCancelUnlock: 999,
   passResponse: 999,
@@ -57,9 +57,9 @@ const MOVE_PRIORITY: Record<string, number> = {
   masterPeekBribeDecision: 999,
   playPeek: 80,
   playPeekMaster: 85,
-  // W20.5 · 处女·完美 三选一响应窗（回合外 move，由 worker 顶部分支代发；此处 999 不主动选）
+  // W20.5 · 处女·完美 三选一响应窗（回合外 move，由自动行动判定以处女本人的名义发；此处 999 不主动选）
   respondVirgoPerfect: 999,
-  // W20.5-C · 双鱼·闪避 SHOOT 响应窗（同上：响应类 999 不主动选；由 worker 代发）
+  // W20.5-C · 双鱼·闪避 SHOOT 响应窗（同上：响应类 999 不主动选；由自动行动判定以目标本人的名义发）
   respondShootEvade: 999,
   respondShootPass: 999,
   // W20.5-D · 恐怖分子·狂热 SHOOT 响应窗（同上）
@@ -72,7 +72,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   playAquariusCoherence: 7,
   // W20.5-E · 雅典娜·急智（useAthenaWit）回合外主动 move
   //   优先级 999：bot 自己回合 engine 会拒（已 guard "非 currentPlayerID 才能用"）
-  //   他人回合的接入由 worker 顶部分支检测后专用代发；此处 999 防 SimpleBot 主动选
+  //   目前没有调度方替他发这个 move；此处 999 防 SimpleBot 主动选
   useAthenaWit: 999,
 };
 

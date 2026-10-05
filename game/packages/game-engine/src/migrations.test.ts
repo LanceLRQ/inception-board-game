@@ -94,6 +94,41 @@ describe('migrations', () => {
     );
   });
 
+  describe('入口校验', () => {
+    it.each([
+      ['null', null],
+      ['数组', []],
+      ['字符串', 'x'],
+      ['数字', 3],
+    ])('状态本身是 %s 时抛错', (_name, raw) => {
+      expect(() => migrateGameState(raw as never)).toThrow(/普通对象/);
+    });
+
+    it.each([
+      ['字符串 "3"', '3'],
+      ['小数 7.5', 7.5],
+      ['NaN', Number.NaN],
+      ['负数 -1', -1],
+      ['字符串 "abc"', 'abc'],
+      ['null', null],
+      ['Infinity', Number.POSITIVE_INFINITY],
+    ])('schemaVersion 是 %s 时抛错，信息带上收到的值', (_name, version) => {
+      expect(() => migrateGameState({ schemaVersion: version })).toThrow(/schemaVersion/);
+    });
+
+    it('错误信息带上收到的版本值', () => {
+      expect(() => migrateGameState({ schemaVersion: '3' })).toThrow(/"3"/);
+      expect(() => migrateGameState({ schemaVersion: 7.5 })).toThrow(/7\.5/);
+    });
+
+    it('缺省 schemaVersion 的对象仍能走完整条迁移链', () => {
+      const state = migrateGameState({ turnNumber: 2, players: {} });
+      expect(state.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      expect(state.pendingLibra).toBeNull();
+      expect(state.removedFromGame).toEqual([]);
+    });
+  });
+
   it('补齐遗漏字段：旧版本状态迁移后含初始状态的全部顶层字段，且已有字段不被覆盖', () => {
     const fresh = createInitialState({
       playerCount: 4,

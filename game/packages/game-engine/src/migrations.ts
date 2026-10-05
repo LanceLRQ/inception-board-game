@@ -99,10 +99,24 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
   ],
 ]);
 
+// 错误信息里展示收到的值：字符串带引号以区分 '3' 与 3，数组、null 等用 JSON 表示
+function describeValue(value: unknown): string {
+  if (typeof value === 'number') return String(value);
+  const json = JSON.stringify(value);
+  return json === undefined ? String(value) : json;
+}
+
 // 将任意 GameState 迁移到当前版本；版本号高于当前版本的状态无法降级，直接抛错
 export function migrateGameState(raw: Record<string, unknown>): SetupState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(`快照状态必须是普通对象，收到 ${describeValue(raw)}`);
+  }
   let state = { ...raw };
-  let version = (state.schemaVersion as number) ?? 0;
+  const declared: unknown = state.schemaVersion;
+  if (declared !== undefined && !(Number.isInteger(declared) && (declared as number) >= 0)) {
+    throw new Error(`快照 schemaVersion 必须是非负整数，收到 ${describeValue(declared)}`);
+  }
+  let version = (declared as number | undefined) ?? 0;
 
   if (version > CURRENT_SCHEMA_VERSION) {
     throw new Error(`快照版本 ${version} 高于当前版本 ${CURRENT_SCHEMA_VERSION}，无法迁移`);

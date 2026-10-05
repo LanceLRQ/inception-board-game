@@ -140,6 +140,11 @@ export const RESTRICTED_MOVES: ReadonlySet<string> = new Set(
   RIGHTS_RULES.flatMap((rule) => rule.moves),
 );
 
+/** 会挡住其他所有行动的待结算字段（由表里 blocking 为真的行派生，去重） */
+export const BLOCKING_FIELDS: readonly (keyof SetupState)[] = [
+  ...new Set(RIGHTS_RULES.filter((rule) => rule.blocking).map((rule) => rule.field)),
+];
+
 /** 当前所有的等待事项；没有待结算时返回空数组 */
 export function listAwaiting(G: SetupState): Awaiting[] {
   const result: Awaiting[] = [];
