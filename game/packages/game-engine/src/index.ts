@@ -266,3 +266,13 @@ export type {
   DeckView,
   ResponseWindowView,
 } from './engine/matchView.js';
+
+// 联机对局消息协议
+export { MATCH_PROTOCOL_VERSION, parseClientMatchMessage } from './net/matchProtocol.js';
+export type {
+  ClientMatchMessage,
+  ServerMatchMessage,
+  SeatInfo,
+  MatchSnapshotForViewer,
+  MoveRejectCode,
+} from './net/matchProtocol.js';
