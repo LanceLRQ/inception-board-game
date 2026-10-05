@@ -37,12 +37,17 @@ function setActionPhase(state: SetupState): SetupState {
 
 function setBribePool(
   state: SetupState,
-  pool: { id: string; status: 'inPool' | 'dealt' | 'deal' | 'shattered' }[],
+  pool: {
+    id: string;
+    kind?: 'deal' | 'fail';
+    status: 'inPool' | 'dealt' | 'deal' | 'shattered';
+  }[],
 ): SetupState {
   return {
     ...state,
     bribePool: pool.map((b) => ({
       id: b.id,
+      kind: b.kind ?? 'fail',
       status: b.status,
       heldBy: null,
       originalOwnerId: null,
@@ -54,8 +59,8 @@ describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
   it('canImperialPickBribe：合法目标 + inPool 贿赂 → true', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
     s = setBribePool(s, [
-      { id: 'bribe-deal-1', status: 'inPool' },
-      { id: 'bribe-fail-1', status: 'inPool' },
+      { id: 'bribe-deal-1', kind: 'deal', status: 'inPool' },
+      { id: 'bribe-fail-1', kind: 'fail', status: 'inPool' },
     ]);
     expect(canImperialPickBribe(s, 'pM', 'p1', 0)).toBe(true);
     expect(canImperialPickBribe(s, 'pM', 'p1', 1)).toBe(true);
@@ -63,19 +68,19 @@ describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
 
   it('canImperialPickBribe：非皇城梦主 → false', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
-    s = setBribePool(s, [{ id: 'bribe-deal-1', status: 'inPool' }]);
+    s = setBribePool(s, [{ id: 'bribe-deal-1', kind: 'deal', status: 'inPool' }]);
     expect(canImperialPickBribe(s, 'pM', 'p1', 0)).toBe(false);
   });
 
   it('canImperialPickBribe：贿赂已派发 → false', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
-    s = setBribePool(s, [{ id: 'bribe-deal-1', status: 'dealt' }]);
+    s = setBribePool(s, [{ id: 'bribe-deal-1', kind: 'deal', status: 'dealt' }]);
     expect(canImperialPickBribe(s, 'pM', 'p1', 0)).toBe(false);
   });
 
   it('canImperialPickBribe：目标已死 → false', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
-    s = setBribePool(s, [{ id: 'bribe-deal-1', status: 'inPool' }]);
+    s = setBribePool(s, [{ id: 'bribe-deal-1', kind: 'deal', status: 'inPool' }]);
     s = {
       ...s,
       players: {
@@ -90,8 +95,8 @@ describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
     s = setActionPhase(s);
     s = setBribePool(s, [
-      { id: 'bribe-fail-1', status: 'inPool' },
-      { id: 'bribe-deal-1', status: 'inPool' },
+      { id: 'bribe-fail-1', kind: 'fail', status: 'inPool' },
+      { id: 'bribe-deal-1', kind: 'deal', status: 'inPool' },
     ]);
     const r = callMove(s, 'masterDealBribeImperial', ['p1', 1], { currentPlayer: 'pM' });
     expectMoveOk(r);
@@ -104,7 +109,7 @@ describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
   it('move masterDealBribeImperial：派发 fail → 不转阵营', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
     s = setActionPhase(s);
-    s = setBribePool(s, [{ id: 'bribe-fail-1', status: 'inPool' }]);
+    s = setBribePool(s, [{ id: 'bribe-fail-1', kind: 'fail', status: 'inPool' }]);
     const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
     expectMoveOk(r);
     expect(r.players.p1!.faction).toBe('thief');
@@ -114,7 +119,7 @@ describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
   it('move masterDealBribeImperial：非梦主调用 → INVALID', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
     s = setActionPhase(s);
-    s = setBribePool(s, [{ id: 'bribe-deal-1', status: 'inPool' }]);
+    s = setBribePool(s, [{ id: 'bribe-deal-1', kind: 'deal', status: 'inPool' }]);
     const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'p1' });
     expect(r).toBe('INVALID_MOVE');
   });

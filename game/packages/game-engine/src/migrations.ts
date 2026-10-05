@@ -3,7 +3,7 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -94,6 +94,23 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
         lastPlayedCardThisTurn: state.lastPlayedCardThisTurn ?? null,
         lastShootRoll: state.lastShootRoll ?? null,
         removedFromGame: state.removedFromGame ?? [],
+      };
+    },
+  ],
+  // v8 → v9：贿赂牌的成败改存 kind 字段；旧状态按旧标识前缀补上（bribe-deal- 为成功，其余为失败），标识不改
+  [
+    9,
+    (state) => {
+      const pool = state.bribePool;
+      if (!Array.isArray(pool)) return state;
+      return {
+        ...state,
+        bribePool: pool.map((bribe: Record<string, unknown>) => ({
+          ...bribe,
+          kind:
+            bribe.kind ??
+            (typeof bribe.id === 'string' && bribe.id.startsWith('bribe-deal-') ? 'deal' : 'fail'),
+        })),
       };
     },
   ],

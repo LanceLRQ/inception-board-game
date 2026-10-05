@@ -9,8 +9,8 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     dreamMasterID: '4',
     pendingPeekDecision: { peekerID: '1', targetLayer: 3 },
     bribePool: [
-      { id: 'b-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'b-2', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
+      { id: 'b-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'b-2', kind: 'fail', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
     ],
     ...overrides,
   } as unknown as SetupState;
@@ -43,9 +43,9 @@ describe('computeMasterPeekBribeState', () => {
   it('inPoolCount 正确统计', () => {
     const s = makeState({
       bribePool: [
-        { id: 'b-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'b-2', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'b-3', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
+        { id: 'b-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'b-2', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'b-3', kind: 'fail', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
       ],
     });
     expect(computeMasterPeekBribeState(s, '4').inPoolCount).toBe(2);

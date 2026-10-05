@@ -150,9 +150,9 @@ describe('W16-A · 盛夏（dm_midsummer）', () => {
     s = {
       ...s,
       bribePool: [
-        { id: 'b1', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'b2', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'b3', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'b1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'b2', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'b3', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
       ],
     };
     expect(getMidsummerExtraDraws(s)).toBe(3);

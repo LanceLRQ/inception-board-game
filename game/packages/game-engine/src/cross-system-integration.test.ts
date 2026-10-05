@@ -67,12 +67,12 @@ function sceneCrossSystem(): SetupState {
       }),
     },
     bribePool: [
-      { id: 'bribe-deal-0', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'bribe-deal-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'bribe-deal-2', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'bribe-fail-0', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'bribe-fail-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'bribe-fail-2', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-deal-0', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-deal-1', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-deal-2', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-fail-0', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-fail-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-fail-2', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
     ],
     layers: {
       ...base.layers,
@@ -109,7 +109,7 @@ describe('跨系统 · 贿赂 × 阵营切换', () => {
     // 把贿赂池清空 deal，只留 fail
     s = {
       ...s,
-      bribePool: s.bribePool.filter((b) => b.id.startsWith('bribe-fail-')),
+      bribePool: s.bribePool.filter((b) => b.kind === 'fail'),
     };
     const r = callMove(s, 'masterDealBribe', ['p1'], {
       currentPlayer: 'pM',
@@ -279,7 +279,7 @@ describe('跨系统 · 重复贿赂累计', () => {
     // 只留 fail，确保两次都不转阵营
     s = {
       ...s,
-      bribePool: s.bribePool.filter((b) => b.id.startsWith('bribe-fail-')),
+      bribePool: s.bribePool.filter((b) => b.kind === 'fail'),
     };
     const r1 = callMove(s, 'masterDealBribe', ['p1'], {
       currentPlayer: 'pM',

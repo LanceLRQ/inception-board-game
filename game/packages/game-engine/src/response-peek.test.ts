@@ -96,8 +96,8 @@ function sceneBeforePeek(): SetupState {
 /** 给 bribePool 塞 N 张 inPool 贿赂（默认 1 fail + 1 deal） */
 function withStandardBribes(state: SetupState): SetupState {
   return withBribes(state, [
-    { id: 'bribe-fail-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-    { id: 'bribe-deal-1', status: 'inPool', heldBy: null, originalOwnerId: null },
+    { id: 'bribe-fail-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+    { id: 'bribe-deal-1', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
   ]);
 }
 
@@ -190,7 +190,7 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
       const s0 = sceneBeforePeek();
       // 池里只有 dealt 的，没有 inPool
       const s1 = withBribes(s0, [
-        { id: 'bribe-fail-1', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
+        { id: 'bribe-fail-1', kind: 'fail', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
       ]);
       const r = callMove(s1, 'playPeek', [PEEK_CARD, 2], { currentPlayer: 'p1' });
       expect(r).not.toBe('INVALID_MOVE');
@@ -266,8 +266,8 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
       const s1 = callMove(s0, 'playPeek', [PEEK_CARD, 3], { currentPlayer: 'p1' }) as SetupState;
       // 强制把 bribe-fail-1 先改成 dealt，让 shuffle 取到 bribe-deal-1
       const s2 = withBribes(s1, [
-        { id: 'bribe-fail-1', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
-        { id: 'bribe-deal-1', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-fail-1', kind: 'fail', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
+        { id: 'bribe-deal-1', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
       ]);
       const r = callMove(s2, 'masterPeekBribeDecision', [true], { currentPlayer: 'pM' });
       expect(r).not.toBe('INVALID_MOVE');
@@ -439,8 +439,8 @@ describe('OOT-03 · 梦境窥视效果② 梦主查看贿赂牌（F10 red test�
       },
     };
     return withBribes(s, [
-      { id: 'bribe-fail-1', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
-      { id: 'bribe-deal-1', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'bribe-fail-1', kind: 'fail', status: 'dealt', heldBy: 'p2', originalOwnerId: 'p2' },
+      { id: 'bribe-deal-1', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
     ]);
   }
 

@@ -44,12 +44,17 @@ function setLayer(state: SetupState, playerID: string, layer: Layer): SetupState
 
 function setBribePool(
   state: SetupState,
-  pool: { id: string; status: 'inPool' | 'dealt' | 'deal' | 'shattered' }[],
+  pool: {
+    id: string;
+    kind?: 'deal' | 'fail';
+    status: 'inPool' | 'dealt' | 'deal' | 'shattered';
+  }[],
 ): SetupState {
   return {
     ...state,
     bribePool: pool.map((b) => ({
       id: b.id,
+      kind: b.kind ?? 'fail',
       status: b.status,
       heldBy: null,
       originalOwnerId: null,

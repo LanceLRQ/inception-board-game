@@ -811,6 +811,7 @@ function withInPoolBribe(state: SetupState): SetupState {
     bribePool: [
       {
         id: 'bribe-test-0',
+        kind: 'fail',
         status: 'inPool',
         heldBy: null,
         originalOwnerId: null,

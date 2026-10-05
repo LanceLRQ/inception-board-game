@@ -19,27 +19,18 @@ import {
 /**
  * 构建初始贿赂池
  * 对照：docs/manual/03-game-flow.md 贿赂&背叛者
- * MVP 固定 3 DEAL + 3 fail；洗牌由派发时用 BGIO random.Shuffle 处理
+ * 3 张成功 + 3 张失败；先按种子洗乱，再按下标给不透明标识 `bribe-N`，
+ * 这样标识和池内顺序都推不出成败，成败只记在 kind 字段里（由视图过滤掉）
  */
-function buildInitialBribePool(): BribeSetup[] {
-  const out: BribeSetup[] = [];
-  for (let i = 0; i < 3; i++) {
-    out.push({
-      id: `bribe-deal-${i}`,
-      status: 'inPool',
-      heldBy: null,
-      originalOwnerId: null,
-    });
-  }
-  for (let i = 0; i < 3; i++) {
-    out.push({
-      id: `bribe-fail-${i}`,
-      status: 'inPool',
-      heldBy: null,
-      originalOwnerId: null,
-    });
-  }
-  return out;
+function buildInitialBribePool(rngSeed: string): BribeSetup[] {
+  const kinds: BribeSetup['kind'][] = ['deal', 'deal', 'deal', 'fail', 'fail', 'fail'];
+  return seededShuffle(kinds, rngSeed + ':bribe').map((kind, i) => ({
+    id: `bribe-${i}`,
+    kind,
+    status: 'inPool' as const,
+    heldBy: null,
+    originalOwnerId: null,
+  }));
 }
 
 function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] {
@@ -312,6 +303,8 @@ export interface VaultSetup {
 
 export interface BribeSetup {
   id: string;
+  // 成败：唯一的判断依据；标识与池内顺序都不携带成败，对外的视图必须把它过滤掉
+  kind: 'deal' | 'fail';
   status: 'inPool' | 'dealt' | 'deal' | 'shattered';
   heldBy: string | null;
   originalOwnerId: string | null;
@@ -423,7 +416,7 @@ export function createInitialState(options: {
     expansionEnabled: options.expansionEnabled ?? false,
     layers,
     vaults,
-    bribePool: buildInitialBribePool(),
+    bribePool: buildInitialBribePool(rngSeed),
     deck: {
       cards: buildInitialDeck(options.expansionEnabled ?? false, rngSeed),
       discardPile: [],

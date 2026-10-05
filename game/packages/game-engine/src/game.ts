@@ -191,7 +191,7 @@ function applyCoinVaultBribeReward(
   const shuffled = random.Shuffle(poolIdxs);
   const pick = shuffled[0]!;
   const bribe = pick.b;
-  const isDeal = bribe.id.startsWith('bribe-deal-');
+  const isDeal = bribe.kind === 'deal';
   const nextPool = state.bribePool.map((b, i) =>
     i === pick.i
       ? {
@@ -1506,7 +1506,7 @@ export const InceptionCityGame = {
                 const shuffled = random.Shuffle(poolIdxs);
                 const pick = shuffled[0]!;
                 const bribe = pick.b;
-                const isDeal = bribe.id.startsWith('bribe-deal-');
+                const isDeal = bribe.kind === 'deal';
                 const nextPool = G.bribePool.map((b, i) =>
                   i === pick.i
                     ? {
@@ -1611,7 +1611,7 @@ export const InceptionCityGame = {
             const shuffled = random.Shuffle(poolIdxs);
             const pick = shuffled[0]!;
             const bribe = pick.b;
-            const isDeal = bribe.id.startsWith('bribe-deal-');
+            const isDeal = bribe.kind === 'deal';
 
             // 更新贿赂状态：派出 → dealt（命中 DEAL 转 deal）
             const nextPool = G.bribePool.map((b, i) =>
@@ -1655,7 +1655,7 @@ export const InceptionCityGame = {
 
             const target = G.players[targetPlayerID]!;
             const bribe = G.bribePool[poolIndex]!;
-            const isDeal = bribe.id.startsWith('bribe-deal-');
+            const isDeal = bribe.kind === 'deal';
 
             const nextPool = G.bribePool.map((b, i) =>
               i === poolIndex
@@ -3068,7 +3068,7 @@ function applyNightmareEffect(
         const pickIdx = (random.Die(poolIdxs.length) - 1) % poolIdxs.length;
         const pick = poolIdxs[pickIdx]!;
         const bribe = pick.b;
-        const isDeal = bribe.id.startsWith('bribe-deal-');
+        const isDeal = bribe.kind === 'deal';
         const target = s.players[pid]!;
         const nextPool = s.bribePool.map((b, i) =>
           i === pick.i

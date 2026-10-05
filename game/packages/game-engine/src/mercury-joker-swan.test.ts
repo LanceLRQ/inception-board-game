@@ -33,7 +33,8 @@ describe('applyMercuryRouteExtraFailBribe（水星世界观）', () => {
     const r = applyMercuryRouteExtraFailBribe(s, 'dm_mercury_route' as CardID);
     expect(r.bribePool.length).toBe(before + 1);
     const added = r.bribePool[r.bribePool.length - 1]!;
-    expect(added.id.startsWith('bribe-fail-')).toBe(true);
+    expect(added.kind).toBe('fail');
+    expect(added.id).toMatch(/^bribe-\d+$/);
     expect(added.status).toBe('inPool');
     expect(added.heldBy).toBeNull();
     expect(added.originalOwnerId).toBeNull();
@@ -41,11 +42,11 @@ describe('applyMercuryRouteExtraFailBribe（水星世界观）', () => {
 
   it('水星梦主 → fail 计数相对 +1（不影响 deal 计数）', () => {
     const s = scenarioStartOfGame3p();
-    const beforeFail = s.bribePool.filter((b) => b.id.includes('fail')).length;
-    const beforeDeal = s.bribePool.filter((b) => b.id.includes('deal')).length;
+    const beforeFail = s.bribePool.filter((b) => b.kind === 'fail').length;
+    const beforeDeal = s.bribePool.filter((b) => b.kind === 'deal').length;
     const r = applyMercuryRouteExtraFailBribe(s, 'dm_mercury_route' as CardID);
-    const afterFail = r.bribePool.filter((b) => b.id.includes('fail')).length;
-    const afterDeal = r.bribePool.filter((b) => b.id.includes('deal')).length;
+    const afterFail = r.bribePool.filter((b) => b.kind === 'fail').length;
+    const afterDeal = r.bribePool.filter((b) => b.kind === 'deal').length;
     expect(afterFail).toBe(beforeFail + 1);
     expect(afterDeal).toBe(beforeDeal);
   });

@@ -2555,22 +2555,19 @@ export function applyMercuryRouteExtraFailBribe(
   masterCharacterID: CardID | null,
 ): SetupState {
   if (masterCharacterID !== 'dm_mercury_route') return state;
-  // 新 fail 贿赂的编号需要避开既有 `bribe-fail-0..2`
-  const existingFailIds = new Set(
-    state.bribePool.filter((b) => b.id.startsWith('bribe-fail-')).map((b) => b.id),
-  );
-  let newId = 'bribe-fail-mercury';
-  let suffix = 0;
-  while (existingFailIds.has(newId)) {
-    suffix += 1;
-    newId = `bribe-fail-mercury-${suffix}`;
-  }
+  // 新牌的标识沿用不透明的编号：取池里现有最大编号加一
+  const maxIndex = state.bribePool.reduce((max, b) => {
+    const m = /^bribe-(\d+)$/.exec(b.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, -1);
+  const newId = `bribe-${maxIndex + 1}`;
   return {
     ...state,
     bribePool: [
       ...state.bribePool,
       {
         id: newId,
+        kind: 'fail',
         status: 'inPool',
         heldBy: null,
         originalOwnerId: null,

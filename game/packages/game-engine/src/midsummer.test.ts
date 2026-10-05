@@ -68,9 +68,9 @@ describe('盛夏·充盈（梦主多抽=未派发贿赂数）', () => {
         pM: { ...s.players.pM!, hand: [], faction: 'master' },
       },
       bribePool: [
-        { id: 'bribe-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'bribe-2', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'bribe-3', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-2', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-3', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
       ],
     };
     const before = s.players.pM!.hand.length;

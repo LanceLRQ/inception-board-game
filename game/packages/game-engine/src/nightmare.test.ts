@@ -389,7 +389,9 @@ describe('masterActivateNightmare · 回音萦绕', () => {
 describe('masterActivateNightmare · 邪念瘟疫', () => {
   it('未被梦主派发贿赂的当层盗梦者 → 迷失层', () => {
     const s = makeState({
-      bribePool: [{ id: 'bribe-deal-0', status: 'inPool', heldBy: null, originalOwnerId: null }],
+      bribePool: [
+        { id: 'bribe-deal-0', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
+      ],
       layers: {
         ...makeState().layers,
         1: {

@@ -170,6 +170,7 @@ export function cloneState<T>(state: T): T {
 export function withBribes(state: SetupState, bribes: readonly Partial<BribeSetup>[]): SetupState {
   const filled: BribeSetup[] = bribes.map((b, i) => ({
     id: b.id ?? `b-${i}`,
+    kind: b.kind ?? 'fail',
     status: b.status ?? 'inPool',
     heldBy: b.heldBy ?? null,
     originalOwnerId: b.originalOwnerId ?? null,

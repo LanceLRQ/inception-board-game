@@ -683,8 +683,8 @@ describe('回合外响应 · 梦境窥视', () => {
         },
       },
       [
-        { id: 'bribe-fail-1', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'bribe-deal-1', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-fail-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-deal-1', kind: 'deal', status: 'inPool', heldBy: null, originalOwnerId: null },
       ],
     );
     const s = mustApply(load(G), 'p1', 'playPeek', [PEEK, 2]);

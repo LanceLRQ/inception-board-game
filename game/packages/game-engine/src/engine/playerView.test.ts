@@ -30,10 +30,10 @@ function makeState(): SetupState {
       { id: 'v3', layer: 3, contentType: 'coin', isOpened: false, openedBy: null },
     ],
     bribePool: [
-      { id: 'b1', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'b2', status: 'dealt', heldBy: 'T1', originalOwnerId: 'M' },
-      { id: 'b3', status: 'deal', heldBy: 'T2', originalOwnerId: 'M' },
-      { id: 'b4', status: 'shattered', heldBy: 'T3', originalOwnerId: 'M' },
+      { id: 'b1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
+      { id: 'b2', kind: 'fail', status: 'dealt', heldBy: 'T1', originalOwnerId: 'M' },
+      { id: 'b3', kind: 'deal', status: 'deal', heldBy: 'T2', originalOwnerId: 'M' },
+      { id: 'b4', kind: 'deal', status: 'shattered', heldBy: 'T3', originalOwnerId: 'M' },
     ],
     deck: { cards: ['d1', 'd2', 'd3', 'd4'] as CardID[], discardPile: ['x1'] as CardID[] },
   };

@@ -664,7 +664,7 @@ describe('getAvailableActiveSkills · 皇城·重金（已从常驻主动技能�
       baseCtx({
         characterId: 'dm_imperial_city',
         faction: 'master',
-        bribePoolItems: [{ index: 0, id: 'bribe-deal-0' }],
+        bribePoolItems: [{ index: 0, id: 'bribe-0' }],
       }),
     );
     expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);

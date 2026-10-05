@@ -30,9 +30,27 @@ function makePlayer(id: string, faction: 'thief' | 'master', layer: number, aliv
 
 function makeBribePool() {
   return [
-    { id: 'bribe-deal-0', status: 'inPool' as const, heldBy: null, originalOwnerId: null },
-    { id: 'bribe-deal-1', status: 'inPool' as const, heldBy: null, originalOwnerId: null },
-    { id: 'bribe-fail-0', status: 'inPool' as const, heldBy: null, originalOwnerId: null },
+    {
+      id: 'bribe-deal-0',
+      kind: 'deal' as const,
+      status: 'inPool' as const,
+      heldBy: null,
+      originalOwnerId: null,
+    },
+    {
+      id: 'bribe-deal-1',
+      kind: 'deal' as const,
+      status: 'inPool' as const,
+      heldBy: null,
+      originalOwnerId: null,
+    },
+    {
+      id: 'bribe-fail-0',
+      kind: 'fail' as const,
+      status: 'inPool' as const,
+      heldBy: null,
+      originalOwnerId: null,
+    },
   ];
 }
 
