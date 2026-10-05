@@ -111,6 +111,50 @@ export interface GameDef<G> {
    * 钩子必须逐字段显式构造返回值，不能把 G 原样带出去。
    */
   view?(args: { G: G; ctx: RunnerCtx; viewer: string | null }): unknown;
+  /**
+   * 事件描述：对比一步之前与之后的状态，给出这一步产生的领域事件（不含 stateID 与 index，由运行器补上）。
+   * 必须是纯函数；抛异常说明实现有缺陷，运行器不吞。
+   */
+  describe?(args: {
+    before: G;
+    after: G;
+    ctxBefore: RunnerCtx;
+    ctxAfter: RunnerCtx;
+    request: MoveRequest;
+  }): Array<Omit<MatchEvent, 'stateID' | 'index'>>;
+}
+
+/** 一步 move 产生的事件 */
+export interface MatchEvent {
+  /** 产生它的那一步之后的状态版本号 */
+  stateID: number;
+  /** 同一步里的第几条，从 0 起 */
+  index: number;
+  kind: string;
+  /** 触发者；系统产生的为 null */
+  actor: string | null;
+  /** 所有人都能看到的内容 */
+  data: Record<string, unknown>;
+  /** 只给点名玩家看的内容 */
+  secret?: { to: readonly string[]; data: Record<string, unknown> };
+}
+
+/** 把事件裁成某个观察者能看到的样子：不在 secret.to 里的人拿不到 secret */
+export function eventsFor(events: readonly MatchEvent[], viewer: string | null): MatchEvent[] {
+  return events.map((ev) => {
+    // data 与 secret 各拷贝一层，返回值不与入参共享引用
+    const visible: MatchEvent = { ...ev, data: { ...ev.data } };
+    if (ev.secret === undefined) {
+      delete visible.secret;
+      return visible;
+    }
+    if (typeof viewer === 'string' && ev.secret.to.includes(viewer)) {
+      visible.secret = { to: [...ev.secret.to], data: { ...ev.secret.data } };
+    } else {
+      delete visible.secret;
+    }
+    return visible;
+  });
 }
 
 export interface MoveRequest {
@@ -128,7 +172,7 @@ export type RejectReason =
   | 'move_error';
 
 export type MoveOutcome<G> =
-  | { ok: true; state: MatchState<G> }
+  | { ok: true; state: MatchState<G>; events: MatchEvent[] }
   | { ok: false; reason: RejectReason; state: MatchState<G>; error?: unknown };
 
 export interface ApplyMoveOptions {
@@ -373,6 +417,7 @@ const GAME_KEYS = new Set([
   'migrate',
   'validate',
   'view',
+  'describe',
 ]);
 const PHASE_KEYS = new Set(['start', 'next', 'endIf', 'onBegin', 'onEnd', 'turn', 'moves']);
 const TURN_KEYS = new Set(['order', 'onBegin', 'onEnd']);
@@ -543,14 +588,32 @@ export function applyMove<G>(
     nextState = process(game, nextState, [{ kind: 'endTurn', turn: ev.turn, arg: ev.arg }]);
   }
 
-  return {
-    ok: true,
-    state: {
-      ...nextState,
-      rngState: seeded ? seeded.state() : state.rngState,
-      stateID: state.stateID + 1,
-    },
+  const finalState: MatchState<G> = {
+    ...nextState,
+    rngState: seeded ? seeded.state() : state.rngState,
+    stateID: state.stateID + 1,
   };
+  const described =
+    game.describe?.({
+      before: state.G,
+      after: finalState.G,
+      ctxBefore: state.ctx,
+      ctxAfter: finalState.ctx,
+      request,
+    }) ?? [];
+  const events: MatchEvent[] = [
+    {
+      stateID: finalState.stateID,
+      index: 0,
+      kind: 'move',
+      actor: playerID,
+      data: { move },
+      // 参数里可能有手牌之类的私密内容，只给发起者
+      secret: { to: [playerID], data: { args: [...args] } },
+    },
+    ...described.map((ev, i) => ({ ...ev, stateID: finalState.stateID, index: i + 1 })),
+  ];
+  return { ok: true, state: finalState, events };
 }
 
 /** 发给某个观察者的对局状态：视图化后的 G，加上公开的 ctx 与版本号；永远不带随机数状态 */
@@ -582,4 +645,32 @@ export function viewMatch<G>(
   if (state.ctx.gameover !== undefined) ctx.gameover = state.ctx.gameover;
   const G = game.view ? game.view({ G: state.G, ctx: state.ctx, viewer: who }) : state.G;
   return { G, ctx, stateID: state.stateID };
+}
+
+/** 一局对局的完整记录：起始参数加上每个被接受的请求，足以重放出同一个终局 */
+export interface MatchRecord {
+  numPlayers: number;
+  setupData?: Record<string, unknown>;
+  seed: string;
+  moves: MoveRequest[];
+}
+
+/** 从头建局并依次执行记录里的请求；任何一步被拒绝就抛错，信息里带上第几步和原因 */
+export function replayMatch<G>(game: GameDef<G>, record: MatchRecord): MatchState<G> {
+  let state = createMatch(game, {
+    numPlayers: record.numPlayers,
+    setupData: record.setupData,
+    seed: record.seed,
+  });
+  for (let i = 0; i < record.moves.length; i++) {
+    const request = record.moves[i]!;
+    const res = applyMove(game, state, request);
+    if (!res.ok) {
+      throw new Error(
+        `重放失败：第 ${i + 1} 步 ${request.move}（玩家 ${request.playerID}）被拒绝：${res.reason}`,
+      );
+    }
+    state = res.state;
+  }
+  return state;
 }

@@ -129,6 +129,7 @@ import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { denyAction } from './engine/actionRights.js';
 import { viewFor } from './engine/matchView.js';
+import { describeMatchEvents } from './engine/matchEvents.js';
 import { isPlainRecord, isRecordOf, isString, isStringArray } from './engine/argShape.js';
 import {
   openResponseWindow,
@@ -2926,6 +2927,9 @@ export const InceptionCityGame = {
   view({ G, ctx, viewer }) {
     return viewFor(G, viewer, { gameOver: ctx.gameover !== undefined });
   },
+
+  // 事件描述：对比一步前后的状态，推导这一步产生的领域事件
+  describe: describeMatchEvents,
 
   // 恢复快照时把旧版本的对局状态迁移到当前版本
   migrate: (G) => migrateGameState(G as Record<string, unknown>),
