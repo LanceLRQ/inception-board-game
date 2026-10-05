@@ -128,6 +128,7 @@ import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { denyAction } from './engine/actionRights.js';
+import { viewFor } from './engine/matchView.js';
 import { isPlainRecord, isRecordOf, isString, isStringArray } from './engine/argShape.js';
 import {
   openResponseWindow,
@@ -2919,6 +2920,11 @@ export const InceptionCityGame = {
   actionRights({ G, ctx, playerID, move }) {
     if (ctx.phase === 'playing') return denyAction(G, playerID, move) === null;
     return playerID === ctx.currentPlayer;
+  },
+
+  // 视图：服务端发给每个观察者的对局状态，经白名单裁剪；视图只经运行器的 viewMatch 取得
+  view({ G, ctx, viewer }) {
+    return viewFor(G, viewer, { gameOver: ctx.gameover !== undefined });
   },
 
   // 恢复快照时把旧版本的对局状态迁移到当前版本

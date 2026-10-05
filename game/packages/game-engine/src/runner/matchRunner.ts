@@ -105,6 +105,12 @@ export interface GameDef<G> {
    * 只检查运行器和行动权判定依赖的基本形状，不检查规则层面的不变量。
    */
   validate?(G: G): string | null;
+  /**
+   * 视图：把 G 裁剪成某个观察者（玩家 id，或 null 表示旁观者）能看到的样子，用于发给客户端。
+   * 返回值由钩子自己定义形状，运行器原样转交；没有提供时视图就是完整的 G。
+   * 钩子必须逐字段显式构造返回值，不能把 G 原样带出去。
+   */
+  view?(args: { G: G; ctx: RunnerCtx; viewer: string | null }): unknown;
 }
 
 export interface MoveRequest {
@@ -366,6 +372,7 @@ const GAME_KEYS = new Set([
   'actionRights',
   'migrate',
   'validate',
+  'view',
 ]);
 const PHASE_KEYS = new Set(['start', 'next', 'endIf', 'onBegin', 'onEnd', 'turn', 'moves']);
 const TURN_KEYS = new Set(['order', 'onBegin', 'onEnd']);
@@ -544,4 +551,35 @@ export function applyMove<G>(
       stateID: state.stateID + 1,
     },
   };
+}
+
+/** 发给某个观察者的对局状态：视图化后的 G，加上公开的 ctx 与版本号；永远不带随机数状态 */
+export interface MatchViewState {
+  G: unknown;
+  ctx: RunnerCtx;
+  stateID: number;
+}
+
+/**
+ * 取某个观察者看到的对局状态。viewer 是玩家 id，或 null（旁观者）；
+ * 其他取值（例如 undefined）一律按旁观者处理，宁可少给，不会因为传错参数而给出完整状态。
+ * 没有视图钩子时 G 原样返回，所以只有带钩子的 Game 定义才适合对外发送。
+ */
+export function viewMatch<G>(
+  game: GameDef<G>,
+  state: MatchState<G>,
+  viewer: string | null,
+): MatchViewState {
+  const who = typeof viewer === 'string' ? viewer : null;
+  const ctx: RunnerCtx = {
+    numPlayers: state.ctx.numPlayers,
+    playOrder: state.ctx.playOrder.slice(),
+    playOrderPos: state.ctx.playOrderPos,
+    currentPlayer: state.ctx.currentPlayer,
+    phase: state.ctx.phase,
+    turn: state.ctx.turn,
+  };
+  if (state.ctx.gameover !== undefined) ctx.gameover = state.ctx.gameover;
+  const G = game.view ? game.view({ G: state.G, ctx: state.ctx, viewer: who }) : state.G;
+  return { G, ctx, stateID: state.stateID };
 }

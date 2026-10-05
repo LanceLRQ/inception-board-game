@@ -229,6 +229,7 @@ export {
   applyMove,
   matchFromSnapshot,
   assertSupportedGame,
+  viewMatch,
 } from './runner/matchRunner.js';
 export type {
   GameDef,
@@ -245,4 +246,19 @@ export type {
   RejectReason,
   ApplyMoveOptions,
   CreateMatchOptions,
+  MatchViewState,
 } from './runner/matchRunner.js';
+
+// 白名单式对局视图：服务端发给每个观察者的状态
+export { viewFor, FIELD_DISPOSITION } from './engine/matchView.js';
+export type {
+  MatchView,
+  MatchViewOptions,
+  Viewer,
+  PlayerView,
+  LayerView,
+  VaultView,
+  BribeView,
+  DeckView,
+  ResponseWindowView,
+} from './engine/matchView.js';
