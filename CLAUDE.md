@@ -83,7 +83,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ├── game/                           # 产品代码（pnpm monorepo）
 │   ├── packages/
 │   │   ├── shared/                 # 共享类型、卡牌数据、通用规则
-│   │   ├── game-engine/            # 游戏引擎（Boardgame.io Game 定义、moves、技能）
+│   │   ├── game-engine/            # 游戏引擎（对局定义、moves、技能，含对局运行器）
 │   │   ├── bot/                    # AI Bot
 │   │   ├── server/                 # Koa 服务端（REST / WebSocket / Prisma）
 │   │   ├── client/                 # React PWA 客户端
@@ -140,7 +140,7 @@ docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs
 
 | 路径 | 入口 URL | 驱动组件 | 状态源 | 用途 |
 |------|---------|---------|-------|------|
-| **A · 本地真实对局** | `/local` / `?friend=1` | `components/LocalMatchRuntime/index.tsx` | BGIO Worker（`workers/localMatch.worker.ts`）真实 engine | 主战场：人机对战、好友房本地模式 |
+| **A · 本地真实对局** | `/local` / `?friend=1` | `components/LocalMatchRuntime/index.tsx` | 本地 Worker（`workers/localMatch.worker.ts`），由对局运行器驱动真实引擎 | 主战场：人机对战、好友房本地模式 |
 | **B · Mock 调试视图** | `/game/:matchId` 非 friend 模式 | `pages/Game/index.tsx → GameMockView` | `hooks/useMockMatch.ts`（静态 mock） | 开发调试、UI 走查、视角切换（`?as=master` / `?pending=1`） |
 | **C · 旧降级 UI** | 任一路径 + `?legacyUi=1` | `pages/Game/{ThiefBoard,MasterBoard}` | 同上 | 新 UI 上线后的应急降级通道 |
 
@@ -160,7 +160,7 @@ docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs
 
 **LocalMatchRuntime 接入新 UI 的方式：**
 
-- 适配器 `components/LocalMatchRuntime/bgioAdapter.ts` 把 BGIO `G/ctx` 转为 `MockMatchState` 供新 UI 复用
+- 适配器 `components/LocalMatchRuntime/bgioAdapter.ts` 把对局运行器输出的状态（`G` / `ctx`）转为 `MockMatchState` 供新 UI 复用
 - `components/LocalMatchRuntime/RuntimeStage.tsx` 做视口分派（PC → `TableStage` / 移动 → `TurnOrderRail`），仅负责**展示层**
 - LocalMatchRuntime 自己的 Dialog 群（TargetPlayerPickerDialog、ShooterLayerPickerDialog、嫁接/万有引力/棋局易位等）**保留原样**——新 UI 的 `TargetPickerDialog` 仅服务于 Mock 调试路径
 
@@ -170,7 +170,7 @@ docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs
 2. 访问 `/game/debug?as=master`（路径 B）确认 mock 路径生效
 3. 访问任一路径 + `?legacyUi=1`（路径 C）确认降级通道仍可用
 4. PC 1280×800 + 移动 iPhone 12（390×844）两个视口都要走查
-5. 如果改动影响状态结构（`MockMatchState` / BGIO `G`），务必同步更新 `bgioAdapter.ts` + 测试
+5. 如果改动影响状态结构（`MockMatchState` / 对局状态 `G`），务必同步更新 `bgioAdapter.ts` + 测试
 
 **交互硬规范：**
 
