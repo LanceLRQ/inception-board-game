@@ -10,6 +10,7 @@
     "./setup": "./src/setup.ts",
     "./config": "./src/config.ts",
     "./invariants": "./src/invariants.ts",
+    "./runner": "./src/runner/matchRunner.ts",
     "./testing/fixtures": "./src/testing/fixtures.ts",
     "./testing/scenarios": "./src/testing/scenarios.ts"
   },

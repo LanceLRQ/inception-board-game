@@ -221,3 +221,22 @@ export {
   scenarioMasterWin,
   scenarioEmptyState,
 } from './testing/scenarios.js';
+
+// 对局运行器
+export { createMatch, applyMove, matchFromSnapshot } from './runner/matchRunner.js';
+export type {
+  GameDef,
+  PhaseDef,
+  TurnDef,
+  MoveDef,
+  MoveArgs,
+  HookArgs,
+  MatchState,
+  RunnerCtx,
+  RandomSource,
+  MoveRequest,
+  MoveOutcome,
+  RejectReason,
+  ApplyMoveOptions,
+  CreateMatchOptions,
+} from './runner/matchRunner.js';

@@ -131,6 +131,7 @@ import {
   passOnResponse,
 } from './engine/abilities/response-chain.js';
 import type { CardID, Faction, Layer } from '@icgame/shared';
+import type { GameDef } from './runner/matchRunner.js';
 
 export type { SetupState } from './setup.js';
 
@@ -2954,7 +2955,7 @@ export const InceptionCityGame = {
 
     return undefined;
   },
-};
+} satisfies GameDef<SetupState>;
 
 function isAdjacent(from: number, to: number): boolean {
   return Math.abs(from - to) === 1 && from >= 1 && from <= 4 && to >= 1 && to <= 4;
