@@ -244,7 +244,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
 
   // 人类弃牌交互：超过手牌上限（5）时必须选择要弃的牌
   const HAND_LIMIT = 5;
-  const humanHand = (humanPlayer?.hand as string[]) ?? [];
+  const humanHand = useMemo(() => (humanPlayer?.hand as string[]) ?? [], [humanPlayer]);
   const overHand = Math.max(0, humanHand.length - HAND_LIMIT);
   const [selectedDiscard, setSelectedDiscard] = useState<string[]>([]);
 
@@ -506,9 +506,10 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
     });
   }, []);
   // 派生：只保留仍在手牌中且处于 pending 时的选择
-  const effectiveGraftPick = isHumanGraftPending
-    ? graftPick.filter((c) => humanHand.includes(c))
-    : [];
+  const effectiveGraftPick = useMemo(
+    () => (isHumanGraftPending ? graftPick.filter((c) => humanHand.includes(c)) : []),
+    [isHumanGraftPending, graftPick, humanHand],
+  );
 
   // pendingGravity 人类 bonder 驱动池挑选
   const pendingGravity = G?.pendingGravity as

@@ -10,3 +10,7 @@
 .env
 .env.*
 !.env.example
+
+# 部署的本地数据目录
+deploy/dev/local
+deploy/prod/data

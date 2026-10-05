@@ -17,7 +17,11 @@ import {
   type ReputationRecord,
   type ReputationStore,
 } from '../services/ReputationService.js';
-import { ReportService, VALID_REPORT_REASONS } from '../services/ReportService.js';
+import {
+  ReportService,
+  VALID_REPORT_REASONS,
+  type ReportReason,
+} from '../services/ReportService.js';
 import { PrismaReportArchive } from '../services/PrismaReportArchive.js';
 
 const router = new Router();
@@ -81,7 +85,7 @@ router.post('/matches/:id/report', authMiddleware, async (ctx) => {
     matchID,
     reporterID: playerId,
     targetID: body.targetPlayerId,
-    reason: body.reason as ReturnType<typeof parseReason>,
+    reason: body.reason as ReportReason,
     ...(body.description ? { description: body.description } : {}),
   });
 
@@ -103,9 +107,5 @@ router.post('/matches/:id/report', authMiddleware, async (ctx) => {
     targetNewScore: result.targetNewScore,
   };
 });
-
-function parseReason(r: string): 'cheating' | 'afk' | 'abusive' | 'other' {
-  return r as 'cheating' | 'afk' | 'abusive' | 'other';
-}
 
 export { router as reportsRouter };

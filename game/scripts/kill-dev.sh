@@ -8,7 +8,8 @@
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PORTS=(3000 3001 3002 4173 4174 5173 5174 8080 3001)
+# 只列本项目开发服务用到的端口；不要加 80 / 8080 这类常被本机其他服务占用的端口
+PORTS=(3000 3001 3002 3100 3101 4173 4174 5173 5174)
 
 killed=0
 
@@ -24,7 +25,17 @@ for port in "${PORTS[@]}"; do
 done
 
 # 2) 按项目路径兜底（vite / tsx watch / vitest --watch 残留）
-stale=$(pgrep -f "$ROOT" 2>/dev/null | grep -vE "^$$\$|^$PPID\$" || true)
+stale=""
+for pid in $(pgrep -f "$ROOT" 2>/dev/null | grep -vE "^$$\$|^$PPID\$" || true); do
+  # 命令行里带项目路径的不一定是开发服务：镜像构建、容器编排、编辑器都会带，跳过它们
+  cmd=$(ps -o command= -p "$pid" 2>/dev/null || true)
+  case "$cmd" in
+    *docker*|*buildx*|*compose*) continue;;
+  esac
+  case "$cmd" in
+    *node*|*vite*|*tsx*|*vitest*|*turbo*|*pnpm*|*esbuild*) stale="$stale $pid";;
+  esac
+done
 if [ -n "$stale" ]; then
   echo "[kill:dev] 发现项目路径内残留进程："
   # shellcheck disable=SC2086

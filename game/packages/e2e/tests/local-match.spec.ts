@@ -2,7 +2,14 @@
 // 对照：docs/_internal/design/08-security-ai.md §8.5 / docs/_internal/TASKS.md P2 B18
 // 守护：BGIO 回合机制（ctx.currentPlayer ↔ G.currentPlayerID 对齐）与 Bot 自动推进
 
+import type { Page } from '@playwright/test';
 import { test, expect, waitForAppReady } from './fixtures/index.js';
+
+/** 座位标识的前缀：宽屏是围坐布局的座位，窄屏是行动轴上的格子（断点 1024px） */
+function seatPrefix(page: Page): string {
+  const width = page.viewportSize()?.width ?? 1280;
+  return width >= 1024 ? 'player-seat-' : 'rail-slot-';
+}
 
 test.describe('人机对战 LocalMatch', () => {
   test('打开 /local 显示玩家人数选择与开始按钮', async ({ page }) => {
@@ -23,11 +30,12 @@ test.describe('人机对战 LocalMatch', () => {
     // 等待 BGIO 从 setup 走到 playing（turnPhase 进入 draw）
     await expect(page.getByText(/回合\s*[1-9]/)).toBeVisible({ timeout: 15_000 });
     // 3 个 AI 玩家的座位应都可见（"玩家明细"列表默认折叠，不能拿它当可见性依据）
+    const prefix = seatPrefix(page);
     for (const id of ['1', '2', '3']) {
-      await expect(page.getByTestId(`player-seat-${id}`)).toBeVisible();
+      await expect(page.getByTestId(`${prefix}${id}`)).toBeVisible();
     }
     // 座位总数 = 玩家数（含真人自己）
-    await expect(page.locator('[data-testid^="player-seat-"]')).toHaveCount(4);
+    await expect(page.locator(`[data-testid^="${prefix}"]`)).toHaveCount(4);
   });
 
   test('人类玩家手牌随抽牌增加，流程推进到 action 阶段', async ({ page }) => {
@@ -118,9 +126,10 @@ test.describe('人机对战 LocalMatch', () => {
 
     await expect(page.getByText(/回合\s*\d+/)).toBeVisible({ timeout: 10_000 });
     // 5 人局：4 个 AI 座位都应可见
+    const prefix = seatPrefix(page);
     for (const id of ['1', '2', '3', '4']) {
-      await expect(page.getByTestId(`player-seat-${id}`)).toBeVisible();
+      await expect(page.getByTestId(`${prefix}${id}`)).toBeVisible();
     }
-    await expect(page.locator('[data-testid^="player-seat-"]')).toHaveCount(5);
+    await expect(page.locator(`[data-testid^="${prefix}"]`)).toHaveCount(5);
   });
 });

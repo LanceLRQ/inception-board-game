@@ -56,6 +56,7 @@ REDIS_PORT=6379
 POSTGRES_DB=icgame
 POSTGRES_USER=icgame
 POSTGRES_PASSWORD=dryrun_pass_$(date +%s)
+REDIS_PASSWORD=dryrunredis$(date +%s)
 JWT_SECRET=$RAND_JWT
 JWT_EXPIRES_IN=1d
 WS_CORS_ORIGIN=*
@@ -113,7 +114,10 @@ probe_with_timeout() {
 }
 
 probe_with_timeout "postgres pg_isready" "DC exec -T postgres pg_isready -U icgame"
-probe_with_timeout "redis PING" "DC exec -T redis redis-cli ping | grep -q PONG"
+# 密码取自环境变量文件；没配时与 compose 的默认值一致
+REDIS_PASS="$(grep -E '^REDIS_PASSWORD=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+REDIS_PASS="${REDIS_PASS:-icgame_dev}"
+probe_with_timeout "redis PING" "DC exec -T redis redis-cli -a '$REDIS_PASS' --no-auth-warning ping | grep -q PONG"
 # 端口由 .env 指定，默认 3001 / 8080
 API_PORT_VAL="$(grep -E '^API_PORT=' "$ENV_FILE" | cut -d= -f2 || echo 3001)"
 CLIENT_PORT_VAL="$(grep -E '^CLIENT_PORT=' "$ENV_FILE" | cut -d= -f2 || echo 8080)"

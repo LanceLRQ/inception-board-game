@@ -136,5 +136,6 @@ describe('待结算闸门 · 对局', () => {
     // 嫁接确实被打出过，否则这条测试什么也没验证
     expect(playedGraft).toBeGreaterThan(5);
     expect(stalled).toEqual([]);
-  });
+    // 21 局随机对局，单独跑约 3–5 秒；与其他包并行时会超过默认的 5 秒
+  }, 60_000);
 });

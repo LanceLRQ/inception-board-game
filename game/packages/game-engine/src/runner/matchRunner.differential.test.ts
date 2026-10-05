@@ -238,19 +238,24 @@ describe('对局运行器 · 与 boardgame.io 归约器的差分', () => {
 
   const totals = { games: 0, finished: 0, accepted: 0, moveNames: new Set<string>() };
 
-  it.each([4, 5, 6, 7, 8, 9, 10])('%i 人局：随机对局逐步一致', (numPlayers) => {
-    let accepted = 0;
-    for (let seed = 1; seed <= 6; seed++) {
-      const stats = playout(numPlayers, seed * 100 + numPlayers, 400);
-      stats.moveNames.forEach((m) => totals.moveNames.add(m));
-      totals.games++;
-      if (stats.finished) totals.finished++;
-      accepted += stats.accepted;
-    }
-    totals.accepted += accepted;
-    // 生成器要真的在推进对局，否则「一致」没有意义
-    expect(accepted).toBeGreaterThan(200);
-  });
+  it.each([4, 5, 6, 7, 8, 9, 10])(
+    '%i 人局：随机对局逐步一致',
+    (numPlayers) => {
+      let accepted = 0;
+      for (let seed = 1; seed <= 6; seed++) {
+        const stats = playout(numPlayers, seed * 100 + numPlayers, 400);
+        stats.moveNames.forEach((m) => totals.moveNames.add(m));
+        totals.games++;
+        if (stats.finished) totals.finished++;
+        accepted += stats.accepted;
+      }
+      totals.accepted += accepted;
+      // 生成器要真的在推进对局，否则「一致」没有意义
+      expect(accepted).toBeGreaterThan(200);
+      // 每个人数约 1–2 秒；与其他包并行时留足余量
+    },
+    30_000,
+  );
 
   it('随机对局的覆盖面足够：打到终局的局数、接受的 move 数、涉及的 move 种类', () => {
     expect(totals.games).toBe(42);

@@ -9,3 +9,10 @@ dist/
 # Perf baseline outputs (not versioned)
 perf-baseline.json
 perf-web-vitals.json
+
+# 部署：数据目录只保留占位文件
+deploy/dev/local/*
+!deploy/dev/local/.gitkeep
+deploy/prod/data/*
+!deploy/prod/data/.gitkeep
+deploy/prod/.init.lock

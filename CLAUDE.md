@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **盗梦都市（Inception City Online / ICO）** —— 移动端优先的桌游《盗梦都市》在线多人复刻，PWA、匿名身份、支持私有部署。
 
-- 玩家人数：3-10（默认 5-8，4 人有变体规则）
+- 玩家人数：原版 3-10；本项目目前支持 4-10（默认 5-8，4 人有变体规则），3 人局尚未支持
 - 核心冲突：1 梦主 vs 多盗梦者（隐藏信息 + 非对称对抗）
 - 当前阶段：**核心玩法与大部分角色已实装，可本地人机对战，也可通过好友房进行服务端权威的联机对局**（详见下方「实现现状」）
 
@@ -30,20 +30,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 不得硬编码云厂商 SDK；域名/路径/密钥全部走环境变量
 - `docker-compose up` 必须能在 1 台 2vCPU/1GB 机器上跑起来
 
-## 技术栈（版本锁定）
+## 技术栈
+
+> 版本为实际安装的主版本，以各包 `package.json` 为准。
 
 | 层次 | 技术 | 版本 |
 |------|------|------|
-| 语言 | TypeScript | 5.x |
-| 游戏引擎 | Boardgame.io | 0.50.x |
-| 前端 | React + Vite | 18 / 5 |
-| PWA | vite-plugin-pwa + Workbox | latest |
-| 本地 AI | Web Worker + Comlink | latest |
-| UI 状态 | Zustand | 4.x |
-| 数据请求 | TanStack Query | 5.x |
-| UI 组件 | Tailwind + shadcn/ui + Framer Motion | latest |
-| 后端 | Node.js + Koa + TypeScript | 20+ |
-| 持久化 | PostgreSQL 16 + Redis 7 | - |
+| 语言与工具链 | TypeScript · Node.js · pnpm · Turborepo | 5.9 · ≥ 20 · 10 · 2 |
+| 游戏引擎 | 自建对局运行器（`game-engine/src/runner/`） | - |
+| 引擎对照 | boardgame.io（仅开发依赖，供差分测试对照，不进运行路径） | 0.50 |
+| 前端 | React · Vite · React Router | 19 · 8 · 7 |
+| PWA | vite-plugin-pwa（Workbox） | 1.x |
+| 本地 AI | Web Worker + Comlink | 4 |
+| UI 状态 | Zustand | 5 |
+| 数据请求 | TanStack Query | 5 |
+| UI 组件 | Tailwind · shadcn/ui · Framer Motion · lucide-react | 4 · - · 12 · 1.x |
+| 国际化 | i18next | 26 |
+| 后端 | Koa · socket.io · pino · zod | 3 · 4 · 10 · 4 |
+| 持久化 | PostgreSQL（Prisma）· Redis（ioredis） | 16（7）· 7（5） |
+| 测试 | Vitest · Playwright | 4 · 1.59 |
 
 ## 实现现状
 
@@ -97,8 +102,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 │   │   ├── server/                 # Koa 服务端（REST / WebSocket / Prisma）
 │   │   ├── client/                 # React PWA 客户端
 │   │   └── e2e/                    # Playwright 端到端测试
-│   ├── docker/                     # Dockerfile 与 Compose
-│   └── scripts/                    # 工程脚本
+│   ├── deploy/                     # 部署：dev（本机依赖）与 prod（Dockerfile / Compose / nginx）
+│   └── scripts/                    # 工程脚本（含 dev.sh / prod.sh 环境管理脚本）
 └── experimental_demo/              # 早期技术验证原型（独立子项目）
 ```
 
@@ -109,7 +114,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 pnpm install                          # 安装依赖
 pnpm dev                              # 启动全部开发服务（服务端 + 客户端）
-pnpm test                             # 全部包的测试（含 E2E 包，需先装好 Playwright 浏览器）
+pnpm test                             # 全部包的单元测试（不含端到端）
+pnpm test:e2e                         # 端到端测试（需先装好 Playwright 浏览器）
 pnpm --filter @icgame/server test     # 只跑某个包的单元测试
 pnpm --filter @icgame/e2e test:online # 双浏览器联机端到端（全内存服务端，需本机装有 Chrome）
 pnpm typecheck                        # 类型检查
@@ -117,7 +123,8 @@ pnpm lint                             # ESLint
 pnpm build                            # 构建
 pnpm copyright:check                  # 扫描对外产物中的内部术语 / 版权合规
 
-docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs/ops/
+./scripts/dev.sh up                   # 本机开发：启动开发用 Postgres / Redis
+./scripts/prod.sh init && ./scripts/prod.sh build && ./scripts/prod.sh start   # 私有部署，详见 docs/ops/
 ```
 
 ## 术语统一（代码 + 文档必须一致）

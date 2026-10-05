@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-typecheck:
@@ -23,7 +27,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: game/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # 数据库客户端是生成物，不入库；类型检查与测试都依赖它
+      - run: pnpm --filter @icgame/server exec prisma generate
       - run: pnpm turbo lint typecheck
+      - run: pnpm copyright:check
 
   unit-test:
     runs-on: ubuntu-latest
@@ -41,13 +48,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: game/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo test -- --coverage
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: game/coverage/
-          retention-days: 7
+      - run: pnpm --filter @icgame/server exec prisma generate
+      - run: pnpm test
+      - run: pnpm --filter @icgame/bot regression
 
   e2e-desktop:
     runs-on: ubuntu-latest
@@ -66,9 +69,12 @@ jobs:
           cache-dependency-path: game/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: game
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @icgame/server exec prisma generate
         working-directory: game
+      - run: pnpm exec playwright install --with-deps chromium chrome
       - run: pnpm test --project=desktop-chrome
+      # 两个浏览器联机打完一局（全内存服务端，不需要数据库）
+      - run: pnpm test:online
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -94,8 +100,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: game
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test --project=mobile-android
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-mobile-traces
+          path: game/packages/e2e/test-results/
+          retention-days: 3
+
+  # iOS Safari 用的是 WebKit 内核；这组用例还没有在 WebKit 上跑通过，先不阻塞合并
+  e2e-mobile-webkit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: game/packages/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: game/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
         working-directory: game
-      - run: pnpm test --project=mobile-ios --project=mobile-android
+      - run: pnpm exec playwright install --with-deps webkit
+      - run: pnpm test --project=mobile-ios
 
   security:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 # MVP 性能基线报告
 
-> 目标：在进入 Phase 3 前锁定一组可对比的性能基线，作为后续回归告警的阈值。
+> 目标：在角色系统开发前锁定一组可对比的性能基线，作为后续回归告警的阈值。
 >
 > 每次 CI 对比该文件记录的历史值，偏移 > 30% 触发 review。
 
@@ -68,6 +68,6 @@ pnpm --filter @icgame/e2e test:offline
 
 ## 后续规划
 
-- Phase 3 前：接入真实 engine move 后重跑基线并更新本文件
-- Phase 4：引入 Lighthouse CI + Web Vitals 实时上报（前端 `web-vitals` 库），区分 lab / field
-- Phase 5：真机 + 弱网（iPhone 12 / 小米 10 / 4G）补一组外场基线
+- 近期：接入真实 engine move 后重跑基线并更新本文件
+- 之后：引入 Lighthouse CI + Web Vitals 实时上报（前端 `web-vitals` 库），区分 lab / field
+- 更后：真机 + 弱网（iPhone 12 / 小米 10 / 4G）补一组外场基线

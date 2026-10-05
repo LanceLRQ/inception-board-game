@@ -11,12 +11,12 @@
 
 ## 项目特性 · Features
 
-- 🎮 51 个基础角色（36 盗梦者 + 15 梦主）+ 6 梦魇 + 20 行动牌
+- 🎮 53 个角色（38 盗梦者 + 15 梦主）+ 6 梦魇 + 20 种行动牌，支持 4-10 人
 - 📱 移动端优先设计（PWA、竖屏、单手触达）
 - 🤖 人机模式（纯本地运行，零服务器流量）
 - 👥 好友房联机对局（6 位房间码，空位可补 Bot，服务端权威判定）
 - 🔐 匿名身份（localStorage JWT + 跨设备恢复码）
-- 🌐 Node.js + React + Boardgame.io 技术栈
+- 🌐 TypeScript 全栈：React 19 + Vite 前端，Koa + socket.io 后端，自建对局运行器
 
 ## 游戏说明 · Game Manual
 
@@ -38,47 +38,37 @@
 | CPU | 1 vCPU | 2 vCPU |
 | 内存 | 512 MB | 1 GB |
 | 磁盘 | 2 GB | 10 GB |
-| Node.js | ≥ 20.x | 22.x LTS |
-| PostgreSQL | ≥ 14 | 16 |
-| Redis | ≥ 6 | 7 |
+| Docker | 24+（含 Compose v2） | - |
 
-### Docker Compose 一键部署（推荐）
+PostgreSQL 16 与 Redis 7 由 Compose 一并启动，不需要另行安装。
+
+### Docker Compose 部署（推荐）
 
 ```bash
 git clone https://github.com/<owner>/inception-board-game.git
-cd inception-board-game
-cp .env.example .env     # 修改必要的环境变量
-docker-compose up -d
-# 默认 http://localhost:3000
+cd inception-board-game/game
+./scripts/prod.sh init     # 复制 .env 并生成 JWT_SECRET、POSTGRES_PASSWORD、REDIS_PASSWORD
+./scripts/prod.sh build    # 构建后端与前端镜像（首次约需十分钟）
+./scripts/prod.sh start    # 启动 Postgres、Redis、后端与前端
+./scripts/prod.sh health   # 逐项探活
+# 默认 http://localhost/ （前端端口 80，可用 CLIENT_PORT 修改）
 ```
 
 ### 关键环境变量
 
 ```bash
-# 基础
-BASE_URL=https://your-domain.com        # 短链和分享链接的根域名
-PORT=3000
-NODE_ENV=production
-
-# 数据库
-DATABASE_URL=postgres://user:pass@localhost:5432/inception
-REDIS_URL=redis://localhost:6379
-
-# 身份安全
-JWT_SECRET=<随机 64 字符>
-RECOVERY_CODE_SALT=<随机 32 字符>
-
-# 可选功能开关
-ENABLE_ANALYTICS=false                   # Plausible 埋点，私有部署默认关
-ENABLE_AI_LOCAL_UPLOAD=true              # 人机模式上传战绩
-ENABLE_REPORT=true                       # 举报功能
+JWT_SECRET=<随机 32 字节以上>            # 必填，留空时由 prod.sh init 生成
+POSTGRES_PASSWORD=<强密码>               # 必填，留空时由 prod.sh init 生成
+REDIS_PASSWORD=<强密码，只用字母和数字>   # 必填，留空时由 prod.sh init 生成
+WS_CORS_ORIGIN=https://your-domain.com   # 允许访问后端的页面来源，生产不要用 *
+CLIENT_PORT=80                           # 前端对外端口
 ```
+
+完整的变量说明、排障与安全清单见 [`docs/ops/docker-deploy.md`](./docs/ops/docker-deploy.md)。
 
 ### 自托管不等于商业部署
 
 即便你私有部署，依然受本项目版权条款约束：**禁止任何商业化使用**（付费、广告、订阅等）。
-
-详细部署文档：`docs/DEPLOYMENT.md`（后续补齐）
 
 ## 贡献 · Contributing
 
@@ -130,7 +120,7 @@ This project uses a **dual licensing structure** separating code from game asset
 
 因为代码和素材是**两种不同的版权客体**：
 
-- 代码选择 MIT 是为了最大化开源友好，方便开发者学习 Boardgame.io / 匿名身份 / PWA 等技术实现
+- 代码选择 MIT 是为了最大化开源友好，方便开发者学习服务端权威对局 / 匿名身份 / PWA 等技术实现
 - 真正阻止商业化的是**原桌游素材版权**——任何人想商用本项目完整形态，都必须先获得原桌游发行商（广州千骐动漫有限公司）的商业授权（本项目不提供这种授权）
 - 如果你想基于本项目代码做**完全自研素材**的衍生作品（自己的卡牌/美术/规则），那代码 MIT 允许你这么做
 
@@ -162,7 +152,7 @@ All **card artwork, card text, game rules, naming conventions, and worldview des
 
 Code and game assets are **two distinct copyright subjects**:
 
-- MIT on the code maximizes open-source friendliness — developers can learn from the Boardgame.io, anonymous-identity, or PWA implementation.
+- MIT on the code maximizes open-source friendliness — developers can learn from the server-authoritative match, anonymous-identity, or PWA implementation.
 - The real barrier to commercialization is the **original board game's asset copyright** — anyone wanting to monetize the complete project must first obtain commercial licensing from the original publisher (Guangzhou Qianqi Animation Co., Ltd.); this project does not grant such rights.
 - You are welcome to build derivative works with **fully original assets** (your own cards, art, rules) on top of this codebase — MIT permits this.
 
