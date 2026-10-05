@@ -7,7 +7,7 @@ import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
 import { makeTestRng, pickLegalMove } from '@icgame/game-engine/testing/moveFuzzer';
-import { nextAutoAction, RESPONSE_MOVES } from './autoAction.js';
+import { nextAutoAction } from './autoAction.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -63,7 +63,7 @@ function playMixed(numPlayers: number, seed: string): MixedResult {
   while (result.steps < MAX_STEPS && state.ctx.gameover === undefined) {
     const action = nextAutoAction(state, { humanPlayerIDs: [HUMAN] });
     if (action !== null) {
-      const outcome = applyMove(game, state, action, { responseMoves: RESPONSE_MOVES });
+      const outcome = applyMove(game, state, action);
       if (!outcome.ok) {
         result.rejected.push({
           step: result.steps,
@@ -80,12 +80,9 @@ function playMixed(numPlayers: number, seed: string): MixedResult {
       continue;
     }
 
-    // 在等真人：由随机 move 生成器替他选一步
-    const humanMove = pickLegalMove(game, state, rnd);
-    const outcome =
-      humanMove === null
-        ? null
-        : applyMove(game, state, humanMove, { responseMoves: RESPONSE_MOVES });
+    // 在等真人：由随机 move 生成器替他选一步，发起者限定为真人
+    const humanMove = pickLegalMove(game, state, rnd, { actors: [HUMAN] });
+    const outcome = humanMove === null ? null : applyMove(game, state, humanMove);
     if (outcome === null || !outcome.ok) {
       result.stalled = {
         pendingFields: pendingFieldsOf(state.G),

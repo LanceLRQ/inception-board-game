@@ -1,4 +1,7 @@
-// 待结算闸门
+// 待结算闸门与行动权校验
+//
+// 约定：对局阶段的 move 本体里，ctx.currentPlayer 表示「发起这个 move 的人」；
+// 回合主人看 G.currentPlayerID。包装层按行动权表校验发起者，通过后把发起者写进 ctx.currentPlayer 再调原函数。
 //
 // 打出【嫁接】【万有引力】【解封】等牌，或触发需要他人响应的技能之后，对局进入「待结算」状态。
 // 这期间只能做结算它的那几个 move；否则玩家可以继续出牌把手牌耗尽，结算条件无法满足，对局卡死。
@@ -6,6 +9,7 @@
 
 import type { SetupState } from '../setup.js';
 import { INVALID_MOVE } from './invalidMove.js';
+import { denyAction } from './actionRights.js';
 
 /**
  * 每种待结算状态放行的 move。字段有值即视为待结算。
@@ -54,16 +58,26 @@ interface GatedMove {
   move: (...args: never[]) => unknown;
 }
 
+interface GateContext {
+  G: SetupState;
+  ctx: { currentPlayer: string };
+  playerID?: string;
+}
+
 /**
- * 给一组 move 套上闸门：被挡住时直接返回非法，不进入 move 本身。
+ * 给一组 move 套上行动权校验：发起者此刻没有行动权时直接返回非法，不进入 move 本身。
+ * 发起者取上下文里的 playerID；直接手写上下文调用、没有 playerID 时退回 ctx.currentPlayer。
  * 原函数挂在包装函数的 unwrapped 属性上，供测试工具读取形参。
  */
 export function withSettleGate<M extends Record<string, GatedMove>>(moves: M): M {
   const gatedMoves: Record<string, GatedMove> = {};
   for (const [name, def] of Object.entries(moves)) {
-    const original = def.move as (ctx: { G: SetupState }, ...rest: unknown[]) => unknown;
-    const gated = (ctx: { G: SetupState }, ...rest: unknown[]): unknown =>
-      blockedByPending(ctx.G, name) === null ? original(ctx, ...rest) : INVALID_MOVE;
+    const original = def.move as (ctx: GateContext, ...rest: unknown[]) => unknown;
+    const gated = (context: GateContext, ...rest: unknown[]): unknown => {
+      const actor = context.playerID ?? context.ctx.currentPlayer;
+      if (denyAction(context.G, actor, name) !== null) return INVALID_MOVE;
+      return original({ ...context, ctx: { ...context.ctx, currentPlayer: actor } }, ...rest);
+    };
     Object.defineProperty(gated, 'unwrapped', { value: original });
     gatedMoves[name] = { ...def, move: gated as never };
   }

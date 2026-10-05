@@ -89,6 +89,12 @@ export interface GameDef<G> {
   setup(args: { ctx: { numPlayers: number } }, setupData?: Record<string, unknown>): G;
   phases: Record<string, PhaseDef<G>>;
   endIf?(args: HookArgs<G>): unknown;
+  /**
+   * 行动权：发起者 playerID 此刻能不能发 move。
+   * 没有提供时只有回合主人（ctx.currentPlayer）可以行动。
+   * 发起者不在 ctx.playOrder 里时运行器直接拒绝，不会问这个钩子。
+   */
+  actionRights?(args: { G: G; ctx: RunnerCtx; playerID: string; move: string }): boolean;
 }
 
 export interface MoveRequest {
@@ -113,9 +119,8 @@ export interface ApplyMoveOptions {
   /** 覆盖随机源（测试用）。提供后不读也不写 state.rngState */
   random?: RandomSource;
   /**
-   * 响应类 move：允许非回合主人发起。
-   * 现有引擎的响应类守卫写的是「ctx.currentPlayer 必须是响应者」，
-   * 所以对这些 move，运行器把发起者作为 ctx.currentPlayer 传进去；回合归属本身不变。
+   * 已不再起作用：回合外谁能发 move 由 Game 定义的 actionRights 决定。
+   * 仅为兼容既有调用方暂时保留，即将移除。
    */
   responseMoves?: ReadonlySet<string>;
 }
@@ -353,6 +358,7 @@ const GAME_KEYS = new Set([
   'setup',
   'phases',
   'endIf',
+  'actionRights',
 ]);
 const PHASE_KEYS = new Set(['start', 'next', 'endIf', 'onBegin', 'onEnd', 'turn', 'moves']);
 const TURN_KEYS = new Set(['order', 'onBegin', 'onEnd']);
@@ -466,23 +472,23 @@ export function applyMove<G>(
   if (!def) return { ok: false, reason: 'unknown_move', state };
   if (state.ctx.gameover !== undefined) return { ok: false, reason: 'game_over', state };
 
-  const isResponse = options.responseMoves?.has(move) === true;
-  if (!isResponse && playerID !== state.ctx.currentPlayer) {
-    return { ok: false, reason: 'not_active', state };
-  }
+  if (!state.ctx.playOrder.includes(playerID)) return { ok: false, reason: 'not_active', state };
+  const allowed = game.actionRights
+    ? game.actionRights({ G: state.G, ctx: state.ctx, playerID, move })
+    : playerID === state.ctx.currentPlayer;
+  if (!allowed) return { ok: false, reason: 'not_active', state };
 
   const seeded = options.random ? null : seededRandom(state.rngState);
   const random = options.random ?? seeded!.source;
 
   const pendingEvents: { turn: number; arg?: { next?: string } }[] = [];
-  const moveCtx = isResponse ? { ...state.ctx, currentPlayer: playerID } : state.ctx;
   const fn = def.move as (a: MoveArgs<G>, ...rest: unknown[]) => G | typeof INVALID_MOVE | void;
   let result: G | typeof INVALID_MOVE | void;
   try {
     result = fn(
       {
         G: state.G,
-        ctx: moveCtx,
+        ctx: state.ctx,
         playerID,
         random,
         events: {

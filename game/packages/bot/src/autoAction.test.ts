@@ -67,15 +67,13 @@ describe('nextAutoAction · 判定顺序', () => {
         },
       });
 
-    it('第一个未响应的响应者是 Bot：回合主人代发 passResponse', () => {
+    it('第一个未响应的响应者是 Bot：响应者本人发 passResponse，运行器接受', () => {
       const s = playingState();
       const [a, b] = othersOf(s, 2) as [string, string];
-      const action = nextAutoAction(makeWindow(s, [a, b], [a]), NO_HUMAN);
-      expect(action).toMatchObject({
-        playerID: s.ctx.currentPlayer,
-        move: 'passResponse',
-        args: [b],
-      });
+      const pending = makeWindow(s, [a, b], [a]);
+      const action = nextAutoAction(pending, NO_HUMAN);
+      expect(action).toMatchObject({ playerID: b, move: 'passResponse', args: [b] });
+      expect(applyMove(game, pending, action!).ok).toBe(true);
     });
 
     it('第一个未响应的响应者是真人：返回 null', () => {
@@ -86,15 +84,17 @@ describe('nextAutoAction · 判定顺序', () => {
   });
 
   describe('4. 梦境窥视的梦主决策', () => {
-    it('梦主是 Bot：回合主人代发 masterPeekBribeDecision(false)', () => {
+    it('梦主是 Bot：梦主本人发 masterPeekBribeDecision(false)，运行器接受', () => {
       const s = playingState();
       const peeker = othersOf(s, 1)[0]!;
       const pending = withG(s, { pendingPeekDecision: { peekerID: peeker, targetLayer: 1 } });
-      expect(nextAutoAction(pending, NO_HUMAN)).toMatchObject({
-        playerID: s.ctx.currentPlayer,
+      const action = nextAutoAction(pending, NO_HUMAN);
+      expect(action).toMatchObject({
+        playerID: s.G.dreamMasterID,
         move: 'masterPeekBribeDecision',
         args: [false],
       });
+      expect(applyMove(game, pending, action!).ok).toBe(true);
     });
 
     it('梦主是真人：返回 null', () => {
@@ -106,17 +106,15 @@ describe('nextAutoAction · 判定顺序', () => {
   });
 
   describe('5. 窥视结果确认', () => {
-    it('看牌者是 Bot：回合主人代发 peekerAcknowledge', () => {
+    it('看牌者是 Bot：看牌者本人发 peekerAcknowledge，运行器接受', () => {
       const s = playingState();
       const peeker = othersOf(s, 1)[0]!;
       const pending = withG(s, {
         peekReveal: { peekerID: peeker, revealKind: 'vault', vaultLayer: 1 },
       });
-      expect(nextAutoAction(pending, NO_HUMAN)).toMatchObject({
-        playerID: s.ctx.currentPlayer,
-        move: 'peekerAcknowledge',
-        args: [],
-      });
+      const action = nextAutoAction(pending, NO_HUMAN);
+      expect(action).toMatchObject({ playerID: peeker, move: 'peekerAcknowledge', args: [] });
+      expect(applyMove(game, pending, action!).ok).toBe(true);
     });
 
     it('看牌者是真人：返回 null', () => {
@@ -140,22 +138,25 @@ describe('nextAutoAction · 判定顺序', () => {
       });
     }
 
-    it('还没分牌：回合主人代 target 发 resolveLibraSplit，两堆合起来正好是 target 的手牌', () => {
+    it('还没分牌：target 本人发 resolveLibraSplit，两堆合起来正好是 target 的手牌', () => {
       const s = libraState(null);
       const action = nextAutoAction(s, NO_HUMAN);
-      expect(action?.playerID).toBe(s.ctx.currentPlayer);
+      expect(action?.playerID).toBe(s.G.pendingLibra!.targetPlayerID);
       expect(action?.move).toBe('resolveLibraSplit');
+      expect(applyMove(game, s, action!).ok).toBe(true);
       const [pile1, pile2] = action!.args as [string[], string[]];
       expect([...pile1, ...pile2].sort()).toEqual(['a', 'b', 'c']);
     });
 
-    it('已分牌：回合主人代 bonder 发 resolveLibraPick，选张数多的一堆', () => {
+    it('已分牌：bonder 本人发 resolveLibraPick，选张数多的一堆', () => {
       const s = libraState({ pile1: ['a'], pile2: ['b', 'c'] });
-      expect(nextAutoAction(s, NO_HUMAN)).toMatchObject({
-        playerID: s.ctx.currentPlayer,
+      const action = nextAutoAction(s, NO_HUMAN);
+      expect(action).toMatchObject({
+        playerID: s.G.pendingLibra!.bonderPlayerID,
         move: 'resolveLibraPick',
         args: ['pile2'],
       });
+      expect(applyMove(game, s, action!).ok).toBe(true);
     });
 
     it('引擎对天秤两步都不核对发起者，所以真人参与时也由回合主人代发（单机没有分牌界面）', () => {
@@ -229,7 +230,7 @@ describe('nextAutoAction · 判定顺序', () => {
         const s = shootResponseState(responseType);
         const action = nextAutoAction(s, NO_HUMAN)!;
         expect(RESPONSE_MOVES.has(action.move)).toBe(true);
-        const res = applyMove(game, s, action, { responseMoves: RESPONSE_MOVES });
+        const res = applyMove(game, s, action);
         expect(res.ok).toBe(true);
         if (res.ok) expect(res.state.G.pendingShootResponse).toBeNull();
       }
@@ -273,7 +274,7 @@ describe('nextAutoAction · 判定顺序', () => {
       });
       const action = nextAutoAction(s, { humanPlayerIDs: [human] });
       expect(action).not.toBeNull();
-      const res = applyMove(game, s, action!, { responseMoves: RESPONSE_MOVES });
+      const res = applyMove(game, s, action!);
       expect(res.ok).toBe(true);
       if (res.ok) expect(res.state.G.pendingVirgoChoice).toBeNull();
     });
@@ -282,7 +283,7 @@ describe('nextAutoAction · 判定顺序', () => {
       const s = virgoState();
       const action = nextAutoAction(s, NO_HUMAN)!;
       expect(RESPONSE_MOVES.has(action.move)).toBe(true);
-      const res = applyMove(game, s, action, { responseMoves: RESPONSE_MOVES });
+      const res = applyMove(game, s, action);
       expect(res.ok).toBe(true);
       if (res.ok) expect(res.state.G.pendingVirgoChoice).toBeNull();
     });

@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
+import { listAwaiting } from '../engine/actionRights.js';
 import { applyMove, createMatch, type GameDef } from './matchRunner.js';
 import { makeTestRng, pickLegalMove } from './moveFuzzer.js';
 
@@ -51,11 +52,16 @@ describe('对局运行器 · 畸形参数', () => {
         for (let step = 0; step < 300 && s.ctx.gameover === undefined; step++) {
           if (step % 3 === 0) {
             statesChecked++;
-            for (const move of moveNames) {
-              for (const args of MALFORMED) {
-                const res = applyMove(game, s, { playerID: s.ctx.currentPlayer, move, args });
-                if (!res.ok && res.reason === 'move_error' && !offenders.has(move)) {
-                  offenders.set(move, `${JSON.stringify(args)} → ${String(res.error)}`);
+            // 回合主人，加上此刻被等待结算的人：结算类 move 只有后者才进得了 move 本体
+            const actors = new Set([s.ctx.currentPlayer]);
+            for (const entry of listAwaiting(s.G)) entry.actors.forEach((id) => actors.add(id));
+            for (const playerID of actors) {
+              for (const move of moveNames) {
+                for (const args of MALFORMED) {
+                  const res = applyMove(game, s, { playerID, move, args });
+                  if (!res.ok && res.reason === 'move_error' && !offenders.has(move)) {
+                    offenders.set(move, `${JSON.stringify(args)} → ${String(res.error)}`);
+                  }
                 }
               }
             }

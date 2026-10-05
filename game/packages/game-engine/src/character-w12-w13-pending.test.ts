@@ -77,20 +77,15 @@ describe('天秤 · 平衡（三阶段 pendingLibra）', () => {
     expect(bad).toBe('INVALID_MOVE');
   });
 
-  // R23：engine 放宽 ctx.currentPlayer guard（单机模式 worker 代发）；
-  // split 合法性仍由 libraValidateSplit 守护，参与方由 pendingLibra 身份守护。
-  it('step 2 放宽：任一参与方可代发合法 split（R23 单机简化）', () => {
+  // 分牌权在被要求分牌的目标手里：发动者（bonder）代发会被行动权表拒绝，
+  // 目标本人发合法 split 才通过；split 合法性仍由 libraValidateSplit 守护。
+  it('step 2 行动权：发动者不能代发 split，目标本人可以', () => {
     const s = setupLibraScenario();
     const r1 = callMove(s, 'playLibraBalance', ['p2']);
     expectMoveOk(r1);
-    // bonder (p1) 代发合法 split：现在接受
-    const r2 = callMove(
-      r1,
-      'resolveLibraSplit',
-      [['action_kick'] as CardID[], ['action_unlock', 'action_creation'] as CardID[]],
-      { currentPlayer: 'p1' },
-    );
-    expectMoveOk(r2);
+    const split = [['action_kick'] as CardID[], ['action_unlock', 'action_creation'] as CardID[]];
+    expect(callMove(r1, 'resolveLibraSplit', split, { currentPlayer: 'p1' })).toBe('INVALID_MOVE');
+    expectMoveOk(callMove(r1, 'resolveLibraSplit', split, { currentPlayer: 'p2' }));
   });
 
   it('step 3：resolveLibraPick bonder 选 pile1 → 拿 pile1，target 留 pile2', () => {

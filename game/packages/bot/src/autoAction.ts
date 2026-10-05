@@ -23,8 +23,8 @@ export interface AutoActionOptions {
 }
 
 /**
- * 允许回合主人以外的玩家发起的 move，交给运行器的 responseMoves。
- * 这些 move 的引擎守卫要求「当前玩家等于被响应的那个人」，而挂起时回合主人是发动者。
+ * 旧的「允许回合主人以外的玩家发起」名单。运行器现在按行动权表放行，这份名单已不再起作用，
+ * 仅为兼容既有调用方暂时保留，即将移除。
  */
 export const RESPONSE_MOVES: ReadonlySet<string> = new Set([
   'respondShootPass',
@@ -49,14 +49,14 @@ export function nextAutoAction(
     return { playerID: owner, move: 'completeSetup', args: [], why: '完成布置，进入对局' };
   }
 
-  // 响应窗口：取第一个还没响应的响应者；Bot 一律放弃响应，由回合主人代发
+  // 响应窗口：取第一个还没响应的响应者；Bot 一律放弃响应，由响应者本人发
   const window = G.pendingResponseWindow;
   if (window) {
     const next = window.responders.find((id) => !window.responded.includes(id));
     if (next !== undefined) {
       if (isHuman(next)) return null;
       return {
-        playerID: owner,
+        playerID: next,
         move: 'passResponse',
         args: [next],
         why: `响应者 ${next} 放弃响应`,
@@ -68,7 +68,7 @@ export function nextAutoAction(
   if (G.pendingPeekDecision) {
     if (isHuman(G.dreamMasterID)) return null;
     return {
-      playerID: owner,
+      playerID: G.dreamMasterID,
       move: 'masterPeekBribeDecision',
       args: [false],
       why: `梦主 ${G.dreamMasterID} 不派贿赂牌`,
@@ -79,23 +79,23 @@ export function nextAutoAction(
   if (G.peekReveal) {
     const { peekerID } = G.peekReveal;
     if (isHuman(peekerID)) return null;
-    return { playerID: owner, move: 'peekerAcknowledge', args: [], why: `${peekerID} 确认看牌` };
+    return { playerID: peekerID, move: 'peekerAcknowledge', args: [], why: `${peekerID} 确认看牌` };
   }
 
-  // 天秤：引擎的分牌与挑牌两步都不核对发起者，由回合主人代发。
-  // 单机没有分牌界面，真人参与时同样自动完成，避免对局停住。
+  // 天秤：分牌由被要求分牌的目标发，挑牌由发动者发。
+  // 单机没有分牌界面，真人参与时同样自动完成（以各自本人的名义），避免对局停住。
   const libra = G.pendingLibra;
   if (libra) {
     if (!libra.split) {
       return {
-        playerID: owner,
+        playerID: libra.targetPlayerID,
         move: 'resolveLibraSplit',
         args: defaultArgsFor('resolveLibraSplit', G, libra.targetPlayerID),
         why: `代 ${libra.targetPlayerID} 分牌`,
       };
     }
     return {
-      playerID: owner,
+      playerID: libra.bonderPlayerID,
       move: 'resolveLibraPick',
       args: defaultArgsFor('resolveLibraPick', G, libra.bonderPlayerID),
       why: `代 ${libra.bonderPlayerID} 挑牌`,

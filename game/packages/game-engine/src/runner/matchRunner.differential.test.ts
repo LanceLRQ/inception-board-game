@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { InceptionCityGame } from '../game.js';
+import { denyAction } from '../engine/actionRights.js';
 import type { SetupState } from '../setup.js';
 import {
   applyMove,
@@ -23,8 +24,17 @@ import {
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
-/** 把 Game 定义里每个 move 的随机源换成指定的那一个，其余不变 */
-function withRandom(base: GameDef<SetupState>, random: RandomSource): GameDef<SetupState> {
+/**
+ * 把 Game 定义里每个 move 的随机源换成指定的那一个，其余不变。
+ * 传了 actingAs 时，move 看到的发起者改成它返回的玩家（返回 undefined 则不改）：
+ * boardgame.io 只接受回合主人，回合外响应者的请求要借回合主人的名义送进去，
+ * 而 move 本体仍按真正的发起者校验行动权。
+ */
+function withRandom(
+  base: GameDef<SetupState>,
+  random: RandomSource,
+  actingAs: () => string | undefined = () => undefined,
+): GameDef<SetupState> {
   const phases: GameDef<SetupState>['phases'] = {};
   for (const [name, phase] of Object.entries(base.phases)) {
     const moves: NonNullable<typeof phase.moves> = {};
@@ -32,7 +42,13 @@ function withRandom(base: GameDef<SetupState>, random: RandomSource): GameDef<Se
       const original = def.move as (c: object, ...a: unknown[]) => unknown;
       moves[moveName] = {
         ...def,
-        move: ((c: object, ...a: unknown[]) => original({ ...c, random }, ...a)) as never,
+        move: ((c: object, ...a: unknown[]) => {
+          const actor = actingAs();
+          return original(
+            actor === undefined ? { ...c, random } : { ...c, random, playerID: actor },
+            ...a,
+          );
+        }) as never,
       };
     }
     // boardgame.io 初始化时会原地改写 phase.turn，这里拷一份，避免污染共享的引擎定义
@@ -54,26 +70,38 @@ interface RefState {
 
 /** boardgame.io 一侧：服务端语义的归约器（isClient 不开），每个 move 只执行一次 */
 function makeReference(numPlayers: number, setupData: Record<string, unknown>, seed: number) {
-  const refGame = withRandom(game, makeRandomSource(makeTestRng(seed)));
+  let actingAs: string | undefined;
+  const refGame = withRandom(game, makeRandomSource(makeTestRng(seed)), () => actingAs);
   const reducer = CreateGameReducer({ game: refGame as never });
   let state = InitializeGame({ game: refGame as never, numPlayers, setupData });
   return {
     get state(): RefState {
       return state as unknown as RefState;
     },
-    apply(c: MoveCandidate): boolean {
+    apply(c: MoveCandidate, borrowOwner = false): boolean {
       let next: { transients?: { error?: unknown } };
+      // 回合外的发起者：以回合主人的名义送给 boardgame.io，move 内部再换回真正的发起者
+      const owner = (state as unknown as RefState).ctx.currentPlayer;
+      const impersonate = borrowOwner && c.playerID !== owner;
+      if (impersonate) actingAs = c.playerID;
       try {
         next = reducer(
           state as never,
           {
             type: 'MAKE_MOVE',
-            payload: { type: c.move, args: c.args, playerID: c.playerID, credentials: undefined },
+            payload: {
+              type: c.move,
+              args: c.args,
+              playerID: impersonate ? owner : c.playerID,
+              credentials: undefined,
+            },
           } as never,
         ) as unknown as { transients?: { error?: unknown } };
       } catch {
         // 畸形参数让 move 抛异常时，boardgame.io 不拦截；这里按「拒绝」处理
         return false;
+      } finally {
+        actingAs = undefined;
       }
       if (next.transients?.error) return false;
       const rest = { ...next };
@@ -147,28 +175,38 @@ function playout(numPlayers: number, seed: number, maxSteps: number): PlayoutSta
     deepFreeze(run);
     const label = `n=${numPlayers} seed=${seed} step=${step}`;
 
-    // 先发一个大概率非法的 move，比较两边的拒绝行为
+    // 先发一个大概率非法的 move，比较两边的拒绝行为。
+    // 回合外的人发的请求，运行器按行动权表可能接受，而对照的 boardgame.io 一律拒绝，
+    // 这是有意的分叉：只有行动权表也判定拒绝的请求才发给两边比较。
     const noise = pickNoiseMove(game, run, fuzz);
-    const noiseRef = ref.apply(noise);
-    const noiseRun = applyMove(game, run, noise, { random: runRandom });
-    expect(noiseRun.ok, `${label} 干扰 move ${noise.move} by ${noise.playerID}`).toBe(noiseRef);
-    if (noiseRun.ok) {
-      run = noiseRun.state;
-      stats.accepted++;
-      stats.moveNames.add(noise.move);
-    } else {
-      stats.rejectedNoise++;
+    const offTurn = noise.playerID !== run.ctx.currentPlayer;
+    const comparable =
+      !offTurn ||
+      run.ctx.phase !== 'playing' ||
+      denyAction(run.G, noise.playerID, noise.move) !== null;
+    if (comparable) {
+      const noiseRef = ref.apply(noise);
+      const noiseRun = applyMove(game, run, noise, { random: runRandom });
+      expect(noiseRun.ok, `${label} 干扰 move ${noise.move} by ${noise.playerID}`).toBe(noiseRef);
+      if (noiseRun.ok) {
+        run = noiseRun.state;
+        stats.accepted++;
+        stats.moveNames.add(noise.move);
+      } else {
+        stats.rejectedNoise++;
+      }
+      expectSame(run, ref.state, `${label} 干扰 move ${noise.move} 之后`);
     }
-    expectSame(run, ref.state, `${label} 干扰 move ${noise.move} 之后`);
     if (run.ctx.gameover !== undefined) {
       stats.finished = true;
       break;
     }
 
     deepFreeze(run);
+    // 回合外的响应者也出招，否则遇到需要他们结算的局面就停滞了
     const cand = pickLegalMove(game, run, fuzz);
     if (!cand) break;
-    const okRef = ref.apply(cand);
+    const okRef = ref.apply(cand, true);
     const res = applyMove(game, run, cand, { random: runRandom });
     expect(res.ok, `${label} move ${cand.move}`).toBe(okRef);
     if (res.ok) {

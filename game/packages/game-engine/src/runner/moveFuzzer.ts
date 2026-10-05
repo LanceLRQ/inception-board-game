@@ -4,6 +4,7 @@
 //       留下被接受的候选。试跑用独立的随机源，不影响正式对局的随机序列。
 
 import type { SetupState } from '../setup.js';
+import { listAwaiting } from '../engine/actionRights.js';
 import { applyMove, type GameDef, type MatchState, type RandomSource } from './matchRunner.js';
 
 export interface MoveCandidate {
@@ -144,12 +145,15 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
     if (r < 0.85 && pending.length > 0) return pick(rnd, pending);
     return pick(rnd, G.deck.discardPile) ?? pick(rnd, hand);
   }
-  if (/layer/.test(n)) return Math.floor(rnd() * 6);
+  // 注意 targetPlayerID 这类名字里也含有 layer，玩家 ID 必须留给下面的分支
+  if (/layer/.test(n) && !/playerid/.test(n)) return Math.floor(rnd() * 6);
   if (/(idx|index)/.test(n)) return Math.floor(rnd() * 6);
   if (n === 'responderid') {
     const r = rnd();
     if (r < 0.2) return undefined;
-    if (r < 0.7 && pendingPlayers.length > 0) return pick(rnd, pendingPlayers);
+    // 响应者多半报自己的 ID
+    if (r < 0.55) return actor;
+    if (r < 0.8 && pendingPlayers.length > 0) return pick(rnd, pendingPlayers);
     return pick(rnd, players);
   }
   if (/(playerid|targetid|reviveid|thiefid)/.test(n)) {
@@ -203,6 +207,27 @@ export interface PickLegalMoveOptions {
   attemptsPerMove?: number;
   /** 有可结算事项时是否优先结算。关掉它可以模拟不守规矩的客户端 */
   preferSettle?: boolean;
+  /**
+   * 只替回合主人试 move。对照用的 boardgame.io 归约器只接受回合主人，差分测试要开这个。
+   * 默认 false：替此刻所有有行动权的玩家（回合主人加上各待结算事项的行动者）试。
+   */
+  ownerOnly?: boolean;
+  /** 只替名单里的玩家试 move（与上面的候选取交集） */
+  actors?: readonly string[];
+}
+
+/** 此刻值得试 move 的玩家：回合主人，加上对局阶段各待结算事项的行动者 */
+function candidateActors(
+  state: MatchState<SetupState>,
+  ownerOnly: boolean,
+  only?: readonly string[],
+): string[] {
+  const owner = state.ctx.currentPlayer;
+  const all = new Set<string>([owner]);
+  if (!ownerOnly && state.ctx.phase === 'playing') {
+    for (const entry of listAwaiting(state.G)) entry.actors.forEach((id) => all.add(id));
+  }
+  return [...all].filter((id) => only === undefined || only.includes(id));
 }
 
 /**
@@ -215,20 +240,25 @@ export function pickLegalMove(
   rnd: () => number,
   options: PickLegalMoveOptions = {},
 ): MoveCandidate | null {
-  const { attemptsPerMove = 2, preferSettle = true } = options;
+  const { attemptsPerMove = 2, preferSettle = true, ownerOnly = false, actors } = options;
   const probeRandom = makeRandomSource(makeTestRng(Math.floor(rnd() * 2 ** 31)));
-  const actor = state.ctx.currentPlayer;
   const names = Object.keys(currentMoves(game, state.ctx.phase));
   const accepted: MoveCandidate[] = [];
-  for (const move of names) {
-    const hard = SETTLE_MOVE.test(move) || move === 'doDiscard';
-    const attempts = hard ? attemptsPerMove * 8 : attemptsPerMove;
-    for (let i = 0; i < attempts; i++) {
-      const cand = fuzzCandidate(game, state, move, actor, rnd);
-      const res = applyMove(game, state, cand, { random: probeRandom });
-      if (res.ok) {
-        accepted.push(cand);
-        break;
+  for (const actor of candidateActors(state, ownerOnly, actors)) {
+    for (const move of names) {
+      // 没有行动权的组合不必试，试了也是被拒
+      if (game.actionRights?.({ G: state.G, ctx: state.ctx, playerID: actor, move }) === false) {
+        continue;
+      }
+      const hard = SETTLE_MOVE.test(move) || move === 'doDiscard';
+      const attempts = hard ? attemptsPerMove * 8 : attemptsPerMove;
+      for (let i = 0; i < attempts; i++) {
+        const cand = fuzzCandidate(game, state, move, actor, rnd);
+        const res = applyMove(game, state, cand, { random: probeRandom });
+        if (res.ok) {
+          accepted.push(cand);
+          break;
+        }
       }
     }
   }

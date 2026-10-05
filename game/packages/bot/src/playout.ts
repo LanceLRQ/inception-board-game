@@ -13,7 +13,7 @@ import {
   type MoveRequest,
   type RejectReason,
 } from '@icgame/game-engine/runner';
-import { nextAutoAction, RESPONSE_MOVES } from './autoAction.js';
+import { nextAutoAction } from './autoAction.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -87,7 +87,7 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
       move: action.move,
       args: action.args,
     };
-    const outcome = applyMove(game, state, request, { responseMoves: RESPONSE_MOVES });
+    const outcome = applyMove(game, state, request);
     if (!outcome.ok) {
       rejected = {
         step: steps,

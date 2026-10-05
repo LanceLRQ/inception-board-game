@@ -11,19 +11,6 @@ const game: GameDef<SetupState> = InceptionCityGame;
 
 const settleFields = Object.keys(SETTLE_MOVES) as BlockingField[];
 
-/**
- * 允许停住的待结算字段及其结算者：结算者不是回合主人，而本测试不开放回合外行动，
- * 生成器只会替回合主人出招，所以这些字段停住不代表引擎死局。
- * 只有结算者确实不是回合主人时才放行，否则仍记为停滞。
- *   - pendingShootResponse：respondShootEvade / respondShootPass / respondTerroristDiscard /
- *     respondTerroristAccept 都要求回合主人等于被射击的目标，而挂起时回合主人是发动 SHOOT 的人。
- *   - pendingVirgoChoice：respondVirgoPerfect 要求回合主人等于处女，处女不是回合主人时没人能发。
- */
-const STALL_ALLOWLIST: Partial<Record<BlockingField, (G: SetupState) => string | undefined>> = {
-  pendingShootResponse: (G) => G.pendingShootResponse?.targetPlayerID,
-  pendingVirgoChoice: (G) => G.pendingVirgoChoice?.virgoID,
-};
-
 function afterSetup(numPlayers: number, seed: string): MatchState<SetupState> {
   const s = createMatch(game, { numPlayers, setupData: { rngSeed: seed }, seed });
   const res = applyMove(game, s, { playerID: '0', move: 'completeSetup', args: [] });
@@ -44,7 +31,7 @@ describe('待结算闸门 · 对局', () => {
     };
     const res = applyMove(game, pending, draw);
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('invalid_move');
+    if (!res.ok) expect(res.reason).toBe('not_active');
   });
 
   it('白羊·星尘的待选择不拦住回合主人推进回合，回合结束时被清空', () => {
@@ -137,11 +124,7 @@ describe('待结算闸门 · 对局', () => {
           if (!cand) {
             // 找不到任何合法 move：记下停在哪些待结算字段上
             for (const field of settleFields) {
-              if (!s.G[field]) continue;
-              const settler = STALL_ALLOWLIST[field]?.(s.G);
-              if (settler === undefined || settler === s.ctx.currentPlayer) {
-                stalled.push(`${field} n=${n} k=${k} step=${step}`);
-              }
+              if (s.G[field]) stalled.push(`${field} n=${n} k=${k} step=${step}`);
             }
             break;
           }

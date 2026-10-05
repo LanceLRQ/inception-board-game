@@ -215,21 +215,9 @@ describe('对局运行器 · 回合外响应', () => {
     return res.state;
   }
 
-  it('默认只有回合主人能行动：被射击的双鱼无法响应', () => {
+  it('被射击的双鱼可以在别人的回合里闪避，不需要登记响应类 move', () => {
     const s = shootAtPisces();
     const res = applyMove(game, s, { playerID: 'p2', move: 'respondShootEvade', args: [] });
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('not_active');
-  });
-
-  it('把 move 登记为响应类之后，双鱼可以在别人的回合里闪避', () => {
-    const s = shootAtPisces();
-    const res = applyMove(
-      game,
-      s,
-      { playerID: 'p2', move: 'respondShootEvade', args: [] },
-      { responseMoves: new Set(['respondShootEvade']) },
-    );
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.state.G.pendingShootResponse).toBeNull();
@@ -240,15 +228,86 @@ describe('对局运行器 · 回合外响应', () => {
     expect(res.state.ctx.currentPlayer).toBe('p1');
   });
 
-  it('响应类 move 仍由引擎校验身份：不是被射击者一样被拒绝', () => {
+  it('回合主人不能替被射击者响应', () => {
     const s = shootAtPisces();
-    const res = applyMove(
-      game,
-      s,
-      { playerID: 'p3', move: 'respondShootEvade', args: [] },
-      { responseMoves: new Set(['respondShootEvade']) },
-    );
+    const res = applyMove(game, s, { playerID: 'p1', move: 'respondShootEvade', args: [] });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('invalid_move');
+    if (!res.ok) expect(res.reason).toBe('not_active');
+  });
+
+  it('不是被射击者的人响应一样被拒绝', () => {
+    const s = shootAtPisces();
+    const res = applyMove(game, s, { playerID: 'p3', move: 'respondShootEvade', args: [] });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toBe('not_active');
+  });
+
+  it('不在对局里的人发 move 被拒绝', () => {
+    const s = shootAtPisces();
+    const res = applyMove(game, s, { playerID: 'ghost', move: 'respondShootEvade', args: [] });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toBe('not_active');
+  });
+
+  it('待结算期间被拒绝的请求不改变状态', () => {
+    const s = shootAtPisces();
+    const res = applyMove(game, s, { playerID: 'p3', move: 'respondShootEvade', args: [] });
+    expect(res.state).toBe(s);
+  });
+});
+
+describe('对局运行器 · 行动权钩子', () => {
+  interface Tiny {
+    n: number;
+    seen: string[];
+  }
+  const tiny = (rights?: GameDef<Tiny>['actionRights']): GameDef<Tiny> => ({
+    setup: () => ({ n: 0, seen: [] }),
+    actionRights: rights,
+    phases: {
+      main: {
+        start: true,
+        turn: {},
+        moves: {
+          inc: {
+            move: ({ G, ctx }: { G: Tiny; ctx: { currentPlayer: string } }) => ({
+              n: G.n + 1,
+              seen: [...G.seen, ctx.currentPlayer],
+            }),
+          },
+        },
+      },
+    },
+  });
+
+  it('没提供钩子时只有回合主人可以行动', () => {
+    const s = createMatch(tiny(), { numPlayers: 3, seed: 's' });
+    const res = applyMove(tiny(), s, { playerID: '1', move: 'inc', args: [] });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toBe('not_active');
+  });
+
+  it('钩子放行时非回合主人可以行动，运行器不替换传给 move 的 ctx.currentPlayer', () => {
+    const g = tiny(() => true);
+    const s = createMatch(g, { numPlayers: 3, seed: 's' });
+    const res = applyMove(g, s, { playerID: '1', move: 'inc', args: [] });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.state.G.seen).toEqual(['0']);
+  });
+
+  it('钩子返回 false 时被拒绝', () => {
+    const g = tiny(({ playerID }) => playerID === '2');
+    const s = createMatch(g, { numPlayers: 3, seed: 's' });
+    const res = applyMove(g, s, { playerID: '0', move: 'inc', args: [] });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toBe('not_active');
+  });
+
+  it('发起者不在出牌名单里时，不问钩子直接拒绝', () => {
+    const g = tiny(() => true);
+    const s = createMatch(g, { numPlayers: 3, seed: 's' });
+    const res = applyMove(g, s, { playerID: '9', move: 'inc', args: [] });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toBe('not_active');
   });
 });

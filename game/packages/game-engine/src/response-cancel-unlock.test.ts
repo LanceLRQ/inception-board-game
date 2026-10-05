@@ -160,7 +160,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
   describe('respondCancelUnlock 校验（OOT-01.a/b/c/d/e）', () => {
     it('未开启响应窗口时 → INVALID_MOVE', () => {
       const s0 = sceneBeforeUnlock(); // 未 playUnlock
-      const r = callMove(s0, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s0, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p2' });
       expect(r).toBe('INVALID_MOVE');
     });
 
@@ -175,14 +175,14 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
       // p3 在 responders 但手牌为空
-      const r = callMove(s1, 'respondCancelUnlock', ['p3'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['p3'], { currentPlayer: 'p3' });
       expect(r).toBe('INVALID_MOVE');
     });
 
     it('死亡玩家（不在 responders）传入 → INVALID_MOVE', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r = callMove(s1, 'respondCancelUnlock', ['p4'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['p4'], { currentPlayer: 'p4' });
       expect(r).toBe('INVALID_MOVE');
     });
 
@@ -191,11 +191,11 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
       const s1 = doPlayUnlock(s0);
       // 给 pM 也放一张，以模拟"第二个响应者尝试二次抵消"
       const s2 = withHand(s1, 'pM', [UNLOCK_CARD]);
-      const r1 = callMove(s2, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p1' });
+      const r1 = callMove(s2, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p2' });
       expect(r1).not.toBe('INVALID_MOVE');
       const sCancelled = r1 as SetupState;
       // 此时窗口应关闭 → 二次响应无效
-      const r2 = callMove(sCancelled, 'respondCancelUnlock', ['pM'], { currentPlayer: 'p1' });
+      const r2 = callMove(sCancelled, 'respondCancelUnlock', ['pM'], { currentPlayer: 'pM' });
       expect(r2).toBe('INVALID_MOVE');
     });
   });
@@ -204,7 +204,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
     it('有牌响应者成功：pendingUnlock 清空 + pendingResponseWindow 清空', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p2' });
       expect(r).not.toBe('INVALID_MOVE');
       const s2 = r as SetupState;
       expect(s2.pendingUnlock).toBeNull();
@@ -214,7 +214,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
     it('响应者手中 action_unlock -1 张（p2 从 [UNLOCK] → []）', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p2' });
       const s2 = r as SetupState;
       expect(s2.players.p2!.hand).toEqual([]);
     });
@@ -225,7 +225,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
       // playUnlock 已经弃了 p1 的 1 张
       expect(s1.deck.discardPile).toContain(UNLOCK_CARD);
       const discardBefore = s1.deck.discardPile.length;
-      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p2' });
       const s2 = r as SetupState;
       // 抵消者再弃 1 张
       expect(s2.deck.discardPile.length).toBe(discardBefore + 1);
@@ -234,7 +234,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
     it('层心锁保持原值（没有真正解封）', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['p2'], { currentPlayer: 'p2' });
       const s2 = r as SetupState;
       expect(s2.layers[1]!.heartLockValue).toBe(2);
       expect(s2.players.p1!.successfulUnlocksThisTurn).toBe(0);
@@ -243,7 +243,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
     it('梦主持有 action_unlock 也能抵消（规则"任何玩家"）', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r = callMove(s1, 'respondCancelUnlock', ['pM'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'respondCancelUnlock', ['pM'], { currentPlayer: 'pM' });
       expect(r).not.toBe('INVALID_MOVE');
       const s2 = r as SetupState;
       expect(s2.pendingUnlock).toBeNull();
@@ -254,7 +254,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
   describe('passResponse 校验与全员 pass 自动结算（OOT-01.e）', () => {
     it('未开窗时 passResponse → INVALID_MOVE', () => {
       const s0 = sceneBeforeUnlock();
-      const r = callMove(s0, 'passResponse', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s0, 'passResponse', ['p2'], { currentPlayer: 'p2' });
       expect(r).toBe('INVALID_MOVE');
     });
 
@@ -268,16 +268,16 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
     it('重复 pass（同一玩家调 2 次）→ 第二次 INVALID_MOVE', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r1 = callMove(s1, 'passResponse', ['p2'], { currentPlayer: 'p1' });
+      const r1 = callMove(s1, 'passResponse', ['p2'], { currentPlayer: 'p2' });
       expect(r1).not.toBe('INVALID_MOVE');
-      const r2 = callMove(r1 as SetupState, 'passResponse', ['p2'], { currentPlayer: 'p1' });
+      const r2 = callMove(r1 as SetupState, 'passResponse', ['p2'], { currentPlayer: 'p2' });
       expect(r2).toBe('INVALID_MOVE');
     });
 
     it('单人 pass 后 responded 记录该玩家，窗口仍开', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);
-      const r = callMove(s1, 'passResponse', ['p2'], { currentPlayer: 'p1' });
+      const r = callMove(s1, 'passResponse', ['p2'], { currentPlayer: 'p2' });
       const s2 = r as SetupState;
       expect(s2.pendingResponseWindow).not.toBeNull();
       expect(s2.pendingResponseWindow!.responded).toContain('p2');
@@ -288,7 +288,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
       const s0 = sceneBeforeUnlock();
       let s = doPlayUnlock(s0);
       for (const rid of ['p2', 'p3', 'pM']) {
-        const r = callMove(s, 'passResponse', [rid], { currentPlayer: 'p1' });
+        const r = callMove(s, 'passResponse', [rid], { currentPlayer: rid });
         expect(r).not.toBe('INVALID_MOVE');
         s = r as SetupState;
       }

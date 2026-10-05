@@ -187,7 +187,12 @@ describe('嫁接 · 直接调用 move 函数（纯单元）', () => {
   it('resolveGraft cardsToReturn 长度 ≠ 2 → INVALID_MOVE', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const moves = (InceptionCityGame as any).phases.playing.moves;
-    const state = { pendingGraft: { playerID: '0' }, players: { '0': { hand: ['a', 'b'] } } };
+    const state = {
+      playerOrder: ['0', '1'],
+      currentPlayerID: '0',
+      pendingGraft: { playerID: '0' },
+      players: { '0': { hand: ['a', 'b'] } },
+    };
     const ctx = { currentPlayer: '0' };
     const r1 = moves.resolveGraft.move({ G: state, ctx }, ['a']);
     const r3 = moves.resolveGraft.move({ G: state, ctx }, ['a', 'b', 'c']);
@@ -198,7 +203,12 @@ describe('嫁接 · 直接调用 move 函数（纯单元）', () => {
   it('resolveGraft 非 pendingGraft 玩家 → INVALID_MOVE', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const moves = (InceptionCityGame as any).phases.playing.moves;
-    const state = { pendingGraft: { playerID: '1' }, players: { '0': { hand: ['a', 'b'] } } };
+    const state = {
+      playerOrder: ['0', '1'],
+      currentPlayerID: '0',
+      pendingGraft: { playerID: '1' },
+      players: { '0': { hand: ['a', 'b'] } },
+    };
     const r = moves.resolveGraft.move({ G: state, ctx: { currentPlayer: '0' } }, ['a', 'b']);
     expect(r).toBe('INVALID_MOVE');
   });

@@ -126,6 +126,7 @@ import {
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
+import { denyAction } from './engine/actionRights.js';
 import { isPlainRecord, isRecordOf, isString, isStringArray } from './engine/argShape.js';
 import {
   openResponseWindow,
@@ -2973,6 +2974,13 @@ export const InceptionCityGame = {
     }
 
     return undefined;
+  },
+
+  // 行动权：对局阶段按行动权表放行（回合外的响应者、被选中的目标也能行动）；
+  // 其他阶段只有回合主人。对局阶段 move 本体里的 ctx.currentPlayer 由包装层改写为发起者
+  actionRights({ G, ctx, playerID, move }) {
+    if (ctx.phase === 'playing') return denyAction(G, playerID, move) === null;
+    return playerID === ctx.currentPlayer;
   },
 } satisfies GameDef<SetupState>;
 
