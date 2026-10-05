@@ -8,3 +8,6 @@ export type { MoveDescriptor } from './simpleBot.js';
 
 export { AITakeoverManager } from './takeover.js';
 export type { TakeoverReason, TakeoverRecord } from './takeover.js';
+
+export { MOVES_BY_PHASE, MOVE_PRIORITY, legalMovesFor } from './moveTables.js';
+export { pickBotMove, defaultArgsFor } from './botMoves.js';
