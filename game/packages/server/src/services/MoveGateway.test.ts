@@ -1,31 +1,10 @@
-// MoveGateway 测试 - 管道集成
-// 验证 validator + RateGuard 协作
+// MoveGateway 测试：请求形状 + move 名单 + 幂等与限流 的协作
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createInitialState, type SetupState } from '@icgame/game-engine';
-import type { CardID } from '@icgame/shared';
 import { InMemoryRateGuard } from './RateGuardService.js';
 import { MoveGateway } from './MoveGateway.js';
 
-function makeState(): SetupState {
-  const s = createInitialState({
-    playerCount: 4,
-    playerIds: ['P1', 'P2', 'P3', 'P4'],
-    nicknames: ['A', 'B', 'C', 'D'],
-    rngSeed: 'seed',
-  });
-  return {
-    ...s,
-    phase: 'playing',
-    turnPhase: 'action',
-    currentPlayerID: 'P1',
-    dreamMasterID: 'P4',
-    players: {
-      ...s.players,
-      P1: { ...s.players.P1!, hand: ['c1' as CardID] },
-    },
-  };
-}
+const shoot = { move: 'playShoot', args: ['c1', 'P2'] };
 
 describe('MoveGateway', () => {
   let guard: InMemoryRateGuard;
@@ -36,82 +15,67 @@ describe('MoveGateway', () => {
     gateway = new MoveGateway(guard);
   });
 
-  it('accepts valid playShoot', async () => {
-    const state = makeState();
+  it('接受合法请求并回传规整后的请求', async () => {
+    const r = await gateway.accept({ phase: 'playing', playerID: 'P1', request: shoot });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.request).toEqual(shoot);
+  });
+
+  it('拒绝形状不对的请求', async () => {
+    const r = await gateway.accept({ phase: 'playing', playerID: 'P1', request: null });
+    expect(r).toMatchObject({ ok: false, code: 'not_object' });
+  });
+
+  it('拒绝不在当前阶段名单里的 move', async () => {
     const r = await gateway.accept({
-      state,
+      phase: 'playing',
       playerID: 'P1',
-      currentPlayer: 'P1',
-      payload: { name: 'playShoot', cardId: 'c1', targetPlayerID: 'P2' },
+      request: { move: 'constructor', args: [] },
     });
+    expect(r).toMatchObject({ ok: false, code: 'unknown_move' });
+  });
+
+  it('不替运行器做合法性判定：非回合主人的请求也只按形状放行', async () => {
+    const r = await gateway.accept({ phase: 'playing', playerID: 'P2', request: shoot });
     expect(r.ok).toBe(true);
   });
 
-  it('rejects bad schema at L1', async () => {
-    const state = makeState();
-    const r = await gateway.accept({
-      state,
-      playerID: 'P1',
-      currentPlayer: 'P1',
-      payload: null,
-    });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.layer).toBe(1);
-  });
-
-  it('rejects non-current player at L2', async () => {
-    const state = makeState();
-    const r = await gateway.accept({
-      state,
-      playerID: 'P2',
-      currentPlayer: 'P1',
-      payload: { name: 'playShoot', cardId: 'c1', targetPlayerID: 'P3' },
-    });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.layer).toBe(2);
-  });
-
-  it('rejects duplicate intent at L7', async () => {
-    const state = makeState();
+  it('拒绝重复的 intent', async () => {
     guard.recordIntent('int-1');
     const r = await gateway.accept({
-      state,
+      phase: 'playing',
       playerID: 'P1',
-      currentPlayer: 'P1',
       intentId: 'int-1',
-      payload: { name: 'playShoot', cardId: 'c1', targetPlayerID: 'P2' },
+      request: shoot,
     });
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.layer).toBe(7);
-      expect(r.code).toBe('RATE_INTENT_DUPLICATE');
-    }
+    expect(r).toMatchObject({ ok: false, code: 'RATE_INTENT_DUPLICATE' });
   });
 
-  it('commit records intent and move', async () => {
-    const state = makeState();
+  it('intentId 也可以写在请求里', async () => {
+    guard.recordIntent('int-2');
     const r = await gateway.accept({
-      state,
+      phase: 'playing',
       playerID: 'P1',
-      currentPlayer: 'P1',
+      request: { ...shoot, intentId: 'int-2' },
+    });
+    expect(r).toMatchObject({ ok: false, code: 'RATE_INTENT_DUPLICATE' });
+  });
+
+  it('commit 记录 intent 与 move', async () => {
+    const r = await gateway.accept({
+      phase: 'playing',
+      playerID: 'P1',
       intentId: 'int-new',
-      payload: { name: 'playShoot', cardId: 'c1', targetPlayerID: 'P2' },
+      request: shoot,
     });
     expect(r.ok).toBe(true);
     if (r.ok) await gateway.commit(r.context);
     expect(guard.isDuplicate('int-new')).toBe(true);
   });
 
-  it('rate limit kicks in after threshold', async () => {
-    const state = makeState();
+  it('超过阈值后限流', async () => {
     for (let i = 0; i < 3; i++) guard.recordMove('P1');
-    const r = await gateway.accept({
-      state,
-      playerID: 'P1',
-      currentPlayer: 'P1',
-      payload: { name: 'playShoot', cardId: 'c1', targetPlayerID: 'P2' },
-    });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe('RATE_LIMIT_EXCEEDED');
+    const r = await gateway.accept({ phase: 'playing', playerID: 'P1', request: shoot });
+    expect(r).toMatchObject({ ok: false, code: 'RATE_LIMIT_EXCEEDED' });
   });
 });

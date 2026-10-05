@@ -1,95 +1,81 @@
-// MoveGateway - WS Move 入口统一管道
-// 对照：docs/_internal/design/07-backend-network.md §7.4 + §7.9
+// MoveGateway - 请求入口管道（尚未接入对局房间）
 //
 // 管道顺序：
-//   1. 预加载 intent 幂等状态（Redis 版需要）
-//   2. 调用 validateMove（L1-L7 全量）
-//   3. 通过 → 转发给 BGIO；失败 → 返回错误响应
-//   4. 成功后 recordIntent + recordMove
+//   1. 校验请求形状与 move 名单（由引擎的 move 表派生）
+//   2. 预加载 intent 幂等状态（Redis 版需要）
+//   3. 幂等与限流
+//   4. 通过 → 调用方把请求交给对局运行器；失败 → 返回错误响应
+//   5. 运行器接受后，调用方 commit 记录 intent 与限流计数
+//
+// 合法性判定（行动权、待结算闸门、各 move 的守卫）由对局运行器负责，
+// 这里不执行 move，也不做那些判定。
 
 import {
-  validateMove,
-  type MoveContext,
-  type MovePayload,
-  type ValidationResult,
+  validateRate,
+  validateRequestShape,
+  type ValidatedRequest,
+  type RateContext,
 } from '@icgame/game-engine';
-import type { SetupState } from '@icgame/game-engine';
 import type { RateGuardMutable, RedisRateGuard } from './RateGuardService.js';
 import { logger } from '../infra/logger.js';
 
 export interface GatewayInput {
-  readonly state: SetupState;
-  readonly playerID: string; // WS 鉴权后的真实玩家
-  readonly currentPlayer: string; // BGIO 当前玩家
+  /** 引擎的阶段名：'setup' 或 'playing' */
+  readonly phase: string;
+  /** 连接鉴权后的真实玩家 */
+  readonly playerID: string;
+  /** 不可信的原始请求：{ move, args, intentId? } */
+  readonly request: unknown;
+  /** 优先于请求里自带的 intentId */
   readonly intentId?: string;
-  readonly payload: unknown;
 }
 
 export interface GatewayAcceptResult {
   readonly ok: true;
-  readonly payload: MovePayload;
-  readonly context: MoveContext;
+  readonly request: ValidatedRequest;
+  readonly context: RateContext;
 }
 
 export interface GatewayRejectResult {
   readonly ok: false;
   readonly code: string;
   readonly reason: string;
-  readonly layer: number;
 }
 
 export type GatewayResult = GatewayAcceptResult | GatewayRejectResult;
 
-/**
- * Move 入口：预加载 guard 状态 → 跑 validator → 返回判定结果。
- * 调用方负责：判定通过后执行 BGIO move，再 await gateway.commit()。
- */
 export class MoveGateway {
   constructor(private readonly guard: RateGuardMutable) {}
 
   async accept(input: GatewayInput): Promise<GatewayResult> {
+    const shape = validateRequestShape(input.request, input.phase);
+    if (!shape.ok) {
+      logger.warn({ playerID: input.playerID, code: shape.code }, 'move request rejected');
+      return { ok: false, code: shape.code, reason: `invalid request: ${shape.code}` };
+    }
+
+    const intentId = input.intentId ?? shape.request.intentId;
+
     // 预加载（Redis 版需要；内存版 no-op）
     const rg = this.guard as Partial<RedisRateGuard>;
-    if (input.intentId && typeof rg.preloadIntent === 'function') {
-      await rg.preloadIntent(input.intentId);
+    if (intentId && typeof rg.preloadIntent === 'function') {
+      await rg.preloadIntent(intentId);
     }
     if (typeof rg.preloadRateCount === 'function') {
       await rg.preloadRateCount(input.playerID);
     }
 
-    const ctx: MoveContext = {
-      playerID: input.playerID,
-      currentPlayer: input.currentPlayer,
-      intentId: input.intentId,
-    };
-
-    const result: ValidationResult = validateMove(input.state, ctx, input.payload, this.guard);
-    if (!result.ok) {
-      logger.warn(
-        {
-          playerID: input.playerID,
-          code: result.code,
-          layer: result.layer,
-          reason: result.reason,
-        },
-        'move rejected',
-      );
-      return {
-        ok: false,
-        code: result.code,
-        reason: result.reason,
-        layer: result.layer,
-      };
+    const context: RateContext = { playerID: input.playerID, intentId };
+    const rate = validateRate(context, this.guard);
+    if (!rate.ok) {
+      logger.warn({ playerID: input.playerID, code: rate.code }, 'move request rejected');
+      return { ok: false, code: rate.code, reason: rate.reason };
     }
-    return {
-      ok: true,
-      payload: input.payload as MovePayload,
-      context: ctx,
-    };
+    return { ok: true, request: shape.request, context };
   }
 
-  /** Move 成功执行后调用，记录 intent 幂等 + 限流计数 */
-  async commit(ctx: MoveContext): Promise<void> {
+  /** 运行器接受请求后调用，记录 intent 幂等 + 限流计数 */
+  async commit(ctx: RateContext): Promise<void> {
     if (ctx.intentId) {
       await this.guard.recordIntent(ctx.intentId);
     }

@@ -1,337 +1,166 @@
-// Move Validator - L1-L7 七层校验流水线
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.4 + docs/_internal/design/08-security-ai.md §8.4
+// 请求校验：只挡「形状不对」和「过于频繁」的请求。
+//
+// 合法性判定（谁能在什么时候出什么牌、目标与资源是否成立）一律由对局运行器负责：
+// 行动权表、待结算闸门、各 move 自己的守卫。这里不重复那些判定，
+// 也不维护手写的 move 清单——move 名单在加载时从引擎的 move 表派生。
+//
+// 校验分三层：
+//   1. 请求形状：{ move: string, args: unknown[], intentId?: string }，有长度与大小上限
+//   2. move 是否属于当前阶段的名单（由 move 表派生，原型链上的名字不算）
+//   3. 幂等与限流（RateGuard 由服务端提供实现）
 
-import type { SetupState } from '../setup.js';
-import { denyAction } from './actionRights.js';
-import type { CardID } from '@icgame/shared';
+import { InceptionCityGame } from '../game.js';
 
-// === 错误码 ===
+// === move 名单 ===
 
-export type ValidationCode =
-  // L1 Schema
-  | 'SCHEMA_INVALID'
-  | 'SCHEMA_MISSING_FIELD'
-  | 'SCHEMA_BAD_TYPE'
-  // L2 身份
-  | 'AUTH_PLAYER_MISMATCH'
-  | 'AUTH_PLAYER_NOT_FOUND'
-  | 'AUTH_NOT_CURRENT_PLAYER'
-  // L3 阶段
-  | 'PHASE_INVALID'
-  | 'STAGE_INVALID'
-  | 'PENDING_RESPONSE_BLOCKED'
-  // L4 资源
-  | 'RESOURCE_NO_CARD'
-  | 'RESOURCE_PLAYER_DEAD'
-  | 'RESOURCE_FACTION_MISMATCH'
-  // L5 目标
-  | 'TARGET_NOT_FOUND'
-  | 'TARGET_DEAD'
-  | 'TARGET_LAYER_INVALID'
-  | 'TARGET_SELF_FORBIDDEN'
-  // L6 规则
-  | 'RULE_UNLOCK_LIMIT'
-  | 'RULE_HAND_LIMIT'
-  | 'RULE_LAYER_NOT_ADJACENT'
-  | 'RULE_NO_HEART_LOCK'
-  // L7 频率
-  | 'RATE_INTENT_DUPLICATE'
-  | 'RATE_LIMIT_EXCEEDED';
+/** 阶段名 → move 名集合，加载时派生一次并冻结 */
+const MOVE_TABLES: Readonly<Record<string, Readonly<Record<string, true>>>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(InceptionCityGame.phases).map(([phase, def]) => [
+      phase,
+      Object.freeze(
+        Object.fromEntries(
+          ('moves' in def ? Object.keys(def.moves) : []).map((name) => [name, true as const]),
+        ),
+      ),
+    ]),
+  ),
+);
 
-export interface ValidationOk {
+const MOVE_LISTS: Readonly<Record<string, readonly string[]>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(MOVE_TABLES).map(([phase, table]) => [phase, Object.freeze(Object.keys(table))]),
+  ),
+);
+
+const EMPTY_LIST: readonly string[] = Object.freeze([]);
+
+/** 某个阶段（'setup' / 'playing'）的全部 move 名；未知阶段返回空 */
+export function knownMoves(phase: string): readonly string[] {
+  return Object.hasOwn(MOVE_LISTS, phase) ? MOVE_LISTS[phase]! : EMPTY_LIST;
+}
+
+/** move 是否属于该阶段的名单 */
+export function isKnownMove(phase: string, move: string): boolean {
+  if (!Object.hasOwn(MOVE_TABLES, phase)) return false;
+  return Object.hasOwn(MOVE_TABLES[phase]!, move);
+}
+
+// === 请求形状 ===
+
+/** args 的最大长度 */
+export const MAX_ARGS = 8;
+/** 整个请求序列化后的最大字节数 */
+export const MAX_REQUEST_BYTES = 4096;
+
+export interface ValidatedRequest {
+  readonly move: string;
+  readonly args: unknown[];
+  readonly intentId?: string;
+}
+
+export type RequestShapeCode =
+  | 'not_object'
+  | 'move_not_string'
+  | 'args_not_array'
+  | 'args_too_long'
+  | 'request_too_large'
+  | 'not_serializable'
+  | 'unknown_move'
+  | 'intent_id_not_string';
+
+export type RequestShapeResult =
+  | { readonly ok: true; readonly request: ValidatedRequest }
+  | { readonly ok: false; readonly code: RequestShapeCode };
+
+const shapeFail = (code: RequestShapeCode): RequestShapeResult => ({ ok: false, code });
+
+/**
+ * 校验不可信的原始请求。无论输入是什么都不会抛异常。
+ * 只读取自有的数据属性；访问器属性（getter）与读取时抛错的对象一律按「无法序列化」拒绝。
+ */
+export function validateRequestShape(raw: unknown, phase: string): RequestShapeResult {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return shapeFail('not_object');
+  }
+  try {
+    const read = (key: string): { readonly found: boolean; readonly value: unknown } => {
+      const desc = Object.getOwnPropertyDescriptor(raw, key);
+      if (desc === undefined) return { found: false, value: undefined };
+      if (!('value' in desc)) throw new TypeError('accessor property');
+      return { found: true, value: desc.value };
+    };
+    const move = read('move').value;
+    const args = read('args').value;
+    const intent = read('intentId');
+
+    if (typeof move !== 'string') return shapeFail('move_not_string');
+    if (!Array.isArray(args)) return shapeFail('args_not_array');
+    if (args.length > MAX_ARGS) return shapeFail('args_too_long');
+    if (intent.found && intent.value !== undefined && typeof intent.value !== 'string') {
+      return shapeFail('intent_id_not_string');
+    }
+
+    const json = JSON.stringify(raw);
+    if (new TextEncoder().encode(json).length > MAX_REQUEST_BYTES) {
+      return shapeFail('request_too_large');
+    }
+    if (!isKnownMove(phase, move)) return shapeFail('unknown_move');
+
+    const intentId = typeof intent.value === 'string' ? intent.value : undefined;
+    return {
+      ok: true,
+      request:
+        intentId === undefined ? { move, args: [...args] } : { move, args: [...args], intentId },
+    };
+  } catch {
+    // 循环引用、BigInt、getter 抛错等：请求无法被安全地读取或序列化
+    return shapeFail('not_serializable');
+  }
+}
+
+// === 幂等与限流 ===
+
+export type RateCode = 'RATE_INTENT_DUPLICATE' | 'RATE_LIMIT_EXCEEDED';
+
+export interface RateOk {
   readonly ok: true;
 }
 
-export interface ValidationFail {
+export interface RateFail {
   readonly ok: false;
-  readonly layer: 1 | 2 | 3 | 4 | 5 | 6 | 7;
-  readonly code: ValidationCode;
+  readonly code: RateCode;
   readonly reason: string;
 }
 
-export type ValidationResult = ValidationOk | ValidationFail;
+export type RateResult = RateOk | RateFail;
 
-const OK: ValidationOk = { ok: true };
-
-function fail(
-  layer: ValidationFail['layer'],
-  code: ValidationCode,
-  reason: string,
-): ValidationFail {
-  return { ok: false, layer, code, reason };
-}
-
-// === Move 类型描述 ===
-
-export type MoveName =
-  | 'doDraw'
-  | 'skipDraw'
-  | 'doDiscard'
-  | 'skipDiscard'
-  | 'endActionPhase'
-  | 'playShoot'
-  | 'playUnlock'
-  | 'resolveUnlock'
-  | 'respondCancelUnlock'
-  | 'passResponse'
-  | 'playDreamTransit'
-  | 'playCreation'
-  | 'dreamMasterMove';
-
-export interface MoveContext {
-  readonly playerID: string; // WS 鉴权后的 playerID
-  readonly currentPlayer: string; // BGIO ctx.currentPlayer
-  readonly intentId?: string;
-  readonly turnStage?: string; // BGIO stage（可选）
-}
-
-export interface MovePayload {
-  readonly name: MoveName;
-  readonly cardId?: CardID;
-  readonly targetPlayerID?: string;
-  readonly targetLayer?: number;
-  readonly cardIds?: CardID[];
-}
-
-// === L1 · Schema 校验 ===
-
-export function validateSchema(payload: unknown): ValidationResult {
-  if (!payload || typeof payload !== 'object') {
-    return fail(1, 'SCHEMA_INVALID', 'payload must be an object');
-  }
-  const p = payload as Partial<MovePayload>;
-  if (typeof p.name !== 'string') {
-    return fail(1, 'SCHEMA_MISSING_FIELD', 'missing move name');
-  }
-  if (p.cardId !== undefined && typeof p.cardId !== 'string') {
-    return fail(1, 'SCHEMA_BAD_TYPE', 'cardId must be string');
-  }
-  if (p.targetPlayerID !== undefined && typeof p.targetPlayerID !== 'string') {
-    return fail(1, 'SCHEMA_BAD_TYPE', 'targetPlayerID must be string');
-  }
-  if (p.targetLayer !== undefined && typeof p.targetLayer !== 'number') {
-    return fail(1, 'SCHEMA_BAD_TYPE', 'targetLayer must be number');
-  }
-  if (p.cardIds !== undefined && !Array.isArray(p.cardIds)) {
-    return fail(1, 'SCHEMA_BAD_TYPE', 'cardIds must be array');
-  }
-  return OK;
-}
-
-// === L2 · 身份鉴权 ===
-
-export function validateAuth(
-  state: SetupState,
-  ctx: MoveContext,
-  payload: MovePayload,
-): ValidationResult {
-  if (!state.players[ctx.playerID]) {
-    return fail(2, 'AUTH_PLAYER_NOT_FOUND', `player ${ctx.playerID} not in match`);
-  }
-  if (ctx.playerID !== ctx.currentPlayer) {
-    // 非当前玩家能不能发这个 move，由行动权表决定（响应者、被点名的目标等）
-    const denial = denyAction(state, ctx.playerID, payload.name);
-    if (denial !== null) {
-      return fail(
-        2,
-        'AUTH_NOT_CURRENT_PLAYER',
-        `${ctx.playerID} is not current player (${ctx.currentPlayer}): ${denial}`,
-      );
-    }
-  }
-  return OK;
-}
-
-// === L3 · 阶段合法性 ===
-
-const PHASE_ALLOWED_MOVES: Record<SetupState['turnPhase'], MoveName[]> = {
-  turnStart: [],
-  draw: ['doDraw', 'skipDraw'],
-  action: [
-    'endActionPhase',
-    'playShoot',
-    'playUnlock',
-    'resolveUnlock',
-    'respondCancelUnlock',
-    'passResponse',
-    'playDreamTransit',
-    'playCreation',
-    'dreamMasterMove',
-  ],
-  discard: ['doDiscard', 'skipDiscard'],
-  turnEnd: [],
-};
-
-export function validatePhase(state: SetupState, payload: MovePayload): ValidationResult {
-  if (state.phase !== 'playing') {
-    return fail(3, 'PHASE_INVALID', `game phase is ${state.phase}, not playing`);
-  }
-  const allowed = PHASE_ALLOWED_MOVES[state.turnPhase] ?? [];
-  if (!allowed.includes(payload.name)) {
-    return fail(
-      3,
-      'STAGE_INVALID',
-      `move ${payload.name} not allowed in turnPhase ${state.turnPhase}`,
-    );
-  }
-  // 响应窗口：有 pendingUnlock 时只允许响应类 move
-  if (state.pendingUnlock) {
-    const responseOnly: MoveName[] = ['respondCancelUnlock', 'passResponse', 'resolveUnlock'];
-    if (!responseOnly.includes(payload.name)) {
-      return fail(
-        3,
-        'PENDING_RESPONSE_BLOCKED',
-        `pendingUnlock active, only response moves allowed`,
-      );
-    }
-  }
-  return OK;
-}
-
-// === L4 · 资源/手牌 ===
-
-export function validateResource(
-  state: SetupState,
-  ctx: MoveContext,
-  payload: MovePayload,
-): ValidationResult {
-  const player = state.players[ctx.playerID];
-  if (!player) return fail(4, 'RESOURCE_PLAYER_DEAD', 'player not found');
-  if (!player.isAlive && payload.name !== 'passResponse') {
-    return fail(4, 'RESOURCE_PLAYER_DEAD', `player ${ctx.playerID} is dead`);
-  }
-  if (payload.cardId !== undefined) {
-    if (!player.hand.includes(payload.cardId)) {
-      return fail(4, 'RESOURCE_NO_CARD', `card ${payload.cardId} not in hand`);
-    }
-  }
-  if (payload.name === 'playUnlock' && player.faction !== 'thief') {
-    return fail(4, 'RESOURCE_FACTION_MISMATCH', 'only thieves can play unlock');
-  }
-  if (payload.name === 'dreamMasterMove' && player.faction !== 'master') {
-    return fail(4, 'RESOURCE_FACTION_MISMATCH', 'only dream master can dreamMasterMove');
-  }
-  return OK;
-}
-
-// === L5 · 目标合法性 ===
-
-export function validateTarget(state: SetupState, payload: MovePayload): ValidationResult {
-  if (payload.targetPlayerID !== undefined) {
-    const t = state.players[payload.targetPlayerID];
-    if (!t) return fail(5, 'TARGET_NOT_FOUND', `target ${payload.targetPlayerID} not found`);
-    if (!t.isAlive) return fail(5, 'TARGET_DEAD', `target ${payload.targetPlayerID} is dead`);
-  }
-  if (payload.targetLayer !== undefined) {
-    if (payload.targetLayer < 0 || payload.targetLayer > 4) {
-      return fail(5, 'TARGET_LAYER_INVALID', `targetLayer ${payload.targetLayer} out of range`);
-    }
-  }
-  return OK;
-}
-
-// === L6 · 规则不变量 ===
-
-export function validateRule(
-  state: SetupState,
-  ctx: MoveContext,
-  payload: MovePayload,
-): ValidationResult {
-  const player = state.players[ctx.playerID];
-  if (!player) return OK;
-
-  if (payload.name === 'playUnlock') {
-    if (player.successfulUnlocksThisTurn >= state.maxUnlockPerTurn) {
-      return fail(
-        6,
-        'RULE_UNLOCK_LIMIT',
-        `unlock limit reached (${player.successfulUnlocksThisTurn}/${state.maxUnlockPerTurn})`,
-      );
-    }
-    const layerState = state.layers[player.currentLayer];
-    if (!layerState || layerState.heartLockValue <= 0) {
-      return fail(6, 'RULE_NO_HEART_LOCK', `layer ${player.currentLayer} has no heart lock`);
-    }
-  }
-
-  if (payload.name === 'playDreamTransit' && payload.targetLayer !== undefined) {
-    if (Math.abs(player.currentLayer - payload.targetLayer) !== 1) {
-      return fail(
-        6,
-        'RULE_LAYER_NOT_ADJACENT',
-        `layer ${payload.targetLayer} not adjacent to ${player.currentLayer}`,
-      );
-    }
-  }
-
-  if (payload.name === 'dreamMasterMove' && payload.targetLayer !== undefined) {
-    if (Math.abs(player.currentLayer - payload.targetLayer) !== 1) {
-      return fail(
-        6,
-        'RULE_LAYER_NOT_ADJACENT',
-        `layer ${payload.targetLayer} not adjacent to ${player.currentLayer}`,
-      );
-    }
-  }
-
-  return OK;
-}
-
-// === L7 · 频率/幂等 ===
-
-// 在 server 层配合 Redis 实现；engine 层仅提供接口
+/** 服务端提供实现（Redis / 内存）；引擎层只定义接口 */
 export interface RateGuard {
   isDuplicate(intentId: string): boolean;
   isRateLimited(playerID: string): boolean;
 }
 
-export function validateRate(ctx: MoveContext, guard?: RateGuard): ValidationResult {
-  if (!guard) return OK;
-  if (ctx.intentId && guard.isDuplicate(ctx.intentId)) {
-    return fail(7, 'RATE_INTENT_DUPLICATE', `intent ${ctx.intentId} already processed`);
-  }
-  if (guard.isRateLimited(ctx.playerID)) {
-    return fail(7, 'RATE_LIMIT_EXCEEDED', `rate limit exceeded for ${ctx.playerID}`);
-  }
-  return OK;
+export interface RateContext {
+  readonly playerID: string;
+  readonly intentId?: string;
 }
 
-// === 完整流水线 ===
-
-export function validateMove(
-  state: SetupState,
-  ctx: MoveContext,
-  payloadRaw: unknown,
-  guard?: RateGuard,
-): ValidationResult {
-  // L1
-  const l1 = validateSchema(payloadRaw);
-  if (!l1.ok) return l1;
-  const payload = payloadRaw as MovePayload;
-
-  // L2
-  const l2 = validateAuth(state, ctx, payload);
-  if (!l2.ok) return l2;
-
-  // L3
-  const l3 = validatePhase(state, payload);
-  if (!l3.ok) return l3;
-
-  // L4
-  const l4 = validateResource(state, ctx, payload);
-  if (!l4.ok) return l4;
-
-  // L5
-  const l5 = validateTarget(state, payload);
-  if (!l5.ok) return l5;
-
-  // L6
-  const l6 = validateRule(state, ctx, payload);
-  if (!l6.ok) return l6;
-
-  // L7
-  const l7 = validateRate(ctx, guard);
-  if (!l7.ok) return l7;
-
-  return OK;
+export function validateRate(ctx: RateContext, guard?: RateGuard): RateResult {
+  if (!guard) return { ok: true };
+  if (ctx.intentId && guard.isDuplicate(ctx.intentId)) {
+    return {
+      ok: false,
+      code: 'RATE_INTENT_DUPLICATE',
+      reason: `intent ${ctx.intentId} already processed`,
+    };
+  }
+  if (guard.isRateLimited(ctx.playerID)) {
+    return {
+      ok: false,
+      code: 'RATE_LIMIT_EXCEEDED',
+      reason: `rate limit exceeded for ${ctx.playerID}`,
+    };
+  }
+  return { ok: true };
 }
