@@ -26,9 +26,9 @@ COPY packages/game-engine ./packages/game-engine
 COPY packages/bot ./packages/bot
 COPY packages/client ./packages/client
 # Vite 构建时的运行期 API base（通过构建参数注入）
-ARG VITE_API_BASE=""
-ARG VITE_WS_URL=""
-ENV VITE_API_BASE=$VITE_API_BASE \
+ARG VITE_API_URL="/api"
+ARG VITE_WS_URL="/ws"
+ENV VITE_API_URL=$VITE_API_URL \
     VITE_WS_URL=$VITE_WS_URL
 RUN cd packages/client && pnpm build
 

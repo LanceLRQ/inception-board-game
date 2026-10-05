@@ -85,13 +85,15 @@ curl -fsS http://localhost:3001/ready
 | --- | --- | --- |
 | `JWT_SECRET` | **是** | JWT 签名密钥；必须是 32+ 字节随机串 |
 | `POSTGRES_PASSWORD` | **是** | 数据库密码 |
-| `WS_CORS_ORIGIN` | 建议改 | 生产填前端域名（如 `https://ico.example.com`），开发用 `*` |
+| `WS_CORS_ORIGIN` | 建议改 | 允许访问后端的页面来源，接口请求与联机实时连接共用；生产填前端域名（如 `https://ico.example.com`），开发用 `*` |
 | `CLIENT_PORT` | 可选 | 前端对外端口，默认 80；如被占用改为 8080 |
 | `API_PORT` | 可选 | 后端对外端口，默认 3001 |
 | `LOG_LEVEL` | 可选 | 生产建议 `info`，调试用 `debug` |
 | `MATCH_BOT_STEP_DELAY_MS` | 可选 | Bot 每一步之间的间隔，默认 600 毫秒 |
 | `MATCH_PENDING_TIMEOUT_MS` | 可选 | 等待玩家应答（响应、选择目标等）的时限，默认 45000 毫秒；超时由服务端代为行动 |
 | `MATCH_TURN_TIMEOUT_MS` | 可选 | 一个回合的时限，默认 120000 毫秒；超时由服务端代为结束回合 |
+| `VITE_API_URL` | 可选 | 前端构建参数：浏览器访问后端接口的地址。默认 `/api`（同域，由 nginx 反代）；前后端分域部署时填完整地址，如 `https://api.example.com` |
+| `VITE_WS_URL` | 可选 | 前端构建参数：联机对局实时连接的地址。默认 `/ws`，此时与 `VITE_API_URL` 同源（同域部署即当前页面的域名）；单独部署实时服务时填完整地址 |
 
 对局运行在单个服务进程内：进行中的对局状态存放在 Redis，每一步的记录写入 PostgreSQL。服务重启后会从 Redis 恢复未结束的对局；目前不支持多个服务实例同时承载对局。
 
@@ -168,9 +170,10 @@ docker compose -f docker/docker-compose.yml down -v
 
 ### ❌ 前端打开白屏
 
-1. 检查 `VITE_API_BASE` / `VITE_WS_URL` 是否匹配实际部署
+1. 检查 `VITE_API_URL` / `VITE_WS_URL` 是否匹配实际部署
 2. 默认 `/api` 和 `/ws` 走 nginx 反代，已在 `docker/nginx.conf` 配置好
-3. 如自定义域名，在前端构建前设置 `VITE_API_BASE=https://api.example.com`
+3. 如自定义域名，在前端构建前设置 `VITE_API_URL=https://api.example.com`
+4. 这两个变量在构建前端镜像时写入产物，修改后需要重新构建 `client` 镜像才生效
 
 ### ❌ 端口冲突（80/3001/5432/6379）
 

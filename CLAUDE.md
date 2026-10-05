@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 玩家人数：3-10（默认 5-8，4 人有变体规则）
 - 核心冲突：1 梦主 vs 多盗梦者（隐藏信息 + 非对称对抗）
-- 当前阶段：**核心玩法与大部分角色已实装，可本地人机对战；服务端权威对局已可运行，客户端尚未接入联机**（详见下方「实现现状」）
+- 当前阶段：**核心玩法与大部分角色已实装，可本地人机对战，也可通过好友房进行服务端权威的联机对局**（详见下方「实现现状」）
 
 ## ⚠️ 不可协商的硬约束
 
@@ -53,26 +53,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 本地人机对局（引擎与 Bot 都运行在浏览器内）：回合流程、4–10 人、20 种行动牌、6 张梦魇牌，以及 38 名盗梦者与 15 名梦主的大部分技能
 - 对局界面：PC 围坐椭圆 + 移动端行动轴双模式
+- 好友房联机对局：房主建房、其他人凭房间码加入、空位可补 Bot，开始后全体进入同一局服务端权威对局；刷新或断线后回到同一局
 - 匿名身份（JWT + 恢复码）、房间创建与加入、新手教程、PWA 离线访问
-- 工程基建：pnpm + Turborepo monorepo、单元测试 3100+ 条、Docker Compose 部署文件
+- 工程基建：pnpm + Turborepo monorepo、单元测试 3200+ 条、双浏览器联机端到端用例、Docker Compose 部署文件
 
-**服务端已可运行，客户端尚未接入**
+**联机对局的实现方式**
 
 - 服务端权威对局：房间开始游戏后在服务端建立对局，由对局运行器驱动引擎；move 经形状校验、限流与行动权检查后串行执行；Bot 座位与超时由服务端代为行动
 - 信息隔离：发给每个连接的状态是按座位裁剪的白名单视图，事件的私密部分只发给被点名的座位；随机种子与完整状态不出服务端
 - 持久化：进行中的对局存 Redis，逐步记录存 PostgreSQL；服务重启后恢复未结束的对局；回放接口读取逐步记录并按座位裁剪
-- 客户端的对局界面目前只连接本地 Worker，还不能进入服务端对局
+- 客户端：本地对局与联机对局共用同一套对局界面，区别只在状态来源（本地 Worker 或服务端连接）；界面只拿到按座位裁剪的视图
+- 联机时有 6 类需要玩家应答的情形（如天秤、白羊、处女的选择，被射击时的响应）还没有操作界面：轮到真人应答时只显示等待提示，到时限后由服务端代为处理
 
 **已有实现但尚未接入运行路径**
 
 - 成就、最佳玩家评分、举报与运营审核的后端接口和计算函数（尚未消费对局数据）
-- 聊天、头像、举报、断线重连等客户端组件（尚未挂载到页面）
+- 聊天、头像、举报等客户端组件（尚未挂载到页面）
 
 **已知缺口**
 
 - 部分角色技能与世界观未接入对局，另有若干规则细节与原版有出入
 - 尚不支持 3 人局
-- 在线多人对局的客户端接入、旁观、公开匹配、多实例部署
+- 旁观、公开匹配、对局内聊天、回放播放器、多实例部署
+- 联机对局没有事件驱动的动画，状态变化直接刷新
 - 启发式 Bot、渗透测试、动画音效、完整的无障碍支持与英文本地化
 - 持续集成流水线已编写，尚未实际运行
 
@@ -108,6 +111,7 @@ pnpm install                          # 安装依赖
 pnpm dev                              # 启动全部开发服务（服务端 + 客户端）
 pnpm test                             # 全部包的测试（含 E2E 包，需先装好 Playwright 浏览器）
 pnpm --filter @icgame/server test     # 只跑某个包的单元测试
+pnpm --filter @icgame/e2e test:online # 双浏览器联机端到端（全内存服务端，需本机装有 Chrome）
 pnpm typecheck                        # 类型检查
 pnpm lint                             # ESLint
 pnpm build                            # 构建
@@ -142,12 +146,13 @@ docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs
 
 ## 对局界面多路径地图（⚠️ 改 UI 前必读）
 
-**对局界面（Match UI）有三条并行渲染路径，任何视觉/布局改动都必须同步评估是否需要三路同改：**
+**对局界面（Match UI）有三条并行渲染路径，任何视觉/布局改动都必须同步评估是否需要三路同改。路径 A 有本地与联机两个状态来源，共用同一套界面：**
 
 | 路径 | 入口 URL | 驱动组件 | 状态源 | 用途 |
 |------|---------|---------|-------|------|
-| **A · 本地真实对局** | `/local` / `?friend=1` | `components/LocalMatchRuntime/index.tsx` | 本地 Worker（`workers/localMatch.worker.ts`），由对局运行器驱动真实引擎 | 主战场：人机对战、好友房本地模式 |
-| **B · Mock 调试视图** | `/game/:matchId` 非 friend 模式 | `pages/Game/index.tsx → GameMockView` | `hooks/useMockMatch.ts`（静态 mock） | 开发调试、UI 走查、视角切换（`?as=master` / `?pending=1`） |
+| **A · 真实对局（本地）** | `/local` / `/game/:matchId?friend=1&players=N` | `components/LocalMatchRuntime/index.tsx` → `components/MatchRuntime/` | 本地 Worker（`workers/localMatch.worker.ts`），由对局运行器驱动真实引擎，只向界面交出按座位裁剪的视图 | 人机对战；后端不可达时好友房的本地模式 |
+| **A · 真实对局（联机）** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` → `components/MatchRuntime/` | 服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
+| **B · Mock 调试视图** | `/game/:matchId` 不带 `online` / `friend` 参数 | `pages/Game/index.tsx → GameMockView` | `hooks/useMockMatch.ts`（静态 mock） | 开发调试、UI 走查、视角切换（`?as=master` / `?pending=1`） |
 | **C · 旧降级 UI** | 任一路径 + `?legacyUi=1` | `pages/Game/{ThiefBoard,MasterBoard}` | 同上 | 新 UI 上线后的应急降级通道 |
 
 **核心组件（所有路径共用）：**
@@ -164,19 +169,22 @@ docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs
 - `pages/Game/Track/` — 移动端星穹铁道行动轴（`TurnOrderRail` / `MatchTrack` / `MasterPanelCollapsible` / `turnOrder`）
 - `pages/Game/shared/` — 双路径复用（`CenterPanel` 中央桌面 / `MasterConsole` 梦主控制台）
 
-**LocalMatchRuntime 接入新 UI 的方式：**
+**真实对局（路径 A）接入新 UI 的方式：**
 
-- 适配器 `components/LocalMatchRuntime/bgioAdapter.ts` 把对局运行器输出的状态（`G` / `ctx`）转为 `MockMatchState` 供新 UI 复用
-- `components/LocalMatchRuntime/RuntimeStage.tsx` 做视口分派（PC → `TableStage` / 移动 → `TurnOrderRail`），仅负责**展示层**
-- LocalMatchRuntime 自己的 Dialog 群（TargetPlayerPickerDialog、ShooterLayerPickerDialog、嫁接/万有引力/棋局易位等）**保留原样**——新 UI 的 `TargetPickerDialog` 仅服务于 Mock 调试路径
+- `components/MatchRuntime/index.tsx` 是本地与联机共用的对局界面，只依赖对局来源接口 `match/matchSource.ts`（视图、发 move、本人座位、连接状态、座位信息）；本地实现是 `match/useLocalMatchSource.ts`，联机实现是 `match/useRemoteMatchSource.ts`
+- 界面拿到的永远是**按座位裁剪的视图**（他人手牌只有张数、牌库只有张数），不要在界面里读完整状态才有的字段；本人座位取自来源接口，不得写死座位号（`MatchRuntime/noHardcodedSeat.test.ts` 会拦）
+- 适配器 `components/MatchRuntime/viewAdapter.ts` 把视图（`G` / `ctx`）转为 `MockMatchState` 供新 UI 复用
+- `components/MatchRuntime/RuntimeStage.tsx` 做视口分派（PC → `TableStage` / 移动 → `TurnOrderRail`），仅负责**展示层**
+- 对局页的分流规则在 `pages/Game/resolveGameMode.ts`
+- MatchRuntime 自己的 Dialog 群（TargetPlayerPickerDialog、ShooterLayerPickerDialog、嫁接/万有引力/棋局易位等）**保留原样**——新 UI 的 `TargetPickerDialog` 仅服务于 Mock 调试路径
 
 **改 UI 时的自检清单：**
 
-1. 访问 `/local`（路径 A）确认新视觉生效
+1. 访问 `/local`（路径 A）确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
 2. 访问 `/game/debug?as=master`（路径 B）确认 mock 路径生效
 3. 访问任一路径 + `?legacyUi=1`（路径 C）确认降级通道仍可用
 4. PC 1280×800 + 移动 iPhone 12（390×844）两个视口都要走查
-5. 如果改动影响状态结构（`MockMatchState` / 对局状态 `G`），务必同步更新 `bgioAdapter.ts` + 测试
+5. 如果改动影响状态结构（`MockMatchState` / 对局状态 `G`），务必同步更新 `viewAdapter.ts` + 测试
 
 **交互硬规范：**
 
