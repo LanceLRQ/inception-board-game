@@ -1,12 +1,13 @@
-// Redis Key 命名规范（参照设计文档 §3.9.1）
+// Redis 键命名规范
 // 格式：`ico:{domain}:{entity}:{id}[:field]`
 
 const PREFIX = 'ico';
 
 export const RedisKeys = {
-  // BGIO 对局状态（设计文档保留 bgio: 前缀兼容）
-  bgioMatch: (matchId: string) => `bgio:match:${matchId}`,
-  bgioLog: (matchId: string) => `bgio:log:${matchId}`,
+  // 对局快照（完整状态 + 座位表 + 建局参数，整体一个 JSON 字符串）
+  matchSnapshot: (matchId: string) => `${PREFIX}:match:${matchId}`,
+  // 进行中的对局 id 集合
+  matchActive: () => `${PREFIX}:match:active`,
 
   // 自有业务
   playerSession: (playerId: string) => `${PREFIX}:session:player:${playerId}`,
@@ -19,7 +20,7 @@ export const RedisKeys = {
 
 // TTL 常量（秒）
 export const RedisTTL = {
-  BGIO_MATCH: 86400 * 2, // 2 天
+  MATCH_FINISHED: 86400, // 对局结束后快照保留 1 天
   SHORT_LINK: 86400 * 7, // 7 天
   SESSION: 86400 * 30, // 30 天
   RATE_LIMIT_WINDOW: 60, // 1 分钟
