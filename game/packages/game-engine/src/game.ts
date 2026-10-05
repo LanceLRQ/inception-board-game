@@ -126,6 +126,7 @@ import {
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
+import { isPlainRecord, isRecordOf, isString, isStringArray } from './engine/argShape.js';
 import {
   openResponseWindow,
   respondToWindow,
@@ -547,6 +548,7 @@ export const InceptionCityGame = {
         // 对照：docs/manual/05-dream-thieves.md 黑天鹅
         playBlackSwanTour: {
           move: ({ G, ctx }: MoveCtx, distribution: Record<string, CardID[]>) => {
+            if (!isRecordOf(distribution, isStringArray)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             const applied = applyBlackSwanTour(G, G.currentPlayerID, distribution);
             if (applied === null) return INVALID_MOVE;
@@ -561,6 +563,7 @@ export const InceptionCityGame = {
         // 对照：docs/manual/05-dream-thieves.md 黑洞
         playBlackHoleLevy: {
           move: ({ G, ctx }: MoveCtx, giverPicks: Record<string, CardID>) => {
+            if (!isRecordOf(giverPicks, isString)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             const applied = applyBlackHoleLevy(G, G.currentPlayerID, giverPicks);
             if (applied === null) return INVALID_MOVE;
@@ -602,6 +605,7 @@ export const InceptionCityGame = {
         // 对照：docs/manual/03-game-flow.md 复活 / docs/manual/06-dream-master.md 密道
         playRevive: {
           move: ({ G, ctx }: MoveCtx, targetID: string | null, discardedCardIds: CardID[]) => {
+            if (!isStringArray(discardedCardIds)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const applied = applyRevive(G, ctx.currentPlayer, targetID, discardedCardIds);
             if (applied === null) return INVALID_MOVE;
@@ -614,6 +618,7 @@ export const InceptionCityGame = {
         // 对照：docs/manual/06-dream-master.md 金星·镜界
         useVenusMirrorWorld: {
           move: ({ G, ctx, random }: MoveCtx, targetID: string, discardedCardIds: CardID[]) => {
+            if (!isStringArray(discardedCardIds)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const roll = random.D6();
             const applied = applyVenusMirrorWorld(
@@ -1878,6 +1883,8 @@ export const InceptionCityGame = {
         // 对照：packages/game-engine/src/engine/skills.ts applyChessTranspose
         useChessTranspose: {
           move: ({ G, ctx }: MoveCtx, vaultIdx1: number, vaultIdx2: number) => {
+            if (!Number.isInteger(vaultIdx1) || !Number.isInteger(vaultIdx2)) return INVALID_MOVE;
+            if (!G.vaults[vaultIdx1] || !G.vaults[vaultIdx2]) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const next = applyChessTranspose(G, ctx.currentPlayer, vaultIdx1, vaultIdx2);
@@ -1942,6 +1949,7 @@ export const InceptionCityGame = {
         // 对照：docs/manual/04-action-cards.md 万有引力
         playGravity: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetIds: string[]) => {
+            if (!isStringArray(targetIds)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             for (const tid of targetIds) {
               if (isMazeBlocked(G, tid, 'playGravity')) return INVALID_MOVE;
@@ -2523,6 +2531,14 @@ export const InceptionCityGame = {
         // 对照：docs/manual/05-dream-thieves.md 欺诈师
         playForgerExchange: {
           move: ({ G, ctx }: MoveCtx, exchange: ForgerExchange) => {
+            if (
+              !isPlainRecord(exchange) ||
+              !isString(exchange.targetID) ||
+              !isStringArray(exchange.takenFromTarget) ||
+              !isStringArray(exchange.returnedToTarget)
+            ) {
+              return INVALID_MOVE;
+            }
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyForgerExchange(G, ctx.currentPlayer, exchange);
@@ -2601,6 +2617,7 @@ export const InceptionCityGame = {
         // 代 target 在 bonder 回合内补完）。split 合法性由 libraValidateSplit 守护。
         resolveLibraSplit: {
           move: ({ G }: MoveCtx, pile1: CardID[], pile2: CardID[]) => {
+            if (!isStringArray(pile1) || !isStringArray(pile2)) return INVALID_MOVE;
             const pl = G.pendingLibra;
             if (!pl) return INVALID_MOVE;
             if (pl.split !== null) return INVALID_MOVE;
@@ -2822,6 +2839,7 @@ export const InceptionCityGame = {
         // --- 弃牌阶段 ---
         doDiscard: {
           move: ({ G, ctx, events }: MoveCtx, cardIds: CardID[]) => {
+            if (!isStringArray(cardIds)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'discard')) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             // 小丑·赌博罚则：armed 且已过"下个回合"（armedAtTurn < turnNumber）→ 强制传入 = 全手牌
