@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net';
 import type Koa from 'koa';
 import type { Middleware } from 'koa';
 import { createApp } from './app.js';
+import type { IdentityPrisma } from './api/identity.js';
 import { logger } from './infra/logger.js';
 import type { MatchArchive } from './match/MatchArchive.js';
 import type { RoomDeps } from './match/MatchRoom.js';
@@ -28,6 +29,8 @@ export interface RealtimeDeps {
   archive: MatchArchive;
   lobbyRedis?: LobbyRedis;
   lobbyPrisma?: LobbyPrisma;
+  /** 身份接口的数据库访问；默认全局数据库客户端 */
+  identityPrisma?: IdentityPrisma;
   heartbeatRedis?: HeartbeatRedis;
   /** 默认 InMemoryRateGuard */
   rateGuard?: RateGuardMutable;
@@ -95,7 +98,13 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     prisma: deps.lobbyPrisma,
     matches,
   });
-  const app = createApp({ lobby, rateLimit: deps.httpRateLimit, archive: deps.archive });
+  const app = createApp({
+    lobby,
+    rateLimit: deps.httpRateLimit,
+    archive: deps.archive,
+    identityPrisma: deps.identityPrisma,
+    corsOrigin: deps.ws?.corsOrigin,
+  });
   const httpServer = createServer(app.callback());
   gateway.attach(httpServer);
 

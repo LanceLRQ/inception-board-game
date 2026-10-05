@@ -1,0 +1,59 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createApp } from '../app.js';
+import { createMemoryIdentityPrisma } from '../testing/memoryIdentity.js';
+
+vi.mock('../infra/logger.js', () => ({
+  logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+let server: Server | null = null;
+
+afterEach(async () => {
+  await new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve()));
+  server = null;
+});
+
+async function start(): Promise<string> {
+  const app = createApp({
+    identityPrisma: createMemoryIdentityPrisma(),
+    rateLimit: async (_ctx, next) => {
+      await next();
+    },
+  });
+  server = createServer(app.callback());
+  await new Promise<void>((resolve) => server!.listen(0, resolve));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
+describe('身份路由使用注入的数据库', () => {
+  it('建档后能凭令牌读到自己，并能凭恢复码恢复', async () => {
+    const base = await start();
+    const init = await fetch(`${base}/identity/init`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nickname: '甲' }),
+    });
+    expect(init.status).toBe(201);
+    const created = (await init.json()) as {
+      playerId: string;
+      token: string;
+      recoveryCode: string;
+    };
+
+    const me = await fetch(`${base}/identity/me`, {
+      headers: { authorization: `Bearer ${created.token}` },
+    });
+    expect(me.status).toBe(200);
+    expect(await me.json()).toMatchObject({ playerId: created.playerId, nickname: '甲' });
+
+    const recovered = await fetch(`${base}/identity/recover`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: created.recoveryCode }),
+    });
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toMatchObject({ playerId: created.playerId });
+  });
+});

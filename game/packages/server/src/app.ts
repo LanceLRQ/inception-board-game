@@ -1,10 +1,11 @@
 import Koa, { type Middleware } from 'koa';
 import bodyParser from 'koa-bodyparser';
 import { logger } from './infra/logger.js';
+import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { healthRouter } from './api/health.js';
-import { identityRouter } from './api/identity.js';
+import { createIdentityRouter, type IdentityPrisma } from './api/identity.js';
 import { createRoomsRouter } from './api/rooms.js';
 import { LobbyService } from './services/LobbyService.js';
 import { playersRouter } from './api/players.js';
@@ -23,12 +24,17 @@ export interface AppDeps {
   rateLimit?: Middleware;
   /** 对局归档；回放与对局事件接口从这里读。不给时用 PrismaMatchArchive */
   archive?: MatchArchive;
+  /** 身份接口的数据库访问；不给时用全局数据库客户端 */
+  identityPrisma?: IdentityPrisma;
+  /** 允许跨域访问的页面源；不给时不处理跨域 */
+  corsOrigin?: string | string[];
 }
 
 export function createApp(deps: AppDeps = {}): Koa {
   const app = new Koa();
 
-  // 全局中间件
+  // 全局中间件；跨域在最外层，预检不计入限流，出错的响应也带跨域头
+  if (deps.corsOrigin) app.use(corsMiddleware(deps.corsOrigin));
   app.use(errorHandler);
   app.use(bodyParser());
   app.use(deps.rateLimit ?? rateLimitMiddleware);
@@ -42,6 +48,7 @@ export function createApp(deps: AppDeps = {}): Koa {
   });
 
   // API 路由（按前缀挂载）
+  const identityRouter = createIdentityRouter({ prisma: deps.identityPrisma });
   app.use(identityRouter.routes());
   app.use(identityRouter.allowedMethods());
 

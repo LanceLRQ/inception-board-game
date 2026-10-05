@@ -98,3 +98,36 @@ describe('timingFromEnv', () => {
     expect(log.warn).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('buildRealtime 的跨域配置', () => {
+  async function originHeader(corsOrigin: string | undefined): Promise<string | null> {
+    const rt = buildRealtime({
+      store: new InMemoryMatchStore(),
+      archive: new InMemoryMatchArchive(),
+      lobbyRedis: {
+        get: vi.fn(),
+        setex: vi.fn(),
+        set: vi.fn(),
+        del: vi.fn(),
+        exists: vi.fn(),
+      },
+      heartbeatRedis: { get: vi.fn(), setex: vi.fn(), del: vi.fn() } as never,
+      httpRateLimit: passThrough,
+      ws: corsOrigin ? { corsOrigin } : undefined,
+    });
+    const port = await rt.start(0);
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/health`, {
+        headers: { Origin: 'http://a.test' },
+      });
+      return res.headers.get('access-control-allow-origin');
+    } finally {
+      await rt.stop();
+    }
+  }
+
+  it('给了 corsOrigin 时 HTTP 响应带跨域头，没给时不带', async () => {
+    expect(await originHeader('http://a.test')).toBe('http://a.test');
+    expect(await originHeader(undefined)).toBeNull();
+  });
+});

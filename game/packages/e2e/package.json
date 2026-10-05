@@ -7,7 +7,8 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:offline": "playwright test --config=playwright.offline.config.ts",
-    "lint": "eslint tests/ tests-offline/",
+    "test:online": "playwright test --config=playwright.online.config.ts",
+    "lint": "eslint tests/ tests-offline/ tests-online/",
     "clean": "rm -rf test-results playwright-report"
   },
   "devDependencies": {
