@@ -258,6 +258,10 @@ export const InceptionCityGame = {
 
   setup: ({ ctx }: { ctx: { numPlayers: number } }, setupData?: Record<string, unknown>) => {
     const data = setupData ?? {};
+    // 种子决定金库、贿赂、梦魇与牌库顺序，不能有默认值：漏传会让每局布局完全相同
+    if (typeof data.rngSeed !== 'string' || data.rngSeed.length === 0) {
+      throw new Error('建局必须提供非空的 rngSeed（setupData.rngSeed）');
+    }
     const numPlayers = ctx.numPlayers;
     const playerIds = Array.from({ length: numPlayers }, (_, i) => String(i));
     const nicknames = playerIds.map((_, i) => `Player ${i + 1}`);
@@ -266,7 +270,7 @@ export const InceptionCityGame = {
       playerCount: numPlayers,
       playerIds,
       nicknames,
-      rngSeed: (data.rngSeed as string | undefined) ?? 'default',
+      rngSeed: data.rngSeed,
       ruleVariant: data.ruleVariant as string | undefined,
       exCardsEnabled: data.exCardsEnabled as boolean | undefined,
       expansionEnabled: data.expansionEnabled as boolean | undefined,

@@ -1,6 +1,7 @@
 // Schema 版本化与迁移框架
 // 确保旧版 GameState 可以平滑升级到新版
 
+import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
 export const CURRENT_SCHEMA_VERSION = 9;
@@ -97,19 +98,34 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       };
     },
   ],
-  // v8 → v9：贿赂牌的成败改存 kind 字段；旧状态按旧标识前缀补上（bribe-deal- 为成功，其余为失败），标识不改
+  // v8 → v9：贿赂牌的成败改存 kind 字段，标识与池内顺序都不能再透露成败。
+  //   旧状态按旧标识前缀补 kind（bribe-deal- 为成功，其余为失败）；只要有任何一张的标识不是
+  //   `bribe-<数字>`，就把整个池按对局种子重新洗乱并重新编号。整池一起洗而不是把已派出的牌
+  //   保持原顺序：旧池里成功牌排在前，已派出的牌若保持原相对顺序，顺序本身就会泄露成败。
+  //   已派出的牌的持有者、成败与状态随牌走，不改。
   [
     9,
     (state) => {
       const pool = state.bribePool;
       if (!Array.isArray(pool)) return state;
-      return {
-        ...state,
-        bribePool: pool.map((bribe: Record<string, unknown>) => ({
+      const withKind = pool.map(
+        (bribe: Record<string, unknown>): Record<string, unknown> => ({
           ...bribe,
           kind:
             bribe.kind ??
             (typeof bribe.id === 'string' && bribe.id.startsWith('bribe-deal-') ? 'deal' : 'fail'),
+        }),
+      );
+      const opaque = withKind.every(
+        (bribe) => typeof bribe.id === 'string' && /^bribe-\d+$/.test(bribe.id),
+      );
+      if (opaque) return { ...state, bribePool: withKind };
+      const seed = typeof state.rngSeed === 'string' ? state.rngSeed : '';
+      return {
+        ...state,
+        bribePool: seededShuffle(withKind, seed, 'bribe-migrate').map((bribe, i) => ({
+          ...bribe,
+          id: `bribe-${i}`,
         })),
       };
     },

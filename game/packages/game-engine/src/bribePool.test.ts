@@ -53,7 +53,7 @@ describe('贿赂池', () => {
     expect(buildPool('same')).toEqual(buildPool('same'));
   });
 
-  it('迁移：旧快照里没有 kind 的贿赂牌按旧标识前缀补上，标识不变', () => {
+  it('迁移：旧快照里没有 kind 的贿赂牌按旧标识前缀补上，标识重新编号', () => {
     const fresh = createInitialState({
       playerCount: 4,
       playerIds: ['0', '1', '2', '3'],
@@ -70,11 +70,9 @@ describe('贿赂池', () => {
       ],
     };
     const migrated = migrateGameState(old);
-    expect(migrated.bribePool.map((b) => [b.id, b.kind])).toEqual([
-      ['bribe-deal-0', 'deal'],
-      ['bribe-fail-1', 'fail'],
-      ['bribe-fail-mercury', 'fail'],
-    ]);
+    // 旧标识带成败前缀，会泄露成败：迁移后整池重排并重新编号，成败只留在 kind 里
+    expect(migrated.bribePool.map((b) => b.id)).toEqual(['bribe-0', 'bribe-1', 'bribe-2']);
+    expect(migrated.bribePool.map((b) => b.kind).sort()).toEqual(['deal', 'fail', 'fail']);
   });
 
   it('迁移：已有 kind 的贿赂牌保持原值', () => {

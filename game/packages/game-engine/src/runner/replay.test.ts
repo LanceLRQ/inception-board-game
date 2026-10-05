@@ -33,10 +33,62 @@ interface StepRecord {
   events: MatchEvent[];
   /** 这一步之后仍未翻开的玩家与他们的角色 */
   hiddenChars: Record<string, string>;
-  /** 这一步离开牌库的张数（牌库减少量，重洗时为 null） */
-  leftDeck: number | null;
-  /** 这一步新增的「移出游戏」的牌里，不是从手牌来的张数（被翻开的牌库顶） */
+  /** 这一步牌库的变化与去向，全部从状态前后算出；重洗（弃牌堆回牌库）的那一步为 null */
+  deck: DeckAccount | null;
+}
+
+interface DeckAccount {
+  /** 牌库减少量，进入牌库多于离开时为负 */
+  left: number;
+  /** 离开牌库的牌（按种类的多重集差，从状态前后算） */
+  out: string[];
+  /** 从手牌放回牌库的张数（按种类的多重集差） */
+  entered: number;
+  /** 本步新增的「移出游戏」的牌里，不是从手牌来的张数（被翻开的牌库顶） */
   flipped: number;
+  /** 弃牌堆新增的牌（按种类的多重集差，含手牌弃掉的和牌库直接进来的） */
+  discardGain: string[];
+}
+
+/** 多重集差：a 里去掉 b 之后剩下的牌 */
+function minus(a: readonly string[], b: readonly string[]): string[] {
+  const left = new Map<string, number>();
+  for (const x of b) left.set(x, (left.get(x) ?? 0) + 1);
+  const out: string[] = [];
+  for (const x of a) {
+    const n = left.get(x) ?? 0;
+    if (n > 0) left.set(x, n - 1);
+    else out.push(x);
+  }
+  return out;
+}
+
+/** 多重集交：a 与 b 共有的牌 */
+function common(a: readonly string[], b: readonly string[]): string[] {
+  return minus(a, minus(a, b));
+}
+
+function accountDeck(was: SetupState, now: SetupState): DeckAccount | null {
+  const out = minus(was.deck.cards, now.deck.cards);
+  const entered = minus(now.deck.cards, was.deck.cards);
+  const discardLoss = minus(was.deck.discardPile, now.deck.discardPile);
+  // 进入牌库的牌里有从弃牌堆来的，说明重洗过，这一步按差值算不了
+  if (common(entered, discardLoss).length > 0) return null;
+  // 从手牌里移出游戏的时间风暴本身；其余新增的是被翻开的牌库顶
+  const newlyRemoved = now.removedFromGame.slice(was.removedFromGame.length);
+  const stormsIn = (G: SetupState): number =>
+    Object.values(G.players).reduce(
+      (t, pl) => t + pl.hand.filter((c) => c === 'action_time_storm').length,
+      0,
+    );
+  const stormsLeftHands = newlyRemoved.length > 0 ? stormsIn(was) - stormsIn(now) : 0;
+  return {
+    left: was.deck.cards.length - now.deck.cards.length,
+    out,
+    entered: entered.length,
+    flipped: newlyRemoved.length - stormsLeftHands,
+    discardGain: minus(now.deck.discardPile, was.deck.discardPile),
+  };
 }
 
 /** 用模糊器随机打一局，记下起始参数与每个被接受的请求，以及全部事件 */
@@ -55,20 +107,6 @@ function playOut(numPlayers: number, seed: string, maxSteps = 500): Played {
     events.push(...res.events);
     const was = state.G;
     const now = res.state.G;
-    const newlyRemoved = now.removedFromGame.slice(was.removedFromGame.length);
-    // 从手牌里移出游戏的时间风暴本身；其余的是被翻开的牌库顶
-    const stormsIn = (G: SetupState): number =>
-      Object.values(G.players).reduce(
-        (t, pl) => t + pl.hand.filter((c) => c === 'action_time_storm').length,
-        0,
-      );
-    const stormsLeftHands = newlyRemoved.length > 0 ? stormsIn(was) - stormsIn(now) : 0;
-    // 牌库里出现了原来没有的牌，说明重洗过
-    const countIn = (cards: readonly string[], card: string): number =>
-      cards.filter((x) => x === card).length;
-    const reshuffled = now.deck.cards.some(
-      (card) => countIn(was.deck.cards, card) < countIn(now.deck.cards, card),
-    );
     const hiddenChars: Record<string, string> = {};
     for (const id of now.playerOrder) {
       if (!now.players[id]!.isRevealed) hiddenChars[id] = now.players[id]!.characterId;
@@ -77,8 +115,7 @@ function playOut(numPlayers: number, seed: string, maxSteps = 500): Played {
       move: request.move,
       events: res.events,
       hiddenChars,
-      leftDeck: reshuffled ? null : was.deck.cards.length - now.deck.cards.length,
-      flipped: newlyRemoved.length - stormsLeftHands,
+      deck: accountDeck(was, now),
     });
     state = res.state;
   };
@@ -95,7 +132,8 @@ function playOut(numPlayers: number, seed: string, maxSteps = 500): Played {
 
 const GAMES: { n: number; seed: string }[] = [];
 for (let n = 4; n <= 10; n++) {
-  GAMES.push({ n, seed: `replay-${n}-a` }, { n, seed: `replay-${n}-b` });
+  // 现有种子之外再加几组不同后缀：对账结论不能依赖某一个种子的布局
+  for (const suffix of ['a', 'b', 'c', 'd', 'e']) GAMES.push({ n, seed: `replay-${n}-${suffix}` });
 }
 
 // 同一批对局被多条用例复用，只打一次
@@ -182,13 +220,18 @@ describe('事件流', () => {
         // 死亡次数减复活次数：为 0 就是活着，为 1 就是死着
         expect(deaths - revives).toBe(G.players[id]!.isAlive ? 0 : 1);
 
-        // 解封计数：心锁下降的解封都算。另有一类解封发生在迷失层（第 0 层没有心锁，心锁不会下降），
-        // 引擎照样给解封者记一次 unlockCount，这里把它们单独列出来对账
+        // 解封计数：心锁下降的解封都算。迷失层没有心锁，那里的解封照常走完待解封流程，
+        // 引擎照样给解封者记一次 unlockCount，但心锁不变，事件里表现为 success 为否。
+        // 被【解封】取消的解封（respondCancelUnlock）在事件里同样是 success 为否，
+        // 单看事件分不出两者，所以按产生这条事件的 move 区分：取消的不计数，其余迷失层的照计。
         const unlockEvents = events.filter(
           (e) => e.kind === 'unlock_resolved' && e.data.player === id,
         );
         const lostLayerUnlocks = unlockEvents.filter(
-          (e) => e.data.success === false && e.data.layer === 0,
+          (e) =>
+            e.data.success === false &&
+            e.data.layer === 0 &&
+            p.record.moves[e.stateID - 1]!.move !== 'respondCancelUnlock',
         ).length;
         const unlocks =
           unlockEvents.filter((e) => e.data.success === true).length + lostLayerUnlocks;
@@ -269,30 +312,48 @@ describe('事件流', () => {
     expect(samples).toBeGreaterThan(100);
   });
 
-  it('对账：离开牌库的牌都能在 cards_drawn 里找到，去向不是手牌的另有出处', () => {
-    // 牌库减少量 = 抽到的牌 + 被翻开移出游戏的牌库顶。
-    // 例外：重洗那一步无法按差值计算；嫁接归还、空间女王放回牌库顶是把手牌放回牌库（牌库变多），不在此列
+  it('对账：离开牌库的牌都有去向，直接进弃牌堆的牌都在 cards_discarded 里', () => {
+    // 离开牌库的牌 = 抽到手里的（cards_drawn）+ 翻开移出游戏的 + 直接进弃牌堆的；
+    // 放回牌库的牌（嫁接归还、空间女王、进化）反向抵扣。对所有 move 成立，不按 move 名字特判。
+    // 直接进弃牌堆的张数 = 离开张数 - 抽到的 - 翻开的（状态前后的差减去前两项）；
+    // 它必须非负，且这些牌在弃牌堆新增和 cards_discarded 里都找得到，否则说明有牌凭空消失。
+    // 唯一的例外是重洗那一步（弃牌堆回到牌库），差值算不了。
     let checked = 0;
     let withFlip = 0;
+    let withDeckDiscard = 0;
+    let withReturn = 0;
     for (const p of played) {
       for (const st of p.steps) {
-        if (
-          st.leftDeck === null ||
-          st.move === 'resolveGraft' ||
-          st.move === 'useSpaceQueenStashTop'
-        ) {
-          continue;
-        }
+        const d = st.deck;
+        if (d === null) continue;
+        const where = `${p.record.seed} ${st.move}`;
         const drawn = st.events
           .filter((e) => e.kind === 'cards_drawn')
           .reduce((t, e) => t + (e.data.count as number), 0);
-        expect(st.leftDeck, `${st.move}`).toBe(drawn + st.flipped);
+        const toDiscard = d.out.length - drawn - d.flipped;
+        expect(d.left, where).toBe(drawn + d.flipped + toDiscard - d.entered);
+        expect(toDiscard, `${where} 直接进弃牌堆的张数不能为负`).toBeGreaterThanOrEqual(0);
+        const announced = st.events
+          .filter((e) => e.kind === 'cards_discarded')
+          .flatMap((e) => e.data.cards as string[]);
+        expect(
+          common(d.out, d.discardGain).length,
+          `${where} 直接进弃牌堆的牌要在弃牌堆新增里`,
+        ).toBeGreaterThanOrEqual(toDiscard);
+        expect(
+          common(d.out, announced).length,
+          `${where} 直接进弃牌堆的牌要在 cards_discarded 里`,
+        ).toBeGreaterThanOrEqual(toDiscard);
         checked++;
-        if (st.flipped > 0) withFlip++;
+        if (d.flipped > 0) withFlip++;
+        if (toDiscard > 0) withDeckDiscard++;
+        if (d.entered > 0) withReturn++;
       }
     }
     expect(checked).toBeGreaterThan(1000);
     expect(withFlip).toBeGreaterThan(0);
+    expect(withDeckDiscard).toBeGreaterThan(0);
+    expect(withReturn).toBeGreaterThan(0);
   });
 });
 

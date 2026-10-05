@@ -47,7 +47,20 @@ describe('对局运行器 · 快照校验', () => {
     ],
     ['阶段类型不对', broken((s) => (ctxOf(s).phase = 3)), 'ctx.phase'],
     ['回合数为负', broken((s) => (ctxOf(s).turn = -1)), 'ctx.turn'],
-    ['随机数状态不是整数', broken((s) => (s.rngState = 1.5)), 'rngState'],
+    ['随机数状态是小数', broken((s) => (s.rngState = 1.5)), 'rngState'],
+    ['随机数状态是随意字符串', broken((s) => (s.rngState = 'abc')), 'rngState'],
+    [
+      '随机数状态的密钥不是 64 位小写十六进制',
+      broken((s) => (s.rngState = `${'G'.repeat(64)}:0`)),
+      'rngState',
+    ],
+    [
+      '随机数状态的计数器不是非负整数',
+      broken((s) => (s.rngState = `${'a'.repeat(64)}:-1`)),
+      'rngState',
+    ],
+    ['随机数状态缺失', broken((s) => delete s.rngState), 'rngState'],
+    ['随机数状态是对象', broken((s) => (s.rngState = { a: 1 })), 'rngState'],
     ['版本号为负', broken((s) => (s.stateID = -1)), 'stateID'],
   ])('%s：抛错并指出字段', (_label, raw, field) => {
     expect(() => matchFromSnapshot(raw)).toThrow(field);

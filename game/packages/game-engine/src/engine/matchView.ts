@@ -644,6 +644,7 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
     mazeState: maze
       ? { mazedPlayerID: maze.mazedPlayerID, untilTurnNumber: maze.untilTurnNumber }
       : null,
+    // 这里遮住的行动者，必须与 matchEvents.ts 的 MASKED_ACTOR_FIELDS 保持一致
     pendingAriesChoice: aries
       ? {
           ariesID: who.open || who.who === aries.ariesID ? aries.ariesID : null,

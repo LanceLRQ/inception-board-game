@@ -52,6 +52,16 @@ function newlyPlayed(before: SetupState, after: SetupState): CardID[] {
   return a.slice();
 }
 
+/**
+ * 等待事项里「行动者身份在视图中被遮蔽」的字段。
+ * 必须与 matchView.ts 中把 ariesID / virgoID 只给本人的遮蔽保持一致：
+ * 视图遮住谁，事件就不能在公开部分点名谁（真实行动者放进 secret，只给他们本人）。
+ */
+export const MASKED_ACTOR_FIELDS: ReadonlySet<string> = new Set([
+  'pendingAriesChoice',
+  'pendingVirgoChoice',
+]);
+
 export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   const { before, after, ctxBefore, ctxAfter, request } = args;
   const mover = request.playerID;
@@ -273,7 +283,7 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     }
   }
 
-  // awaiting_changed
+  // awaiting_changed：是否变化按完整内容（含行动者）比较；公开的那份里，行动者在视图中被遮蔽的条目不带行动者
   const awaitingOf = (G: SetupState) =>
     listAwaiting(G).map((a) => ({
       field: a.field,
@@ -284,7 +294,23 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   const awaitingBefore = awaitingOf(before);
   const awaitingAfter = awaitingOf(after);
   if (JSON.stringify(awaitingBefore) !== JSON.stringify(awaitingAfter)) {
-    events.push({ kind: 'awaiting_changed', actor: null, data: { awaiting: awaitingAfter } });
+    const hidden = awaitingAfter.filter((a) => MASKED_ACTOR_FIELDS.has(a.field));
+    const ev: DescribedEvent = {
+      kind: 'awaiting_changed',
+      actor: null,
+      data: {
+        awaiting: awaitingAfter.map((a) =>
+          MASKED_ACTOR_FIELDS.has(a.field) ? { ...a, actors: [] } : a,
+        ),
+      },
+    };
+    if (hidden.length > 0) {
+      ev.secret = {
+        to: [...new Set(hidden.flatMap((a) => a.actors))],
+        data: { actors: Object.fromEntries(hidden.map((a) => [a.field, a.actors])) },
+      };
+    }
+    events.push(ev);
   }
 
   // game_over

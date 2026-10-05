@@ -12,6 +12,7 @@
 // 没有实现：分阶段行动（stages / activePlayers）、回合的 endIf 与步数上限、撤销重做、插件。
 
 import { INVALID_MOVE } from '../engine/invalidMove.js';
+import { createStream, deriveKey, labelNonce, shuffleWith } from '../prng.js';
 
 export interface RandomSource {
   D6(): number;
@@ -34,8 +35,8 @@ export interface RunnerCtx {
 export interface MatchState<G> {
   G: G;
   ctx: RunnerCtx;
-  /** 随机数发生器的内部状态，随状态一起保存，重启后可以接着掷 */
-  rngState: number;
+  /** 随机数流的状态「64 位十六进制密钥:块计数器」，随状态一起保存，重启后可以接着掷；绝不对外 */
+  rngState: string;
   /** 每接受一个 move 加 1，用作乐观锁版本号 */
   stateID: number;
 }
@@ -181,41 +182,50 @@ export interface ApplyMoveOptions {
 }
 
 // ---------------------------------------------------------------------------
-// 随机数：mulberry32，内部状态是一个 32 位整数
+// 随机数：ChaCha20 流。状态是「密钥:计数器」，密钥 256 位且从不对外，
+// 每次取数用一个块，计数器随之前进；公开的骰值推不出密钥。
 // ---------------------------------------------------------------------------
 
-function hashSeed(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h | 0;
+const RUNNER_STREAM_LABEL = 'runner';
+const RNG_STATE_PATTERN = /^([0-9a-f]{64}):(\d{1,10})$/;
+
+function keyToHex(key: Uint32Array): string {
+  return Array.from(key, (w) => w.toString(16).padStart(8, '0')).join('');
 }
 
-function seededRandom(initial: number): { source: RandomSource; state(): number } {
-  let a = initial | 0;
-  const next = (): number => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function hexToKey(hex: string): Uint32Array {
+  const key = new Uint32Array(8);
+  for (let i = 0; i < 8; i++) key[i] = parseInt(hex.slice(i * 8, i * 8 + 8), 16);
+  return key;
+}
+
+function formatRngState(key: Uint32Array, counter: number): string {
+  return `${keyToHex(key)}:${counter}`;
+}
+
+/** 解析随机数状态；格式不对返回 null */
+function parseRngState(value: unknown): { key: Uint32Array; counter: number } | null {
+  if (typeof value !== 'string') return null;
+  const m = RNG_STATE_PATTERN.exec(value);
+  if (!m) return null;
+  const counter = Number(m[2]);
+  if (counter > 0xffffffff) return null;
+  return { key: hexToKey(m[1]!), counter };
+}
+
+function seededRandom(rngState: string): { source: RandomSource; state(): string } {
+  const parsed = parseRngState(rngState);
+  if (!parsed) invalidSnapshot('rngState');
+  const stream = createStream(parsed.key, labelNonce(RUNNER_STREAM_LABEL), parsed.counter);
+  const next = stream.next;
   const Die = (sides: number): number => Math.floor(next() * sides) + 1;
   return {
     source: {
       Die,
       D6: () => Die(6),
-      Shuffle: <T>(arr: T[]): T[] => {
-        const out = [...arr];
-        for (let i = out.length - 1; i > 0; i--) {
-          const j = Math.floor(next() * (i + 1));
-          [out[i], out[j]] = [out[j]!, out[i]!];
-        }
-        return out;
-      },
+      Shuffle: <T>(arr: T[]): T[] => shuffleWith(arr, next),
     },
-    state: () => a,
+    state: () => formatRngState(parsed.key, stream.counter()),
   };
 }
 
@@ -480,7 +490,9 @@ export function createMatch<G>(game: GameDef<G>, options: CreateMatchOptions): M
     turn: 0,
   };
   const G = game.setup({ ctx }, setupData);
-  return process(game, { G, ctx, rngState: hashSeed(seed), stateID: 0 }, [{ kind: 'startPhase' }]);
+  return process(game, { G, ctx, rngState: formatRngState(deriveKey(seed), 0), stateID: 0 }, [
+    { kind: 'startPhase' },
+  ]);
 }
 
 function invalidSnapshot(what: string): never {
@@ -516,9 +528,18 @@ export function matchFromSnapshot<G>(raw: unknown, game?: GameDef<G>): MatchStat
   if (ctx.phase !== null && typeof ctx.phase !== 'string') invalidSnapshot('ctx.phase');
   if (!Number.isInteger(ctx.turn) || ctx.turn < 0) invalidSnapshot('ctx.turn');
 
-  if (!Number.isInteger(s.rngState)) invalidSnapshot('rngState');
+  // 旧的本地快照里 rngState 是 32 位整数：转成新格式（以整数派生密钥、计数器 0）。
+  // 这只为兼容旧快照，联机对局不会产生这种状态。
+  let rngState: string;
+  if (typeof s.rngState === 'number' && Number.isInteger(s.rngState)) {
+    rngState = formatRngState(deriveKey(`legacy:${s.rngState}`), 0);
+  } else if (parseRngState(s.rngState) !== null) {
+    rngState = s.rngState as string;
+  } else {
+    invalidSnapshot('rngState');
+  }
   if (!Number.isInteger(s.stateID) || (s.stateID as number) < 0) invalidSnapshot('stateID');
-  const match = s as MatchState<G>;
+  const match = { ...s, rngState } as MatchState<G>;
   // 传入 Game 定义且它带迁移钩子时，把旧版本的 G 升到当前版本；迁移失败的错误原样抛出
   const migrated: MatchState<G> = game?.migrate ? { ...match, G: game.migrate(match.G) } : match;
   const problem = game?.validate?.(migrated.G);

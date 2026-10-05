@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
 import { applyMove, createMatch, type GameDef, type MatchState } from './matchRunner.js';
-import { makeTestRng, pickLegalMove } from './moveFuzzer.js';
+import { fuzzCandidate, makeTestRng, pickLegalMove } from './moveFuzzer.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -57,5 +57,36 @@ describe('pickLegalMove · 替谁出招', () => {
     for (let i = 1; i <= 10; i++) {
       expect(pickLegalMove(game, clean, makeTestRng(i))?.playerID).toBe(owner);
     }
+  });
+});
+
+describe('fuzzCandidate · 小丑罚则下的弃牌', () => {
+  it('罚则生效后，弃牌的参数是全部手牌', () => {
+    const s = createMatch(game, { numPlayers: 5, setupData: { rngSeed: 'f' }, seed: 'f' });
+    const done = applyMove(game, s, { playerID: '0', move: 'completeSetup', args: [] });
+    if (!done.ok) throw new Error('completeSetup 被拒绝');
+    const base = done.state;
+    const pid = base.ctx.currentPlayer;
+    const player = base.G.players[pid]!;
+    const hand = ['action_shoot', 'action_kick', 'action_unlock', 'action_kick', 'action_shoot'];
+    const state: MatchState<SetupState> = {
+      ...base,
+      G: {
+        ...base.G,
+        turnPhase: 'discard',
+        turnNumber: 10,
+        players: {
+          ...base.G.players,
+          [pid]: { ...player, hand: hand as never, forcedDiscardArmedAtTurn: 4 },
+        },
+      },
+    };
+    const rnd = makeTestRng(7);
+    for (let i = 0; i < 20; i++) {
+      expect(fuzzCandidate(game, state, 'doDiscard', pid, rnd).args).toEqual([hand]);
+    }
+    expect(applyMove(game, state, { playerID: pid, move: 'doDiscard', args: [hand] }).ok).toBe(
+      true,
+    );
   });
 });

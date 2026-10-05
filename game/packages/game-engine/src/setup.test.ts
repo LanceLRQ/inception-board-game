@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createInitialState } from './setup.js';
+import { InceptionCityGame } from './game.js';
 import {
   PLAYER_COUNT_CONFIGS,
   LAYER_COUNT,
@@ -276,6 +277,24 @@ describe('setup', () => {
       });
       expect(s.playerOrder).toHaveLength(10);
       expect(Object.keys(s.players)).toHaveLength(10);
+    });
+  });
+
+  describe('建局种子', () => {
+    const setupOf = (data?: Record<string, unknown>) =>
+      InceptionCityGame.setup({ ctx: { numPlayers: 5 } }, data);
+
+    it('缺少 rngSeed 时抛错，不回落到默认值', () => {
+      expect(() => setupOf()).toThrow(/rngSeed/);
+      expect(() => setupOf({})).toThrow(/rngSeed/);
+      expect(() => setupOf({ rngSeed: '' })).toThrow(/rngSeed/);
+      expect(() => setupOf({ rngSeed: 42 })).toThrow(/rngSeed/);
+    });
+
+    it('同一个种子得到相同布局，不同种子得到不同布局', () => {
+      const a = setupOf({ rngSeed: 'one' });
+      expect(setupOf({ rngSeed: 'one' })).toEqual(a);
+      expect(setupOf({ rngSeed: 'two' })).not.toEqual(a);
     });
   });
 });

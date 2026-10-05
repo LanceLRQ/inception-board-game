@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { Client } from 'boardgame.io/client';
 import { Local } from 'boardgame.io/multiplayer';
-import { InceptionCityGame } from './game.js';
+import { seededGame } from './testing/seededGame.js';
 import type { SetupState } from './setup.js';
 import { HAND_LIMIT } from './config.js';
 
@@ -31,10 +31,12 @@ function createClients(playerCount: number): BGIOClient[] {
   // 每个测试用独立 matchID，避免 BGIO Local master 单例状态污染
   const matchID = `test-match-${++testCounter}-${Date.now()}`;
   const multi = Local();
+  // 同一局的所有客户端必须共用同一个游戏对象，本地服务端按对象区分对局
+  const game = seededGame('client-seed');
   const clients: BGIOClient[] = [];
   for (let i = 0; i < playerCount; i++) {
     const client = Client({
-      game: InceptionCityGame as never,
+      game: game as never,
       numPlayers: playerCount,
       multiplayer: multi,
       playerID: String(i),

@@ -4,12 +4,21 @@
 import type { Layer, CardID, Faction } from '@icgame/shared';
 import { ACTION_CARDS } from '@icgame/shared';
 import { CURRENT_SCHEMA_VERSION } from './migrations.js';
+import { seededShuffle } from './prng.js';
 import {
   PLAYER_COUNT_CONFIGS,
   VAULT_SECRET_COUNT,
   VAULT_COIN_COUNT,
   LAYER_COUNT,
 } from './config.js';
+
+/** 开局各处洗牌用的流标签：同一种子下，不同标签得到互相独立的流 */
+const SHUFFLE_LABEL = {
+  deck: 'deck',
+  bribe: 'bribe',
+  nightmare: 'nightmare',
+  vault: 'vault',
+} as const;
 
 /**
  * 构建行动牌牌库
@@ -24,7 +33,7 @@ import {
  */
 function buildInitialBribePool(rngSeed: string): BribeSetup[] {
   const kinds: BribeSetup['kind'][] = ['deal', 'deal', 'deal', 'fail', 'fail', 'fail'];
-  return seededShuffle(kinds, rngSeed + ':bribe').map((kind, i) => ({
+  return seededShuffle(kinds, rngSeed, SHUFFLE_LABEL.bribe).map((kind, i) => ({
     id: `bribe-${i}`,
     kind,
     status: 'inPool' as const,
@@ -41,33 +50,7 @@ function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] 
     const qty = Math.max(1, def.quantity ?? 1);
     for (let i = 0; i < qty; i++) cards.push(def.id as CardID);
   }
-  return seededShuffle(cards, rngSeed);
-}
-
-/**
- * 带种子的洗牌（Fisher-Yates + mulberry32）
- * 与 bot/matchRunner 使用同款 PRNG，保证可复现性
- */
-function seededShuffle<T>(input: readonly T[], seed: string): T[] {
-  const out = [...input];
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  let t = h >>> 0;
-  const rand = (): number => {
-    t = (t + 0x6d2b79f5) >>> 0;
-    let x = t;
-    x = Math.imul(x ^ (x >>> 15), x | 1);
-    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [out[i], out[j]] = [out[j]!, out[i]!];
-  }
-  return out;
+  return seededShuffle(cards, rngSeed, SHUFFLE_LABEL.deck);
 }
 
 export interface SetupState {
@@ -370,7 +353,7 @@ export function createInitialState(options: {
     'nightmare_plague',
     'nightmare_vortex',
   ];
-  const shuffledNightmares = seededShuffle(nightmarePool, rngSeed + ':nightmare');
+  const shuffledNightmares = seededShuffle(nightmarePool, rngSeed, SHUFFLE_LABEL.nightmare);
 
   const layers: Record<number, LayerSetup> = {};
   for (let l = 1; l <= LAYER_COUNT; l++) {
@@ -394,7 +377,7 @@ export function createInitialState(options: {
     ...Array.from({ length: VAULT_SECRET_COUNT }, () => 'secret' as const),
     ...Array.from({ length: VAULT_COIN_COUNT }, () => 'coin' as const),
   ];
-  const shuffledVaultContents = seededShuffle(vaultContents, rngSeed + ':vault');
+  const shuffledVaultContents = seededShuffle(vaultContents, rngSeed, SHUFFLE_LABEL.vault);
   const vaults: VaultSetup[] = shuffledVaultContents.map((contentType, i) => ({
     id: `vault-${i + 1}`,
     layer: ((i % LAYER_COUNT) + 1) as Layer,

@@ -6,7 +6,9 @@ import { describe, it, expect } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
-import { describeMatchEvents } from './matchEvents.js';
+import { describeMatchEvents, MASKED_ACTOR_FIELDS } from './matchEvents.js';
+import { viewFor } from './matchView.js';
+import { buildViewScene } from '../testing/viewScene.js';
 import { createTestState, makePlayer, withBribes } from '../testing/fixtures.js';
 import {
   applyMove,
@@ -502,5 +504,114 @@ describe('事件 · 翻开角色', () => {
     for (const id of state.G.playerOrder.filter((p) => p !== master)) {
       expect(text).not.toContain(state.G.players[id]!.characterId);
     }
+  });
+});
+
+describe('事件 · 待选择里被遮蔽的行动者', () => {
+  const sceneG = buildViewScene();
+  const { G: viewG, a, b, c, d } = sceneG;
+  const ctx = {
+    numPlayers: viewG.playerOrder.length,
+    playOrder: viewG.playerOrder,
+    playOrderPos: 0,
+    currentPlayer: viewG.currentPlayerID,
+    phase: 'playing',
+    turn: 1,
+  };
+  const request = { playerID: a, move: 'x', args: [] as unknown[] };
+
+  function awaitingEvents(before: SetupState, after: SetupState): MatchEvent[] {
+    const described = describeMatchEvents({
+      before,
+      after,
+      ctxBefore: ctx,
+      ctxAfter: ctx,
+      request,
+    });
+    return described.map((ev, index) => ({ ...ev, stateID: 1, index })) as MatchEvent[];
+  }
+
+  /** 收集值里所有字符串叶子，避免用子串匹配把数字误判成玩家 id */
+  const stringLeaves = (value: unknown): string[] =>
+    typeof value === 'string'
+      ? [value]
+      : typeof value === 'object' && value !== null
+        ? Object.values(value).flatMap(stringLeaves)
+        : [];
+
+  const withAries = (who: string): SetupState => ({
+    ...viewG,
+    pendingAriesChoice: { ariesID: who, victimLayer: 2, victimID: c },
+  });
+  const withVirgo = (who: string): SetupState => ({
+    ...viewG,
+    pendingVirgoChoice: { virgoID: who, triggerRoll: 6, shooterID: a },
+  });
+
+  it('遮蔽的字段集合与视图一致：集合里的每个字段，视图都对非本人遮住行动者', () => {
+    for (const field of MASKED_ACTOR_FIELDS) {
+      const state = field === 'pendingAriesChoice' ? withAries(b) : withVirgo(d);
+      const outsider = viewFor(state, a, { gameOver: false });
+      const owner = viewFor(state, field === 'pendingAriesChoice' ? b : d, { gameOver: false });
+      const pick = (view: typeof outsider): string | null | undefined =>
+        field === 'pendingAriesChoice'
+          ? view.pendingAriesChoice?.ariesID
+          : view.pendingVirgoChoice?.virgoID;
+      expect(pick(outsider)).toBeNull();
+      expect(pick(owner)).toBe(field === 'pendingAriesChoice' ? b : d);
+    }
+    // 响应窗口的行动者就是公开的 SHOOT 目标，不在集合里
+    expect(MASKED_ACTOR_FIELDS.has('pendingShootResponse')).toBe(false);
+  });
+
+  for (const [field, build, who] of [
+    ['pendingAriesChoice', withAries, b],
+    ['pendingVirgoChoice', withVirgo, d],
+  ] as const) {
+    it(`${field}：非本人拿到的事件里没有行动者的 id，本人在 secret 里拿得到`, () => {
+      const events = awaitingEvents(viewG, build(who));
+      const ev = events.find((e) => e.kind === 'awaiting_changed')!;
+      const outsiderView = eventsFor([ev], a).find((e) => e.kind === 'awaiting_changed')!;
+      expect(outsiderView.secret).toBeUndefined();
+      const entry = (outsiderView.data.awaiting as { field: string; actors: string[] }[]).find(
+        (x) => x.field === field,
+      )!;
+      expect(entry.actors).toEqual([]);
+      expect(stringLeaves(outsiderView)).not.toContain(who);
+      expect(stringLeaves(eventsFor([ev], null))).not.toContain(who);
+
+      const ownerView = eventsFor([ev], who).find((e) => e.kind === 'awaiting_changed')!;
+      expect(stringLeaves(ownerView.secret)).toContain(who);
+      expect(ownerView.secret!.to).toEqual([who]);
+    });
+  }
+
+  it('变没变的判断基于完整内容：公开部分相同、行动者变了，也要发事件', () => {
+    const events = awaitingEvents(withAries(b), withAries(d));
+    expect(events.filter((e) => e.kind === 'awaiting_changed')).toHaveLength(1);
+    const same = awaitingEvents(withAries(b), withAries(b));
+    expect(same.filter((e) => e.kind === 'awaiting_changed')).toHaveLength(0);
+  });
+
+  it('SHOOT 响应窗口的行动者照旧公开', () => {
+    const after: SetupState = {
+      ...viewG,
+      pendingShootResponse: {
+        shooterID: a,
+        targetPlayerID: c,
+        cardId: 'action_shoot',
+        sameLayerRequired: true,
+        deathFaces: [1],
+        moveFaces: [2],
+        extraOnMove: null,
+        responseType: 'terrorist',
+      },
+    };
+    const ev = awaitingEvents(viewG, after).find((e) => e.kind === 'awaiting_changed')!;
+    const entry = (ev.data.awaiting as { field: string; actors: string[] }[]).find(
+      (x) => x.field === 'pendingShootResponse',
+    )!;
+    expect(entry.actors).toEqual([c]);
+    expect(ev.secret).toBeUndefined();
   });
 });

@@ -171,6 +171,30 @@ describe('对局运行器 · 随机数与快照', () => {
     expect(s1.rngState).not.toBe(s0.rngState);
   });
 
+  it('随机数状态是「64 位十六进制密钥:计数器」，密钥不变、计数器随取数前进', () => {
+    const s0 = start(5, 'fmt');
+    expect(s0.rngState).toMatch(/^[0-9a-f]{64}:0$/);
+    const s1 = mustApply(s0, '0', 'completeSetup');
+    expect(s1.rngState).toMatch(/^[0-9a-f]{64}:[1-9]\d*$/);
+    expect(s1.rngState.split(':')[0]).toBe(s0.rngState.split(':')[0]);
+    // 密钥由种子经 deriveKey 得到，种子不同密钥不同
+    expect(start(5, 'fmt-other').rngState.split(':')[0]).not.toBe(s0.rngState.split(':')[0]);
+  });
+
+  it('旧快照里的整数 rngState 兼容读入，转成新格式', () => {
+    const s0 = start();
+    const legacy = { ...JSON.parse(JSON.stringify(s0)), rngState: 12345 };
+    const restored = matchFromSnapshot<SetupState>(legacy);
+    expect(restored.rngState).toMatch(/^[0-9a-f]{64}:0$/);
+    const again = matchFromSnapshot<SetupState>(legacy);
+    expect(again.rngState).toBe(restored.rngState);
+    expect(matchFromSnapshot<SetupState>({ ...legacy, rngState: 12346 }).rngState).not.toBe(
+      restored.rngState,
+    );
+    // 之后可以正常推进
+    expect(mustApply(restored, '0', 'completeSetup').rngState).not.toBe(restored.rngState);
+  });
+
   it('状态经 JSON 往返后可以原样继续', () => {
     const s0 = mustApply(start(5, 'json'), '0', 'completeSetup');
     const restored = matchFromSnapshot<SetupState>(JSON.parse(JSON.stringify(s0)));

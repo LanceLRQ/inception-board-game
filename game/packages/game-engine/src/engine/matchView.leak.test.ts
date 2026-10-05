@@ -197,7 +197,18 @@ function scanMoment(
       for (const id of G.playerOrder) {
         const real = G.players[id]!;
         if (id === viewer || real.isRevealed) continue;
-        expect(json, `${at} 玩家${id}的角色`).not.toContain(`"${real.characterId}"`);
+        const quoted = `"${real.characterId}"`;
+        // 移形换影之后，观察者自己的快照条目里合法地带着他原来的角色编号，而那个角色此刻在别人身上。
+        // 这一个编号只允许出现在他本人的快照条目里，视图别处出现仍然算泄露。
+        const ownSnapshot = viewer === null ? undefined : G.shiftSnapshot?.[viewer];
+        if (ownSnapshot !== undefined && ownSnapshot === real.characterId) {
+          expect(view.shiftSnapshot?.[viewer!], `${at} 自己的快照条目`).toBe(real.characterId);
+          expect(json.split(quoted).length - 1, `${at} 玩家${id}的角色只在自己的快照条目里`).toBe(
+            1,
+          );
+        } else {
+          expect(json, `${at} 玩家${id}的角色`).not.toContain(quoted);
+        }
         counts.roleTextChecks++;
       }
     }
@@ -231,8 +242,11 @@ function playout(numPlayers: number, seed: string, maxSteps: number, every: numb
 describe('泄露扫描 · 随机对局（4 到 10 人）', () => {
   it('每个观察者的视图在整局里都不泄露秘密', () => {
     const total = emptyCounts();
-    for (let n = 4; n <= 10; n++) {
-      addCounts(total, playout(n, `leak-seed-${n}-xyzzy`, 120, 6));
+    // 多组不同后缀的种子：检查结论不能依赖某一个种子的布局
+    for (const suffix of ['xyzzy', 'plugh', 'qwert', 'foo', 'bar', 'baz']) {
+      for (let n = 4; n <= 10; n++) {
+        addCounts(total, playout(n, `leak-seed-${n}-${suffix}`, 120, 6));
+      }
     }
     // 每一类秘密都确实被检查过，样本为零会失败
     for (const key of Object.keys(total) as (keyof ScanCounts)[]) {

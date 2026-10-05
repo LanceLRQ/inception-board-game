@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { migrateGameState, getSchemaVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';
 import { createInitialState } from './setup.js';
+import { viewFor } from './engine/matchView.js';
 
 describe('migrations', () => {
   it('should add missing fields to raw state', () => {
@@ -182,5 +183,120 @@ describe('migrations', () => {
     });
     expect(state.players['0']!.successfulUnlocksThisTurn).toBe(0);
     expect(state.players['1']!.successfulUnlocksThisTurn).toBe(2);
+  });
+
+  describe('v8 → v9 · 贿赂池', () => {
+    // 旧状态：成功牌在前，标识带成败前缀；有两张已派出
+    function legacyState(seed: unknown): Record<string, unknown> {
+      const fresh = createInitialState({
+        playerCount: 5,
+        playerIds: ['0', '1', '2', '3', '4'],
+        nicknames: ['a', 'b', 'c', 'd', 'e'],
+        rngSeed: 'legacy-base',
+      }) as unknown as Record<string, unknown>;
+      const thieves = (fresh.playerOrder as string[]).filter((id) => id !== fresh.dreamMasterID);
+      const old = [
+        { id: 'bribe-deal-0', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-deal-1', status: 'dealt', heldBy: thieves[0], originalOwnerId: thieves[0] },
+        { id: 'bribe-deal-2', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-fail-0', status: 'inPool', heldBy: null, originalOwnerId: null },
+        { id: 'bribe-fail-1', status: 'dealt', heldBy: thieves[1], originalOwnerId: thieves[1] },
+        { id: 'bribe-fail-2', status: 'inPool', heldBy: null, originalOwnerId: null },
+      ];
+      const raw: Record<string, unknown> = { ...fresh, schemaVersion: 8, bribePool: old };
+      if (seed === undefined) delete raw.rngSeed;
+      else raw.rngSeed = seed;
+      return raw;
+    }
+
+    const kindsOf = (state: { bribePool: { kind: string }[] }): string => {
+      return state.bribePool.map((b) => b.kind).join(',');
+    };
+
+    it('旧式标识被重新编号，池里不再有成败字样的标识', () => {
+      const state = migrateGameState(legacyState('s1'));
+      expect(state.bribePool.map((b) => b.id)).toEqual([
+        'bribe-0',
+        'bribe-1',
+        'bribe-2',
+        'bribe-3',
+        'bribe-4',
+        'bribe-5',
+      ]);
+    });
+
+    it('迁移后任一盗梦者的视图里没有成败字样，也没有旧式标识', () => {
+      const state = migrateGameState(legacyState('s2'));
+      const thieves = state.playerOrder.filter((id) => id !== state.dreamMasterID);
+      const strings = (v: unknown): string[] =>
+        typeof v === 'string'
+          ? [v]
+          : typeof v === 'object' && v !== null
+            ? Object.values(v).flatMap(strings)
+            : [];
+      for (const viewer of thieves) {
+        const pool = viewFor(state, viewer, { gameOver: false }).bribePool;
+        const leaves = strings(pool.filter((b) => b.heldBy !== viewer));
+        for (const leaf of leaves) {
+          expect(leaf).not.toMatch(/deal|fail/);
+        }
+        expect(JSON.stringify(pool)).not.toMatch(/bribe-(deal|fail)/);
+      }
+    });
+
+    it('成功牌的下标在不同种子下不固定', () => {
+      const layouts = new Set<string>();
+      for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+        layouts.add(kindsOf(migrateGameState(legacyState(seed))));
+      }
+      expect(layouts.size).toBeGreaterThan(2);
+    });
+
+    it('已派出的牌的持有者、成败、状态原样保留', () => {
+      const raw = legacyState('s3');
+      const before = (raw.bribePool as Record<string, unknown>[])
+        .map((b) =>
+          JSON.stringify([
+            b.status,
+            b.heldBy,
+            b.originalOwnerId,
+            String(b.id).includes('deal') ? 'deal' : 'fail',
+          ]),
+        )
+        .sort();
+      const after = migrateGameState(raw)
+        .bribePool.map((b) => JSON.stringify([b.status, b.heldBy, b.originalOwnerId, b.kind]))
+        .sort();
+      expect(after).toEqual(before);
+    });
+
+    it('迁移是纯函数且幂等：不改入参，重复迁移结果相同', () => {
+      const raw = legacyState('s4');
+      const snapshot = JSON.stringify(raw);
+      const once = migrateGameState(raw);
+      expect(JSON.stringify(raw)).toBe(snapshot);
+      const twice = migrateGameState({ ...once, schemaVersion: 8 } as Record<string, unknown>);
+      expect(twice.bribePool).toEqual(once.bribePool);
+      expect(migrateGameState(legacyState('s4')).bribePool).toEqual(once.bribePool);
+    });
+
+    it('已经是新式标识的状态不动', () => {
+      const fresh = createInitialState({
+        playerCount: 5,
+        playerIds: ['0', '1', '2', '3', '4'],
+        nicknames: ['a', 'b', 'c', 'd', 'e'],
+        rngSeed: 'new-style',
+      });
+      const migrated = migrateGameState({
+        ...fresh,
+        schemaVersion: 8,
+      } as unknown as Record<string, unknown>);
+      expect(migrated.bribePool).toEqual(fresh.bribePool);
+    });
+
+    it('rngSeed 缺失或不是字符串时不抛错', () => {
+      expect(() => migrateGameState(legacyState(undefined))).not.toThrow();
+      expect(() => migrateGameState(legacyState(42))).not.toThrow();
+    });
   });
 });
