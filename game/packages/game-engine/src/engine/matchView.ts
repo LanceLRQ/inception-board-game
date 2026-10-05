@@ -17,6 +17,7 @@ import type { CardID, Faction, Layer } from '@icgame/shared';
 import type { BribeSetup, LayerSetup, PlayerSetup, SetupState, VaultSetup } from '../setup.js';
 import type { ResponseWindowState } from './abilities/response-chain.js';
 import type { ResponseWindowSourceType } from './abilities/types.js';
+import type { MatchOutcome } from './outcome.js';
 
 /** 观察者：对局里的玩家，或旁观者（null） */
 export type Viewer = string | null;
@@ -24,6 +25,8 @@ export type Viewer = string | null;
 export interface MatchViewOptions {
   /** 对局是否已结束；结束后全部公开 */
   gameOver: boolean;
+  /** 对局结果；不给时用状态里的同名字段 */
+  outcome?: MatchOutcome;
 }
 
 // ---------------------------------------------------------------------------
@@ -661,8 +664,8 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
       : null,
     pendingShootResponse: shootResponse ? viewShootResponse(shootResponse, who) : null,
 
-    winner: G.winner,
-    winReason: G.winReason,
+    winner: options.outcome ? options.outcome.winner : G.winner,
+    winReason: options.outcome ? options.outcome.reason : G.winReason,
     endTurn: G.endTurn,
 
     playedCardsThisTurn: G.playedCardsThisTurn.slice(),

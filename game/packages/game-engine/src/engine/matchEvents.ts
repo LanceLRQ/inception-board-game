@@ -13,6 +13,7 @@ import type { CardID } from '@icgame/shared';
 import type { MatchEvent, MoveRequest, RunnerCtx } from '../runner/matchRunner.js';
 import type { SetupState } from '../setup.js';
 import { listAwaiting } from './actionRights.js';
+import { matchOutcome } from './outcome.js';
 
 type DescribedEvent = Omit<MatchEvent, 'stateID' | 'index'>;
 
@@ -315,12 +316,11 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
 
   // game_over
   if (ctxBefore.gameover === undefined && ctxAfter.gameover !== undefined) {
-    const over = ctxAfter.gameover as { winner?: unknown; reason?: unknown } | true;
-    const detail = typeof over === 'object' ? over : {};
+    const outcome = matchOutcome(ctxAfter.gameover, after);
     events.push({
       kind: 'game_over',
       actor: null,
-      data: { winner: detail.winner ?? after.winner, reason: detail.reason ?? after.winReason },
+      data: { winner: outcome.winner, reason: outcome.reason },
     });
   }
 

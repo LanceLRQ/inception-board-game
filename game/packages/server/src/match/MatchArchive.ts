@@ -3,6 +3,7 @@
 // 逐步记录里的事件是完整事件（含私密部分），读出来后由调用方按观察者裁剪。
 
 import { createHash } from 'node:crypto';
+import { matchOutcome } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import type { MatchEvent, MatchState, MoveRequest } from '@icgame/game-engine/runner';
 import type { PrismaClient } from '../generated/prisma/client.js';
@@ -179,13 +180,13 @@ export class PrismaMatchArchive implements MatchArchive {
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
   ): Promise<void> {
-    const winner = final.G.winner;
+    const { winner, reason } = matchOutcome(final.ctx.gameover, final.G);
     await this.prisma.match.update({
       where: { id: matchID },
       data: {
         endedAt: new Date(),
         winner,
-        winReason: final.G.winReason === null ? null : final.G.winReason.slice(0, WIN_REASON_MAX),
+        winReason: reason === null ? null : reason.slice(0, WIN_REASON_MAX),
       },
     });
     for (const s of seats) {

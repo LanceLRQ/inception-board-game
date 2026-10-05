@@ -242,6 +242,8 @@ export type { Awaiting } from './engine/actionRights.js';
 
 // 白名单式对局视图：服务端发给每个观察者的状态
 export { viewFor, FIELD_DISPOSITION } from './engine/matchView.js';
+export { matchOutcome } from './engine/outcome.js';
+export type { MatchOutcome } from './engine/outcome.js';
 
 // 对局事件：对比一步前后的状态推导领域事件
 export { describeMatchEvents } from './engine/matchEvents.js';

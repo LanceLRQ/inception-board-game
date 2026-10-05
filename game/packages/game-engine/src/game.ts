@@ -129,6 +129,7 @@ import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { denyAction } from './engine/actionRights.js';
 import { viewFor } from './engine/matchView.js';
+import { matchOutcome } from './engine/outcome.js';
 import { describeMatchEvents } from './engine/matchEvents.js';
 import { isPlainRecord, isRecordOf, isString, isStringArray } from './engine/argShape.js';
 import {
@@ -2963,7 +2964,10 @@ export const InceptionCityGame = {
 
   // 视图：服务端发给每个观察者的对局状态，经白名单裁剪；视图只经运行器的 viewMatch 取得
   view({ G, ctx, viewer }) {
-    return viewFor(G, viewer, { gameOver: ctx.gameover !== undefined });
+    return viewFor(G, viewer, {
+      gameOver: ctx.gameover !== undefined,
+      outcome: matchOutcome(ctx.gameover, G),
+    });
   },
 
   // 事件描述：对比一步前后的状态，推导这一步产生的领域事件

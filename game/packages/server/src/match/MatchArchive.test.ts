@@ -195,8 +195,8 @@ describe('PrismaMatchArchive', () => {
     const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
     const snap = makeTestSnapshot('m1');
     const final = structuredClone(snap.state);
-    final.G.winner = 'thief';
-    final.G.winReason = 'x'.repeat(150);
+    // 胜负由运行器记在 ctx.gameover 里，状态里的同名字段保持为空
+    final.ctx.gameover = { winner: 'thief', reason: 'x'.repeat(150) };
     await archive.recordFinish('m1', final, snap.seats);
 
     const m = stub.match.update.mock.calls[0]![0] as {
