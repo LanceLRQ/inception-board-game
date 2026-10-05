@@ -164,6 +164,30 @@
     "waiting": "等待资源清单...",
     "failed": "{{count}} 张卡图加载失败，将使用占位"
   },
+  "match": {
+    "reject": {
+      "too_fast": "操作太快",
+      "not_allowed": "现在不能这样做",
+      "network": "网络不稳，操作未送达"
+    },
+    "waiting_others": "等待其他玩家应答",
+    "waiting_auto": "这一步暂时不能手动操作，到时间后由系统代为处理",
+    "deadline": "剩余 {{seconds}} 秒",
+    "connecting": "正在连接",
+    "back_to_lobby": "返回大厅",
+    "seat": {
+      "bot": "机器人",
+      "offline": "已掉线",
+      "taken_over": "已由系统托管"
+    },
+    "fatal": {
+      "AUTH_REQUIRED": "需要先登录身份",
+      "AUTH_INVALID": "身份已失效，请重新进入",
+      "NOT_IN_MATCH": "你不在这局对局中",
+      "PROTOCOL_MISMATCH": "客户端版本与服务端不一致，请刷新页面",
+      "REPLACED": "你已在其他页面进入这局对局"
+    }
+  },
   "network": {
     "back_to_lobby": "返回大厅"
   },

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, RotateCcw, Skull, Trophy } from 'lucide-react';
+import { ArrowRight, Bot, RotateCcw, Skull, Timer, Trophy, UserCog, WifiOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
@@ -29,6 +29,10 @@ import type { MatchView, MatchViewState, RunnerCtx } from '@icgame/game-engine';
 import type { MatchSource } from '../../match/matchSource';
 import { RuntimeStage } from './RuntimeStage';
 import { toast } from '@/lib/toast';
+import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
+import { awaitingNotice } from './awaitingNotice';
+import { remainingSeconds, useSecondClock } from './deadline';
+import { seatMarkers } from './seatMarkers';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 interface MatchRuntimeProps {
@@ -141,10 +145,29 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
   }, [sourceKind]);
 
   const sourceMakeMove = source.makeMove;
+  // 包一层：被拒时提示并留日志；自动发出的 move（silent）被拒不提示
   const makeMove = useCallback(
-    (move: string, args: unknown[] = []) => sourceMakeMove(move, args),
-    [sourceMakeMove],
+    async (move: string, args: unknown[] = [], opts?: { silent?: boolean }) => {
+      const outcome = await sourceMakeMove(move, args);
+      if (!outcome.ok) {
+        logger.warn('game/move', 'move rejected', { move, code: outcome.code });
+        const key = opts?.silent ? null : rejectMessage(outcome.code);
+        if (key) toast.warn(t(key));
+      }
+      return outcome;
+    },
+    [sourceMakeMove, t],
   );
+
+  const deadlineAt = source.deadlineAt;
+  const clockNow = useSecondClock(deadlineAt !== null);
+  const deadlineSeconds = remainingSeconds(deadlineAt, clockNow);
+  const awaiting = useMemo(
+    () => (sourceView ? awaitingNotice(sourceView.G as MatchView, mySeat) : null),
+    [sourceView, mySeat],
+  );
+  const isRemote = sourceKind === 'remote';
+  const seatByID = useMemo(() => new Map(source.seats.map((s) => [s.seat, s])), [source.seats]);
 
   const G = gameState?.G as Record<string, unknown> | undefined;
   const ctx = gameState?.ctx as Record<string, unknown> | undefined;
@@ -556,9 +579,35 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
           >
             {isMyTurn ? t('localMatch.yourTurn') : t('localMatch.botTurn', { id: currentPlayerID })}
           </div>
+          {deadlineSeconds !== null && (
+            <div
+              className="flex items-center gap-1 text-sm font-medium tabular-nums"
+              data-testid="deadline"
+            >
+              <Timer className="h-4 w-4" aria-hidden />
+              {t('match.deadline', {
+                seconds: deadlineSeconds,
+                defaultValue: '剩余 {{seconds}} 秒',
+              })}
+            </div>
+          )}
           {topRight}
         </div>
       </div>
+
+      {awaiting && (
+        <div
+          className="mb-4 rounded-md border border-border bg-card/60 px-3 py-2 text-sm text-muted-foreground"
+          role="status"
+          data-testid="awaiting-notice"
+        >
+          {awaiting.mine
+            ? t('match.waiting_auto', {
+                defaultValue: '这一步暂时不能手动操作，到时间后由系统代为处理',
+              })
+            : t('match.waiting_others', { defaultValue: '等待其他玩家应答' })}
+        </div>
+      )}
 
       {winner && (
         <div
@@ -583,7 +632,9 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
             data-testid="restart-button"
           >
             <RotateCcw className="h-4 w-4" />
-            {t('localMatch.restart')}
+            {isRemote
+              ? t('match.back_to_lobby', { defaultValue: '返回大厅' })
+              : t('localMatch.restart')}
           </button>
         </div>
       )}
@@ -950,8 +1001,24 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
                     <PlayerMiniAvatar characterId={cid} isMaster={isMaster} />
                   </button>
                   <span className="font-medium">
-                    {id === mySeat ? t('localMatch.you') : `AI ${id}`}
+                    {id === mySeat
+                      ? t('localMatch.you')
+                      : seatByID.get(id)?.isBot === false
+                        ? seatByID.get(id)?.nickname || id
+                        : `AI ${id}`}
                   </span>
+                  {seatMarkers(seatByID.get(id)).map((m) => {
+                    const Icon = m === 'bot' ? Bot : m === 'offline' ? WifiOff : UserCog;
+                    return (
+                      <Icon
+                        key={m}
+                        className="h-3 w-3 text-muted-foreground"
+                        role="img"
+                        aria-label={t(`match.seat.${m}`)}
+                        data-testid={`seat-marker-${m}-${id}`}
+                      />
+                    );
+                  })}
                   <span className="text-muted-foreground">{String(p.faction)}</span>
                   <span className="text-muted-foreground">L{String(p.currentLayer)}</span>
                   {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}
@@ -988,6 +1055,8 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
         viewerPlayerID={viewerSeat}
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         makeMove={makeMove}
+        autoPass={!isRemote}
+        deadlineAt={deadlineAt}
       />
       <MasterPeekBribeDialog
         G={gameState?.G}

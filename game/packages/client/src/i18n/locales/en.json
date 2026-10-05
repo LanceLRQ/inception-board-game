@@ -164,6 +164,30 @@
     "waiting": "Waiting for resources...",
     "failed": "{{count}} card images failed to load, using placeholders"
   },
+  "match": {
+    "reject": {
+      "too_fast": "Too fast",
+      "not_allowed": "You can't do that right now",
+      "network": "Network unstable, action not delivered"
+    },
+    "waiting_others": "Waiting for other players to respond",
+    "waiting_auto": "This step can't be handled manually; the system will resolve it when time runs out",
+    "deadline": "{{seconds}}s left",
+    "connecting": "Connecting",
+    "back_to_lobby": "Back to Lobby",
+    "seat": {
+      "bot": "Bot",
+      "offline": "Offline",
+      "taken_over": "Taken over by system"
+    },
+    "fatal": {
+      "AUTH_REQUIRED": "Identity required",
+      "AUTH_INVALID": "Identity expired, please re-enter",
+      "NOT_IN_MATCH": "You are not in this match",
+      "PROTOCOL_MISMATCH": "Client version differs from the server, please refresh",
+      "REPLACED": "You joined this match from another page"
+    }
+  },
   "network": {
     "back_to_lobby": "Back to Lobby"
   },

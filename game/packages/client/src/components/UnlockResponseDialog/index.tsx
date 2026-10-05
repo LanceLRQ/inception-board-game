@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { KeyRound, AlertTriangle, Clock } from 'lucide-react';
 import type { MatchView } from '@icgame/game-engine';
 import { computeUnlockResponseState } from '../UnlockResponseBanner/logic.js';
+import { remainingSeconds, useSecondClock } from '../MatchRuntime/deadline';
+import { startAutoPass } from './autoPass';
 import {
   Dialog,
   DialogBody,
@@ -19,7 +21,11 @@ export interface UnlockResponseDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
   nicknameOf?: (playerID: string) => string;
-  makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
+  makeMove: (move: string, args: unknown[], opts?: { silent?: boolean }) => Promise<unknown> | void;
+  /** 到点自动放弃；联机时由服务端代发，传 false。缺省 true */
+  autoPass?: boolean;
+  /** 服务端给出的截止时间（毫秒时间戳）；autoPass 为 false 时用它显示倒计时 */
+  deadlineAt?: number | null;
 }
 
 export function UnlockResponseDialog({
@@ -27,6 +33,8 @@ export function UnlockResponseDialog({
   viewerPlayerID,
   nicknameOf,
   makeMove,
+  autoPass = true,
+  deadlineAt = null,
 }: UnlockResponseDialogProps) {
   const { visible, unlockerID, layer, canCancel, remainingResponders, timeoutMs } =
     computeUnlockResponseState(G, viewerPlayerID);
@@ -37,25 +45,31 @@ export function UnlockResponseDialog({
   );
 
   useEffect(() => {
-    if (!visible || !windowKey) return;
+    if (!visible || !windowKey || !autoPass) return;
     const startAt = Date.now();
     const tick = () => setCountdown({ key: windowKey, startAt, now: Date.now() });
     const id = setInterval(tick, 500);
     queueMicrotask(tick);
     return () => clearInterval(id);
-  }, [visible, windowKey]);
+  }, [visible, windowKey, autoPass]);
 
   useEffect(() => {
-    if (!visible || !windowKey || timeoutMs <= 0) return;
-    const id = setTimeout(() => {
-      void makeMove('passResponse', []);
-    }, timeoutMs);
-    return () => clearTimeout(id);
-  }, [visible, windowKey, timeoutMs, makeMove]);
+    const stop = startAutoPass({
+      active: visible && windowKey !== null,
+      autoPass,
+      timeoutMs,
+      makeMove,
+    });
+    return stop ?? undefined;
+  }, [visible, windowKey, autoPass, timeoutMs, makeMove]);
+
+  const serverClock = useSecondClock(!autoPass && visible);
 
   const elapsed = countdown && countdown.key === windowKey ? countdown.now - countdown.startAt : 0;
   const remainingMs = Math.max(0, timeoutMs - elapsed);
-  const remainingSec = Math.ceil(remainingMs / 1000);
+  const remainingSec = autoPass
+    ? Math.ceil(remainingMs / 1000)
+    : remainingSeconds(deadlineAt, serverClock);
   const unlockerName = unlockerID ? (nicknameOf?.(unlockerID) ?? unlockerID) : '玩家';
 
   return (
@@ -74,7 +88,9 @@ export function UnlockResponseDialog({
       <DialogBody>
         <div className="flex items-center gap-2 rounded bg-sky-500/10 px-2 py-1 text-[11px] font-medium text-sky-700 dark:text-sky-300">
           <Clock className="h-3 w-3" />
-          <span>倒计时 {remainingSec}s，到期自动跳过</span>
+          <span>
+            {remainingSec === null ? '到期自动跳过' : `倒计时 ${remainingSec}s，到期自动跳过`}
+          </span>
         </div>
         {!canCancel && (
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
