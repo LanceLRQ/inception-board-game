@@ -33,6 +33,7 @@ export function incrementMoveCounter(state: { moveCounter: number }): typeof sta
 
 // 导出游戏核心
 export { InceptionCityGame } from './game.js';
+export { INVALID_MOVE } from './engine/invalidMove.js';
 export type { SetupState } from './game.js';
 export { createInitialState } from './setup.js';
 export {

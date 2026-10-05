@@ -11,7 +11,7 @@
 //   - 全局：endIf
 // 没有实现：分阶段行动（stages / activePlayers）、回合的 endIf 与步数上限、撤销重做、插件。
 
-const INVALID_MOVE = 'INVALID_MOVE';
+import { INVALID_MOVE } from '../engine/invalidMove.js';
 
 export interface RandomSource {
   D6(): number;

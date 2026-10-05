@@ -13,7 +13,7 @@
 //   3. 所有 move 扁平化到 playing.moves（不用 BGIO stages），内部自检 G.turnPhase
 //   4. 弃牌阶段完成后，move 内调 events.endTurn() 让 BGIO 推进回合
 
-import { INVALID_MOVE } from 'boardgame.io/core';
+import { INVALID_MOVE } from './engine/invalidMove.js';
 import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
 import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT } from './config.js';
 import {

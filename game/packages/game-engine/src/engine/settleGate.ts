@@ -5,8 +5,7 @@
 // 对照：docs/manual/04-action-cards.md 嫁接、万有引力、解封
 
 import type { SetupState } from '../setup.js';
-
-const INVALID_MOVE = 'INVALID_MOVE';
+import { INVALID_MOVE } from './invalidMove.js';
 
 /**
  * 每种待结算状态放行的 move。字段有值即视为待结算。

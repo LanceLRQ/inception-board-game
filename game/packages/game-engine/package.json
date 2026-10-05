@@ -22,7 +22,9 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@icgame/shared": "workspace:*",
+    "@icgame/shared": "workspace:*"
+  },
+  "devDependencies": {
     "boardgame.io": "^0.50.2"
   }
 }
