@@ -55,7 +55,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 对局界面：PC 围坐椭圆 + 移动端行动轴双模式
 - 好友房联机对局：房主建房、其他人凭房间码加入、空位可补 Bot，开始后全体进入同一局服务端权威对局；刷新或断线后回到同一局
 - 匿名身份（JWT + 恢复码）、房间创建与加入、新手教程、PWA 离线访问
-- 工程基建：pnpm + Turborepo monorepo、单元测试 3200+ 条、双浏览器联机端到端用例、Docker Compose 部署文件
+- 工程基建：pnpm + Turborepo monorepo、单元测试 3300+ 条、双浏览器联机端到端用例、Docker Compose 部署文件
 
 **联机对局的实现方式**
 
