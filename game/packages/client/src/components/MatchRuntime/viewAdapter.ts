@@ -1,26 +1,26 @@
 // 将对局视图 G 与流程信息 ctx 适配为 MockMatchState 结构，复用新 UI（MatchTable / MatchTrack）
 //
-// 注意：这是纯展示层适配，不影响 LocalMatchRuntime 的真实交互（pendingPlay / Dialog 群等）
+// 注意：这是纯展示层适配，不影响 MatchRuntime 的真实交互（pendingPlay / Dialog 群等）
 
 import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
 import type { MockMatchState, MockPlayer, MockLayer, MockVault } from '../../hooks/useMockMatch.js';
 
-export interface AdaptBGIOtoMockStateOpts {
+export interface AdaptViewToStageOpts {
   G: MatchView;
   ctx: Pick<RunnerCtx, 'currentPlayer'>;
-  /** 人类玩家 ID，默认 '0' */
-  humanPlayerID?: string;
+  /** 本人的座位号 */
+  humanPlayerID: string;
   /** 房间 ID */
   matchId?: string;
 }
 
 /**
- * 把 BGIO 的 G/ctx 转成 MockMatchState 视图。
+ * 把对局视图 G 与流程信息 ctx 转成 MockMatchState 视图。
  * 入参已经是按座位裁剪过的视图：他人手牌为 null、只有张数，牌库只有张数。这里只做结构对齐。
  */
-export function adaptBGIOtoMockState(opts: AdaptBGIOtoMockStateOpts): MockMatchState | null {
-  const { G, ctx, humanPlayerID = '0', matchId = 'local-match' } = opts;
+export function adaptViewToStage(opts: AdaptViewToStageOpts): MockMatchState | null {
+  const { G, ctx, humanPlayerID, matchId = 'local-match' } = opts;
   const rawPlayers = G.players;
   if (!rawPlayers) return null;
 

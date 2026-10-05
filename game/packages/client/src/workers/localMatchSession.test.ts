@@ -121,6 +121,11 @@ describe('LocalMatchSession', () => {
     const r = session.humanMove('doDraw', []);
     expect(r.ok).toBe(false);
     expect(r.reason).toBeTruthy();
+    // reason 是运行器的拒绝码，说明文字另放在 detail
+    expect(['unknown_move', 'game_over', 'not_active', 'invalid_move', 'move_error']).toContain(
+      r.reason,
+    );
+    expect(r.detail).toBeTruthy();
     expect(JSON.stringify(session.view())).toBe(before);
 
     // 走到真人回合，真人结束回合后轮到 Bot：此时真人再发 doDraw 同样被拒

@@ -11,7 +11,7 @@ export interface MasterNightmareDecisionDialogProps {
   G: MatchView | null | undefined;
   currentPlayerID: string;
   dreamMasterID: string;
-  makeMove: (move: string, args: unknown[]) => Promise<void> | void;
+  makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
 }
 
 export function MasterNightmareDecisionDialog({

@@ -20,7 +20,7 @@ export interface MasterPeekBribeDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
   nicknameOf?: (playerID: string) => string;
-  makeMove: (move: string, args: unknown[]) => Promise<void> | void;
+  makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
 }
 
 export function MasterPeekBribeDialog({

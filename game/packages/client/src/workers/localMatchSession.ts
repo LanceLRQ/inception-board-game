@@ -12,9 +12,11 @@ import {
   type GameDef,
   type MatchState,
   type MoveOutcome,
+  type RejectReason,
   type RunnerCtx,
 } from '@icgame/game-engine/runner';
 import { nextAutoAction, type AutoAction } from '@icgame/bot';
+import { LOCAL_HUMAN_SEAT } from './localSeat.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -43,7 +45,7 @@ export interface StepResult {
 export interface LocalMatchSessionOptions {
   playerCount: number;
   seed: string;
-  /** 真人玩家 ID，默认 '0' */
+  /** 真人玩家 ID，默认是本地真人座位 */
   humanPlayerID?: string;
 }
 
@@ -71,7 +73,7 @@ export class LocalMatchSession {
   private rejectedCount = 0;
 
   constructor(options: LocalMatchSessionOptions) {
-    this.humanPlayerID = options.humanPlayerID ?? '0';
+    this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
     this.state = createMatch(game, {
       numPlayers: options.playerCount,
       setupData: { rngSeed: options.seed },
@@ -86,10 +88,18 @@ export class LocalMatchSession {
     return { G: G as MatchView, ctx, stateID };
   }
 
-  /** 真人发起的 move；被拒不抛异常，状态不变 */
-  humanMove(move: string, args: unknown[]): { ok: boolean; reason?: string } {
+  /**
+   * 真人发起的 move；被拒不抛异常，状态不变。
+   * reason 是运行器给出的拒绝码，detail 是带异常信息的一行说明（供日志）。
+   */
+  humanMove(
+    move: string,
+    args: unknown[],
+  ): { ok: boolean; reason?: RejectReason; detail?: string } {
     const outcome = applyMove(game, this.state, { playerID: this.humanPlayerID, move, args });
-    if (!outcome.ok) return { ok: false, reason: describeReject(outcome) };
+    if (!outcome.ok) {
+      return { ok: false, reason: outcome.reason, detail: describeReject(outcome) };
+    }
     this.state = outcome.state;
     this.clearRejects();
     return { ok: true };

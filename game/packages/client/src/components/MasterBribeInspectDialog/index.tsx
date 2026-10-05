@@ -17,7 +17,7 @@ import {
 export interface MasterBribeInspectDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
-  makeMove: (move: string, args: unknown[]) => Promise<void> | void;
+  makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
 }
 
 type BribeKind = 'deal' | 'fail' | null;

@@ -1,8 +1,8 @@
-// adaptBGIOtoMockState 纯函数测试
+// adaptViewToStage 纯函数测试
 
 import { describe, it, expect } from 'vitest';
 import type { MatchView, RunnerCtx } from '@icgame/game-engine';
-import { adaptBGIOtoMockState } from './bgioAdapter.js';
+import { adaptViewToStage } from './viewAdapter.js';
 
 /** 测试里只构造用到的字段，整体按视图类型传入 */
 function asView(g: object): MatchView {
@@ -60,19 +60,21 @@ const sampleG = asView(sampleRaw);
 
 const sampleCtx = { currentPlayer: '0' } as RunnerCtx;
 
-describe('adaptBGIOtoMockState', () => {
+describe('adaptViewToStage', () => {
   it('G=null/ctx=null：返回 null', () => {
-    expect(adaptBGIOtoMockState({ G: asView({}), ctx: {} as RunnerCtx })).toBeNull();
+    expect(
+      adaptViewToStage({ G: asView({}), ctx: {} as RunnerCtx, humanPlayerID: '0' }),
+    ).toBeNull();
   });
 
   it('人类（viewer）hand 保留真实卡 id 数组', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.players['0']!.hand).toEqual(['action_shoot', 'action_unlock']);
     expect(s.players['0']!.handCount).toBe(2);
   });
 
   it('非人类 hand 过滤为 null，仅保留 handCount', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.players['1']!.hand).toBeNull();
     expect(s.players['1']!.handCount).toBe(1);
     expect(s.players['4']!.hand).toBeNull();
@@ -80,29 +82,29 @@ describe('adaptBGIOtoMockState', () => {
   });
 
   it('faction 仅保留 thief/master（默认 thief）', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.players['0']!.faction).toBe('thief');
     expect(s.players['4']!.faction).toBe('master');
   });
 
   it('currentPlayerID 从 ctx 透传', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.currentPlayerID).toBe('0');
   });
 
   it('playerOrder 按 id 排序', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.playerOrder).toEqual(['0', '1', '4']);
   });
 
   it('layers 正确映射', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.layers[2]!.heartLockValue).toBe(2);
     expect(s.layers[1]!.playersInLayer).toEqual(['1']);
   });
 
   it('vaults 正确映射', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.vaults).toHaveLength(2);
     expect(s.vaults[0]).toMatchObject({
       id: 'v1',
@@ -114,24 +116,24 @@ describe('adaptBGIOtoMockState', () => {
   });
 
   it('dreamMasterID 透传', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.dreamMasterID).toBe('4');
   });
 
   it('viewerID 默认为 humanPlayerID', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.viewerID).toBe('0');
   });
 
   it('turnPhase / turnNumber 透传', () => {
-    const s = adaptBGIOtoMockState({ G: sampleG, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.turnPhase).toBe('action');
     expect(s.turnNumber).toBe(3);
   });
 
   it('牌库张数取自 deck.cardCount', () => {
     const G = asView({ ...sampleRaw, deck: { cardCount: 37, discardPile: ['action_kick'] } });
-    const s = adaptBGIOtoMockState({ G, ctx: sampleCtx })!;
+    const s = adaptViewToStage({ G, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.deckCount).toBe(37);
     expect(s.discardPile).toEqual(['action_kick']);
   });
@@ -145,7 +147,7 @@ describe('adaptBGIOtoMockState', () => {
         '4': { ...sampleRaw.players['4'], hand: null, handCount: 3 },
       },
     });
-    const s = adaptBGIOtoMockState({ G, ctx: sampleCtx, humanPlayerID: '0' })!;
+    const s = adaptViewToStage({ G, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.players['0']!.hand).toEqual(['action_shoot']);
     expect(s.players['0']!.handCount).toBe(1);
     expect(s.players['1']!.hand).toBeNull();

@@ -19,7 +19,7 @@ export interface UnlockResponseDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
   nicknameOf?: (playerID: string) => string;
-  makeMove: (move: string, args: unknown[]) => Promise<void> | void;
+  makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
 }
 
 export function UnlockResponseDialog({

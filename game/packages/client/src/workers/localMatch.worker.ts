@@ -3,17 +3,22 @@
 // 所有判断都在 LocalMatchSession 里；这里只负责 Comlink 外壳、自动循环的定时调度与日志。
 
 import * as Comlink from 'comlink';
+import type { RejectReason } from '@icgame/game-engine/runner';
+import { LOCAL_HUMAN_SEAT } from './localSeat.js';
 import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS, buildMatchSeed } from './localMatchSession.js';
+
+/** 真人 move 的结果 */
+export type LocalMoveResult = { ok: true } | { ok: false; reason: RejectReason };
 
 export interface LocalMatchWorker {
   createLocalMatch: (playerCount: number, matchID?: string) => Promise<void>;
   getState: () => Promise<unknown>;
-  makeMove: (move: string, args: unknown[]) => Promise<void>;
+  /** 会话尚未建立时返回 null；被拒时 reason 是运行器的拒绝码 */
+  makeMove: (move: string, args: unknown[]) => Promise<LocalMoveResult | null>;
   getPlayerId: () => Promise<string>;
 }
 
-// 人类固定为玩家 0
-const HUMAN_PLAYER_ID = '0';
+const HUMAN_PLAYER_ID = LOCAL_HUMAN_SEAT;
 
 /** 自动循环的步进间隔（毫秒） */
 const STEP_INTERVAL_MS = 100;
@@ -158,19 +163,20 @@ const workerApi: LocalMatchWorker = {
   },
 
   async makeMove(move: string, args: unknown[]) {
-    if (!session) return;
+    if (!session) return null;
     const result = session.humanMove(move, args);
     if (result.ok) {
       logMove(`human(${HUMAN_PLAYER_ID})`, move, { args });
       logFlowChanges(session);
       // 状态变了才需要重新启动自动循环；被拒的 move 不改变状态
       scheduleNext();
-    } else {
-      logWarn(`move rejected: human(${HUMAN_PLAYER_ID}) → ${move}`, {
-        reason: result.reason,
-        args,
-      });
+      return { ok: true };
     }
+    logWarn(`move rejected: human(${HUMAN_PLAYER_ID}) → ${move}`, {
+      reason: result.detail,
+      args,
+    });
+    return { ok: false, reason: result.reason ?? 'invalid_move' };
   },
 
   async getPlayerId() {

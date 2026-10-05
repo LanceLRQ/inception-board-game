@@ -1,13 +1,13 @@
-// RuntimeStage · LocalMatchRuntime 的"新视觉层"
+// RuntimeStage · MatchRuntime 的"新视觉层"
 //
 // 职责：展示玩家围坐/行动轴 + 中央桌面（金库/心锁/焦点层），
-//      只做视觉和长按详情，不承担出牌/选目标等业务交互（这些仍由 LocalMatchRuntime 的 Dialog 群处理）
+//      只做视觉和长按详情，不承担出牌/选目标等业务交互（这些仍由 MatchRuntime 的 Dialog 群处理）
 //
 // 断点：
 //   ≥1024px (PC) → TableStage 围坐椭圆 + 中央 CenterPanel
 //   <1024px (移动) → TurnOrderRail 星穹轴 + 中央 CenterPanel
 //
-// 选目标：LocalMatchRuntime 已使用 TargetPlayerPickerDialog 弹层完成（符合主人"弹层选目标"要求），
+// 选目标：MatchRuntime 已使用 TargetPlayerPickerDialog 弹层完成（符合主人"弹层选目标"要求），
 //        本组件上的 Seat/Slot 只做查看详情（长按/双击）
 
 import { useState } from 'react';
@@ -17,22 +17,22 @@ import { TableStage } from '../../pages/Game/Table/TableStage.js';
 import { TurnOrderRail } from '../../pages/Game/Track/TurnOrderRail.js';
 import { CenterPanel } from '../../pages/Game/shared/CenterPanel.js';
 import { CardDetailModal } from '../CardDetailModal/index.js';
-import { adaptBGIOtoMockState } from './bgioAdapter.js';
+import { adaptViewToStage } from './viewAdapter.js';
 import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
 
 export interface RuntimeStageProps {
   G: MatchView;
   ctx: Pick<RunnerCtx, 'currentPlayer'>;
-  humanPlayerID?: string;
+  humanPlayerID: string;
   className?: string;
 }
 
-export function RuntimeStage({ G, ctx, humanPlayerID = '0', className }: RuntimeStageProps) {
+export function RuntimeStage({ G, ctx, humanPlayerID, className }: RuntimeStageProps) {
   const [detailCard, setDetailCard] = useState<CardID | null>(null);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
-  const state = adaptBGIOtoMockState({ G, ctx, humanPlayerID });
+  const state = adaptViewToStage({ G, ctx, humanPlayerID });
   if (!state) return null;
 
   const viewer = state.players[humanPlayerID];

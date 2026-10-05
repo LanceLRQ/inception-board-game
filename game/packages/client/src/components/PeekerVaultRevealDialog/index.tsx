@@ -17,7 +17,7 @@ import {
 export interface PeekerVaultRevealDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
-  makeMove: (move: string, args: unknown[]) => Promise<void> | void;
+  makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
 }
 
 function vaultIcon(contentType: string) {
