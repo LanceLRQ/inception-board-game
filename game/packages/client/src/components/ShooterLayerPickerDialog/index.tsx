@@ -4,12 +4,12 @@
 // 复用 ShooterLayerPickerBanner/logic.ts 的纯函数 computeShooterLayerPickerState。
 
 import { Crosshair } from 'lucide-react';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeShooterLayerPickerState } from '../ShooterLayerPickerBanner/logic.js';
 import { Dialog, DialogBody, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export interface ShooterLayerPickerDialogProps {
-  G: SetupState | null | undefined;
+  G: MatchView | null | undefined;
   viewerPlayerID: string;
   nicknameOf?: (playerID: string) => string;
   cardNameOf?: (cardId: string) => string;

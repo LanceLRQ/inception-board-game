@@ -3,22 +3,22 @@
 // "仅梦主使用，查看一名盗梦者的所有贿赂牌。"
 //
 // 触发：peekReveal 挂起 + revealKind='bribe' + viewer 是 peekerID(=梦主)
-//   展示 targetThiefID 名下所有 bribe 的状态（engine playerView 已透传）。
+//   展示 targetThiefID 名下所有 bribe 的成败：视图里成败只在 kind 上，看不到时为 null。
 
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 
 export interface MasterBribeInspectBannerState {
   visible: boolean;
   targetThiefID: string | null;
   bribes: Array<{
     id: string;
-    status: string;
-    originalOwnerId: string | null;
+    /** 成败；视图没有给出时为 null（按「未知」展示） */
+    kind: 'deal' | 'fail' | null;
   }>;
 }
 
 export function computeMasterBribeInspectState(
-  G: SetupState | null | undefined,
+  G: MatchView | null | undefined,
   viewerPlayerID: string,
 ): MasterBribeInspectBannerState {
   const empty: MasterBribeInspectBannerState = {
@@ -34,11 +34,7 @@ export function computeMasterBribeInspectState(
 
   const bribes = G.bribePool
     .filter((b) => b.heldBy === pr.targetThiefID)
-    .map((b) => ({
-      id: b.id,
-      status: String(b.status),
-      originalOwnerId: b.originalOwnerId ?? null,
-    }));
+    .map((b) => ({ id: b.id, kind: b.kind }));
 
   return {
     visible: true,

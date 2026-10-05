@@ -5,7 +5,7 @@
 // 说明：只有 bribePool 中有 inPool 的贿赂时 playPeek 才会挂起 pendingPeekDecision
 //   （engine 已在 playPeek 分支处理）。若派完则直接挂 peekReveal 跳过本 banner。
 
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 
 export interface MasterPeekBribeBannerState {
   visible: boolean;
@@ -16,7 +16,7 @@ export interface MasterPeekBribeBannerState {
 }
 
 export function computeMasterPeekBribeState(
-  G: SetupState | null | undefined,
+  G: MatchView | null | undefined,
   viewerPlayerID: string,
 ): MasterPeekBribeBannerState {
   const empty: MasterPeekBribeBannerState = {

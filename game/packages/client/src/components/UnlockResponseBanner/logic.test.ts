@@ -1,11 +1,11 @@
 // 解封响应 banner 纯逻辑测试
 
 import { describe, it, expect } from 'vitest';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
 import { computeUnlockResponseState } from './logic.js';
 
-function makeState(overrides: Partial<SetupState> = {}): SetupState {
+function makeState(overrides: Partial<MatchView> = {}): MatchView {
   return {
     pendingUnlock: { playerID: '1', layer: 2, cardId: 'action_unlock' as CardID },
     pendingResponseWindow: {
@@ -24,7 +24,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
       '3': { isAlive: true, hand: [] as CardID[] } as never,
     },
     ...overrides,
-  } as unknown as SetupState;
+  } as unknown as MatchView;
 }
 
 describe('computeUnlockResponseState', () => {
@@ -41,6 +41,7 @@ describe('computeUnlockResponseState', () => {
     const s = makeState({
       pendingResponseWindow: {
         sourceAbilityID: 'other_source',
+        sourceType: null,
         responders: ['0'],
         responded: [],
         timeoutMs: 30_000,
@@ -61,6 +62,7 @@ describe('computeUnlockResponseState', () => {
     const s = makeState({
       pendingResponseWindow: {
         sourceAbilityID: 'action_unlock_effect_1',
+        sourceType: null,
         responders: ['0', '2'],
         responded: ['0'],
         timeoutMs: 30_000,
@@ -80,11 +82,11 @@ describe('computeUnlockResponseState', () => {
     expect(r.unlockerID).toBe('1');
     expect(r.layer).toBe(2);
     expect(r.remainingResponders).toBe(3);
-    // W19-B F11 · timeoutMs 从 pendingResponseWindow 透传
+    // timeoutMs 从 pendingResponseWindow 透传
     expect(r.timeoutMs).toBe(30_000);
   });
 
-  it('W19-B F11 · 不可见状态下 timeoutMs=0（避免污染）', () => {
+  it('不可见状态下 timeoutMs=0（避免污染）', () => {
     expect(computeUnlockResponseState(null, '0').timeoutMs).toBe(0);
   });
 

@@ -1,10 +1,10 @@
 // SHOOT 发动方选层 banner 纯逻辑测试
 
 import { describe, it, expect } from 'vitest';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeShooterLayerPickerState } from './logic.js';
 
-function makeState(overrides: Partial<SetupState> = {}): SetupState {
+function makeState(overrides: Partial<MatchView> = {}): MatchView {
   return {
     pendingShootMove: {
       shooterID: '0',
@@ -14,7 +14,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
       choices: [1, 3],
     },
     ...overrides,
-  } as unknown as SetupState;
+  } as unknown as MatchView;
 }
 
 describe('computeShooterLayerPickerState', () => {
@@ -25,7 +25,7 @@ describe('computeShooterLayerPickerState', () => {
   it('无 pendingShootMove → visible=false', () => {
     const s = makeState({
       pendingShootMove: null,
-    } as unknown as Partial<SetupState>);
+    } as unknown as Partial<MatchView>);
     expect(computeShooterLayerPickerState(s, '0').visible).toBe(false);
   });
 
@@ -52,7 +52,7 @@ describe('computeShooterLayerPickerState', () => {
         extraOnMove: null,
         choices: [2, 4],
       },
-    } as unknown as Partial<SetupState>);
+    } as unknown as Partial<MatchView>);
     expect(computeShooterLayerPickerState(s, '0').choices).toEqual([2, 4]);
   });
 });

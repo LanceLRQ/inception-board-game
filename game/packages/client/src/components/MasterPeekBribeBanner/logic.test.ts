@@ -1,19 +1,19 @@
 // 梦境窥视派贿赂决策 banner 纯逻辑测试
 
 import { describe, it, expect } from 'vitest';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeMasterPeekBribeState } from './logic.js';
 
-function makeState(overrides: Partial<SetupState> = {}): SetupState {
+function makeState(overrides: Partial<MatchView> = {}): MatchView {
   return {
     dreamMasterID: '4',
     pendingPeekDecision: { peekerID: '1', targetLayer: 3 },
     bribePool: [
-      { id: 'b-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'b-2', kind: 'fail', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
+      { id: 'b-1', kind: 'fail', status: 'inPool', heldBy: null },
+      { id: 'b-2', kind: 'fail', status: 'dispatched', heldBy: '2' },
     ],
     ...overrides,
-  } as unknown as SetupState;
+  } as unknown as MatchView;
 }
 
 describe('computeMasterPeekBribeState', () => {
@@ -43,9 +43,9 @@ describe('computeMasterPeekBribeState', () => {
   it('inPoolCount 正确统计', () => {
     const s = makeState({
       bribePool: [
-        { id: 'b-1', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'b-2', kind: 'fail', status: 'inPool', heldBy: null, originalOwnerId: null },
-        { id: 'b-3', kind: 'fail', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
+        { id: 'b-1', kind: 'fail', status: 'inPool', heldBy: null },
+        { id: 'b-2', kind: 'fail', status: 'inPool', heldBy: null },
+        { id: 'b-3', kind: 'fail', status: 'dispatched', heldBy: '2' },
       ],
     });
     expect(computeMasterPeekBribeState(s, '4').inPoolCount).toBe(2);

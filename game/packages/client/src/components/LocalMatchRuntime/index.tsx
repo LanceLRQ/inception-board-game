@@ -1,5 +1,4 @@
 // 本地对局运行时 · 抽离自 /local 页，可复用于好友房 1 人类+N AI 模式
-// 对照：docs/_internal/design/08-security-ai.md §8.5 L0 Bot
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Comlink from 'comlink';
@@ -28,13 +27,16 @@ import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
 import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
 import { ShootDiceOverlay } from '../ShootDiceOverlay';
+import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import { RuntimeStage } from './RuntimeStage';
 import { toast } from '@/lib/toast';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
+/** Worker 交给主线程的对局状态：真人座位的视图，没有种子与牌库顺序 */
 export type BGIOState = {
-  G: Record<string, unknown>;
-  ctx: Record<string, unknown>;
+  G: MatchView;
+  ctx: RunnerCtx;
+  stateID?: number;
 };
 
 interface LocalMatchRuntimeProps {
@@ -342,7 +344,7 @@ export function LocalMatchRuntime({
   // SHOOT 结算 → 骰子动画 + Toast（按结果分级）
   //   流程：检测到 SHOOT 牌打出 + lastShootRoll 有值 → 显示 ShootDiceOverlay
   //   骰子动画完成后 → Toast 通知结果
-  //   判定（对照 plans/2-1-3-1-2-ui-cozy-wave.md SHOOT Toast 分级表）：
+  //   判定（SHOOT Toast 分级）：
   //     - pendingShootMove != null → L2/L3 挂起中，不 toast（由 ShooterLayerPickerDialog 承担）
   //     - 某玩家 currentLayer 从 N → 0 → kill → toast.error
   //     - 某玩家 currentLayer 变化（非 0）→ move → toast.info
@@ -638,14 +640,10 @@ export function LocalMatchRuntime({
         </div>
       )}
 
-      {/* 新 UI 围坐/星穹行动轴（ADR-043）· 只做视觉展示；选目标仍走下方 Dialog 群 */}
-      {G && ctx && (
+      {/* 新 UI 围坐/星穹行动轴 · 只做视觉展示；选目标仍走下方 Dialog 群 */}
+      {gameState && (
         <div className="mb-4">
-          <RuntimeStage
-            G={G as Record<string, unknown>}
-            ctx={ctx as Record<string, unknown>}
-            humanPlayerID="0"
-          />
+          <RuntimeStage G={gameState.G} ctx={gameState.ctx} humanPlayerID="0" />
         </div>
       )}
 
@@ -933,7 +931,7 @@ export function LocalMatchRuntime({
 
           {/* 目标玩家 / 目标层选择已迁至全局 Dialog（TargetPlayerPickerDialog /
               TargetLayerPickerDialog），挂载在本组件末尾的 Dialog 集群区。
-              对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 5 */}
+              */}
           {turnPhase === 'discard' && overHand === 0 && (
             <button
               type="button"
@@ -972,7 +970,7 @@ export function LocalMatchRuntime({
           均已迁至 Dialog（ChessTransposeDialog / DreamTransitModeDialog /
           GravityTargetPickerDialog / GravityPoolPickerDialog / GraftResolverDialog），
           挂载在本组件末尾的 Dialog 集群区。
-          对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 5 */}
+          */}
 
       {/* 玩家紧凑列表（旧视图）：收起为次要信息；主要展示由 RuntimeStage 承载 */}
       {players && (
@@ -1010,7 +1008,7 @@ export function LocalMatchRuntime({
                   <span className="text-muted-foreground">L{String(p.currentLayer)}</span>
                   {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}
                   <span className="ml-auto text-muted-foreground">
-                    {t('localMatch.cards')}：{(p.hand as unknown[])?.length ?? 0}
+                    {t('localMatch.cards')}：{(p.handCount as number | undefined) ?? 0}
                   </span>
                 </div>
               );
@@ -1030,29 +1028,29 @@ export function LocalMatchRuntime({
       {/* SHOOT 骰子动画浮层 */}
       <ShootDiceOverlay roll={shootDiceRoll} onComplete={handleDiceComplete} />
 
-      {/* 响应类 Dialog 群（互斥业务保证同时只会有一个 open） · 对照 plans/2-1-3-1-2-ui-cozy-wave.md */}
+      {/* 响应类 Dialog 群（互斥业务保证同时只会有一个 open） */}
       <MasterNightmareDecisionDialog
-        G={G as never}
+        G={gameState?.G}
         currentPlayerID={currentPlayerID}
         dreamMasterID={dreamMasterID}
         makeMove={makeMove}
       />
       <UnlockResponseDialog
-        G={G as never}
+        G={gameState?.G}
         viewerPlayerID="0"
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         makeMove={makeMove}
       />
       <MasterPeekBribeDialog
-        G={G as never}
+        G={gameState?.G}
         viewerPlayerID="0"
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         makeMove={makeMove}
       />
-      <PeekerVaultRevealDialog G={G as never} viewerPlayerID="0" makeMove={makeMove} />
-      <MasterBribeInspectDialog G={G as never} viewerPlayerID="0" makeMove={makeMove} />
+      <PeekerVaultRevealDialog G={gameState?.G} viewerPlayerID="0" makeMove={makeMove} />
+      <MasterBribeInspectDialog G={gameState?.G} viewerPlayerID="0" makeMove={makeMove} />
       <ShooterLayerPickerDialog
-        G={G as never}
+        G={gameState?.G}
         viewerPlayerID="0"
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         cardNameOf={(cardId) => getCardName(cardId)}

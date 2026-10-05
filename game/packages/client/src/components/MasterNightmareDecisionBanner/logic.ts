@@ -9,7 +9,7 @@
 //   附：masterDealBribe(...)  → 派发贿赂（配套使用）
 
 import { findCoinVaultsWithHiddenNightmare } from '@icgame/game-engine';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView, SetupState } from '@icgame/game-engine';
 
 /** 梦主决策提示状态（纯函数 · 便于测试） */
 export interface NightmareDecisionState {
@@ -26,7 +26,7 @@ export interface NightmareDecisionState {
  * @param dreamMasterID G.dreamMasterID
  */
 export function computeNightmareDecisionState(
-  G: SetupState | null | undefined,
+  G: MatchView | null | undefined,
   currentPlayerID: string,
   dreamMasterID: string,
 ): NightmareDecisionState {
@@ -36,10 +36,12 @@ export function computeNightmareDecisionState(
     return { visible: false, pendingLayers: [] };
   }
   // 非 action 阶段不提示（避免误触）
-  if ((G as unknown as { turnPhase?: string }).turnPhase !== 'action') {
+  if (G.turnPhase !== 'action') {
     return { visible: false, pendingLayers: [] };
   }
-  const pending = findCoinVaultsWithHiddenNightmare(G);
+  // 该函数只读 vaults 与 layers 里的 nightmareId / nightmareRevealed / nightmareTriggered，
+  // 这些字段在梦主视角下都有；只有梦主会走到这里，所以把视图当作它要求的状态传入。
+  const pending = findCoinVaultsWithHiddenNightmare(G as unknown as SetupState);
   return {
     visible: pending.length > 0,
     pendingLayers: pending,

@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeNightmareDecisionState } from './logic.js';
-import { scenarioStartOfGame3p, type SetupState } from '@icgame/game-engine';
+import { scenarioStartOfGame3p, viewFor, type SetupState } from '@icgame/game-engine';
 
 /** 构造一个金币金库已开 + 同层未翻开梦魇的场景 */
 function withCoinVaultAndHiddenNightmare(s: SetupState, layer: 0 | 1 | 2 | 3 | 4): SetupState {
@@ -26,6 +26,11 @@ function withCoinVaultAndHiddenNightmare(s: SetupState, layer: 0 | 1 | 2 | 3 | 4
   };
 }
 
+/** 以梦主座位取视图：界面拿到的就是这个形状 */
+function masterView(s: SetupState) {
+  return viewFor(s, s.dreamMasterID, { gameOver: false });
+}
+
 /** 确保状态处于 action 阶段 */
 function atActionPhase(s: SetupState): SetupState {
   return { ...s, turnPhase: 'action', currentPlayerID: 'pM' };
@@ -41,7 +46,7 @@ describe('computeNightmareDecisionState', () => {
 
   it('非梦主回合 → 不显示', () => {
     const s = atActionPhase(withCoinVaultAndHiddenNightmare(scenarioStartOfGame3p(), 2));
-    expect(computeNightmareDecisionState(s, 'p1', 'pM')).toEqual({
+    expect(computeNightmareDecisionState(masterView(s), 'p1', 'pM')).toEqual({
       visible: false,
       pendingLayers: [],
     });
@@ -49,7 +54,7 @@ describe('computeNightmareDecisionState', () => {
 
   it('梦主回合 + action + 金币金库已开 + 未翻开梦魇 → 显示', () => {
     const s = atActionPhase(withCoinVaultAndHiddenNightmare(scenarioStartOfGame3p(), 2));
-    const r = computeNightmareDecisionState(s, 'pM', 'pM');
+    const r = computeNightmareDecisionState(masterView(s), 'pM', 'pM');
     expect(r.visible).toBe(true);
     expect(r.pendingLayers).toEqual([2]);
   });
@@ -60,7 +65,7 @@ describe('computeNightmareDecisionState', () => {
       turnPhase: 'discard',
       currentPlayerID: 'pM',
     };
-    expect(computeNightmareDecisionState(s, 'pM', 'pM').visible).toBe(false);
+    expect(computeNightmareDecisionState(masterView(s), 'pM', 'pM').visible).toBe(false);
   });
 
   it('金币金库未开 → 不显示', () => {
@@ -78,12 +83,12 @@ describe('computeNightmareDecisionState', () => {
         },
       },
     });
-    expect(computeNightmareDecisionState(s, 'pM', 'pM').visible).toBe(false);
+    expect(computeNightmareDecisionState(masterView(s), 'pM', 'pM').visible).toBe(false);
   });
 
   it('dreamMasterID 为空 → 不显示', () => {
     const s = atActionPhase(withCoinVaultAndHiddenNightmare(scenarioStartOfGame3p(), 2));
-    expect(computeNightmareDecisionState(s, 'pM', '').visible).toBe(false);
+    expect(computeNightmareDecisionState(masterView(s), 'pM', '').visible).toBe(false);
   });
 
   it('多层同时待决策 → pendingLayers 全部返回', () => {
@@ -91,7 +96,7 @@ describe('computeNightmareDecisionState', () => {
     s = withCoinVaultAndHiddenNightmare(s, 2);
     s = withCoinVaultAndHiddenNightmare(s, 3);
     s = atActionPhase(s);
-    const r = computeNightmareDecisionState(s, 'pM', 'pM');
+    const r = computeNightmareDecisionState(masterView(s), 'pM', 'pM');
     expect(r.visible).toBe(true);
     expect(r.pendingLayers.sort()).toEqual([2, 3]);
   });

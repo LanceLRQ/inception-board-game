@@ -5,7 +5,7 @@
 // 复用 MasterPeekBribeBanner/logic.ts 的纯函数 computeMasterPeekBribeState。
 
 import { Coins } from 'lucide-react';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeMasterPeekBribeState } from '../MasterPeekBribeBanner/logic.js';
 import {
   Dialog,
@@ -17,7 +17,7 @@ import {
 } from '../ui/dialog';
 
 export interface MasterPeekBribeDialogProps {
-  G: SetupState | null | undefined;
+  G: MatchView | null | undefined;
   viewerPlayerID: string;
   nicknameOf?: (playerID: string) => string;
   makeMove: (move: string, args: unknown[]) => Promise<void> | void;

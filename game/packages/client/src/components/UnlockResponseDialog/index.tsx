@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { KeyRound, AlertTriangle, Clock } from 'lucide-react';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeUnlockResponseState } from '../UnlockResponseBanner/logic.js';
 import {
   Dialog,
@@ -16,7 +16,7 @@ import {
 } from '../ui/dialog';
 
 export interface UnlockResponseDialogProps {
-  G: SetupState | null | undefined;
+  G: MatchView | null | undefined;
   viewerPlayerID: string;
   nicknameOf?: (playerID: string) => string;
   makeMove: (move: string, args: unknown[]) => Promise<void> | void;

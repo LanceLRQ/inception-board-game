@@ -1,14 +1,14 @@
-// 将 BGIO G/ctx 适配为 MockMatchState 结构，复用新 UI（MatchTable / MatchTrack）
-// 对照：docs/_internal/design/06c-match-table-layout.md
+// 将对局视图 G 与流程信息 ctx 适配为 MockMatchState 结构，复用新 UI（MatchTable / MatchTrack）
 //
 // 注意：这是纯展示层适配，不影响 LocalMatchRuntime 的真实交互（pendingPlay / Dialog 群等）
 
+import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
 import type { MockMatchState, MockPlayer, MockLayer, MockVault } from '../../hooks/useMockMatch.js';
 
 export interface AdaptBGIOtoMockStateOpts {
-  G: Record<string, unknown>;
-  ctx: Record<string, unknown>;
+  G: MatchView;
+  ctx: Pick<RunnerCtx, 'currentPlayer'>;
   /** 人类玩家 ID，默认 '0' */
   humanPlayerID?: string;
   /** 房间 ID */
@@ -17,73 +17,64 @@ export interface AdaptBGIOtoMockStateOpts {
 
 /**
  * 把 BGIO 的 G/ctx 转成 MockMatchState 视图。
- * 不做隐藏信息过滤（LocalMatchRuntime 本地跑，已知全貌），只做结构对齐。
+ * 入参已经是按座位裁剪过的视图：他人手牌为 null、只有张数，牌库只有张数。这里只做结构对齐。
  */
 export function adaptBGIOtoMockState(opts: AdaptBGIOtoMockStateOpts): MockMatchState | null {
   const { G, ctx, humanPlayerID = '0', matchId = 'local-match' } = opts;
-  const rawPlayers = G.players as Record<string, Record<string, unknown>> | undefined;
+  const rawPlayers = G.players;
   if (!rawPlayers) return null;
 
-  const dreamMasterID = (G.dreamMasterID as string) ?? '';
+  const dreamMasterID = G.dreamMasterID ?? '';
   const playerOrder = Object.keys(rawPlayers).sort();
-  const currentPlayerID = (ctx.currentPlayer as string) ?? playerOrder[0] ?? '';
+  const currentPlayerID = ctx.currentPlayer ?? playerOrder[0] ?? '';
 
   const players: Record<string, MockPlayer> = {};
   for (const id of playerOrder) {
     const p = rawPlayers[id]!;
-    const hand = p.hand as CardID[] | undefined;
     players[id] = {
       id,
-      nickname: (p.nickname as string) ?? id,
+      nickname: p.nickname ?? id,
       avatarSeed: 0,
-      faction: ((p.faction as string) === 'master' ? 'master' : 'thief') as 'thief' | 'master',
-      characterId: ((p.characterId as string) ?? '') as CardID | '',
+      faction: p.faction === 'master' ? 'master' : 'thief',
+      characterId: p.characterId ?? '',
       isRevealed: !!p.isRevealed,
-      currentLayer: (p.currentLayer as number) ?? 1,
-      // 仅 human 暴露真实手牌（其他玩家 hand 设为 null，UI 显示手牌数角标）
-      hand: id === humanPlayerID && Array.isArray(hand) ? (hand as CardID[]) : null,
-      handCount: Array.isArray(hand) ? hand.length : ((p.handCount as number) ?? 0),
+      currentLayer: p.currentLayer ?? 1,
+      // 视图里只有本人（和对局结束后）带牌；其他玩家 hand 为 null，只看张数
+      hand: id === humanPlayerID && Array.isArray(p.hand) ? p.hand : null,
+      handCount: p.handCount ?? 0,
       isAlive: p.isAlive === undefined ? true : !!p.isAlive,
     };
   }
 
-  const rawLayers = G.layers as Record<string, Record<string, unknown>> | undefined;
   const layers: Record<number, MockLayer> = {};
-  if (rawLayers) {
-    for (const [k, info] of Object.entries(rawLayers)) {
-      const layerNum = (info.layer as number) ?? Number(k);
-      layers[layerNum] = {
-        layer: layerNum,
-        heartLockValue: (info.heartLockValue as number) ?? 0,
-        playersInLayer: (info.playersInLayer as string[]) ?? [],
-        nightmareRevealed: !!info.nightmareRevealed,
-      };
-    }
+  for (const [k, info] of Object.entries(G.layers ?? {})) {
+    const layerNum = info.layer ?? Number(k);
+    layers[layerNum] = {
+      layer: layerNum,
+      heartLockValue: info.heartLockValue ?? 0,
+      playersInLayer: info.playersInLayer ?? [],
+      nightmareRevealed: !!info.nightmareRevealed,
+    };
   }
 
-  const rawVaults = G.vaults as Array<Record<string, unknown>> | undefined;
-  const vaults: MockVault[] = (rawVaults ?? []).map((v, i) => ({
-    id: (v.id as string) ?? `vault_${i}`,
-    layer: (v.layer as number) ?? 0,
-    contentType: ((v.contentType as string) ?? 'hidden') as 'secret' | 'coin' | 'empty' | 'hidden',
+  const vaults: MockVault[] = (G.vaults ?? []).map((v, i) => ({
+    id: v.id ?? `vault_${i}`,
+    layer: v.layer ?? 0,
+    // 看不到内容的金库（null）按「未知」展示
+    contentType: v.contentType ?? 'hidden',
     isOpened: !!v.isOpened,
   }));
 
-  const rawDeck = G.deck as { cards?: CardID[]; discardPile?: CardID[] } | undefined;
-  const deckCount = rawDeck?.cards?.length ?? 0;
-  const discardPile = rawDeck?.discardPile ?? [];
-
-  const pendingUnlockRaw = G.pendingUnlock as
-    | { playerID: string; layer: number; cardId: CardID }
-    | null
-    | undefined;
+  // 视图里牌库只有张数，没有牌序
+  const deckCount = G.deck?.cardCount ?? 0;
+  const discardPile: CardID[] = G.deck?.discardPile ?? [];
 
   return {
     matchId,
     viewerID: humanPlayerID,
     phase: 'playing',
-    turnPhase: ((G.turnPhase as string) ?? 'action') as MockMatchState['turnPhase'],
-    turnNumber: (G.turnNumber as number) ?? 0,
+    turnPhase: G.turnPhase ?? 'action',
+    turnNumber: G.turnNumber ?? 0,
     currentPlayerID,
     dreamMasterID,
     players,
@@ -92,6 +83,6 @@ export function adaptBGIOtoMockState(opts: AdaptBGIOtoMockStateOpts): MockMatchS
     vaults,
     deckCount,
     discardPile,
-    pendingUnlock: pendingUnlockRaw ?? null,
+    pendingUnlock: G.pendingUnlock ?? null,
   };
 }

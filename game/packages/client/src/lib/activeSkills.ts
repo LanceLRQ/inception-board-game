@@ -62,7 +62,7 @@ export interface ActiveSkillContext {
   readonly sameLayerPlayerIds?: readonly string[];
   /** 弃牌堆（战争之王·黑市等选弃牌堆技能用） */
   readonly discardPile?: readonly string[];
-  /** 贿赂池中仍 inPool 的项（皇城·重金用）：{ index, id } 对，id 带 deal/fail 标识 */
+  /** 贿赂池中仍 inPool 的项（皇城·重金用）：{ index, id } 对；id 是不透明的标识，看不出成败 */
   readonly bribePoolItems?: readonly { readonly index: number; readonly id: string }[];
   /** 火星·战场世界观是否激活（= 当前梦主 = dm_mars_battlefield） */
   readonly marsBattlefieldActive?: boolean;

@@ -1,20 +1,20 @@
 // 梦主查看盗梦者贿赂牌 banner 纯逻辑测试
 
 import { describe, it, expect } from 'vitest';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeMasterBribeInspectState } from './logic.js';
 
-function makeState(overrides: Partial<SetupState> = {}): SetupState {
+function makeState(overrides: Partial<MatchView> = {}): MatchView {
   return {
     peekReveal: { peekerID: '4', revealKind: 'bribe', targetThiefID: '2' },
     bribePool: [
-      { id: 'b-1', status: 'dealt', heldBy: '2', originalOwnerId: '2' },
-      { id: 'b-2', status: 'deal', heldBy: '2', originalOwnerId: '2' },
-      { id: 'b-3', status: 'inPool', heldBy: null, originalOwnerId: null },
-      { id: 'b-4', status: 'dealt', heldBy: '3', originalOwnerId: '3' },
+      { id: 'b-1', status: 'dispatched', heldBy: '2', kind: 'fail' },
+      { id: 'b-2', status: 'dispatched', heldBy: '2', kind: 'deal' },
+      { id: 'b-3', status: 'inPool', heldBy: null, kind: null },
+      { id: 'b-4', status: 'dispatched', heldBy: '3', kind: 'fail' },
     ],
     ...overrides,
-  } as unknown as SetupState;
+  } as unknown as MatchView;
 }
 
 describe('computeMasterBribeInspectState', () => {
@@ -61,5 +61,22 @@ describe('computeMasterBribeInspectState', () => {
     const r = computeMasterBribeInspectState(s, '4');
     expect(r.visible).toBe(true);
     expect(r.bribes).toEqual([]);
+  });
+
+  it('展示用的成败取自 kind，视图里没有 originalOwnerId', () => {
+    const r = computeMasterBribeInspectState(makeState(), '4');
+    expect(r.bribes.map((b) => [b.id, b.kind])).toEqual([
+      ['b-1', 'fail'],
+      ['b-2', 'deal'],
+    ]);
+    expect(r.bribes.every((b) => !('originalOwnerId' in b))).toBe(true);
+  });
+
+  it('kind 为 null 时按未知处理', () => {
+    const s = makeState({
+      bribePool: [{ id: 'b-9', status: 'dispatched', heldBy: '2', kind: null }],
+    } as unknown as Partial<MatchView>);
+    const r = computeMasterBribeInspectState(s, '4');
+    expect(r.bribes).toEqual([{ id: 'b-9', kind: null }]);
   });
 });

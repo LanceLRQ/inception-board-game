@@ -228,11 +228,31 @@ describe('LocalMatchSession', () => {
     expect(r.continue).toBe(true);
   });
 
-  it('view() 只返回 G 和 ctx，不含随机数状态', () => {
+  it('view() 只返回 G、ctx 与版本号，不含随机数状态', () => {
     const session = makeSession();
     runUntilIdle(session);
     const view = session.view();
-    expect(Object.keys(view).sort()).toEqual(['G', 'ctx']);
+    expect(Object.keys(view).sort()).toEqual(['G', 'ctx', 'stateID']);
     expect(JSON.stringify(view)).not.toContain('rngState');
+  });
+
+  it('view() 给出的是座位 0 的视图：没有种子与牌库顺序，他人手牌被隐去', () => {
+    const session = makeSession(5, 'view-seat0');
+    runUntilIdle(session);
+    const view = session.view();
+    const G = view.G as unknown as {
+      rngSeed?: unknown;
+      deck: { cards?: unknown; cardCount: unknown };
+      players: Record<string, { hand: unknown; handCount: unknown }>;
+    };
+    expect('rngSeed' in G).toBe(false);
+    expect(G.deck.cards).toBeUndefined();
+    expect(typeof G.deck.cardCount).toBe('number');
+    for (const [id, p] of Object.entries(G.players)) {
+      expect(typeof p.handCount).toBe('number');
+      if (id === HUMAN) expect(Array.isArray(p.hand)).toBe(true);
+      else expect(p.hand).toBeNull();
+    }
+    expect(JSON.stringify(view)).not.toContain('rngSeed');
   });
 });

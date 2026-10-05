@@ -5,7 +5,7 @@
 // 说明：L1/L4 目标被 engine 判为唯一相邻层时自动移动，不挂起，本 banner 不出现；
 //   L2/L3 目标必须由发动方从 2 个相邻层中选一。
 
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 
 export interface ShooterLayerPickerState {
   visible: boolean;
@@ -16,7 +16,7 @@ export interface ShooterLayerPickerState {
 }
 
 export function computeShooterLayerPickerState(
-  G: SetupState | null | undefined,
+  G: MatchView | null | undefined,
   viewerPlayerID: string,
 ): ShooterLayerPickerState {
   const empty: ShooterLayerPickerState = {
@@ -26,8 +26,7 @@ export function computeShooterLayerPickerState(
     choices: [],
   };
   if (!G) return empty;
-  const pending = (G as unknown as { pendingShootMove?: SetupState['pendingShootMove'] })
-    .pendingShootMove;
+  const pending = G.pendingShootMove;
   if (!pending) return empty;
   // 仅发动方可见
   if (viewerPlayerID !== pending.shooterID) return empty;

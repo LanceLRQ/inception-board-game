@@ -3,7 +3,7 @@
 // 复用 PeekerVaultRevealBanner/logic.ts
 
 import { Eye, KeyRound, Coins, HelpCircle } from 'lucide-react';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computePeekerVaultRevealState } from '../PeekerVaultRevealBanner/logic.js';
 import {
   Dialog,
@@ -15,7 +15,7 @@ import {
 } from '../ui/dialog';
 
 export interface PeekerVaultRevealDialogProps {
-  G: SetupState | null | undefined;
+  G: MatchView | null | undefined;
   viewerPlayerID: string;
   makeMove: (move: string, args: unknown[]) => Promise<void> | void;
 }

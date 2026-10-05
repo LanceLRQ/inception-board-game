@@ -6,7 +6,7 @@
 //   vault 内容：contentType ∈ 'secret' | 'coin' | 'empty' | 'hidden'
 //   engine playerView 已将 peekerID 视角下 vaultLayer 对应 vault 透传 contentType。
 
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 
 export interface PeekerVaultRevealBannerState {
   visible: boolean;
@@ -16,7 +16,7 @@ export interface PeekerVaultRevealBannerState {
 }
 
 export function computePeekerVaultRevealState(
-  G: SetupState | null | undefined,
+  G: MatchView | null | undefined,
   viewerPlayerID: string,
 ): PeekerVaultRevealBannerState {
   const empty: PeekerVaultRevealBannerState = {

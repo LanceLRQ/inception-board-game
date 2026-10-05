@@ -3,7 +3,7 @@
 // 复用 MasterBribeInspectBanner/logic.ts
 
 import { Eye, Handshake, ShieldX, HelpCircle } from 'lucide-react';
-import type { SetupState } from '@icgame/game-engine';
+import type { MatchView } from '@icgame/game-engine';
 import { computeMasterBribeInspectState } from '../MasterBribeInspectBanner/logic.js';
 import {
   Dialog,
@@ -15,21 +15,23 @@ import {
 } from '../ui/dialog';
 
 export interface MasterBribeInspectDialogProps {
-  G: SetupState | null | undefined;
+  G: MatchView | null | undefined;
   viewerPlayerID: string;
   makeMove: (move: string, args: unknown[]) => Promise<void> | void;
 }
 
-function bribeIcon(status: string) {
-  if (status === 'deal') return <Handshake className="h-4 w-4 text-rose-500" />;
-  if (status === 'dealt') return <ShieldX className="h-4 w-4 text-slate-500" />;
+type BribeKind = 'deal' | 'fail' | null;
+
+function bribeIcon(kind: BribeKind) {
+  if (kind === 'deal') return <Handshake className="h-4 w-4 text-rose-500" />;
+  if (kind === 'fail') return <ShieldX className="h-4 w-4 text-slate-500" />;
   return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
 }
 
-function bribeLabel(status: string): string {
-  if (status === 'deal') return 'DEAL · 成交（该盗梦者已转阵营）';
-  if (status === 'dealt') return '碎裂 · 未成交';
-  return status;
+function bribeLabel(kind: BribeKind): string {
+  if (kind === 'deal') return 'DEAL · 成交（该盗梦者已转阵营）';
+  if (kind === 'fail') return '碎裂 · 未成交';
+  return '未知';
 }
 
 export function MasterBribeInspectDialog({
@@ -60,8 +62,8 @@ export function MasterBribeInspectDialog({
                 key={b.id}
                 className="flex items-center gap-2 rounded bg-background/60 px-2 py-1.5"
               >
-                {bribeIcon(b.status)}
-                <span className="text-xs">{bribeLabel(b.status)}</span>
+                {bribeIcon(b.kind)}
+                <span className="text-xs">{bribeLabel(b.kind)}</span>
               </div>
             ))
           )}

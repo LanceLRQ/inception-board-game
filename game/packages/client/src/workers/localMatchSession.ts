@@ -4,7 +4,7 @@
 // 不含 Comlink、定时器与 DOM，Worker 只负责调度与日志。
 // 状态由引擎包的对局运行器驱动；Bot 的决策来自 @icgame/bot。
 
-import { InceptionCityGame } from '@icgame/game-engine';
+import { InceptionCityGame, viewMatch, type MatchView } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import {
   applyMove,
@@ -21,10 +21,14 @@ const game: GameDef<SetupState> = InceptionCityGame;
 /** 同一个自动动作连续被拒达到这个次数后，不再继续调度 */
 export const MAX_CONSECUTIVE_REJECTS = 3;
 
-/** 主线程可见的对局视图：只有对局状态和流程信息，不含随机数状态 */
+/**
+ * 主线程可见的对局视图：真人座位看到的白名单视图加流程信息与版本号，
+ * 不含随机种子、牌库顺序、他人手牌。
+ */
 export interface SessionView {
-  G: SetupState;
+  G: MatchView;
   ctx: RunnerCtx;
+  stateID: number;
 }
 
 export interface StepResult {
@@ -75,8 +79,11 @@ export class LocalMatchSession {
     });
   }
 
+  /** 真人座位的视图；完整状态只留在会话内部，供 Bot 决策与 move 使用 */
   view(): SessionView {
-    return { G: this.state.G, ctx: this.state.ctx };
+    const { G, ctx, stateID } = viewMatch(game, this.state, this.humanPlayerID);
+    // 视图钩子产出的就是 MatchView（协议类型里 G 只是不透明的 unknown）
+    return { G: G as MatchView, ctx, stateID };
   }
 
   /** 真人发起的 move；被拒不抛异常，状态不变 */
