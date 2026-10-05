@@ -78,10 +78,29 @@ describe('Validator', () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.code).toBe('AUTH_NOT_CURRENT_PLAYER');
     });
-    it('allows non-current player for response moves', () => {
-      const s = makeState();
+    it('allows non-current player for response moves when the window awaits them', () => {
+      const s = makeState({
+        pendingUnlock: { playerID: 'P1', layer: 1, cardId: 'c' as CardID },
+        pendingResponseWindow: {
+          sourceAbilityID: 'action_unlock_effect_1',
+          sourceType: 'unlock',
+          responders: ['P2', 'P3'],
+          responded: [],
+          timeoutMs: 30_000,
+          validResponseAbilityIDs: ['action_unlock_effect_2'],
+          onTimeout: 'resolve',
+          parentWindow: null,
+        },
+      });
       const ctx: MoveContext = { playerID: 'P2', currentPlayer: 'P1' };
       expect(validateAuth(s, ctx, { name: 'respondCancelUnlock' }).ok).toBe(true);
+    });
+    it('rejects response moves from a non-current player the window does not await', () => {
+      const s = makeState();
+      const ctx: MoveContext = { playerID: 'P2', currentPlayer: 'P1' };
+      const r = validateAuth(s, ctx, { name: 'respondCancelUnlock' });
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.code).toBe('AUTH_NOT_CURRENT_PLAYER');
     });
     it('rejects unknown player', () => {
       const s = makeState();

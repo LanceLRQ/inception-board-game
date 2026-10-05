@@ -42,8 +42,8 @@ export function pickBotMove(G: SetupState, botID: string, legal: readonly string
     return 'resolveShootMove';
   }
 
-  // 天秤待结算：引擎已放宽回合守卫，任一参与方都可代发
-  // 单机简化：优先由 bonder 一次性补完 split + pick
+  // 天秤待结算：分牌由被要求分牌的目标发，挑牌由发动者发（行动权表）；
+  // 这里只按 bonder 的视角选 move 名，实际的自动结算走 autoAction
   const pl = G.pendingLibra;
   if (pl && pl.bonderPlayerID === botID) {
     if (!pl.split && legal.includes('resolveLibraSplit')) return 'resolveLibraSplit';

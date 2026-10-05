@@ -22,16 +22,6 @@ export interface AutoActionOptions {
   humanPlayerIDs: readonly string[];
 }
 
-/**
- * 旧的「允许回合主人以外的玩家发起」名单。运行器现在按行动权表放行，这份名单已不再起作用，
- * 仅为兼容既有调用方暂时保留，即将移除。
- */
-export const RESPONSE_MOVES: ReadonlySet<string> = new Set([
-  'respondShootPass',
-  'respondTerroristAccept',
-  'respondVirgoPerfect',
-]);
-
 /** 当前状态下应当自动执行的下一步；该等真人、对局已结束、或无事可做时返回 null */
 export function nextAutoAction(
   state: MatchState<SetupState>,
@@ -58,7 +48,7 @@ export function nextAutoAction(
       return {
         playerID: next,
         move: 'passResponse',
-        args: [next],
+        args: [],
         why: `响应者 ${next} 放弃响应`,
       };
     }

@@ -118,11 +118,6 @@ export type MoveOutcome<G> =
 export interface ApplyMoveOptions {
   /** 覆盖随机源（测试用）。提供后不读也不写 state.rngState */
   random?: RandomSource;
-  /**
-   * 已不再起作用：回合外谁能发 move 由 Game 定义的 actionRights 决定。
-   * 仅为兼容既有调用方暂时保留，即将移除。
-   */
-  responseMoves?: ReadonlySet<string>;
 }
 
 // ---------------------------------------------------------------------------

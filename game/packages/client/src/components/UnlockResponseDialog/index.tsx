@@ -48,10 +48,10 @@ export function UnlockResponseDialog({
   useEffect(() => {
     if (!visible || !windowKey || timeoutMs <= 0) return;
     const id = setTimeout(() => {
-      void makeMove('passResponse', [viewerPlayerID]);
+      void makeMove('passResponse', []);
     }, timeoutMs);
     return () => clearTimeout(id);
-  }, [visible, windowKey, timeoutMs, makeMove, viewerPlayerID]);
+  }, [visible, windowKey, timeoutMs, makeMove]);
 
   const elapsed = countdown && countdown.key === windowKey ? countdown.now - countdown.startAt : 0;
   const remainingMs = Math.max(0, timeoutMs - elapsed);
@@ -86,7 +86,7 @@ export function UnlockResponseDialog({
       <DialogFooter>
         <button
           type="button"
-          onClick={() => void makeMove('passResponse', [viewerPlayerID])}
+          onClick={() => void makeMove('passResponse', [])}
           className="rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-muted"
         >
           跳过
@@ -94,7 +94,7 @@ export function UnlockResponseDialog({
         <button
           type="button"
           disabled={!canCancel}
-          onClick={() => void makeMove('respondCancelUnlock', [viewerPlayerID])}
+          onClick={() => void makeMove('respondCancelUnlock', [])}
           className="rounded-md border border-sky-500 bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
         >
           使用【解封】抵消

@@ -6,10 +6,8 @@
 //   且 viewerPlayerID 在 responders 中且未响应时，显示 banner。
 // 行为：两个按钮 — 使用【解封】抵消（需持牌）/ 跳过。
 //
-// 特别注意：当前 w19-b f4 架构下 responderID 作为参数由调用方 client 代发。
-//   在 LocalMatchRuntime 中 humanClient 的 ctx.currentPlayer 可能 ≠ human，
-//   但 engine 的 respondCancelUnlock/passResponse 支持第一个参数 responderID
-//   指定，所以可以直接用 humanClient.moves 代发。
+// 特别注意：respondCancelUnlock / passResponse 不带参数，响应者就是发起这个 move 的玩家；
+//   客户端以真人玩家的身份发出，引擎按行动权表确认他在响应窗口里且尚未响应。
 
 import type { SetupState } from '@icgame/game-engine';
 

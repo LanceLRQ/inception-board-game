@@ -2,6 +2,7 @@
 // 对照：docs/_internal/design/02-game-rules-spec.md §2.4 + docs/_internal/design/08-security-ai.md §8.4
 
 import type { SetupState } from '../setup.js';
+import { denyAction } from './actionRights.js';
 import type { CardID } from '@icgame/shared';
 
 // === 错误码 ===
@@ -128,16 +129,13 @@ export function validateAuth(
     return fail(2, 'AUTH_PLAYER_NOT_FOUND', `player ${ctx.playerID} not in match`);
   }
   if (ctx.playerID !== ctx.currentPlayer) {
-    // 响应窗口类 move 允许非当前玩家
-    if (
-      payload.name !== 'respondCancelUnlock' &&
-      payload.name !== 'passResponse' &&
-      payload.name !== 'resolveUnlock'
-    ) {
+    // 非当前玩家能不能发这个 move，由行动权表决定（响应者、被点名的目标等）
+    const denial = denyAction(state, ctx.playerID, payload.name);
+    if (denial !== null) {
       return fail(
         2,
         'AUTH_NOT_CURRENT_PLAYER',
-        `${ctx.playerID} is not current player (${ctx.currentPlayer})`,
+        `${ctx.playerID} is not current player (${ctx.currentPlayer}): ${denial}`,
       );
     }
   }

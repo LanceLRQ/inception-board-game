@@ -36,7 +36,7 @@ interface RightsRule {
 }
 
 /** 非回合主人在没有待结算时唯一可以发的 move */
-const OFF_TURN_MOVES: readonly string[] = ['useAthenaWit'];
+export const OFF_TURN_MOVES: readonly string[] = ['useAthenaWit'];
 
 const RIGHTS_RULES: readonly RightsRule[] = [
   {

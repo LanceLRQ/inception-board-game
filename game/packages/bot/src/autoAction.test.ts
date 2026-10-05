@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
-import { nextAutoAction, RESPONSE_MOVES } from './autoAction.js';
+import { nextAutoAction } from './autoAction.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -72,7 +72,7 @@ describe('nextAutoAction · 判定顺序', () => {
       const [a, b] = othersOf(s, 2) as [string, string];
       const pending = makeWindow(s, [a, b], [a]);
       const action = nextAutoAction(pending, NO_HUMAN);
-      expect(action).toMatchObject({ playerID: b, move: 'passResponse', args: [b] });
+      expect(action).toMatchObject({ playerID: b, move: 'passResponse', args: [] });
       expect(applyMove(game, pending, action!).ok).toBe(true);
     });
 
@@ -159,14 +159,19 @@ describe('nextAutoAction · 判定顺序', () => {
       expect(applyMove(game, s, action!).ok).toBe(true);
     });
 
-    it('引擎对天秤两步都不核对发起者，所以真人参与时也由回合主人代发（单机没有分牌界面）', () => {
+    it('真人参与时也自动完成（单机没有分牌界面），仍以各自本人的名义发出', () => {
       const s = libraState(null);
       const target = s.G.pendingLibra!.targetPlayerID;
-      expect(nextAutoAction(s, { humanPlayerIDs: [target] })?.move).toBe('resolveLibraSplit');
+      expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toMatchObject({
+        playerID: target,
+        move: 'resolveLibraSplit',
+      });
       const picked = libraState({ pile1: ['a'], pile2: ['b'] });
-      expect(nextAutoAction(picked, { humanPlayerIDs: [picked.ctx.currentPlayer] })?.move).toBe(
-        'resolveLibraPick',
-      );
+      const bonder = picked.G.pendingLibra!.bonderPlayerID;
+      expect(nextAutoAction(picked, { humanPlayerIDs: [bonder] })).toMatchObject({
+        playerID: bonder,
+        move: 'resolveLibraPick',
+      });
     });
   });
 
@@ -225,11 +230,11 @@ describe('nextAutoAction · 判定顺序', () => {
       expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toBeNull();
     });
 
-    it('RESPONSE_MOVES 收录这些响应 move，经运行器执行后待结算被清空', () => {
+    it('目标是 Bot：以目标本人的名义放弃闪避 / 接受惩罚，经运行器执行后待结算被清空', () => {
       for (const responseType of ['pisces', 'terrorist'] as const) {
         const s = shootResponseState(responseType);
         const action = nextAutoAction(s, NO_HUMAN)!;
-        expect(RESPONSE_MOVES.has(action.move)).toBe(true);
+        expect(action.playerID).toBe(s.G.pendingShootResponse!.targetPlayerID);
         const res = applyMove(game, s, action);
         expect(res.ok).toBe(true);
         if (res.ok) expect(res.state.G.pendingShootResponse).toBeNull();
@@ -282,7 +287,7 @@ describe('nextAutoAction · 判定顺序', () => {
     it('经运行器执行后 pendingVirgoChoice 被清空', () => {
       const s = virgoState();
       const action = nextAutoAction(s, NO_HUMAN)!;
-      expect(RESPONSE_MOVES.has(action.move)).toBe(true);
+      expect(action.playerID).toBe(s.G.pendingVirgoChoice!.virgoID);
       const res = applyMove(game, s, action);
       expect(res.ok).toBe(true);
       if (res.ok) expect(res.state.G.pendingVirgoChoice).toBeNull();

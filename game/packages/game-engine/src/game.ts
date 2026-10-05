@@ -1347,11 +1347,10 @@ export const InceptionCityGame = {
         // 响应解封效果②：抵消一张正在结算的【解封】。
         // 对照：docs/manual/04-action-cards.md §解封 效果②
         // W19-B F2：补齐 responder 校验 + 持卡校验 + 弃牌 + 关闭响应窗口。
-        //   签名：respondCancelUnlock(responderID?)；未传参时 fallback 到 ctx.currentPlayer
-        //   （兼容 bot 原无参调用；真实 BGIO 场景应由 unlocker 代理调用时显式传 responderID）
+        //   无参数：响应者就是发起者（包装层已按行动权表校验并把 ctx.currentPlayer 设为发起者）。
         respondCancelUnlock: {
-          move: ({ G, ctx }: MoveCtx, responderID?: string) => {
-            const rid = responderID ?? ctx.currentPlayer;
+          move: ({ G, ctx }: MoveCtx) => {
+            const rid = ctx.currentPlayer;
             if (!G.pendingUnlock) return INVALID_MOVE;
             const w = G.pendingResponseWindow;
             if (!w) return INVALID_MOVE;
@@ -1375,10 +1374,10 @@ export const InceptionCityGame = {
         },
         // pass 响应：表示自己不出效果②抵消。
         // W19-B F2：校验 responder 合法 & 未重复 pass；全员 pass 时自动进入 resolveUnlockFull。
-        //   签名：passResponse(responderID?)；未传参 fallback 到 ctx.currentPlayer
+        //   无参数：响应者就是发起者（同 respondCancelUnlock）。
         passResponse: {
-          move: ({ G, ctx, random }: MoveCtx, responderID?: string) => {
-            const rid = responderID ?? ctx.currentPlayer;
+          move: ({ G, ctx, random }: MoveCtx) => {
+            const rid = ctx.currentPlayer;
             const w = G.pendingResponseWindow;
             if (!w) return INVALID_MOVE;
             if (!w.responders.includes(rid)) return INVALID_MOVE;
@@ -1519,13 +1518,10 @@ export const InceptionCityGame = {
         //   W19-B F6：deal=true 随机派 1 张（命中 DEAL 转阵营）；deal=false 或 inPool=0 → 跳过派发。
         //   两分支终态一致：清 pendingPeekDecision + 挂 peekReveal（由 peeker 通过 peekerAcknowledge 消费）。
         masterPeekBribeDecision: {
-          move: ({ G, ctx, random }: MoveCtx, deal: boolean) => {
+          move: ({ G, random }: MoveCtx, deal: boolean) => {
             if (!G.pendingPeekDecision) return INVALID_MOVE;
-            // 回合外响应 move：不 guard ctx.currentPlayer（BGIO 中 ctx.currentPlayer 指当前回合玩家，
-            //   而非 move 调用者；盗梦者回合触发 peek 挂起时 currentPlayer=盗梦者，梦主代发此
-            //   决策时仍然用当前 active client 发起，身份由 pendingPeekDecision 本身作为凭证）。
-            //   参考 passResponse 范式。联机模式下的身份校验由 net/ws 网关在转发前处理。
-            void ctx; // 保留 ctx 以便未来做 playerID 校验（服务端场景）
+            // 回合外响应 move：只有梦主能发，由行动权表在进入这里之前校验，
+            //   这里不再核对发起者；是否派牌完全取决于参数 deal。
             const { peekerID, targetLayer } = G.pendingPeekDecision;
             const peeker = G.players[peekerID];
             if (!peeker) return INVALID_MOVE;

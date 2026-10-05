@@ -5,7 +5,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { InceptionCityGame } from '../game.js';
-import { denyAction } from '../engine/actionRights.js';
 import type { SetupState } from '../setup.js';
 import {
   applyMove,
@@ -176,27 +175,20 @@ function playout(numPlayers: number, seed: number, maxSteps: number): PlayoutSta
     const label = `n=${numPlayers} seed=${seed} step=${step}`;
 
     // 先发一个大概率非法的 move，比较两边的拒绝行为。
-    // 回合外的人发的请求，运行器按行动权表可能接受，而对照的 boardgame.io 一律拒绝，
-    // 这是有意的分叉：只有行动权表也判定拒绝的请求才发给两边比较。
+    // 回合外的人发的请求，运行器按行动权表可能接受，而对照的 boardgame.io 只认回合主人，
+    // 所以对局阶段里送给对照端时借回合主人的名义（move 内部仍按真正的发起者校验）。
     const noise = pickNoiseMove(game, run, fuzz);
-    const offTurn = noise.playerID !== run.ctx.currentPlayer;
-    const comparable =
-      !offTurn ||
-      run.ctx.phase !== 'playing' ||
-      denyAction(run.G, noise.playerID, noise.move) !== null;
-    if (comparable) {
-      const noiseRef = ref.apply(noise);
-      const noiseRun = applyMove(game, run, noise, { random: runRandom });
-      expect(noiseRun.ok, `${label} 干扰 move ${noise.move} by ${noise.playerID}`).toBe(noiseRef);
-      if (noiseRun.ok) {
-        run = noiseRun.state;
-        stats.accepted++;
-        stats.moveNames.add(noise.move);
-      } else {
-        stats.rejectedNoise++;
-      }
-      expectSame(run, ref.state, `${label} 干扰 move ${noise.move} 之后`);
+    const noiseRef = ref.apply(noise, run.ctx.phase === 'playing');
+    const noiseRun = applyMove(game, run, noise, { random: runRandom });
+    expect(noiseRun.ok, `${label} 干扰 move ${noise.move} by ${noise.playerID}`).toBe(noiseRef);
+    if (noiseRun.ok) {
+      run = noiseRun.state;
+      stats.accepted++;
+      stats.moveNames.add(noise.move);
+    } else {
+      stats.rejectedNoise++;
     }
+    expectSame(run, ref.state, `${label} 干扰 move ${noise.move} 之后`);
     if (run.ctx.gameover !== undefined) {
       stats.finished = true;
       break;

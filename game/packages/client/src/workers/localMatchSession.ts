@@ -14,7 +14,7 @@ import {
   type MoveOutcome,
   type RunnerCtx,
 } from '@icgame/game-engine/runner';
-import { nextAutoAction, RESPONSE_MOVES, type AutoAction } from '@icgame/bot';
+import { nextAutoAction, type AutoAction } from '@icgame/bot';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -81,12 +81,7 @@ export class LocalMatchSession {
 
   /** 真人发起的 move；被拒不抛异常，状态不变 */
   humanMove(move: string, args: unknown[]): { ok: boolean; reason?: string } {
-    const outcome = applyMove(
-      game,
-      this.state,
-      { playerID: this.humanPlayerID, move, args },
-      { responseMoves: RESPONSE_MOVES },
-    );
+    const outcome = applyMove(game, this.state, { playerID: this.humanPlayerID, move, args });
     if (!outcome.ok) return { ok: false, reason: describeReject(outcome) };
     this.state = outcome.state;
     this.clearRejects();
@@ -98,12 +93,11 @@ export class LocalMatchSession {
     const action = nextAutoAction(this.state, { humanPlayerIDs: [this.humanPlayerID] });
     if (action === null) return { action: null, ok: true, continue: false };
 
-    const outcome = applyMove(
-      game,
-      this.state,
-      { playerID: action.playerID, move: action.move, args: action.args },
-      { responseMoves: RESPONSE_MOVES },
-    );
+    const outcome = applyMove(game, this.state, {
+      playerID: action.playerID,
+      move: action.move,
+      args: action.args,
+    });
     if (outcome.ok) {
       this.state = outcome.state;
       this.clearRejects();

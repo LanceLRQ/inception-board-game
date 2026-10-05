@@ -11,7 +11,7 @@ export type { TakeoverReason, TakeoverRecord } from './takeover.js';
 
 export { MOVES_BY_PHASE, MOVE_PRIORITY, legalMovesFor } from './moveTables.js';
 export { pickBotMove, defaultArgsFor } from './botMoves.js';
-export { nextAutoAction, RESPONSE_MOVES } from './autoAction.js';
+export { nextAutoAction } from './autoAction.js';
 export type { AutoAction, AutoActionOptions } from './autoAction.js';
 export { runBotPlayout } from './playout.js';
 export type { BotPlayoutOptions, BotPlayoutResult, StallInfo, RejectedStep } from './playout.js';

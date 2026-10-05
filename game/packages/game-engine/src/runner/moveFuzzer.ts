@@ -4,7 +4,7 @@
 //       留下被接受的候选。试跑用独立的随机源，不影响正式对局的随机序列。
 
 import type { SetupState } from '../setup.js';
-import { listAwaiting } from '../engine/actionRights.js';
+import { listAwaiting, OFF_TURN_MOVES } from '../engine/actionRights.js';
 import { applyMove, type GameDef, type MatchState, type RandomSource } from './matchRunner.js';
 
 export interface MoveCandidate {
@@ -148,14 +148,6 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   // 注意 targetPlayerID 这类名字里也含有 layer，玩家 ID 必须留给下面的分支
   if (/layer/.test(n) && !/playerid/.test(n)) return Math.floor(rnd() * 6);
   if (/(idx|index)/.test(n)) return Math.floor(rnd() * 6);
-  if (n === 'responderid') {
-    const r = rnd();
-    if (r < 0.2) return undefined;
-    // 响应者多半报自己的 ID
-    if (r < 0.55) return actor;
-    if (r < 0.8 && pendingPlayers.length > 0) return pick(rnd, pendingPlayers);
-    return pick(rnd, players);
-  }
   if (/(playerid|targetid|reviveid|thiefid)/.test(n)) {
     if (n === 'reviveid' && rnd() < 0.3) return null;
     if (rnd() < 0.3 && pendingPlayers.length > 0) return pick(rnd, pendingPlayers);
@@ -216,18 +208,30 @@ export interface PickLegalMoveOptions {
   actors?: readonly string[];
 }
 
-/** 此刻值得试 move 的玩家：回合主人，加上对局阶段各待结算事项的行动者 */
+/** 此刻值得试 move 的玩家，分成两类 */
+interface ActorSet {
+  /** 回合主人，加上对局阶段各待结算事项的行动者：什么 move 都值得试 */
+  holders: string[];
+  /** 其余玩家：只值得试回合外可发的 move（没有阻塞型待结算时才有） */
+  bystanders: string[];
+}
+
 function candidateActors(
   state: MatchState<SetupState>,
   ownerOnly: boolean,
   only?: readonly string[],
-): string[] {
-  const owner = state.ctx.currentPlayer;
-  const all = new Set<string>([owner]);
+): ActorSet {
+  const holders = new Set<string>([state.ctx.currentPlayer]);
+  const bystanders = new Set<string>();
   if (!ownerOnly && state.ctx.phase === 'playing') {
-    for (const entry of listAwaiting(state.G)) entry.actors.forEach((id) => all.add(id));
+    const awaiting = listAwaiting(state.G);
+    for (const entry of awaiting) entry.actors.forEach((id) => holders.add(id));
+    if (!awaiting.some((entry) => entry.blocking)) {
+      for (const id of state.G.playerOrder) if (!holders.has(id)) bystanders.add(id);
+    }
   }
-  return [...all].filter((id) => only === undefined || only.includes(id));
+  const keep = (id: string): boolean => only === undefined || only.includes(id);
+  return { holders: [...holders].filter(keep), bystanders: [...bystanders].filter(keep) };
 }
 
 /**
@@ -244,8 +248,11 @@ export function pickLegalMove(
   const probeRandom = makeRandomSource(makeTestRng(Math.floor(rnd() * 2 ** 31)));
   const names = Object.keys(currentMoves(game, state.ctx.phase));
   const accepted: MoveCandidate[] = [];
-  for (const actor of candidateActors(state, ownerOnly, actors)) {
+  const { holders, bystanders } = candidateActors(state, ownerOnly, actors);
+  for (const actor of [...holders, ...bystanders]) {
+    const isBystander = !holders.includes(actor);
     for (const move of names) {
+      if (isBystander && !OFF_TURN_MOVES.includes(move)) continue;
       // 没有行动权的组合不必试，试了也是被拒
       if (game.actionRights?.({ G: state.G, ctx: state.ctx, playerID: actor, move }) === false) {
         continue;
