@@ -2,7 +2,7 @@
 // - friend 模式（?friend=1&players=N&code=ABC123）：1 人类 + (N-1) AI 本地对局
 // - 其他场景：保留原 mock + ThiefBoard/MasterBoard 调试路径
 //
-// 对照：plans/design/07-backend-network.md · plans/design/08-security-ai.md §8.5
+// 对照：docs/_internal/design/07-backend-network.md · docs/_internal/design/08-security-ai.md §8.5
 
 import { useCallback, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';

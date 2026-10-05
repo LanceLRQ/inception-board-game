@@ -40,7 +40,7 @@ export const cardFlip: Variants = {
 /**
  * 当前行动玩家的脉冲光（金色）
  * 用于 PlayerSeat / RailSlot / ActionDock 外框
- * 对照：plans/design/06c-match-table-layout.md §7.2
+ * 对照：docs/_internal/design/06c-match-table-layout.md §7.2
  */
 export const activeTurnPulse: Variants = {
   idle: { boxShadow: '0 0 0 0 rgba(250, 204, 21, 0)' },

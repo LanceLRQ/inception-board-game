@@ -32,6 +32,18 @@ describe('checkLine · 规则命中', () => {
     expect(v.map((x) => x.rule)).toContain('user_story');
   });
 
+  it('flags docs/_internal path', () => {
+    const v = checkLine('See docs/_internal/design/03-data-model.md', 'a.md', 1);
+    // 命中两条：internal_docs_path + design_doc_number
+    expect(v.map((x) => x.rule)).toContain('internal_docs_path');
+    expect(v.map((x) => x.rule)).toContain('design_doc_number');
+  });
+
+  it('does not flag public docs paths as internal', () => {
+    const v = checkLine('规则原文见 docs/manual/ 与 docs/superpowers/specs/', 'a.md', 1);
+    expect(v.map((x) => x.rule)).not.toContain('internal_docs_path');
+  });
+
   it('flags plans/design path', () => {
     const v = checkLine('See plans/design/03-data-model.md', 'a.md', 1);
     // 命中两条：plans_design_path + design_doc_number
@@ -103,6 +115,7 @@ describe('isScanTarget · 白名单目标', () => {
   it('includes docs/** markdown', () => {
     expect(isScanTarget('docs/ops/deploy.md')).toBe(true);
     expect(isScanTarget('docs/manual/01-game-overview.md')).toBe(true);
+    expect(isScanTarget('docs/superpowers/specs/2026-01-01-sample-design.md')).toBe(true);
   });
 
   it('includes i18n locales json', () => {
@@ -119,9 +132,10 @@ describe('isScanTarget · 白名单目标', () => {
     expect(isScanTarget('game/packages/game-engine/src/foo.test.ts')).toBe(false);
   });
 
-  it('excludes plans/ directory', () => {
-    expect(isScanTarget('plans/design/00-overview.md')).toBe(false);
-    expect(isScanTarget('plans/tasks.md')).toBe(false);
+  it('excludes docs/_internal/ directory (internal docs)', () => {
+    expect(isScanTarget('docs/_internal/design/00-overview.md')).toBe(false);
+    expect(isScanTarget('docs/_internal/TASKS.md')).toBe(false);
+    expect(isScanTarget('docs/_internal/audit/AUDIT-2026-04-21-engine-review.md')).toBe(false);
   });
 
   it('excludes experimental_demo/ (internal prototypes)', () => {

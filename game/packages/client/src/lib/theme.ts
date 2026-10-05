@@ -1,5 +1,5 @@
 // 主题解析纯函数
-// 对照：plans/design/06-frontend-design.md 明暗双主题
+// 对照：docs/_internal/design/06-frontend-design.md 明暗双主题
 //
 // 三态：
 //   - 'light' / 'dark'：显式选择

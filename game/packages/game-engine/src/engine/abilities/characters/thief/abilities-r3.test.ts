@@ -1,5 +1,5 @@
 // W10-R3 · 桶 D 6 角色响应窗口类能力注册
-// 对照：plans/tasks.md Phase 3 abilities registry · R3（黑洞·征收/空间女王×2/射手·心锁/恐怖分子·远程/格林射线）
+// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R3（黑洞·征收/空间女王×2/射手·心锁/恐怖分子·远程/格林射线）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

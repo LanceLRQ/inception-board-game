@@ -1,5 +1,5 @@
 // 行动牌快照回归测试（W10 收尾）
-// 对照：plans/tasks.md Phase 3 W10 · 20 种行动牌 × Fixture + 快照测试
+// 对照：docs/_internal/TASKS.md Phase 3 W10 · 20 种行动牌 × Fixture + 快照测试
 // 对照：docs/manual/04-action-cards.md
 //
 // 目标：为 21 种行动牌 move 建立"单一真相"快照网。任意改动 move 行为 → 快照失效 → 强制 review。

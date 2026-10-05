@@ -1,5 +1,5 @@
 // 零信任事件广播 - per-recipient 重写事件 payload
-// 对照：plans/design/07-backend-network.md §7.9b + plans/design/08-security-ai.md §8.4d
+// 对照：docs/_internal/design/07-backend-network.md §7.9b + docs/_internal/design/08-security-ai.md §8.4d
 //
 // 核心原则：
 //   1. 禁止 io.emit 全广播敏感事件

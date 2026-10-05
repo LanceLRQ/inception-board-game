@@ -1,5 +1,5 @@
 // CopyrightNotice - 版权声明组件（多 variant 适配四重展示点）
-// 对照：NOTICE 根文件 / plans/design/06-frontend-design.md 版权展示
+// 对照：NOTICE 根文件 / docs/_internal/design/06-frontend-design.md 版权展示
 //
 // Variants：
 //   - 'footer'：一行紧凑（Landing 底部、Game 结算页小字）

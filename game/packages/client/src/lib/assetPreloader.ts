@@ -1,5 +1,5 @@
 // AssetPreloader - 三阶段预加载（ADR-042）
-// 对照：plans/design/06-frontend-design.md §6.17.5
+// 对照：docs/_internal/design/06-frontend-design.md §6.17.5
 //
 // 纯函数策略 + 可注入 fetch，便于单测。
 // 三阶段：

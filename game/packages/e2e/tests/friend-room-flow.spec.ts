@@ -1,5 +1,5 @@
 // 好友房流程 E2E（Lobby → Room）
-// 对照：plans/design/07-backend-network.md §7.3.2.3 /rooms REST
+// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3 /rooms REST
 //
 // 本用例用 page.route 拦截 /identity/* 与 /rooms/* 的后端调用，
 // 验证前端 UI 流程（不依赖真实后端/Postgres/Redis）：

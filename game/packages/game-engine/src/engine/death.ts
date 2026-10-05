@@ -1,5 +1,5 @@
 // 死亡 + 迷失层 - MVP 简化版
-// 对照：docs/manual/03-game-flow.md 死亡规则 + plans/design/02-game-rules-spec.md §2.5
+// 对照：docs/manual/03-game-flow.md 死亡规则 + docs/_internal/design/02-game-rules-spec.md §2.5
 //
 // MVP 规则：
 //   - 玩家死亡（SHOOT kill / 梦魇）→ isAlive=false + deathTurn=当前回合

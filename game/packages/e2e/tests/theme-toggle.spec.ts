@@ -1,5 +1,5 @@
 // 明/暗/follow 三态主题切换 E2E
-// 对照：plans/tasks.md P2 B8.4
+// 对照：docs/_internal/TASKS.md P2 B8.4
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 

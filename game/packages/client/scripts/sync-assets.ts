@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 // ADR-042 卡牌素材同步脚本
-// 对照：plans/design/06-frontend-design.md §6.17.3
+// 对照：docs/_internal/design/06-frontend-design.md §6.17.3
 //
 // 用法：
 //   pnpm assets:sync              # 默认：按 sha256 幂等复制 + 重写 manifest.json
@@ -8,8 +8,8 @@
 //   pnpm assets:sync --clean      # 清理 public/cards/ 下不在 manifest 中的孤儿文件
 //
 // 来源：
-//   - plans/assets/cards-data.json（唯一事实源，已 gitignored）
-//   - plans/assets/cards/**/*.webp（仅 webp 白名单）
+//   - docs/_internal/reference/assets/cards-data.json（唯一事实源，已 gitignored）
+//   - docs/_internal/reference/assets/cards/**/*.webp（仅 webp 白名单）
 //
 // 目标：
 //   - game/packages/client/public/cards/{category}/{id}.webp
@@ -47,8 +47,8 @@ const __dirname = dirname(__filename);
 
 // 路径解析（脚本在 game/packages/client/scripts/）
 const REPO_ROOT = resolve(__dirname, '../../../..');
-const SOURCE_DATA = resolve(REPO_ROOT, 'plans/assets/cards-data.json');
-const SOURCE_CARDS_DIR = resolve(REPO_ROOT, 'plans/assets');
+const SOURCE_DATA = resolve(REPO_ROOT, 'docs/_internal/reference/assets/cards-data.json');
+const SOURCE_CARDS_DIR = resolve(REPO_ROOT, 'docs/_internal/reference/assets');
 const TARGET_DIR = resolve(__dirname, '../public/cards');
 const MANIFEST_PATH = join(TARGET_DIR, 'manifest.json');
 const MANIFEST_VERSION = '1.0.0';
@@ -212,7 +212,7 @@ function run(): void {
 
 function findSourceFor(entry: AssetManifestEntry): string | null {
   // 解析回源：entry.url = '/cards/{category}/{id}.webp'
-  // 源在 plans/assets/cards/**/*.webp（中文原名），需要通过 cards-data.json 反查
+  // 源在 docs/_internal/reference/assets/cards/**/*.webp（中文原名），需要通过 cards-data.json 反查
   // 简化：用 tier/id 直接找最匹配的 webp——通过 sha256 反查不现实
   // 这里改为：再读一次 cards-data 取 image 并替换为 .webp
   const json = JSON.parse(readFileSync(SOURCE_DATA, 'utf-8')) as Parameters<

@@ -1,6 +1,6 @@
 // 解封响应 · 纯逻辑层
 // 对照：docs/manual/04-action-cards.md §解封 效果②
-// 对照：plans/report/phase3-out-of-turn-interaction-review.md OOT-01
+// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-01
 //
 // 触发：当 pendingResponseWindow.sourceAbilityID='action_unlock_effect_1'
 //   且 viewerPlayerID 在 responders 中且未响应时，显示 banner。

@@ -1,5 +1,5 @@
 // PlayerSeat - PC 围坐桌面座位节点（左角色卡 + 右层徽 + 手牌数角标 + 当前行动脉冲）
-// 对照：plans/design/06c-match-table-layout.md §5.1
+// 对照：docs/_internal/design/06c-match-table-layout.md §5.1
 //
 // 关键约束（按主人确认）：
 //   - Seat 不响应 click 选目标，只支持长按/双击打开 CardDetailModal

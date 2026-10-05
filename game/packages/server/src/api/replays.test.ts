@@ -1,5 +1,5 @@
 // 回放 API 纯函数单测
-// 对照：plans/tasks.md W21 回放系统启动 batch
+// 对照：docs/_internal/TASKS.md W21 回放系统启动 batch
 //
 // 覆盖：rowsToEventLogEntries / alignFilteredWithMeta 两纯函数
 

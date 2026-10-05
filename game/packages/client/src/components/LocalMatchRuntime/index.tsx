@@ -1,5 +1,5 @@
 // 本地对局运行时 · 抽离自 /local 页，可复用于好友房 1 人类+N AI 模式
-// 对照：plans/design/08-security-ai.md §8.5 L0 Bot
+// 对照：docs/_internal/design/08-security-ai.md §8.5 L0 Bot
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Comlink from 'comlink';

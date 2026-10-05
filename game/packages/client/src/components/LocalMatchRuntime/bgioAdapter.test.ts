@@ -1,5 +1,5 @@
 // adaptBGIOtoMockState 纯函数测试
-// 对照：plans/design/06c-match-table-layout.md
+// 对照：docs/_internal/design/06c-match-table-layout.md
 
 import { describe, it, expect } from 'vitest';
 import { adaptBGIOtoMockState } from './bgioAdapter.js';

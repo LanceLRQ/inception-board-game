@@ -1,5 +1,5 @@
 // ActionDock - 底部固定操作栏（viewer 角色卡 + 层徽 + 手牌 + 技能入口）
-// 对照：plans/design/06c-match-table-layout.md §5.4
+// 对照：docs/_internal/design/06c-match-table-layout.md §5.4
 //
 // 布局：
 //   PC（宽屏 ≥lg）：横向一行 [角色卡][层徽][手牌平铺 ≤7 / 抽屉 >7][技能]

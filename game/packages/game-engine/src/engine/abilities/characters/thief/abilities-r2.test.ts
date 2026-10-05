@@ -1,5 +1,5 @@
 // W10-R2 · 桶 C 3 角色 turnPhase 抽牌阶段 hook
-// 对照：plans/tasks.md Phase 3 abilities registry · R2（小丑/黑天鹅/白羊·skill_1）
+// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R2（小丑/黑天鹅/白羊·skill_1）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID } from '@icgame/shared';

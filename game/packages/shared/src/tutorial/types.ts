@@ -1,5 +1,5 @@
 // 教学剧本 Schema（MVP 版）
-// 对照：plans/tasks.md W8.5-9 · 新手教学关卡
+// 对照：docs/_internal/TASKS.md W8.5-9 · 新手教学关卡
 
 export type TutorialStepKind = 'info' | 'highlight' | 'action' | 'choice';
 

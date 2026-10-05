@@ -3,7 +3,7 @@
 //
 // 对外产物（README/LICENSE/NOTICE/docs/源代码注释）严禁出现：
 //   - 内部设计文档编号、ADR、Phase、Week、Spike、User Story、风险代号
-//   - plans/design、plans/manual 路径引用
+//   - docs/_internal 内部文档路径引用（含历史路径 plans/design、plans/manual）
 //
 // 本模块仅导出纯函数，IO 由 copyright-check.ts 入口实现。
 
@@ -62,9 +62,15 @@ export const INTERNAL_TERM_RULES: readonly Rule[] = [
     suggestion: '改用风险描述文字',
   },
   {
+    name: 'internal_docs_path',
+    pattern: /\bdocs\/_internal\b/,
+    description: 'docs/_internal/ 路径引用（内部目录）',
+    suggestion: '引用公开路径（如 docs/manual/）或移除',
+  },
+  {
     name: 'plans_design_path',
     pattern: /\bplans\/design\b/,
-    description: 'plans/design/ 路径引用（内部目录）',
+    description: 'plans/design/ 旧路径引用（内部文档已迁至 docs/_internal/）',
     suggestion: '引用公开路径（如 docs/manual/）或移除',
   },
   {
@@ -124,10 +130,10 @@ export function scanText(
  * 白名单策略：只扫描真正对外产物，避免源代码注释 / 测试 / 原型误报。
  * 允许：
  *   - 仓库根：README.md / NOTICE / LICENSE / CLAUDE.md
- *   - docs/** 对外文档（含 docs/manual/ 规则原文、docs/ops/ 运维指南）
+ *   - docs/** 对外文档（含 docs/manual/ 规则原文、docs/ops/ 运维指南、docs/superpowers/specs/ 定稿规格）
  *   - 各包的 i18n locales JSON（用户可见文案）
  * 排除：
- *   - plans/**（内部开发）
+ *   - docs/_internal/**（内部开发文档，需先于 docs/** 白名单排除）
  *   - experimental_demo/**（原型）
  *   - 源代码 .ts/.tsx/.js（注释引用设计文档是合理的）
  *   - 测试、node_modules、dist 等
@@ -135,7 +141,7 @@ export function scanText(
 export function isScanTarget(relPath: string): boolean {
   // 明确排除
   const excludePatterns = [
-    /^plans\//,
+    /^docs\/_internal\//,
     /^experimental_demo\//,
     /^node_modules\//,
     /\/node_modules\//,

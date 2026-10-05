@@ -1,5 +1,5 @@
 // 能力注册表 — 全局维护所有已注册的能力定义
-// 对照：plans/design/05-card-system.md §5.1.2
+// 对照：docs/_internal/design/05-card-system.md §5.1.2
 
 import type { CardID } from '@icgame/shared';
 import type { AbilityDefinition, AbilityRegistry, TriggerTiming } from './types.js';

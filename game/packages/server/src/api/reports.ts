@@ -1,5 +1,5 @@
 // 举报 API
-// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
 // POST /matches/:id/report
 //   - 鉴权：authMiddleware

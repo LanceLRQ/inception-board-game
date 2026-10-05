@@ -1,5 +1,5 @@
 // 3D 骰子组件 - SVG 底图 + CSS 3D 变换 + reduced-motion 降级
-// 对照：plans/design/06-frontend-design.md §6.6 Dice3D / Spike: experimental_demo/dice-svg-css3d
+// 对照：docs/_internal/design/06-frontend-design.md §6.6 Dice3D / Spike: experimental_demo/dice-svg-css3d
 //
 // 变更（B8.2）：
 //   - 骰子面从 CSS Grid 点阵升级为预渲染 SVG 图（/dice/dice-{color}-{face}.svg）

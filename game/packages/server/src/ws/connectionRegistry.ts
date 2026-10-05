@@ -1,5 +1,5 @@
 // WS 连接注册表（MVP：单实例内存版，Phase 5 多实例改 Redis）
-// 对照：plans/design/07-backend-network.md §7.4.4 / §7.4.5
+// 对照：docs/_internal/design/07-backend-network.md §7.4.4 / §7.4.5
 //
 // 职责：
 //   - socketId ↔ { playerID, matchID } 双向映射

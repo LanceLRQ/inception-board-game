@@ -1,5 +1,5 @@
 // 角色能力 bootstrap — 把所有 AbilityDefinition 注册到一个 InMemoryAbilityRegistry
-// 对照：plans/design/05-card-system.md §5.1.2
+// 对照：docs/_internal/design/05-card-system.md §5.1.2
 //
 // 使用方式（典型）：
 //   import { createDefaultRegistry } from './characters';

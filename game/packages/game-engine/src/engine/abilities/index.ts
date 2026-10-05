@@ -1,5 +1,5 @@
 // 能力系统入口
-// 对照：plans/design/05-card-system.md §5.1-§5.3
+// 对照：docs/_internal/design/05-card-system.md §5.1-§5.3
 
 export type {
   PriorityBucket,

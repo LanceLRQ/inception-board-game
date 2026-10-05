@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 玩家人数：3-10（默认 5-8，4 人有变体规则）
 - 核心冲突：1 梦主 vs 多盗梦者（隐藏信息 + 非对称对抗）
-- 当前阶段：**对外文档与素材就位，代码实现尚未启动**
+- 当前阶段：**核心玩法与角色系统已实装，可本地人机对战；在线多人与运营能力开发中**（详见下方「实现现状」）
 
 ## ⚠️ 不可协商的硬约束
 
@@ -45,9 +45,67 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 后端 | Node.js + Koa + TypeScript | 20+ |
 | 持久化 | PostgreSQL 16 + Redis 7 | - |
 
+## 实现现状
+
+> 截至 2026-10-05。
+
+**已实装**
+
+- 工程基建：pnpm + Turborepo monorepo、CI（lint / typecheck / 单元测试 / E2E）、Docker Compose 私有部署
+- 匿名身份（JWT + 恢复码）、房间与 Lobby、昵称与像素头像、预设短语聊天、短链
+- 游戏引擎：回合流程、服务端权威校验、按接收者过滤的事件广播
+- 卡牌内容：21 种行动牌、6 张梦魇牌、37 名盗梦者、15 名梦主及其世界观、贿赂系统
+- 对局界面：PC 围坐椭圆 + 移动端行动轴双模式，本地人机对战（随机 Bot）
+- 后端接口：回放（视角过滤 / 步进 / 分享短链）、成就与最佳玩家评分计算、举报与运营审核
+
+**未完成**
+
+- 回放播放器、成就与结算页的前端界面
+- 启发式 Bot、渗透测试、内容审核（敏感词过滤 / 版权响应流程）
+- 公开匹配、信誉分分池、多实例生产部署与压测
+- 动画音效打磨、完整的无障碍支持与英文本地化
+
+**测试基线**：单元测试 2500+ 条（`shared` / `game-engine` / `bot` / `server` / `client` 五个包），全部通过。
+
+## 仓库结构
+
+```
+.
+├── LICENSE / NOTICE / README.md    # 对外入口文件
+├── CLAUDE.md                       # 本文件
+├── docs/
+│   ├── manual/                     # 原版桌游规则说明
+│   ├── ops/                        # 部署与性能基线等运维文档
+│   └── superpowers/specs/          # 定稿后公开的设计规格
+├── game/                           # 产品代码（pnpm monorepo）
+│   ├── packages/
+│   │   ├── shared/                 # 共享类型、卡牌数据、通用规则
+│   │   ├── game-engine/            # 游戏引擎（Boardgame.io Game 定义、moves、技能）
+│   │   ├── bot/                    # AI Bot
+│   │   ├── server/                 # Koa 服务端（REST / WebSocket / Prisma）
+│   │   ├── client/                 # React PWA 客户端
+│   │   └── e2e/                    # Playwright 端到端测试
+│   ├── docker/                     # Dockerfile 与 Compose
+│   └── scripts/                    # 工程脚本
+└── experimental_demo/              # 早期技术验证原型（独立子项目）
+```
+
 ## 常用命令
 
-> 代码层尚未启动。代码层启动后，将追加：`pnpm dev` / `pnpm test` / `pnpm build` / `pnpm lint` / `docker-compose up`。届时请更新本节。
+以下命令均在 `game/` 目录下执行（Node.js ≥ 20，pnpm ≥ 9）：
+
+```bash
+pnpm install                          # 安装依赖
+pnpm dev                              # 启动全部开发服务（服务端 + 客户端）
+pnpm test                             # 全部包的测试（含 E2E 包，需先装好 Playwright 浏览器）
+pnpm --filter @icgame/server test     # 只跑某个包的单元测试
+pnpm typecheck                        # 类型检查
+pnpm lint                             # ESLint
+pnpm build                            # 构建
+pnpm copyright:check                  # 扫描对外产物中的内部术语 / 版权合规
+
+docker compose -f docker/docker-compose.yml up -d   # 私有部署，详见 docs/ops/
+```
 
 ## 术语统一（代码 + 文档必须一致）
 
@@ -183,13 +241,3 @@ logger.error({ err, matchId }, 'state corruption');
 - 房间：createRoom / joinRoom / leaveRoom / fillAI / startGame
 - 对局：runtime 挂载 / 对局开始 / 回合开始 / 玩家 move / 胜负产生
 - AI 决策（DEBUG）：Bot 选中 move / 参数构造失败
-
-## 目录结构
-
-```
-.
-├── LICENSE / NOTICE / README.md    # 入库的对外入口文件
-├── docs/
-│   └── manual/                     # 原版桌游规则说明
-└── CLAUDE.md                       # 本文件
-```

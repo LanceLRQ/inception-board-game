@@ -1,5 +1,5 @@
 // Bot 昵称生成器
-// 对照：plans/tasks.md NicknameGenerator（阵营池 + 难度扩展池 + 加权后缀 + 防撞 + UGC 过滤 + 🤖 徽章）
+// 对照：docs/_internal/TASKS.md NicknameGenerator（阵营池 + 难度扩展池 + 加权后缀 + 防撞 + UGC 过滤 + 🤖 徽章）
 //
 // 设计要点：
 //   - 纯函数 + 可注入 rand / existing set，便于单测

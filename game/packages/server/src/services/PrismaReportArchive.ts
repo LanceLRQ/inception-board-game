@@ -1,5 +1,5 @@
 // PrismaReportArchive - 基于 Prisma 的 ReportArchive 生产实现
-// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
 // W22-B Sprint 2：把 InMemoryReportArchive 的内存行为映射到 PostgreSQL。
 // 接口完全对齐 ReportArchive，方便 ReportService / admin API 任意切换注入。

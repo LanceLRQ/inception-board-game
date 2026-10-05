@@ -1,5 +1,5 @@
 // ReportService - 举报收集 + 触发信誉分扣减
-// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
 // 规则：
 //   - 不能自举（senderID === targetID → 拒绝）

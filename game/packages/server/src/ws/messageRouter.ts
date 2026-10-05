@@ -1,5 +1,5 @@
 // WS 入站消息路由
-// 对照：plans/design/07-backend-network.md §7.4.3 C→S 消息
+// 对照：docs/_internal/design/07-backend-network.md §7.4.3 C→S 消息
 //
 // 职责：
 //   - 根据 ClientMessage.type 分发到 heartbeat / reconnect / ack / chat 处理器

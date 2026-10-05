@@ -1,5 +1,5 @@
 // 预置场景 fixtures
-// 对照：plans/design/09-testing-quality.md §9.3.1
+// 对照：docs/_internal/design/09-testing-quality.md §9.3.1
 //
 // 这些 scenarios 是常用对局状态的命名快照，
 // 避免在每个测试里重复大量 overrides。

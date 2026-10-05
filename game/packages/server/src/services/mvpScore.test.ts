@@ -1,5 +1,5 @@
 // MVP 评选算法测试
-// 对照：plans/design/02-game-rules-spec.md §2.13.5
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.13.5
 
 import { describe, it, expect } from 'vitest';
 import {

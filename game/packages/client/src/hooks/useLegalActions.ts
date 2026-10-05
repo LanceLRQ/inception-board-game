@@ -1,5 +1,5 @@
 // useLegalActions - 派生当前视角下的合法操作集合
-// 对照：plans/design/02-game-rules-spec.md §2.4 + plans/design/06-frontend-design.md §6.4.5
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.4 + docs/_internal/design/06-frontend-design.md §6.4.5
 //
 // 真实架构：服务端在每次状态变更后下发 legalActions；此 hook 消费它。
 // 当前 B6 阶段：基于 MockMatchState 前端推导（临时规则镜像）。

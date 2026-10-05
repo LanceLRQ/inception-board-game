@@ -1,5 +1,5 @@
 // MoveGateway - WS Move 入口统一管道
-// 对照：plans/design/07-backend-network.md §7.4 + §7.9
+// 对照：docs/_internal/design/07-backend-network.md §7.4 + §7.9
 //
 // 管道顺序：
 //   1. 预加载 intent 幂等状态（Redis 版需要）

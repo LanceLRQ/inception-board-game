@@ -1,5 +1,5 @@
 // MasterConsole - 梦主专属控制台（世界观 / 梦魇 / 贿赂池）
-// 对照：plans/design/06c-match-table-layout.md §5.5
+// 对照：docs/_internal/design/06c-match-table-layout.md §5.5
 //
 // 两种布局：
 //   pc-sidebar：PC 右侧固定 panel（宽 280-320px）

@@ -1,5 +1,5 @@
 // 预设短语清单（MVP 固定 20 条，分 4 类）
-// 对照：plans/design/07-backend-network.md §7.9 聊天协议 / plans/design/06-frontend-design.md 预设短语面板
+// 对照：docs/_internal/design/07-backend-network.md §7.9 聊天协议 / docs/_internal/design/06-frontend-design.md 预设短语面板
 //
 // 设计：
 //   - 仅广播 presetId，客户端按 i18n 渲染（避免 UGC 风险）

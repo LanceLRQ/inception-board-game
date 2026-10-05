@@ -1,5 +1,5 @@
 // 骰子系统 - 服务端确定性随机
-// 对照：plans/design/02-game-rules-spec.md §2.5
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.5
 
 export interface DiceResult {
   values: number[];

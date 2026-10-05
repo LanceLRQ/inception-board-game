@@ -1,5 +1,5 @@
 // Validator L1-L7 测试
-// 对照：plans/design/02-game-rules-spec.md §2.4
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.4
 
 import { describe, it, expect } from 'vitest';
 import { createInitialState, type SetupState } from '../setup.js';

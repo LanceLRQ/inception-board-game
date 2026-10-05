@@ -1,5 +1,5 @@
 // 教学剧本 E2E
-// 对照：plans/tasks.md P2 B16 · 新手教学关卡
+// 对照：docs/_internal/TASKS.md P2 B16 · 新手教学关卡
 // 验证 8 步基础教学能启动、能前进、能跳过
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';

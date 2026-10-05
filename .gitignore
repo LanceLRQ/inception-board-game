@@ -140,12 +140,18 @@ vite.config.ts.timestamp-*
 
 # project
 .worktree
-plans
-CLAUDE.local.md
-.claude
 .opencode
 .DS_Store
 .playwright-mcp
+
+# --- 内部设计讨论与调研记录（不进公开仓库）---
+# 定稿后可公开的设计规格另放 docs/superpowers/specs/，不在此排除
+docs/_internal/
+
+# --- Claude Code / AI 编辑器相关（不入库）---
+.claude/
+CLAUDE.local.md
+AGENTS.md
 
 # Playwright
 **/playwright-report/

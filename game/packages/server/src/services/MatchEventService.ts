@@ -1,5 +1,5 @@
 // MatchEventService - 对局事件归档（回放持久化 MVP，不含播放器）
-// 对照：plans/design/03-data-model.md §3.8 MatchEvent / plans/design/07-backend-network.md §7.10 回放
+// 对照：docs/_internal/design/03-data-model.md §3.8 MatchEvent / docs/_internal/design/07-backend-network.md §7.10 回放
 //
 // 设计要点：
 //   - 抽象 MatchEventStore（Prisma 实现 + 内存实现便于测试）

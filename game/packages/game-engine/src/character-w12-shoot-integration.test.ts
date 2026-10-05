@@ -1,5 +1,5 @@
 // W12 Tier B SHOOT 修饰角色 game.ts 接入集成测试
-// 对照：plans/tasks.md Phase 3 W12 · 天蝎 / 金牛 接入 applyShootVariant
+// 对照：docs/_internal/TASKS.md Phase 3 W12 · 天蝎 / 金牛 接入 applyShootVariant
 // 对照：docs/manual/05-dream-thieves.md
 //
 // 单测层（character-w12.test.ts）覆盖纯函数；本文件覆盖 callMove 端到端。

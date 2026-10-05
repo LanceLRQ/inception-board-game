@@ -1,5 +1,5 @@
 // W11 盗梦者 3 角色技能单测
-// 对照：plans/tasks.md Phase 3 W11 · 穿行者 / 狮子 / 摩羯
+// 对照：docs/_internal/TASKS.md Phase 3 W11 · 穿行者 / 狮子 / 摩羯
 // 对照：docs/manual/05-dream-thieves.md
 //
 // 已实装角色（W11 之前）：先锋（thief_pointman）、译梦师（thief_dream_interpreter）→ 见 cards.test.ts / engine/skills.test.ts

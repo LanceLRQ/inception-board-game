@@ -1,5 +1,5 @@
 // 盗梦都市 - Prisma Schema
-// 对照：plans/design/03-data-model.md §3.8
+// 对照：docs/_internal/design/03-data-model.md §3.8
 
 generator client {
   provider = "prisma-client"
@@ -252,7 +252,7 @@ model PlayerAchievement {
 }
 
 /// 举报记录（W22-B · 运营审核面板数据源）
-/// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+/// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 model Report {
   id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   matchId              String    @map("match_id") @db.VarChar(64)

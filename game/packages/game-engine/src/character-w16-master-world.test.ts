@@ -1,5 +1,5 @@
 // W16-C 梦主世界观 / 火星·杀戮 / 土星·领地世界观
-// 对照：plans/tasks.md Phase 3 W16
+// 对照：docs/_internal/TASKS.md Phase 3 W16
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

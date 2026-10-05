@@ -481,7 +481,7 @@ export function applyInterpreterForeshadow(state: SetupState, playerID: string):
 }
 
 // === 要塞 · 冷酷 ===
-// 对照：plans/design/05-card-system.md 要塞 + docs/manual/06-dream-master.md
+// 对照：docs/_internal/design/05-card-system.md 要塞 + docs/manual/06-dream-master.md
 // 梦主出牌阶段移动到另一层时，可视为对任一盗梦者使用 1 张 SHOOT
 // 世界观：梦主掷骰结果 -1
 
@@ -559,7 +559,7 @@ export function applyFortressColdness(
 }
 
 // === 棋局 · 易位 ===
-// 对照：plans/design/05-card-system.md 棋局 + docs/manual/06-dream-master.md
+// 对照：docs/_internal/design/05-card-system.md 棋局 + docs/manual/06-dream-master.md
 // 金库被打开前，交换两个金库。限 2 次
 // 世界观：使用梦境窥视时，从牌库顶抽 2 张
 
@@ -1762,7 +1762,7 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
 // W16-A 梦主 6 角色（纯函数 + 简单接入）
 // ============================================================================
 // 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
-// 对照：plans/design/05-card-system.md + docs/manual/06-dream-master.md
+// 对照：docs/_internal/design/05-card-system.md + docs/manual/06-dream-master.md
 
 /** 找当前梦主玩家 ID（faction === 'master'，alive 优先） */
 export function findMasterID(state: SetupState): string | null {
@@ -1863,7 +1863,7 @@ export function getMidsummerWorldThiefBonus(state: SetupState): number {
 // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
 // 规则：只能二选一，不能保留；白羊自己被击杀时同样可触发（victim=self 时白羊已死，由规则自动跳过）
 // 本批次实装：纯函数 + pendingAriesChoice 简化 pending；SHOOT 击杀路径同步接入挂起
-// 对照 plan：plans/report/skill-development-status.md 批次 A · A5
+// 对照 plan：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 A · A5
 
 export const ARIES_STARDUST_SKILL_ID = 'thief_aries.skill_0';
 

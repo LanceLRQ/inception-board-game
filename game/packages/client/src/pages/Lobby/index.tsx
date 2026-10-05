@@ -1,5 +1,5 @@
 // Lobby · 好友房入口
-// 对照：plans/design/07-backend-network.md §7.3.2.3 /rooms REST
+// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3 /rooms REST
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
 import { useCallback, useState } from 'react';

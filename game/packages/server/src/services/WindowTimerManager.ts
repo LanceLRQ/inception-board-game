@@ -1,5 +1,5 @@
 // 响应窗口超时 Timer 管理器
-// 对照：plans/report/phase3-out-of-turn-interaction-review.md OOT-06 · F11
+// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-06 · F11
 //
 // 设计方针（方案 C · Node setTimeout + 启动时扫描重建）：
 //   - 单进程单实例友好：BGIO 0.50 authoritative server 天然单进程一致

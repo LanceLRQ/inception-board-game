@@ -1,5 +1,5 @@
 // PlayerView 5 层过滤测试
-// 对照：plans/design/08-security-ai.md §8.4d
+// 对照：docs/_internal/design/08-security-ai.md §8.4d
 
 import { describe, it, expect } from 'vitest';
 import { createInitialState, type SetupState } from '../setup.js';

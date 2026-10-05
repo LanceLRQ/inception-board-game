@@ -1,5 +1,5 @@
 // Admin API - 运营面板（举报审核）
-// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
 // W22-B Sprint 2：提供举报审核三件套路由。所有端点走 operatorAuthMiddleware 鉴权。
 //   GET    /admin/reports              列表（支持 status/matchId/targetId/reporterId/limit/offset）

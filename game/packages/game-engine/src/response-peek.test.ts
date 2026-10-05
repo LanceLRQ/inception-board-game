@@ -1,6 +1,6 @@
 // 梦境窥视三段式回归测试 · W19-B F5~F8
 // 对照：docs/manual/04-action-cards.md 梦境窥视 效果①
-// 对照：plans/report/phase3-out-of-turn-interaction-review.md OOT-02
+// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-02
 //
 // 规则原文（效果①盗梦者）：
 //   "仅盗梦者使用，梦主可以先给予你 1 张贿赂牌。你查看任意一层梦境的金库，

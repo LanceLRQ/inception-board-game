@@ -1,5 +1,5 @@
 // LayerBadge - 梦境层数徽标（L0-L4）
-// 对照：plans/design/06c-match-table-layout.md §5.1 （PlayerSeat 右侧 / ActionDock 中）
+// 对照：docs/_internal/design/06c-match-table-layout.md §5.1 （PlayerSeat 右侧 / ActionDock 中）
 
 import { cn } from '../../lib/utils.js';
 

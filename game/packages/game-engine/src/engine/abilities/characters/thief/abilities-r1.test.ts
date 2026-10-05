@@ -1,5 +1,5 @@
 // W10-R1 · 桶 A+B 5 角色 AbilityDefinition 注册 + canActivate/apply 行为测试
-// 对照：plans/tasks.md Phase 3 abilities registry · R1（处女/雅典娜急智/水瓶/意念判官/双鱼）
+// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R1（处女/雅典娜急智/水瓶/意念判官/双鱼）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

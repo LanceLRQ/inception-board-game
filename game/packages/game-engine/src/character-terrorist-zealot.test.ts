@@ -1,6 +1,6 @@
 // 恐怖分子 · 狂热（thief_terrorist.skill_1）SHOOT 响应窗口集成单测
 // 对照：docs/manual/05-dream-thieves.md 恐怖分子 247 行
-// 对照：plans/tasks.md W20.5 · Phase 3 遗留 · 响应窗口技能（5 项）批次 D
+// 对照：docs/_internal/TASKS.md W20.5 · Phase 3 遗留 · 响应窗口技能（5 项）批次 D
 //
 // 规则："当你使用 SHOOT 类牌时，除非目标玩家在掷骰前弃掉 1 张手牌，否则掷骰结果 -1"
 //

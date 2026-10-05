@@ -1,5 +1,5 @@
 // 傻 AI L0 - "有啥打啥"策略
-// 对照：plans/design/08-security-ai.md §8.5 L0-L3 AI 分级
+// 对照：docs/_internal/design/08-security-ai.md §8.5 L0-L3 AI 分级
 //
 // L0 设计原则：
 //   - 合法即可行，不考虑胜率

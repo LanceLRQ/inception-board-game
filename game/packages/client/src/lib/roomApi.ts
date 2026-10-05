@@ -3,7 +3,7 @@
 // - 若 VITE_USE_MOCK_API=1 或真实请求失败（网络/5xx/未部署），退化为 LocalStorage 本地实现
 // - 1 人类 + N AI 好友房模式下，Mock 路径即可覆盖完整流程
 //
-// 对照：plans/design/07-backend-network.md §7.3.2.3
+// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3
 
 import { api, ApiRequestError } from './api';
 import { logger } from './logger';

@@ -46,7 +46,7 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     }),
   ],
   // v5 → v6：添加 pendingVirgoChoice（处女·完美 onAfterShoot roll=6 三选一响应窗口）
-  //   对照：docs/manual/05-dream-thieves.md 处女 / plans/tasks.md W20.5
+  //   对照：docs/manual/05-dream-thieves.md 处女 / docs/_internal/TASKS.md W20.5
   [
     6,
     (state) => ({
@@ -55,7 +55,7 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     }),
   ],
   // v6 → v7：添加 pendingShootResponse（SHOOT pre-roll 响应窗口；当前消费方双鱼·闪避 W20.5-C）
-  //   对照：docs/manual/05-dream-thieves.md 双鱼 / plans/tasks.md W20.5
+  //   对照：docs/manual/05-dream-thieves.md 双鱼 / docs/_internal/TASKS.md W20.5
   [
     7,
     (state) => ({

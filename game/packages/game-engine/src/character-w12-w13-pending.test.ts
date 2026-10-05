@@ -1,5 +1,5 @@
 // W12 天秤 + W13 筑梦师 pending state 接入集成测试
-// 对照：plans/tasks.md Phase 3 W12 Tier C / W13 筑梦师·迷宫
+// 对照：docs/_internal/TASKS.md Phase 3 W12 Tier C / W13 筑梦师·迷宫
 // schema v2: pendingLibra + mazeState
 
 import { describe, expect, it } from 'vitest';

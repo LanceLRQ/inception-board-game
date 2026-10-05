@@ -1,5 +1,5 @@
 // 聊天预设 API
-// 对照：plans/design/07-backend-network.md §7.9 聊天协议
+// 对照：docs/_internal/design/07-backend-network.md §7.9 聊天协议
 //
 // GET /chat/presets
 //   - 可选 query: faction=thief|master|all → 过滤该阵营可见的预设

@@ -1,5 +1,5 @@
 // 响应窗口（解封抵消）回归测试 · W19-B F1
-// 对照：plans/report/phase3-out-of-turn-interaction-review.md OOT-01
+// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-01
 // 对照：docs/manual/04-action-cards.md 解封（效果①/效果②）
 //
 // 本测试覆盖"盗梦者打出【解封】效果① → 其他玩家可出【解封】效果② 抵消"完整链路。
@@ -18,7 +18,7 @@
 //   - playUnlock 未开启响应窗口
 //   - respondCancelUnlock 无任何校验，任意玩家可调用且不弃牌
 //   - passResponse 是 noop，未记录响应状态
-//   详见 plans/report/phase3-out-of-turn-interaction-review.md OOT-01
+//   详见 docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-01
 
 import { describe, it, expect } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

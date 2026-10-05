@@ -1,6 +1,6 @@
 // 巨蟹 · 气场 + 庇佑 双被动单测
 // 对照：docs/manual/05-dream-thieves.md 巨蟹
-// 对照：plans/report/skill-development-status.md 批次 A · A1
+// 对照：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 A · A1
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

@@ -216,7 +216,7 @@ describe('handleTimeout', () => {
 
 // ============================================================================
 // R26 · 响应链嵌套 / 边界场景（Phase 3 W19）
-// 对照：plans/design/02-game-rules-spec.md §2.4.2 + plans/tasks.md W19
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.4.2 + docs/_internal/TASKS.md W19
 //
 // 栈式真·嵌套（W19 响应窗口子系统 · parentWindow 链表）：
 // 当已有活跃窗口时再开新窗口 → 新窗口入栈顶，旧窗口保留为 parentWindow；
@@ -385,7 +385,7 @@ describe('响应链嵌套 / 边界（R26 · W19）', () => {
 
 // ============================================================================
 // R27 · 栈式真·嵌套（W19 响应窗口子系统）
-// 对照：plans/design/02-game-rules-spec.md §2.4.2 + plans/tasks.md W19
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.4.2 + docs/_internal/TASKS.md W19
 //
 // 覆盖：深度查询 / 父窗口访问 / 内层关闭自动回退外层 / 多级 pass 回传 /
 //       取消解封中嵌套 SHOOT 响应 / 跨嵌套层独立计数

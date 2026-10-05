@@ -1,5 +1,5 @@
 // Invariant Checker - 规则不变量运行时校验
-// 对照：plans/design/09-testing-quality.md §9.3.3
+// 对照：docs/_internal/design/09-testing-quality.md §9.3.3
 //
 // 用途：
 //   - 在单测 / 集成测试 / Bot 回归中断言 state 仍合规

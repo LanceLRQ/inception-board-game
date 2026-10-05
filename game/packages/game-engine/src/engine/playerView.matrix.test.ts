@@ -1,5 +1,5 @@
 // PlayerView 过滤快照测试矩阵
-// 对照：plans/design/09-testing-quality.md W9 `PlayerView 过滤快照测试矩阵`
+// 对照：docs/_internal/design/09-testing-quality.md W9 `PlayerView 过滤快照测试矩阵`
 //
 // 目标：
 //   - N 个 scenario × M 个 viewer（master / thief / spectator）批量组合过滤

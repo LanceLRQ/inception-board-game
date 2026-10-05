@@ -1,5 +1,5 @@
 // Socket.io 网关 - 连接生命周期 + 消息派发 + 广播
-// 对照：plans/design/07-backend-network.md §7.4 WebSocket 协议
+// 对照：docs/_internal/design/07-backend-network.md §7.4 WebSocket 协议
 //
 // 职责：
 //   1. 从 HTTP server 挂载 Socket.io

@@ -1,5 +1,5 @@
 // W10-R4 · 桶 E 水星/金星 未实装占位 stub
-// 对照：plans/tasks.md Phase 3 abilities registry · R4（水星·航路/金星·镜界 世界观 stub）
+// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R4（水星·航路/金星·镜界 世界观 stub）
 
 import { describe, expect, it } from 'vitest';
 import { scenarioStartOfGame3p } from '../../../../testing/scenarios.js';

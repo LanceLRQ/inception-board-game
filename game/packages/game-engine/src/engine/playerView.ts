@@ -1,5 +1,5 @@
 // PlayerView 5 层过滤 - 零信任隐藏信息
-// 对照：plans/design/08-security-ai.md §8.4d + plans/design/07-backend-network.md §7.9b
+// 对照：docs/_internal/design/08-security-ai.md §8.4d + docs/_internal/design/07-backend-network.md §7.9b
 //
 // 过滤层次：
 //   L1 手牌：非 viewer 的 hand → 数量化

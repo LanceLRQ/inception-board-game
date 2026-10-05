@@ -1,5 +1,5 @@
 // W16-D 梦主世界观补充：天王星·苍穹（行动牌移动弃牌 hook）+ 火星·战场（弃 2 非SHOOT 换 SHOOT）
-// 对照：plans/tasks.md Phase 3 W16
+// 对照：docs/_internal/TASKS.md Phase 3 W16
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

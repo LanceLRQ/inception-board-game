@@ -1,5 +1,5 @@
 // MasterBoard - 梦主移动端视角（Tab 切换：战场 / 世界观+梦魇）
-// 对照：plans/design/06-frontend-design.md §6.3.3 梦主视角
+// 对照：docs/_internal/design/06-frontend-design.md §6.3.3 梦主视角
 //
 // Tab A · 战场：复用 ThiefBoard 的组件，但可见贿赂池 + 金库内容 + 盗梦者身份
 // Tab B · 控制台：世界观规则 + 梦魇解封（Phase 3 接入真实效果）

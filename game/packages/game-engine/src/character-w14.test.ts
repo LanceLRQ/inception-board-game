@@ -1,5 +1,5 @@
 // W14 混合 9 角色单测
-// 对照：plans/tasks.md Phase 3 W14 · 小丑/影子/恐怖分子/黑天鹅/黑洞/欺诈师/降世神通/空间女王/梦境猎手
+// 对照：docs/_internal/TASKS.md Phase 3 W14 · 小丑/影子/恐怖分子/黑天鹅/黑洞/欺诈师/降世神通/空间女王/梦境猎手
 // 对照：docs/manual/05-dream-thieves.md
 //
 // 完整接入：影子 / 降世神通 / 梦境猎手 / 欺诈师 / 恐怖分子（SHOOT 跨层）

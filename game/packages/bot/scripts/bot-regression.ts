@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 // Bot 夜间回归 CLI
-// 对照：plans/design/10-roadmap-risk.md W9 · Bot 夜间 100 局回归
+// 对照：docs/_internal/design/10-roadmap-risk.md W9 · Bot 夜间 100 局回归
 //
 // 用法：
 //   pnpm --filter @icgame/bot regression              # 默认 100 局

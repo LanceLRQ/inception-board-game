@@ -1,5 +1,5 @@
 // 盗梦都市 - 游戏配置常量
-// 对照：docs/manual/02-game-setup.md + plans/design/02-game-rules-spec.md §2.2
+// 对照：docs/manual/02-game-setup.md + docs/_internal/design/02-game-rules-spec.md §2.2
 
 // 手牌上限
 export const HAND_LIMIT = 5;

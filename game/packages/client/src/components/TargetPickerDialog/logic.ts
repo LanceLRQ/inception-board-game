@@ -1,5 +1,5 @@
 // TargetPickerDialog 候选排序纯逻辑
-// 对照：plans/design/06c-match-table-layout.md §5.3 / §6.3
+// 对照：docs/_internal/design/06c-match-table-layout.md §5.3 / §6.3
 //
 // 主人要求："按顺序排列，显示对应的角色卡面，方便一眼认出"
 // 顺序：自 playerOrder 起始，**剔除 viewer 自己**（不能对自己发动），按顺序呈现

@@ -1,5 +1,5 @@
 // shouldShowFlipButton 纯函数测试
-// 对照：plans/design/06c-match-table-layout.md §6.2
+// 对照：docs/_internal/design/06c-match-table-layout.md §6.2
 
 import { describe, it, expect, vi } from 'vitest';
 

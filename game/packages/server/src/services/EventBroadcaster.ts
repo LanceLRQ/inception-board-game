@@ -1,5 +1,5 @@
 // EventBroadcaster - 服务端零信任广播桥
-// 对照：plans/design/07-backend-network.md §7.9b
+// 对照：docs/_internal/design/07-backend-network.md §7.9b
 //
 // 使用方式：
 //   const broadcaster = new EventBroadcaster(io, redisPub);

@@ -1,5 +1,5 @@
 // WSClient - socket.io-client 的薄封装
-// 对照：plans/design/07-backend-network.md §7.4 WebSocket 协议
+// 对照：docs/_internal/design/07-backend-network.md §7.4 WebSocket 协议
 //
 // 职责：
 //   - 建立/关闭 socket.io 连接（携带 JWT + matchID 鉴权）

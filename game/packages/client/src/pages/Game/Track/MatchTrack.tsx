@@ -1,5 +1,5 @@
 // MatchTrack - 移动端星穹铁道式对局入口（<1024px）
-// 对照：plans/design/06c-match-table-layout.md §2.2
+// 对照：docs/_internal/design/06c-match-table-layout.md §2.2
 
 import { useCallback, useMemo, useState } from 'react';
 import { cn } from '../../../lib/utils.js';

@@ -1,8 +1,8 @@
 // cardId → 卡图 URL 映射（W18.5 · UI 素材接入最小版）
-// 对照：plans/design/06-frontend-design.md §6.17
+// 对照：docs/_internal/design/06-frontend-design.md §6.17
 //
 // 数据源：@icgame/shared 的 generated/cards.ts 里每张卡的 imagePath 字段
-// （由 shared/scripts/codegen.ts 从 plans/assets/cards-data.json 生成，
+// （由 shared/scripts/codegen.ts 从 docs/_internal/reference/assets/cards-data.json 生成，
 //  且扩展名被 normalizeImagePath 强制转为 .webp）
 //
 // 静态资源路径：game/packages/client/public/cards/**（由 `pnpm assets:sync` 生成）

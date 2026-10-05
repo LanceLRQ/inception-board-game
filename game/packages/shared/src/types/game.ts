@@ -1,5 +1,5 @@
 // 盗梦都市 - GameState 完整类型定义
-// 对照：plans/design/03-data-model.md §3.4-§3.5
+// 对照：docs/_internal/design/03-data-model.md §3.4-§3.5
 
 import type {
   Layer,

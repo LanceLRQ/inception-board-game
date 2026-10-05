@@ -1,6 +1,6 @@
 // 药剂师 · 注射（skill_1）单测
 // 对照：docs/manual/05-dream-thieves.md 药剂师 278 行
-// 对照：plans/report/skill-development-status.md 批次 B · B3
+// 对照：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 B · B3
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

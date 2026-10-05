@@ -1,5 +1,5 @@
 # 盗梦都市 · 一键部署编排
-# 对照：plans/design/10-roadmap-risk.md W8.5-9 / plans/design/04-system-architecture.md §4.6
+# 对照：docs/_internal/design/10-roadmap-risk.md W8.5-9 / docs/_internal/design/04-system-architecture.md §4.6
 #
 # 使用：
 #   1. 复制 .env.example 为 .env：cp .env.example .env

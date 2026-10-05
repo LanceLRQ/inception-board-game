@@ -1,5 +1,5 @@
 // AssetLoadingScreen - 启动预加载进度屏（ADR-042）
-// 对照：plans/design/06-frontend-design.md §6.17.6
+// 对照：docs/_internal/design/06-frontend-design.md §6.17.6
 //
 // 特性：
 //   - 启动时调用 AssetPreloader.loadManifest + preloadCritical

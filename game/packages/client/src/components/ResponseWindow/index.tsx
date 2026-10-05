@@ -1,5 +1,5 @@
 // 响应窗口 - 30s 倒计时统一组件
-// 对照：plans/design/06-frontend-design.md §6.4 shared/ResponseWindow
+// 对照：docs/_internal/design/06-frontend-design.md §6.4 shared/ResponseWindow
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';

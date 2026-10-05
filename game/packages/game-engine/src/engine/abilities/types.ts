@@ -1,5 +1,5 @@
 // 能力系统核心类型定义
-// 对照：plans/design/05-card-system.md §5.1-§5.2
+// 对照：docs/_internal/design/05-card-system.md §5.1-§5.2
 // 黄金定律：技能(bucket 1) > 行动牌(2) > 世界观(3) > 梦魇(4) > 规则(5)
 
 import type { CardID, Faction } from '@icgame/shared';
@@ -20,7 +20,7 @@ export type PriorityBucket = 1 | 2 | 3 | 4 | 5;
 
 /**
  * 技能触发时机枚举
- * 对照：plans/design/00-overview.md §0.4 / 02-game-rules-spec.md
+ * 对照：docs/_internal/design/00-overview.md §0.4 / 02-game-rules-spec.md
  */
 export type TriggerTiming =
   | 'onTurnStart' // 回合开始
@@ -198,7 +198,7 @@ export interface GameEvent {
 
 /**
  * 能力定义接口 — 所有能力（技能/行动牌/世界观/梦魇）的统一抽象
- * 对照：plans/design/05-card-system.md §5.2 AbilityDefinition
+ * 对照：docs/_internal/design/05-card-system.md §5.2 AbilityDefinition
  */
 export interface AbilityDefinition {
   /** 唯一标识（如 "thief_pointman.skill_0" / "dm_fortress.wv_0"） */

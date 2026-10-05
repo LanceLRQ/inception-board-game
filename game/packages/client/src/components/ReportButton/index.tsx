@@ -1,5 +1,5 @@
 // ReportButton - 举报按钮（配合 ReportDialog 弹窗）
-// 对照：plans/design/06-frontend-design.md 举报入口 / plans/design/08-security-ai.md §8.4b
+// 对照：docs/_internal/design/06-frontend-design.md 举报入口 / docs/_internal/design/08-security-ai.md §8.4b
 
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';

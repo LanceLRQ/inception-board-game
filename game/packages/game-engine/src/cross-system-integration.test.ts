@@ -1,5 +1,5 @@
 // 跨系统集成测试 · 贿赂 × 梦魇 × 世界观（W20-B）
-// 对照：plans/tasks.md W20 · 贿赂 × 梦魇 × 世界观 交互快照测试
+// 对照：docs/_internal/TASKS.md W20 · 贿赂 × 梦魇 × 世界观 交互快照测试
 // 对照：docs/manual/03-game-flow.md 贿赂&背叛者 / 06-dream-master.md 皇城 / 07-nightmare-cards.md
 //
 // 覆盖范围：

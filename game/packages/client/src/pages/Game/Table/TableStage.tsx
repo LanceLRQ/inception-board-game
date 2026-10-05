@@ -1,5 +1,5 @@
 // TableStage - 围坐椭圆舞台容器（PC 端 ≥ 1024px）
-// 对照：plans/design/06c-match-table-layout.md §2.1 / §3
+// 对照：docs/_internal/design/06c-match-table-layout.md §2.1 / §3
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../lib/utils.js';

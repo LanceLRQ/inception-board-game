@@ -1,5 +1,5 @@
 // W16-A 梦主 6 角色单测（纯函数）
-// 对照：plans/tasks.md Phase 3 W16
+// 对照：docs/_internal/TASKS.md Phase 3 W16
 // 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
 
 import { describe, expect, it } from 'vitest';

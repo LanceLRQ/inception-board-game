@@ -1,5 +1,5 @@
 // Web Vitals 性能基线 E2E（FCP / LCP / CLS / Navigation Timing）
-// 对照：plans/tasks.md P1 · MVP 性能基线报告
+// 对照：docs/_internal/TASKS.md P1 · MVP 性能基线报告
 //
 // 只在 prod build + preview 下跑（dev 模式 HMR 注入会干扰测量）
 // 采集基线：

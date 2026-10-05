@@ -1,6 +1,6 @@
 // 回放 API
-// 对照：plans/design/07-backend-network.md §7.10 回放
-// 对照：plans/tasks.md W21 回放系统 启动 batch
+// 对照：docs/_internal/design/07-backend-network.md §7.10 回放
+// 对照：docs/_internal/TASKS.md W21 回放系统 启动 batch
 //
 // 端点：
 //   GET  /replays/:id            - 元信息（match info + event count）

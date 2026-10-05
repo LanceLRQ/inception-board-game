@@ -1,6 +1,6 @@
 // 双鱼 · 闪避（thief_pisces.skill_0）SHOOT 响应窗口集成单测
 // 对照：docs/manual/05-dream-thieves.md 双鱼
-// 对照：plans/tasks.md W20.5 · Phase 3 遗留 · 响应窗口技能（5 项）批次 C
+// 对照：docs/_internal/TASKS.md W20.5 · Phase 3 遗留 · 响应窗口技能（5 项）批次 C
 //
 // 覆盖范围：
 //   A. applyShootVariant 触发 pendingShootResponse 挂起

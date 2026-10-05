@@ -1,5 +1,5 @@
 // 触发时机调度器 — 统一调度 12 种 TriggerTiming
-// 对照：plans/design/05-card-system.md §5.1 + 00-overview.md §0.4
+// 对照：docs/_internal/design/05-card-system.md §5.1 + 00-overview.md §0.4
 
 import type { SetupState } from '../../setup.js';
 import type {

@@ -1,6 +1,6 @@
 // 白羊 · 星尘（skill_0）单测：onKilled 简化 pending + 发动/弃二选一
 // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
-// 对照：plans/report/skill-development-status.md 批次 A · A5
+// 对照：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 A · A5
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

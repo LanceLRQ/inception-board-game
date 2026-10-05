@@ -1,5 +1,5 @@
 // 响应窗口超时 & AI 接管阈值 - 默认行为
-// 对照：plans/design/02-game-rules-spec.md §2.6 响应窗口 / plans/design/08-security-ai.md §8.5 AI 接管
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.6 响应窗口 / docs/_internal/design/08-security-ai.md §8.5 AI 接管
 //
 // 三级超时：
 //   RESPONSE_WINDOW_MS   = 30_000  响应窗口超时 → 默认 pass（应用 unlock 成功）

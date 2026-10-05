@@ -1,5 +1,5 @@
 // ASSETS_MODE 开关（ADR-042 §6.17.1）
-// 对照：plans/design/06-frontend-design.md §6.17.1 / §6.17.8
+// 对照：docs/_internal/design/06-frontend-design.md §6.17.1 / §6.17.8
 //
 // 作用：
 //   - 构建时 Vite env `VITE_ASSETS_MODE=placeholder` → 所有 GameCard 走文字占位，不加载卡图

@@ -1,5 +1,5 @@
 // Dispatcher 工具层 — 简化 game.ts 与 abilities registry 的对接
-// 对照：plans/design/05-card-system.md §5.1
+// 对照：docs/_internal/design/05-card-system.md §5.1
 //
 // 设计原则：
 //   - 单例 registry（lazy-init）避免每次对局创建时重建

@@ -1,5 +1,5 @@
 // RuntimeStage · LocalMatchRuntime 的"新视觉层"
-// 对照：plans/design/06c-match-table-layout.md §2
+// 对照：docs/_internal/design/06c-match-table-layout.md §2
 //
 // 职责：展示玩家围坐/行动轴 + 中央桌面（金库/心锁/焦点层），
 //      只做视觉和长按详情，不承担出牌/选目标等业务交互（这些仍由 LocalMatchRuntime 的 Dialog 群处理）

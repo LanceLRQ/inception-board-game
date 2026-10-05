@@ -1,6 +1,6 @@
 // 批次 D · M4 卡宾枪全局化 · 集成测试
 // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪；§111 印证 M4 先于处女·完美处理
-// 对照：plans/report/skill-development-status.md 批次 D
+// 对照：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 D
 //
 // 目标：验证梦主使用普通 SHOOT 时，目标骰值经 M4 修饰后（-1）决定结果
 //       盗梦者 SHOOT 保持原骰值（M4 不触发）

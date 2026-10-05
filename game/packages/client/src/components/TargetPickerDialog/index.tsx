@@ -1,5 +1,5 @@
 // TargetPickerDialog - 统一目标选择弹层（按 playerOrder 顺序 + 显示角色卡面）
-// 对照：plans/design/06c-match-table-layout.md §5.3
+// 对照：docs/_internal/design/06c-match-table-layout.md §5.3
 //
 // 主人要求："行动轴/Seat 只给看，需要行动选人的时候通过弹层来指定，
 //   注意按顺序排列，然后显示对应的角色卡面，方便一眼认出。"

@@ -1,5 +1,5 @@
 // BGIO Game 对象 - 盗梦都市主游戏定义
-// 对照：plans/design/02-game-rules-spec.md §2.1 + §7.5.1
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.1 + §7.5.1
 //
 // BGIO 0.50 回调签名约定：
 //   setup: (context: { ctx }, setupData?) => G
@@ -282,7 +282,7 @@ export const InceptionCityGame = {
             const masterID = G.playerOrder[masterIdx]!;
 
             // 给玩家随机分配角色 —— 涵盖 Phase 3 所有已实装角色
-            // 梦主 13 个 · 盗梦者 37 个（对照 plans/tasks.md W11-W16）
+            // 梦主 13 个 · 盗梦者 37 个（对照 docs/_internal/TASKS.md W11-W16）
             const masterPool: CardID[] = [
               'dm_fortress',
               'dm_chess',
@@ -2431,7 +2431,7 @@ export const InceptionCityGame = {
         },
 
         // 处女·完美（skill_0）· 三选一响应窗
-        // 对照：docs/manual/05-dream-thieves.md 处女 / plans/tasks.md W20.5
+        // 对照：docs/manual/05-dream-thieves.md 处女 / docs/_internal/TASKS.md W20.5
         // 触发：dispatchPassives(onAfterShoot) 在 lastShootRoll===6 时挂起 pendingVirgoChoice
         // 约束：
         //   - 仅 pendingVirgoChoice.virgoID 本人可发起（回合外 move，不 guard turnPhase）

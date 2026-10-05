@@ -1,5 +1,5 @@
 // operatorAuth - 运营面板鉴权中间件
-// 对照：plans/design/08-security-ai.md §8.4b 反作弊与信誉分
+// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
 // W22-B Sprint 2：简版单 token 鉴权（Phase 5 可升级为多运营账号 + 角色权限）。
 //   - Bearer token 来自 `OPERATOR_TOKEN` 环境变量（未配置时**拒绝所有请求**，避免裸奔）

@@ -1,5 +1,5 @@
 // 人机本地模式 E2E
-// 对照：plans/design/08-security-ai.md §8.5 / plans/tasks.md P2 B18
+// 对照：docs/_internal/design/08-security-ai.md §8.5 / docs/_internal/TASKS.md P2 B18
 // 守护：BGIO 回合机制（ctx.currentPlayer ↔ G.currentPlayerID 对齐）与 Bot 自动推进
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';

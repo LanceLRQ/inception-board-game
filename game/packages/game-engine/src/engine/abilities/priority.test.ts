@@ -1,5 +1,5 @@
 // 优先级仲裁引擎测试
-// 对照：plans/design/05-card-system.md §5.3 黄金定律
+// 对照：docs/_internal/design/05-card-system.md §5.3 黄金定律
 
 import { describe, it, expect } from 'vitest';
 import { arbitrate, resolveDiceModifiers } from './priority.js';
@@ -178,7 +178,7 @@ describe('resolveDiceModifiers', () => {
 
 // ============================================================================
 // R25 · 黄金定律优先级仲裁测试矩阵（Phase 3 W19）
-// 对照：plans/design/05-card-system.md §5.3 + plans/tasks.md W19
+// 对照：docs/_internal/design/05-card-system.md §5.3 + docs/_internal/TASKS.md W19
 // ============================================================================
 describe('arbitrate · 矩阵（R25 · W19 黄金定律）', () => {
   it('5 个 bucket 全部齐全：返回严格升序', () => {

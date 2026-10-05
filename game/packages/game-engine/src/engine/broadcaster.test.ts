@@ -1,5 +1,5 @@
 // 零信任事件广播测试
-// 对照：plans/design/07-backend-network.md §7.9b
+// 对照：docs/_internal/design/07-backend-network.md §7.9b
 
 import { describe, it, expect } from 'vitest';
 import {

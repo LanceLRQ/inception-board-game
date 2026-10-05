@@ -1,5 +1,5 @@
 // 双面角色翻面机制
-// 对照：plans/design/02-game-rules-spec.md §2.6.3 / 05-card-system.md
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.6.3 / 05-card-system.md
 // 规则：进入迷失层**不**触发翻面；翻面由特定技能/条件触发
 
 import type { CardID, Faction } from '@icgame/shared';

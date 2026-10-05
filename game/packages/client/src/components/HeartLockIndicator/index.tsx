@@ -1,5 +1,5 @@
 // HeartLockIndicator - 心锁骰视觉（蓝色骰面常亮，不掷）
-// 对照：plans/design/06-frontend-design.md §6.4.2 HeartLockIndicator
+// 对照：docs/_internal/design/06-frontend-design.md §6.4.2 HeartLockIndicator
 //        Spike: experimental_demo/dice-svg-css3d（蓝色 1-6 SVG）
 //
 // 变更（B8.2）：

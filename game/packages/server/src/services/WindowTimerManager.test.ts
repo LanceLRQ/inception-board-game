@@ -1,5 +1,5 @@
 // WindowTimerManager 单测
-// 对照：plans/report/phase3-out-of-turn-interaction-review.md OOT-06 · F11
+// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-06 · F11
 //
 // 采用 vitest fake timers 精确控制时间流逝，验证：
 //   - scheduleTimeout / cancelTimeout 基本语义

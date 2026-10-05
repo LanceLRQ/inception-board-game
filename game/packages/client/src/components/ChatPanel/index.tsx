@@ -1,5 +1,5 @@
 // ChatPanel - 预设短语抽屉面板（移动端友好）
-// 对照：plans/design/06-frontend-design.md 预设短语面板 / plans/design/07-backend-network.md §7.9
+// 对照：docs/_internal/design/06-frontend-design.md 预设短语面板 / docs/_internal/design/07-backend-network.md §7.9
 
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';

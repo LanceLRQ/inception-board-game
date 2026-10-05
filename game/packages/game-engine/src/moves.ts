@@ -1,5 +1,5 @@
 // 核心 Move 定义 - 回合流程
-// 对照：plans/design/02-game-rules-spec.md §2.3
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.3
 
 import { HAND_LIMIT, BASE_DRAW_COUNT } from './config.js';
 import type { SetupState, PlayerSetup } from './setup.js';
@@ -111,7 +111,7 @@ export function beginTurn(state: SetupState, playerID: string): SetupState {
 /**
  * 记录本回合打出一张行动牌 · 追加到 playedCardsThisTurn + 更新 lastPlayedCardThisTurn。
  * 由所有 playXxx move 在成功结算后调用（不改变其他状态，纯追加日志）。
- * 对照：plans/design/02-game-rules-spec.md §2.4 水星/金星/格林射线等能力
+ * 对照：docs/_internal/design/02-game-rules-spec.md §2.4 水星/金星/格林射线等能力
  */
 export function recordCardPlayed(state: SetupState, cardId: string): SetupState {
   // 兼容早期 schema：字段缺失时 fallback 成空数组
@@ -203,7 +203,7 @@ export function incrementMoveCounter(state: SetupState): SetupState {
 }
 
 // === 解封成功结算 ===
-// 对照：docs/manual/04-action-cards.md 解封 + plans/design/02-game-rules-spec.md §2.4
+// 对照：docs/manual/04-action-cards.md 解封 + docs/_internal/design/02-game-rules-spec.md §2.4
 export function applyUnlockSuccess(state: SetupState): SetupState {
   const pending = state.pendingUnlock;
   if (!pending) return state;

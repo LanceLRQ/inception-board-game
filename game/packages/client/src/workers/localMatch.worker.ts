@@ -1,6 +1,6 @@
 // 人机本地模式 Worker
 // 在 Worker 内运行 BGIO Local 多人模式：1 个人类 + N 个 Bot
-// 对照：plans/design/08-security-ai.md §8.5 L0 Bot
+// 对照：docs/_internal/design/08-security-ai.md §8.5 L0 Bot
 
 import * as Comlink from 'comlink';
 import { Client } from 'boardgame.io/client';

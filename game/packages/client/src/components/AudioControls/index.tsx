@@ -1,5 +1,5 @@
 // AudioControls - 音效开关 + 音量滑块（设置页用）
-// 对照：plans/design/06-frontend-design.md §6.19.5
+// 对照：docs/_internal/design/06-frontend-design.md §6.19.5
 
 import { useTranslation } from 'react-i18next';
 import { useAudioStore } from '../../stores/useAudioStore.js';

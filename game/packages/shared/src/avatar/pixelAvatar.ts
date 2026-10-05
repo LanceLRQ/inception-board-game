@@ -1,5 +1,5 @@
 // 像素头像确定性生成算法（跨端：浏览器 + Node）
-// 对照：plans/design/06-frontend-design.md §6.7 像素头像 / ADR-032
+// 对照：docs/_internal/design/06-frontend-design.md §6.7 像素头像 / ADR-032
 // Spike 验证：experimental_demo/pixel-avatar-algo（已通过 6/6）
 //
 // 设计：

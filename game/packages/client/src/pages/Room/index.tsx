@@ -1,5 +1,5 @@
 // Room · 房间等待页
-// 对照：plans/design/07-backend-network.md §7.3.2.3 /rooms REST
+// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3 /rooms REST
 // 房主：可补 AI、开始游戏；非房主：等待开始；轮询每 3s 刷新房间状态。
 
 import { useCallback, useEffect, useState } from 'react';

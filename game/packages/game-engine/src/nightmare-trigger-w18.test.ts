@@ -1,5 +1,5 @@
 // W18-A 梦魇自动触发检测 + 未翻开梦魇直接弃掉
-// 对照：plans/tasks.md Phase 3 W18 梦魇触发时机集成
+// 对照：docs/_internal/TASKS.md Phase 3 W18 梦魇触发时机集成
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

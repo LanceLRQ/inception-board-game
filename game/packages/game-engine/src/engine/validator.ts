@@ -1,5 +1,5 @@
 // Move Validator - L1-L7 七层校验流水线
-// 对照：plans/design/02-game-rules-spec.md §2.4 + plans/design/08-security-ai.md §8.4
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.4 + docs/_internal/design/08-security-ai.md §8.4
 
 import type { SetupState } from '../setup.js';
 import type { CardID } from '@icgame/shared';

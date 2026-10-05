@@ -1,5 +1,5 @@
 // 教学进度 Zustand store（localStorage 持久化）
-// 对照：plans/tasks.md W8.5-9 · 新手教学关卡
+// 对照：docs/_internal/TASKS.md W8.5-9 · 新手教学关卡
 
 import { create } from 'zustand';
 import {

@@ -1,5 +1,5 @@
 // 将 BGIO G/ctx 适配为 MockMatchState 结构，复用新 UI（MatchTable / MatchTrack）
-// 对照：plans/design/06c-match-table-layout.md
+// 对照：docs/_internal/design/06c-match-table-layout.md
 //
 // 注意：这是纯展示层适配，不影响 LocalMatchRuntime 的真实交互（pendingPlay / Dialog 群等）
 

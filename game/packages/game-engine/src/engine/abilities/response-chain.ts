@@ -1,5 +1,5 @@
 // 响应链框架 — 统一响应窗口模型（栈式）
-// 对照：plans/design/02-game-rules-spec.md §2.4.2 / 05-card-system.md §5.4.6
+// 对照：docs/_internal/design/02-game-rules-spec.md §2.4.2 / 05-card-system.md §5.4.6
 // 取消解封 / SHOOT 响应 / 链式触发的通用容器
 //
 // 栈式语义：当已有窗口时再开新窗口，新窗口挂到栈顶，旧窗口通过 parentWindow 保留；

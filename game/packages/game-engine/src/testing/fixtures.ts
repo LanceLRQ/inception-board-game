@@ -1,5 +1,5 @@
 // 测试 Fixtures 工厂
-// 对照：plans/design/09-testing-quality.md §9.3.2
+// 对照：docs/_internal/design/09-testing-quality.md §9.3.2
 //
 // 用途：生成可控的 SetupState / PlayerSetup / LayerSetup，便于单测与快照。
 // 所有函数都是纯函数，返回深拷贝（不会误改模板）。

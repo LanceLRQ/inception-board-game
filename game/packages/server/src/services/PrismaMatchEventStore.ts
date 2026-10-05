@@ -1,5 +1,5 @@
 // PrismaMatchEventStore - Prisma 适配器
-// 对照：plans/design/03-data-model.md §3.8 match_events
+// 对照：docs/_internal/design/03-data-model.md §3.8 match_events
 //
 // 依赖 Prisma 生成的 matchEvent delegate；唯一约束 (matchId, moveCounter) 保证幂等。
 // 落库时序：append → Prisma create → 若唯一冲突（P2002）转为 'DUPLICATE'。

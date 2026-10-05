@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 // 版权合规终检 CLI
-// 对照：CLAUDE.local.md 核心纪律 1 / plans/tasks.md W9 版权合规终检
+// 对照：CLAUDE.local.md 核心纪律 1 / docs/_internal/TASKS.md W9 版权合规终检
 //
 // 用法：
 //   pnpm run copyright:check          # 扫描仓库根 + docs + game/

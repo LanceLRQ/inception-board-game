@@ -1,5 +1,5 @@
 // BotManager - 跨对局的 AI 接管生命周期调度
-// 对照：plans/design/08-security-ai.md §8.5 AI 接管 / §8.5.3 分级断线策略
+// 对照：docs/_internal/design/08-security-ai.md §8.5 AI 接管 / §8.5.3 分级断线策略
 //
 // 职责：
 //   - 为每个活跃 matchID 维护一份 AITakeoverManager
