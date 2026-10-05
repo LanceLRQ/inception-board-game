@@ -44,9 +44,11 @@ const paramNameCache = new WeakMap<object, string[]>();
 
 /** 读出 move 函数第一个解构参数之后的形参名 */
 export function moveParamNames(fn: (...args: never[]) => unknown): string[] {
-  const cached = paramNameCache.get(fn);
+  // 套过待结算闸门的 move，形参要从原函数上读
+  const target = (fn as { unwrapped?: (...args: never[]) => unknown }).unwrapped ?? fn;
+  const cached = paramNameCache.get(target);
   if (cached) return cached;
-  const src = Function.prototype.toString.call(fn);
+  const src = Function.prototype.toString.call(target);
   const open = src.indexOf('(');
   let depth = 0;
   let end = -1;
@@ -68,7 +70,7 @@ export function moveParamNames(fn: (...args: never[]) => unknown): string[] {
     .split(',')
     .map((s) => s.trim().split(/[\s=:]/)[0] ?? '')
     .filter((s) => /^[A-Za-z_]\w*$/.test(s));
-  paramNameCache.set(fn, names);
+  paramNameCache.set(target, names);
   return names;
 }
 
@@ -81,6 +83,15 @@ function subset<T>(rnd: () => number, arr: readonly T[], max: number): T[] {
   const pool = [...arr];
   const out: T[] = [];
   for (let i = 0; i < n; i++) {
+    out.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]!);
+  }
+  return out;
+}
+
+function sample<T>(rnd: () => number, arr: readonly T[], count: number): T[] {
+  const pool = [...arr];
+  const out: T[] = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
     out.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]!);
   }
   return out;
@@ -108,6 +119,8 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   const pendingPlayers = pending.filter((v) => players.includes(v));
   const n = name.toLowerCase();
 
+  // 嫁接结算要求恰好退回 2 张
+  if (n === 'cardstoreturn' && rnd() < 0.7) return sample(rnd, hand, 2);
   if (/(cardids|handids|discardids|returncards|cardstoreturn|^pile\d$)/.test(n)) {
     return subset(rnd, hand, hand.length);
   }
@@ -179,12 +192,19 @@ const SETTLE_MOVE = /^(resolve|respond|pass|peeker|masterPeek)/;
  * 在运行器上试跑，返回一个会被接受的 move；找不到返回 null。
  * 试跑是纯函数调用，不改动传入的 state。
  */
+export interface PickLegalMoveOptions {
+  attemptsPerMove?: number;
+  /** 有可结算事项时是否优先结算。关掉它可以模拟不守规矩的客户端 */
+  preferSettle?: boolean;
+}
+
 export function pickLegalMove(
   game: GameDef<SetupState>,
   state: MatchState<SetupState>,
   rnd: () => number,
-  attemptsPerMove = 2,
+  options: PickLegalMoveOptions = {},
 ): MoveCandidate | null {
+  const { attemptsPerMove = 2, preferSettle = true } = options;
   const probeRandom = makeRandomSource(makeTestRng(Math.floor(rnd() * 2 ** 31)));
   const actor = state.ctx.currentPlayer;
   const names = Object.keys(currentMoves(game, state.ctx.phase));
@@ -204,7 +224,7 @@ export function pickLegalMove(
   if (accepted.length === 0) return null;
   // 有待结算的事项就先结算，和界面强制弹窗的行为一致；否则继续出牌会把对局卡死
   const settle = accepted.filter((c) => SETTLE_MOVE.test(c.move));
-  if (settle.length > 0) return pick(rnd, settle)!;
+  if (preferSettle && settle.length > 0) return pick(rnd, settle)!;
   const actions = accepted.filter((c) => !PROGRESS_MOVES.has(c.move));
   const progress = accepted.filter((c) => PROGRESS_MOVES.has(c.move));
   if (actions.length > 0 && (progress.length === 0 || rnd() < 0.6)) return pick(rnd, actions)!;

@@ -125,6 +125,7 @@ import {
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
+import { withSettleGate } from './engine/settleGate.js';
 import {
   openResponseWindow,
   respondToWindow,
@@ -458,8 +459,8 @@ export const InceptionCityGame = {
           return s;
         },
       },
-      // 所有 move 扁平化（不用 BGIO stages）
-      moves: {
+      // 所有 move 扁平化（不用 BGIO stages）；统一套上待结算闸门
+      moves: withSettleGate({
         // --- 抽牌阶段 ---
         doDraw: {
           move: ({ G, ctx, random }: MoveCtx) => {
@@ -1497,7 +1498,7 @@ export const InceptionCityGame = {
                 ...s,
                 peekReveal: {
                   peekerID: ctx.currentPlayer,
-                  revealKind: 'vault',
+                  revealKind: 'vault' as const,
                   vaultLayer: targetLayer,
                 },
               };
@@ -1564,7 +1565,7 @@ export const InceptionCityGame = {
               pendingPeekDecision: null,
               peekReveal: {
                 peekerID,
-                revealKind: 'vault',
+                revealKind: 'vault' as const,
                 vaultLayer: targetLayer,
               },
             };
@@ -2911,7 +2912,7 @@ export const InceptionCityGame = {
           },
           client: false,
         },
-      },
+      }),
     },
 
     endgame: {
