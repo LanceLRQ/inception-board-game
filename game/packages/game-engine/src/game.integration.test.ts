@@ -12,6 +12,7 @@ import { Client } from 'boardgame.io/client';
 import { Local } from 'boardgame.io/multiplayer';
 import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
+import { HAND_LIMIT } from './config.js';
 
 type BGIOClient = ReturnType<typeof Client<SetupState>>;
 
@@ -47,6 +48,21 @@ function createClients(playerCount: number): BGIOClient[] {
 
 function stateOf(client: BGIOClient): AnyState {
   return client.getState() as unknown as AnyState;
+}
+
+/**
+ * 弃牌阶段收尾：手牌超过上限就先弃到上限再结束，否则直接跳过。
+ * 梦主与开局手牌是随机的，抽牌后可能超限，此时 skipDiscard 会被拒绝。
+ */
+function finishDiscardPhase(client: BGIOClient): void {
+  const state = stateOf(client);
+  const hand = state.G.players[state.ctx.currentPlayer]!.hand;
+  const moves = client.moves as Record<string, (...args: unknown[]) => void>;
+  if (hand.length > HAND_LIMIT) {
+    moves['doDiscard']?.(hand.slice(0, hand.length - HAND_LIMIT));
+  } else {
+    moves['skipDiscard']?.();
+  }
 }
 
 describe('InceptionCityGame · BGIO 集成', () => {
@@ -93,8 +109,8 @@ describe('InceptionCityGame · BGIO 集成', () => {
     const afterAction = stateOf(masterClient);
     expect(afterAction.G.turnPhase).toBe('discard');
 
-    // discard 阶段的 skipDiscard 必须可用，且会自动切换到下一回合
-    (masterClient.moves as Record<string, (...args: unknown[]) => void>)['skipDiscard']?.();
+    // discard 阶段的弃牌 move 必须可用，且会自动切换到下一回合
+    finishDiscardPhase(masterClient);
     const afterDiscard = stateOf(masterClient);
 
     // 下一回合应切到下一个玩家（G.currentPlayerID 变化，ctx.currentPlayer 同步）
@@ -135,7 +151,7 @@ describe('InceptionCityGame · BGIO 集成', () => {
 
     moves['doDraw']?.();
     moves['endActionPhase']?.();
-    moves['skipDiscard']?.();
+    finishDiscardPhase(masterClient);
 
     const after = stateOf(masterClient);
     expect(after.G.currentPlayerID).toBe(expectedNextId);
