@@ -57,6 +57,31 @@ describe('InMemoryMatchArchive', () => {
     expect(await a.listSteps('other')).toEqual([]);
     expect(a.finished.get('m1')).toBeDefined();
   });
+
+  it('matchInfo：对局不存在返回 null', async () => {
+    expect(await new InMemoryMatchArchive().matchInfo('nope')).toBeNull();
+  });
+
+  it('matchInfo：开局后给出座位与账号，Bot 座位账号为 null，尚未结束', async () => {
+    const a = new InMemoryMatchArchive();
+    await a.recordStart(makeTestSnapshot('m1'));
+    const info = await a.matchInfo('m1');
+    expect(info?.endedAt).toBeNull();
+    expect(info?.seats).toEqual([
+      { seat: '0', playerId: 'account-0' },
+      { seat: '1', playerId: null },
+      { seat: '2', playerId: null },
+      { seat: '3', playerId: null },
+    ]);
+  });
+
+  it('matchInfo：recordFinish 之后有结束时间', async () => {
+    const a = new InMemoryMatchArchive();
+    const snap = makeTestSnapshot('m1');
+    await a.recordStart(snap);
+    await a.recordFinish('m1', snap.state, snap.seats);
+    expect((await a.matchInfo('m1'))?.endedAt).toBeInstanceOf(Date);
+  });
 });
 
 function makeStub() {
@@ -64,10 +89,14 @@ function makeStub() {
     match: {
       upsert: vi.fn(async (_arg: unknown) => ({})),
       update: vi.fn(async (_arg: unknown) => ({})),
+      findUnique: vi.fn(async (_arg: unknown) => null as { endedAt: Date | null } | null),
     },
     matchPlayer: {
       createMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
       update: vi.fn(async (_arg: unknown) => ({})),
+      findMany: vi.fn(
+        async (_arg: unknown) => [] as Array<{ seat: number; playerId: string | null }>,
+      ),
     },
     matchEvent: {
       create: vi.fn(async (_arg: unknown) => ({})),
@@ -236,5 +265,54 @@ describe('PrismaMatchArchive', () => {
     expect(rows).toEqual([
       { matchID: 'm1', stateID: 2, request, events: [publicEv], at: new Date(5) },
     ]);
+  });
+
+  it('listSteps：eventKind 不是 step 的行即使形状碰巧像步骤也忽略', async () => {
+    const stub = makeStub();
+    stub.matchEvent.findMany.mockResolvedValueOnce([
+      {
+        matchId: 'm1',
+        moveCounter: 2,
+        eventKind: 'move.unlock',
+        payload: { request, events: [publicEv] },
+        createdAt: new Date(5),
+      },
+    ]);
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    expect(await archive.listSteps('m1')).toEqual([]);
+  });
+
+  it('matchInfo：对局不存在返回 null', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    expect(await archive.matchInfo('nope')).toBeNull();
+  });
+
+  it('matchInfo：读结束时间与座位，座位号转成字符串并按座位号升序', async () => {
+    const stub = makeStub();
+    const endedAt = new Date(9);
+    stub.match.findUnique.mockResolvedValueOnce({ endedAt });
+    stub.matchPlayer.findMany.mockResolvedValueOnce([
+      { seat: 0, playerId: 'acc-0' },
+      { seat: 1, playerId: null },
+    ]);
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    const info = await archive.matchInfo('m1');
+    expect(stub.match.findUnique).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      select: { endedAt: true },
+    });
+    expect(stub.matchPlayer.findMany).toHaveBeenCalledWith({
+      where: { matchId: 'm1' },
+      select: { seat: true, playerId: true },
+      orderBy: { seat: 'asc' },
+    });
+    expect(info).toEqual({
+      endedAt,
+      seats: [
+        { seat: '0', playerId: 'acc-0' },
+        { seat: '1', playerId: null },
+      ],
+    });
   });
 });

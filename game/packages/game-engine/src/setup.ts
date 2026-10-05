@@ -116,7 +116,7 @@ export interface SetupState {
     peekerID: string;
     targetLayer: number;
   } | null;
-  // 梦境窥视 · 私密展示态（playerView 授权分支消费）
+  // 梦境窥视 · 私密展示态（对局视图按授权分支消费）
   //   revealKind='vault'：效果①（盗梦者使用），仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容
   //   revealKind='bribe'：效果②（梦主使用，W19-B F10），仅对 peekerID(=梦主) 视角透传
   //                     targetThiefID 持有的贿赂牌内容（为未来梦主隐私收紧预留授权入口）

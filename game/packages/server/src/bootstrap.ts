@@ -95,7 +95,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     prisma: deps.lobbyPrisma,
     matches,
   });
-  const app = createApp({ lobby, rateLimit: deps.httpRateLimit });
+  const app = createApp({ lobby, rateLimit: deps.httpRateLimit, archive: deps.archive });
   const httpServer = createServer(app.callback());
   gateway.attach(httpServer);
 

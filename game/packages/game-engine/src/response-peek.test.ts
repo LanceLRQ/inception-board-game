@@ -19,13 +19,11 @@
 //      - 两分支都清 pendingPeekDecision 并挂起 peekReveal
 //   3. peekerAcknowledge() — 盗梦者确认查看完毕 → 清 peekReveal + 记录 moveCounter
 //
-// playerView 授权：peekReveal.peekerID 视角下 peekReveal.vaultLayer 对应的
-//   vault contentType 被透传；其他玩家（除梦主本来可见）仍见 'hidden'。
+// 看牌者能看到哪些金库的视图授权，见 engine/matchView.test.ts 与 engine/matchView.leak.test.ts。
 
 import { describe, it, expect } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
 import { createTestState, callMove, makePlayer, withBribes } from './testing/fixtures.js';
-import { filterFor } from './engine/playerView.js';
 import type { SetupState } from './setup.js';
 
 const PEEK_CARD: CardID = 'action_dream_peek' as CardID;
@@ -349,61 +347,6 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
       expect(r).toBe('INVALID_MOVE');
     });
   });
-
-  describe('D · playerView 授权', () => {
-    /** 构造一个窥视第 2 层金库的已挂起 reveal state */
-    function stateWithPeekReveal(): SetupState {
-      return {
-        ...sceneBeforePeek(),
-        peekReveal: { peekerID: 'p1', revealKind: 'vault', vaultLayer: 2 },
-      };
-    }
-
-    it('peekerID 视角下 vaultLayer 对应金库的 contentType 被透传', () => {
-      const s = stateWithPeekReveal();
-      const view = filterFor(s, 'p1');
-      const vaultL2 = view.vaults.find((v) => v.layer === 2)!;
-      // 原始是 coin（createTestState 默认 L2 的金库）
-      expect(vaultL2.contentType).toBe('coin');
-    });
-
-    it('peekerID 视角下 其他层金库仍然 hidden', () => {
-      const s = stateWithPeekReveal();
-      const view = filterFor(s, 'p1');
-      const vaultL1 = view.vaults.find((v) => v.layer === 1)!;
-      expect(vaultL1.contentType).toBe('hidden');
-    });
-
-    it('其他盗梦者视角 vaultLayer 金库仍然 hidden', () => {
-      const s = stateWithPeekReveal();
-      const view = filterFor(s, 'p2');
-      const vaultL2 = view.vaults.find((v) => v.layer === 2)!;
-      expect(vaultL2.contentType).toBe('hidden');
-    });
-
-    it('梦主视角：所有 vault 本来就可见（不受 peekReveal 影响）', () => {
-      const s = stateWithPeekReveal();
-      const view = filterFor(s, 'pM');
-      for (const v of view.vaults) {
-        expect(v.contentType).not.toBe('hidden');
-      }
-    });
-
-    it('观战者视角：peekReveal 不改变观战可见性（仍 hidden）', () => {
-      const s = stateWithPeekReveal();
-      const view = filterFor(s, null);
-      const vaultL2 = view.vaults.find((v) => v.layer === 2)!;
-      expect(vaultL2.contentType).toBe('hidden');
-    });
-
-    it('无 peekReveal 时所有非梦主视角 vault 均 hidden', () => {
-      const s = sceneBeforePeek(); // peekReveal=null
-      const view = filterFor(s, 'p1');
-      for (const v of view.vaults) {
-        if (!v.isOpened) expect(v.contentType).toBe('hidden');
-      }
-    });
-  });
 });
 
 // -----------------------------------------------------------------------------
@@ -420,9 +363,7 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
 //      - 弃牌 + recordCardPlayed + 挂 peekReveal { revealKind: 'bribe', targetThiefID }
 //   2. peekerAcknowledge() — 梦主确认查看完毕 → 清 peekReveal + moveCounter + 1
 //
-// playerView 授权（filterBribes）：当 peekReveal.revealKind='bribe' 且 viewerID===peekerID
-//   时，targetThiefID 持有的贿赂牌 status / originalOwnerId 保留透传（为未来梦主隐私
-//   收紧预留入口；当前梦主默认全可见，此授权分支幂等）。
+// 梦主看贿赂牌的视图授权，见 engine/matchView.test.ts 与 engine/matchView.leak.test.ts。
 // -----------------------------------------------------------------------------
 
 describe('OOT-03 · 梦境窥视效果② 梦主查看贿赂牌（F10 red test）', () => {
@@ -591,43 +532,6 @@ describe('OOT-03 · 梦境窥视效果② 梦主查看贿赂牌（F10 red test�
       }) as SetupState;
       const r = callMove(s1, 'endActionPhase', [], { currentPlayer: 'pM' });
       expect(r).toBe('INVALID_MOVE');
-    });
-  });
-
-  describe('D · playerView 授权（filterBribes 分支）', () => {
-    /** 构造 peekReveal.bribe 已挂起状态：pM 正在查看 p2 的贿赂 */
-    function stateWithBribeReveal(): SetupState {
-      const base = sceneMasterPeek();
-      return {
-        ...base,
-        peekReveal: { peekerID: 'pM', revealKind: 'bribe', targetThiefID: 'p2' },
-      };
-    }
-
-    it('peekerID(pM) 视角：p2 持有的 bribe status 可见', () => {
-      const s = stateWithBribeReveal();
-      const view = filterFor(s, 'pM');
-      const b = view.bribePool.find((x) => x.id === 'bribe-fail-1')!;
-      expect(b.heldBy).toBe('p2');
-      expect(b.status).toBe('dealt');
-    });
-
-    it('其他盗梦者视角：p2 的 bribe 不因 peekReveal.bribe 而额外暴露', () => {
-      const s = stateWithBribeReveal();
-      const view = filterFor(s, 'p1');
-      // p1 仍看到 bribe-fail-1 的 heldBy（持有人本身公开），但 originalOwnerId 隐藏
-      const b = view.bribePool.find((x) => x.id === 'bribe-fail-1')!;
-      expect(b.heldBy).toBe('p2');
-      // 非持有人非梦主视角：originalOwnerId 应被过滤
-      expect(b.originalOwnerId).toBeNull();
-    });
-
-    it('观战者视角：peekReveal.bribe 不改变观战可见性', () => {
-      const s = stateWithBribeReveal();
-      const view = filterFor(s, null);
-      const b = view.bribePool.find((x) => x.id === 'bribe-fail-1')!;
-      // 观战看到持有人但不看 originalOwnerId
-      expect(b.originalOwnerId).toBeNull();
     });
   });
 });

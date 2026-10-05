@@ -1,78 +1,89 @@
+// 对局 API
+//
+// 端点：
+//   GET  /matches/:id          - 对局元信息
+//   GET  /matches/:id/events   - 对局步骤（需登录；游标分页，按观察者座位裁剪）
+//   POST /matches/local-upload - 人机对局上传（骨架）
+//
+// 事件读自对局归档，裁剪规则与回放接口一致：对局未结束返回 409，
+// 请求者是这局的真人座位成员就按他的座位裁剪，否则按旁观者；每步的请求不返回。
+
 import Router from '@koa/router';
 import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
+import type { MatchArchive } from '../match/MatchArchive.js';
+import { loadFinishedMatch, toStepView } from './archiveEvents.js';
 
-const router = new Router();
+export interface MatchesRouterDeps {
+  archive: MatchArchive;
+}
 
-// GET /matches/:id - 对局元信息
-router.get('/matches/:id', async (ctx) => {
-  const { id } = ctx.params;
-  const match = await prisma.match.findUnique({
-    where: { id },
-    include: { matchPlayers: true },
-  });
-  if (!match) throw new AppError('NOT_FOUND', 'Match not found');
+export function createMatchesRouter(deps: MatchesRouterDeps): Router {
+  const router = new Router();
+  const { archive } = deps;
 
-  ctx.body = {
-    id: match.id,
-    roomId: match.roomId,
-    ruleVariant: match.ruleVariant,
-    exEnabled: match.exEnabled,
-    expansionEnabled: match.expansionEnabled,
-    playerCount: match.playerCount,
-    startedAt: match.startedAt,
-    endedAt: match.endedAt,
-    winner: match.winner,
-    winReason: match.winReason,
-    players: match.matchPlayers.map((mp) => ({
-      seat: mp.seat,
-      nickname: mp.nickname,
-      isBot: mp.isBot,
-      role: mp.role,
-      finalFaction: mp.finalFaction,
-      won: mp.won,
-      abandoned: mp.abandoned,
-    })),
-  };
-});
+  // GET /matches/:id - 对局元信息
+  router.get('/matches/:id', async (ctx) => {
+    const { id } = ctx.params;
+    const match = await prisma.match.findUnique({
+      where: { id },
+      include: { matchPlayers: true },
+    });
+    if (!match) throw new AppError('NOT_FOUND', 'Match not found');
 
-// GET /matches/:id/events - 事件日志（分页）
-router.get('/matches/:id/events', authMiddleware, async (ctx) => {
-  const { id } = ctx.params;
-  const { cursor, limit } = paginationSchema.parse(ctx.query);
-
-  const events = await prisma.matchEvent.findMany({
-    where: {
-      matchId: id,
-      ...(cursor && { moveCounter: { gt: decodeCursor(cursor).moveCounter as number } }),
-    },
-    orderBy: { moveCounter: 'asc' },
-    take: limit + 1,
+    ctx.body = {
+      id: match.id,
+      roomId: match.roomId,
+      ruleVariant: match.ruleVariant,
+      exEnabled: match.exEnabled,
+      expansionEnabled: match.expansionEnabled,
+      playerCount: match.playerCount,
+      startedAt: match.startedAt,
+      endedAt: match.endedAt,
+      winner: match.winner,
+      winReason: match.winReason,
+      players: match.matchPlayers.map((mp) => ({
+        seat: mp.seat,
+        nickname: mp.nickname,
+        isBot: mp.isBot,
+        role: mp.role,
+        finalFaction: mp.finalFaction,
+        won: mp.won,
+        abandoned: mp.abandoned,
+      })),
+    };
   });
 
-  const hasMore = events.length > limit;
-  const data = events.slice(0, limit);
-  const last = data[data.length - 1];
+  // GET /matches/:id/events - 对局步骤（分页）；游标里的序号是版本号
+  router.get('/matches/:id/events', authMiddleware, async (ctx) => {
+    const { id } = ctx.params;
+    const { cursor, limit } = paginationSchema.parse(ctx.query);
+    const after = cursor ? Number(decodeCursor(cursor).stateID) : undefined;
+    if (after !== undefined && !Number.isFinite(after)) {
+      throw new AppError('VALIDATION_ERROR', 'invalid cursor');
+    }
 
-  ctx.body = {
-    data: data.map((e) => ({
-      moveCounter: e.moveCounter,
-      eventKind: e.eventKind,
-      payload: e.payload,
-      createdAt: e.createdAt,
-    })),
-    nextCursor: hasMore && last ? encodeCursor({ moveCounter: last.moveCounter }) : null,
-    hasMore,
-  };
-});
+    const { viewer, steps } = await loadFinishedMatch(archive, id!, ctx.state.player.playerId);
+    const rest = after === undefined ? steps : steps.filter((s) => s.stateID > after);
+    const page = rest.slice(0, limit);
+    const hasMore = rest.length > limit;
+    const last = page[page.length - 1];
 
-// POST /matches/local-upload - 人机对局上传（v1.1 骨架）
-router.post('/matches/local-upload', authMiddleware, async (ctx) => {
-  // Phase 2 完整实装：反作弊校验 + 事件回放验证
-  ctx.status = 201;
-  ctx.body = { matchID: null, saved: false, message: 'Local match upload (Phase 2)' };
-});
+    ctx.body = {
+      data: page.map((s) => toStepView(s, viewer)),
+      nextCursor: hasMore && last ? encodeCursor({ stateID: last.stateID }) : null,
+      hasMore,
+    };
+  });
 
-export { router as matchesRouter };
+  // POST /matches/local-upload - 人机对局上传（骨架）
+  router.post('/matches/local-upload', authMiddleware, async (ctx) => {
+    // 完整实现需要反作弊校验与事件回放验证
+    ctx.status = 201;
+    ctx.body = { matchID: null, saved: false, message: 'Local match upload (not implemented yet)' };
+  });
+
+  return router;
+}

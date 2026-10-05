@@ -17,6 +17,14 @@ export interface StepRow {
   at: Date;
 }
 
+/** 对局的结束时间与座位归属，供接口层决定回放能否提供、观察者坐哪个座位 */
+export interface MatchInfo {
+  /** 对局未结束为 null */
+  endedAt: Date | null;
+  /** 座位号为字符串；Bot 座位的账号为 null */
+  seats: Array<{ seat: string; playerId: string | null }>;
+}
+
 export interface MatchArchive {
   /** 建局时：写对局元信息与各座位 */
   recordStart(snapshot: MatchSnapshot): Promise<void>;
@@ -27,12 +35,15 @@ export interface MatchArchive {
     seats: readonly RoomSeat[],
   ): Promise<void>;
   listSteps(matchID: string): Promise<StepRow[]>;
+  /** 对局不存在返回 null */
+  matchInfo(matchID: string): Promise<MatchInfo | null>;
 }
 
 export class InMemoryMatchArchive implements MatchArchive {
   readonly started = new Map<string, MatchSnapshot>();
   readonly finished = new Map<string, MatchState<SetupState>>();
   private readonly steps = new Map<string, Map<number, StepRow>>();
+  private readonly endedAt = new Map<string, Date>();
 
   async recordStart(snapshot: MatchSnapshot): Promise<void> {
     this.started.set(snapshot.matchID, structuredClone(snapshot));
@@ -50,6 +61,16 @@ export class InMemoryMatchArchive implements MatchArchive {
     _seats: readonly RoomSeat[],
   ): Promise<void> {
     this.finished.set(matchID, structuredClone(final));
+    this.endedAt.set(matchID, new Date());
+  }
+
+  async matchInfo(matchID: string): Promise<MatchInfo | null> {
+    const snap = this.started.get(matchID);
+    if (!snap) return null;
+    return {
+      endedAt: this.endedAt.get(matchID) ?? null,
+      seats: snap.seats.map((s) => ({ seat: s.seat, playerId: s.isBot ? null : s.playerId })),
+    };
   }
 
   async listSteps(matchID: string): Promise<StepRow[]> {
@@ -60,8 +81,8 @@ export class InMemoryMatchArchive implements MatchArchive {
 
 /** PrismaMatchArchive 实际用到的最小接口，便于测试打桩 */
 export interface PrismaArchiveClient {
-  match: Pick<PrismaClient['match'], 'upsert' | 'update'>;
-  matchPlayer: Pick<PrismaClient['matchPlayer'], 'createMany' | 'update'>;
+  match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique'>;
+  matchPlayer: Pick<PrismaClient['matchPlayer'], 'createMany' | 'update' | 'findMany'>;
   matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany'>;
 }
 
@@ -184,7 +205,7 @@ export class PrismaMatchArchive implements MatchArchive {
     });
     const out: StepRow[] = [];
     for (const r of rows) {
-      if (!isStepPayload(r.payload)) continue;
+      if (r.eventKind !== 'step' || !isStepPayload(r.payload)) continue;
       out.push({
         matchID: r.matchId,
         stateID: r.moveCounter,
@@ -194,5 +215,22 @@ export class PrismaMatchArchive implements MatchArchive {
       });
     }
     return out;
+  }
+
+  async matchInfo(matchID: string): Promise<MatchInfo | null> {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchID },
+      select: { endedAt: true },
+    });
+    if (!match) return null;
+    const players = await this.prisma.matchPlayer.findMany({
+      where: { matchId: matchID },
+      select: { seat: true, playerId: true },
+      orderBy: { seat: 'asc' },
+    });
+    return {
+      endedAt: match.endedAt,
+      seats: players.map((p) => ({ seat: String(p.seat), playerId: p.playerId })),
+    };
   }
 }

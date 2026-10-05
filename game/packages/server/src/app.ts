@@ -8,8 +8,10 @@ import { identityRouter } from './api/identity.js';
 import { createRoomsRouter } from './api/rooms.js';
 import { LobbyService } from './services/LobbyService.js';
 import { playersRouter } from './api/players.js';
-import { matchesRouter } from './api/matches.js';
-import { replaysRouter } from './api/replays.js';
+import { createMatchesRouter } from './api/matches.js';
+import { createReplaysRouter } from './api/replays.js';
+import { PrismaMatchArchive, type MatchArchive } from './match/MatchArchive.js';
+import { prisma } from './infra/postgres.js';
 import { reportsRouter } from './api/reports.js';
 import { adminRouter } from './api/admin.js';
 import { chatRouter } from './api/chat.js';
@@ -19,6 +21,8 @@ export interface AppDeps {
   lobby?: LobbyService;
   /** 全局限流中间件；不给时用基于 Redis 的 IP 限流 */
   rateLimit?: Middleware;
+  /** 对局归档；回放与对局事件接口从这里读。不给时用 PrismaMatchArchive */
+  archive?: MatchArchive;
 }
 
 export function createApp(deps: AppDeps = {}): Koa {
@@ -48,6 +52,8 @@ export function createApp(deps: AppDeps = {}): Koa {
   app.use(playersRouter.routes());
   app.use(playersRouter.allowedMethods());
 
+  const archive = deps.archive ?? new PrismaMatchArchive(prisma);
+  const matchesRouter = createMatchesRouter({ archive });
   app.use(matchesRouter.routes());
   app.use(matchesRouter.allowedMethods());
 
@@ -58,6 +64,7 @@ export function createApp(deps: AppDeps = {}): Koa {
   app.use(adminRouter.routes());
   app.use(adminRouter.allowedMethods());
 
+  const replaysRouter = createReplaysRouter({ archive });
   app.use(replaysRouter.routes());
   app.use(replaysRouter.allowedMethods());
 

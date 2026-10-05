@@ -72,20 +72,6 @@ export type {
   RateGuard,
 } from './engine/validator.js';
 
-export { filterFor, filterEventLog, assertNoLeakage } from './engine/playerView.js';
-export type {
-  FilteredPlayer,
-  FilteredVault,
-  FilteredBribe,
-  FilteredDeck,
-  FilteredState,
-  FilterOptions,
-  EventLogEntry,
-} from './engine/playerView.js';
-
-export { resolveRecipients, rewriteForViewer, distribute, Events } from './engine/broadcaster.js';
-export type { EventVisibility, BroadcastEvent, BroadcastContext } from './engine/broadcaster.js';
-
 // 健壮性 · 死亡/迷失层/超时（Phase 2 B7）
 export {
   LOST_LAYER,
