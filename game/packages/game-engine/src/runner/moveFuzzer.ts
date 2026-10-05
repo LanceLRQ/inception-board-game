@@ -119,6 +119,17 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   const pendingPlayers = pending.filter((v) => players.includes(v));
   const n = name.toLowerCase();
 
+  // 万有引力挑选：牌必须来自待挑选的牌池
+  if (n === 'cardid' && G.pendingGravity && G.pendingGravity.pool.length > 0 && rnd() < 0.8) {
+    return pick(rnd, G.pendingGravity.pool);
+  }
+  // 天秤分牌：两堆合起来必须正好是被要求分牌那名玩家的手牌，这里按前后两半切开
+  const libra = G.pendingLibra;
+  if (libra && libra.split === null && /^pile[12]$/.test(n)) {
+    const targetHand = G.players[libra.targetPlayerID]?.hand ?? [];
+    const cut = Math.ceil(targetHand.length / 2);
+    return n === 'pile1' ? targetHand.slice(0, cut) : targetHand.slice(cut);
+  }
   // 嫁接结算要求恰好退回 2 张
   if (n === 'cardstoreturn' && rnd() < 0.7) return sample(rnd, hand, 2);
   if (/(cardids|handids|discardids|returncards|cardstoreturn|^pile\d$)/.test(n)) {
@@ -188,16 +199,16 @@ const PROGRESS_MOVES = new Set(['endActionPhase', 'skipDiscard', 'doDiscard', 's
 /** 结算 / 响应类 move 的参数更难猜中，多试几次 */
 const SETTLE_MOVE = /^(resolve|respond|pass|peeker|masterPeek)/;
 
-/**
- * 在运行器上试跑，返回一个会被接受的 move；找不到返回 null。
- * 试跑是纯函数调用，不改动传入的 state。
- */
 export interface PickLegalMoveOptions {
   attemptsPerMove?: number;
   /** 有可结算事项时是否优先结算。关掉它可以模拟不守规矩的客户端 */
   preferSettle?: boolean;
 }
 
+/**
+ * 在运行器上试跑，返回一个会被接受的 move；找不到返回 null。
+ * 试跑是纯函数调用，不改动传入的 state。
+ */
 export function pickLegalMove(
   game: GameDef<SetupState>,
   state: MatchState<SetupState>,

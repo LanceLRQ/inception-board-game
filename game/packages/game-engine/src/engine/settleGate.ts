@@ -8,7 +8,14 @@ import type { SetupState } from '../setup.js';
 
 const INVALID_MOVE = 'INVALID_MOVE';
 
-/** 每种待结算状态放行的 move。字段有值即视为待结算 */
+/**
+ * 每种待结算状态放行的 move。字段有值即视为待结算。
+ *
+ * 不收录 pendingAriesChoice（白羊·星尘的发动 / 放弃选择）：它的两个结算 move 只能由白羊
+ * 在自己的回合发出，白羊不是回合主人时没人能结算；而回合结束时会自动放弃并清空它。
+ * 若放进闸门，回合主人连结束行动阶段都做不到，对局会停死。
+ * 等回合外响应可用后再收进来。
+ */
 export const SETTLE_MOVES = {
   pendingGraft: ['resolveGraft'],
   pendingGravity: ['resolveGravityPick'],
@@ -26,7 +33,6 @@ export const SETTLE_MOVES = {
     'respondTerroristDiscard',
     'respondTerroristAccept',
   ],
-  pendingAriesChoice: ['playAriesStardustActivate', 'playAriesStardustDiscard'],
 } as const satisfies Partial<Record<keyof SetupState, readonly string[]>>;
 
 export type BlockingField = keyof typeof SETTLE_MOVES;

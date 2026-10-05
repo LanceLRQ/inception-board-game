@@ -43,6 +43,16 @@ describe('待结算闸门', () => {
     expect(blockedByPending(s, 'playKick')).toBe('pendingGraft');
   });
 
+  it('白羊·星尘的待选择不进闸门，回合主人仍可结束行动阶段', () => {
+    const s = withPending();
+    const withAries = {
+      ...s,
+      pendingAriesChoice: { ariesID: '1', victimLayer: 1, victimID: '2' },
+    } as SetupState;
+    expect(blockedByPending(withAries, 'endActionPhase')).toBeNull();
+    expect(blockedByPending(withAries, 'playKick')).toBeNull();
+  });
+
   it('表里登记的结算 move 都是引擎里真实存在的', () => {
     const real = new Set(Object.keys(InceptionCityGame.phases.playing.moves));
     for (const field of fields) {
