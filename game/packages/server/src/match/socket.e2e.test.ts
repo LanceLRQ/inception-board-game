@@ -202,6 +202,21 @@ describe('伪造与畸形请求', () => {
     return { server, room, accounts, cs, byTurn, other, turnSeat };
   }
 
+  it('同一座位最多 3 条连接：第 4 条进来时最旧的一条收到 REPLACED 并被断开', async () => {
+    const { server, room, accounts, cs } = await stillRoom();
+    const extra: TestClient[] = [];
+    for (let i = 0; i < 3; i++) extra.push(track(await connect(server, accounts[0]!, room.id)));
+
+    await waitUntil(() => !cs[0]!.connected, '最旧的连接被断开');
+    expect(
+      cs[0]!.received.some(
+        (r) => r.event === 'icg:error' && (r.payload as { code: string }).code === 'REPLACED',
+      ),
+    ).toBe(true);
+    expect(extra.every((c) => c.connected)).toBe(true);
+    expect(cs.slice(1).every((c) => c.connected)).toBe(true);
+  });
+
   it('握手：非成员、不存在的对局、无效令牌都被拒绝', async () => {
     const server = await boot();
     const { room, accounts } = makeRoom({ humans: 4, bots: 0 });
@@ -401,9 +416,10 @@ describe('重启恢复', () => {
       expect(firstMsg.type).toBe('icg:state');
       expect(firstMsg.view.stateID).toBe(savedID);
     }
-    // 恢复节奏并让房间按新时长重新排程，再打完
+    // 恢复节奏：连接变化不会重置已挂的计时器，所以重新从存储挂载房间，让它按新时长排程，再打完
     Object.assign(second.timing, FAST_TIMING);
-    second.rt.matches.seatsChanged(room.id);
+    second.rt.matches.shutdown();
+    expect(await second.rt.matches.restoreAll()).toEqual({ restored: 1, failed: [] });
     for (const c of again) c.startAutoPlay();
     await waitUntil(() => again.every((c) => c.isGameOver()), '重启后打完', 25_000);
     const finalID = again[0]!.latestStateID();

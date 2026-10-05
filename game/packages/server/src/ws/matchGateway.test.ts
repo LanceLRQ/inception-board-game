@@ -242,6 +242,25 @@ describe('handleMatchMessage', () => {
     expect((out as Extract<ServerMatchMessage, { type: 'icg:state' }>).seat).toBe('0');
   });
 
+  it('icg:sync 与 move 共用限流计数，超限后回 RATE_LIMITED 且不发状态', async () => {
+    const h = await makeMatch();
+    const deps = {
+      matches: h.svc,
+      moveGateway: new MoveGateway(new InMemoryRateGuard({ maxPerWindow: 3 })),
+      seatsFor: () => [],
+    };
+    const outs = [];
+    for (let i = 0; i < 5; i++)
+      outs.push(await handleMatchMessage({ type: 'icg:sync' }, ctx, deps));
+    expect(outs.slice(0, 3).map((o) => o.type)).toEqual(['icg:state', 'icg:state', 'icg:state']);
+    expect(outs[3]).toMatchObject({ type: 'icg:error', code: 'RATE_LIMITED' });
+    expect(outs[4]).toMatchObject({ type: 'icg:error', code: 'RATE_LIMITED' });
+
+    // 同一账号的 move 也已被同一计数器挡住
+    const moveOut = await handleMatchMessage(move(), ctx, deps);
+    expect(moveOut).toMatchObject({ ok: false, code: 'rate_limited' });
+  });
+
   it('answers not_in_match when the room is gone', async () => {
     const h = await makeMatch();
     const out = await handleMatchMessage(
@@ -265,6 +284,7 @@ describe('handleMatchMessage', () => {
     const moveGateway = {
       accept: vi.fn().mockResolvedValue({ ok: false, code: 'RATE_LIMIT_EXCEEDED', reason: 'x' }),
       commit: vi.fn(),
+      consumeRate: vi.fn(),
     };
     const out = await handleMatchMessage(move(), ctx, {
       matches,
@@ -291,6 +311,7 @@ describe('handleMatchMessage', () => {
         moveGateway: {
           accept: vi.fn().mockResolvedValue({ ok: false, code, reason: 'x' }),
           commit: vi.fn(),
+          consumeRate: vi.fn(),
         },
         seatsFor: () => [],
       });
@@ -307,6 +328,7 @@ describe('handleMatchMessage', () => {
       moveGateway: {
         accept: vi.fn().mockResolvedValue({ ok: false, code: 'unknown_move', reason: 'x' }),
         commit,
+        consumeRate: vi.fn(),
       },
       seatsFor: () => [],
     });
@@ -347,7 +369,7 @@ describe('handleMatchMessage', () => {
       matches: {
         get: () => ({ current: () => ({ ctx: { phase: 'playing' } }), submit }) as never,
       },
-      moveGateway: { accept, commit },
+      moveGateway: { accept, commit, consumeRate: vi.fn() },
       seatsFor: () => [],
     });
     expect(out).toEqual({ type: 'icg:moveResult', intentId: 'i-1', ok: true, stateID: 7 });
@@ -374,6 +396,7 @@ describe('handleMatchMessage', () => {
           .fn()
           .mockResolvedValue({ ok: true, request: { move: 'm', args: [] }, context: {} }),
         commit,
+        consumeRate: vi.fn(),
       },
       seatsFor: () => [],
     });
@@ -404,7 +427,7 @@ describe('handleMatchMessage', () => {
           throw new Error('boom: secret detail');
         },
       },
-      moveGateway: { accept: vi.fn(), commit: vi.fn() },
+      moveGateway: { accept: vi.fn(), commit: vi.fn(), consumeRate: vi.fn() },
       seatsFor: () => [],
     });
     expect(out).toEqual({

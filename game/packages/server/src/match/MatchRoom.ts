@@ -83,7 +83,7 @@ export class MatchRoom {
   private autoRejects = 0;
   private timeoutMisses = 0;
 
-  /** intentId → 结果，按插入顺序先进先出 */
+  /** `${座位}:${intentId}` → 结果，按插入顺序先进先出 */
   private readonly intents = new Map<string, SubmitResult>();
 
   constructor(
@@ -112,7 +112,8 @@ export class MatchRoom {
     return this.enqueue(async () => {
       if (this.closed || this.over) return { ok: false, code: 'match_over' };
 
-      const known = this.intents.get(input.intentId);
+      const intentKey = `${seat}:${input.intentId}`;
+      const known = this.intents.get(intentKey);
       if (known !== undefined) return known;
 
       if (input.stateID !== undefined && input.stateID !== this.state.stateID) {
@@ -121,16 +122,27 @@ export class MatchRoom {
 
       const request: MoveRequest = { playerID: seat, move: input.move, args: input.args };
       const outcome = await this.step(request, 'player');
-      this.remember(input.intentId, outcome);
+      this.remember(intentKey, outcome);
       return outcome;
     });
   }
 
-  /** 接管状态或在线状态变了，重新排程 */
+  /**
+   * 接管状态或在线状态变了，重新排程。
+   * 已挂着的计时器与新计划同类时不重挂：连接的建立与断开不能把已经走掉的等待时间清零。
+   * 内部异常只记日志，不向调用方（连接监听器）传播。
+   */
   reschedule(): void {
     if (!this.started || this.closed) return;
     this.autoRejects = 0;
-    this.schedule();
+    try {
+      this.schedule(true);
+    } catch (err) {
+      logger.error(
+        { matchID: this.matchID, stateID: this.state.stateID, err },
+        'reschedule failed',
+      );
+    }
   }
 
   current(): MatchState<SetupState> {
@@ -208,82 +220,129 @@ export class MatchRoom {
     }
   }
 
-  /** 按当前状态挂一个计时器（自动行动的短延迟或截止） */
-  private schedule(): void {
-    this.clearTimer();
-    if (this.closed || this.over) return;
-    if (this.autoRejects >= MAX_AUTO_FAILURES) return;
+  /**
+   * 按当前状态挂一个计时器（自动行动的短延迟或截止）。
+   * keepExisting 为真时，与已挂计时器同类的计划沿用原计时器：
+   * 截止只会提前、不会推后；自动步的延迟不重新计时。
+   */
+  private schedule(keepExisting = false): void {
+    if (this.closed || this.over || this.autoRejects >= MAX_AUTO_FAILURES) {
+      this.clearTimer();
+      return;
+    }
 
     const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
-    if (plan.kind === 'none') return;
-    if (plan.kind === 'deadline' && this.timeoutMisses >= MAX_AUTO_FAILURES) return;
+    if (
+      plan.kind === 'none' ||
+      (plan.kind === 'deadline' && this.timeoutMisses >= MAX_AUTO_FAILURES)
+    ) {
+      this.clearTimer();
+      return;
+    }
 
-    const gen = this.generation;
     const { timers } = this.deps;
-    if (plan.kind === 'deadline') this.deadline = timers.now() + plan.delayMs;
+    let delayMs = plan.delayMs;
+    if (keepExisting && this.timer !== null) {
+      if (plan.kind === 'auto' && this.deadline === null) return;
+      if (plan.kind === 'deadline' && this.deadline !== null) {
+        const target = Math.min(this.deadline, timers.now() + plan.delayMs);
+        if (target >= this.deadline) return;
+        delayMs = Math.max(0, target - timers.now());
+      }
+    }
+
+    this.clearTimer();
+    const gen = this.generation;
+    if (plan.kind === 'deadline') this.deadline = timers.now() + delayMs;
     this.timer = timers.setTimeout(() => {
       this.timer = null;
       void this.enqueue(() => (plan.kind === 'auto' ? this.runAuto(gen) : this.runTimeout(gen)));
-    }, plan.delayMs);
+    }, delayMs);
   }
 
   private async runAuto(gen: number): Promise<void> {
     if (gen !== this.generation || this.closed || this.over) return;
-    const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
-    if (plan.kind !== 'auto') {
-      this.schedule();
-      return;
+    try {
+      const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
+      if (plan.kind !== 'auto') {
+        this.schedule();
+        return;
+      }
+      const { action } = plan;
+      logger.debug(
+        { matchID: this.matchID, seat: action.playerID, move: action.move },
+        'bot decided',
+      );
+      const outcome = await this.step(
+        { playerID: action.playerID, move: action.move, args: action.args },
+        'bot',
+      );
+      this.afterAutomatic(outcome, 'auto');
+    } catch (err) {
+      logger.error(
+        { matchID: this.matchID, stateID: this.state.stateID, err },
+        'automatic move threw',
+      );
+      this.countAutoFailure('auto', 'exception');
     }
-    const { action } = plan;
-    logger.debug(
-      { matchID: this.matchID, seat: action.playerID, move: action.move },
-      'bot decided',
-    );
-    const outcome = await this.step(
-      { playerID: action.playerID, move: action.move, args: action.args },
-      'bot',
-    );
-    this.afterAutomatic(outcome, 'auto');
   }
 
   private async runTimeout(gen: number): Promise<void> {
     if (gen !== this.generation || this.closed || this.over) return;
-    const action = timeoutAction(this.state);
-    if (action === null) {
-      this.timeoutMisses += 1;
-      if (this.timeoutMisses >= MAX_AUTO_FAILURES) {
-        logger.error({ matchID: this.matchID }, 'deadline fired but no action, giving up');
-      } else {
-        logger.warn({ matchID: this.matchID }, 'deadline fired but no action available');
+    try {
+      const action = timeoutAction(this.state);
+      if (action === null) {
+        this.timeoutMisses += 1;
+        if (this.timeoutMisses >= MAX_AUTO_FAILURES) {
+          logger.error({ matchID: this.matchID }, 'deadline fired but no action, giving up');
+        } else {
+          logger.warn({ matchID: this.matchID }, 'deadline fired but no action available');
+        }
+        this.schedule();
+        return;
       }
-      this.schedule();
-      return;
+      logger.info(
+        { matchID: this.matchID, seat: action.playerID, move: action.move },
+        'deadline reached, acting on behalf',
+      );
+      const outcome = await this.step(
+        { playerID: action.playerID, move: action.move, args: action.args },
+        'timeout',
+      );
+      this.afterAutomatic(outcome, 'timeout');
+    } catch (err) {
+      logger.error(
+        { matchID: this.matchID, stateID: this.state.stateID, err },
+        'deadline move threw',
+      );
+      this.countAutoFailure('timeout', 'exception');
     }
-    logger.info(
-      { matchID: this.matchID, seat: action.playerID, move: action.move },
-      'deadline reached, acting on behalf',
-    );
-    const outcome = await this.step(
-      { playerID: action.playerID, move: action.move, args: action.args },
-      'timeout',
-    );
-    this.afterAutomatic(outcome, 'timeout');
   }
 
   /** 自动步被拒时累计次数；达到上限后停止排程 */
   private afterAutomatic(outcome: SubmitResult, kind: 'auto' | 'timeout'): void {
     if (outcome.ok || this.closed || this.over) return;
     if (outcome.code === 'internal_error') return;
+    this.countAutoFailure(kind, outcome.code);
+  }
+
+  /** 记一次自动步失败（被拒或抛异常）；未到上限就重新排程，排程本身出错只记日志 */
+  private countAutoFailure(kind: 'auto' | 'timeout', reason: string): void {
+    if (this.closed || this.over) return;
     this.autoRejects += 1;
     if (this.autoRejects >= MAX_AUTO_FAILURES) {
       logger.error(
-        { matchID: this.matchID, kind, reason: outcome.code },
+        { matchID: this.matchID, kind, reason },
         'automatic move rejected repeatedly, stop scheduling',
       );
       return;
     }
-    logger.warn({ matchID: this.matchID, kind, reason: outcome.code }, 'automatic move rejected');
-    this.schedule();
+    logger.warn({ matchID: this.matchID, kind, reason }, 'automatic move rejected');
+    try {
+      this.schedule();
+    } catch (err) {
+      logger.error({ matchID: this.matchID, err }, 'schedule failed');
+    }
   }
 
   /** 执行一步：运行器 → 快照 → 推进状态 → 排程 → 归档回调 */
@@ -339,7 +398,15 @@ export class MatchRoom {
       this.over = true;
       this.clearTimer();
     } else {
-      this.schedule();
+      try {
+        this.schedule();
+      } catch (err) {
+        // 这一步已落盘，排程出错不能挡住归档与下发
+        logger.error(
+          { matchID: this.matchID, stateID: outcome.state.stateID, err },
+          'schedule failed',
+        );
+      }
     }
 
     try {

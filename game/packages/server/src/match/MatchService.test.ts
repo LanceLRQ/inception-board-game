@@ -267,6 +267,42 @@ describe('MatchService 对局过程', () => {
     expect(h.onSeatsChanged).toHaveBeenCalledWith(id);
   });
 
+  it('从未连上来的真人座位超过接管阈值后被接管，按时连上的不受影响', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0, 1]));
+    h.timers.t += 30_000;
+    h.bot.onReconnect(id, '1');
+    h.timers.t += 31_000;
+    h.bot.tick();
+    expect(h.bot.isBotControlled(id, '0')).toBe(true);
+    expect(h.bot.isBotControlled(id, '1')).toBe(false);
+    expect(h.bot.isBotControlled(id, '2')).toBe(false);
+  });
+
+  it('所有真人座位都没连上来：接管后走自动步的短延迟而不是回合截止', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0, 1]));
+    h.timers.t += 61_000;
+    h.bot.tick();
+    const room = h.svc.get(id)!;
+    expect(room.deadlineAt()).toBeNull();
+    expect(h.bot.isBotControlled(id, '0')).toBe(true);
+    expect(h.bot.isBotControlled(id, '1')).toBe(true);
+  });
+
+  it('恢复路径同样：重启后没有人回来的真人座位被接管', async () => {
+    const first = makeHarness();
+    const id = await first.svc.createFromRoom(makeRoom(4, [0, 1]));
+    first.svc.shutdown();
+
+    const second = makeHarness({}, { store: first.store, archive: first.archive });
+    await second.svc.restoreAll();
+    second.timers.t += 61_000;
+    second.bot.tick();
+    expect(second.bot.isBotControlled(id, '0')).toBe(true);
+    expect(second.bot.isBotControlled(id, '1')).toBe(true);
+  });
+
   it('seatsChanged 对不存在的对局不抛错也不通知', () => {
     const h = makeHarness();
     h.svc.seatsChanged('nope');
@@ -305,9 +341,8 @@ describe('MatchService 对局结束', () => {
     expect(recordFinish).toHaveBeenCalledTimes(1);
   });
 
-  it('结束流程每一步失败只记 ERROR 并继续后面的', async () => {
+  it('结束流程除归档外每一步失败只记 ERROR 并继续后面的', async () => {
     const h = makeHarness();
-    vi.spyOn(h.archive, 'recordFinish').mockRejectedValue(new Error('pg'));
     const finish = vi.spyOn(h.store, 'finish').mockRejectedValue(new Error('redis'));
     const dispose = vi.spyOn(h.bot, 'disposeMatch').mockImplementation(() => {
       throw new Error('bot');
@@ -318,10 +353,34 @@ describe('MatchService 对局结束', () => {
     expect(finish).toHaveBeenCalledTimes(1);
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(h.onGameOver).toHaveBeenCalledTimes(1);
-    expect(log.error.mock.calls.length).toBeGreaterThanOrEqual(4);
+    expect(log.error.mock.calls.length).toBeGreaterThanOrEqual(3);
     // 即使每步都失败，房间仍会被移除
     await drain(h, id);
     expect(h.svc.get(id)).toBeNull();
+  });
+
+  it('结束归档失败：不调 store.finish，对局留在活跃集合，重启恢复时重试并成功后移除', async () => {
+    const first = makeHarness();
+    const recordFinish = vi
+      .spyOn(first.archive, 'recordFinish')
+      .mockRejectedValueOnce(new Error('pg down'));
+    const finish = vi.spyOn(first.store, 'finish');
+    const id = await first.svc.createFromRoom(makeRoom(4));
+    await drain(first, id, () => first.onGameOver.mock.calls.length > 0);
+    expect(recordFinish).toHaveBeenCalledTimes(1);
+    expect(finish).not.toHaveBeenCalled();
+    expect(await first.store.listActive()).toEqual([id]);
+    // 内存里的房间照常延迟移除
+    await drain(first, id);
+    expect(first.svc.get(id)).toBeNull();
+    first.svc.shutdown();
+
+    const second = makeHarness({}, { store: first.store, archive: first.archive });
+    const result = await second.svc.restoreAll();
+    expect(result).toEqual({ restored: 0, failed: [] });
+    // 归档对象是共用的：第一次抛错、重启后重试一次
+    expect(recordFinish).toHaveBeenCalledTimes(2);
+    expect(await second.store.listActive()).toEqual([]);
   });
 });
 

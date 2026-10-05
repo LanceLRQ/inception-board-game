@@ -16,6 +16,17 @@ describe('ConnectionRegistry', () => {
     connectedAt: Date.now(),
   });
 
+  describe('listSeatConnections', () => {
+    it('只返回该对局该座位的连接，按登记顺序排列', () => {
+      registry.register({ ...meta('s1', 'p1', 'm1'), seat: '0' });
+      registry.register({ ...meta('s2', 'p2', 'm1'), seat: '1' });
+      registry.register({ ...meta('s3', 'p1', 'm1'), seat: '0' });
+      registry.register({ ...meta('s4', 'p1', 'm2'), seat: '0' });
+      expect(registry.listSeatConnections('m1', '0').map((m) => m.socketId)).toEqual(['s1', 's3']);
+      expect(registry.listSeatConnections('m1', '9')).toEqual([]);
+    });
+  });
+
   describe('register / unregister', () => {
     it('registers a new connection and exposes by all indices', () => {
       registry.register(meta('s1', 'p1', 'm1'));

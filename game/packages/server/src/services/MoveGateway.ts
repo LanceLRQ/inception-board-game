@@ -78,6 +78,24 @@ export class MoveGateway {
     return { ok: true, request: shape.request, context };
   }
 
+  /**
+   * 只做限流的入口：不带 move 的请求（如状态同步）也要计入同一个计数器。
+   * 未超限时记一次并返回 true，超限返回 false。
+   */
+  async consumeRate(playerID: string): Promise<boolean> {
+    const rg = this.guard as Partial<RedisRateGuard>;
+    if (typeof rg.preloadRateCount === 'function') {
+      await rg.preloadRateCount(playerID);
+    }
+    const limited = validateRate({ playerID }, this.guard);
+    if (!limited.ok) {
+      logger.warn({ playerID, code: limited.code }, 'request rate limited');
+      return false;
+    }
+    await this.guard.recordMove(playerID);
+    return true;
+  }
+
   /** 记一次请求：intent 幂等（有的话）与限流计数。调用方对每次尝试都应调用，不论是否被运行器接受 */
   async commit(ctx: RateContext): Promise<void> {
     if (ctx.intentId) {

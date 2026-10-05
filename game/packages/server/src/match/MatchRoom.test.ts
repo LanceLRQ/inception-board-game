@@ -6,6 +6,7 @@ import { nextAutoAction } from '@icgame/bot';
 import { MatchRoom, type RoomDeps, type RoomSeat, type StepOutput } from './MatchRoom.js';
 import type { TimingConfig } from './scheduling.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
+import { logger } from '../infra/logger.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 const timing: TimingConfig = { botStepDelayMs: 10, pendingTimeoutMs: 5_000, turnTimeoutMs: 20_000 };
@@ -294,8 +295,9 @@ describe('MatchRoom 提交', () => {
   it('幂等表容量 256，先进先出', async () => {
     const h = humanRoom();
     h.room.start();
+    const owner = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!.playerID;
     for (let i = 0; i < 257; i++) {
-      await h.room.submit('0', { move: 'noSuchMove', args: [], intentId: `i${i}` });
+      await h.room.submit(owner, { move: 'noSuchMove', args: [], intentId: `i${i}` });
     }
     // i0 已被挤出表：重新提交仍是被拒，但不再是「记忆结果」，用一个有效 move 区分
     const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
@@ -539,5 +541,175 @@ describe('MatchRoom 访问器', () => {
     expect(h.room.seats()).toHaveLength(4);
     expect(h.room.seats()[1]).toMatchObject({ seat: '1', playerId: 'acct-1', isBot: false });
     expect(h.room.seats()[0]).toMatchObject({ playerId: null, isBot: true });
+  });
+});
+
+describe('MatchRoom 重新排程不延长等待', () => {
+  const humans = ['0', '1', '2', '3', '4'];
+
+  it('截止计时挂上后反复 reschedule，截止时间不变，到点仍然代发', async () => {
+    const h = makeHarness(5, humans, {}, stateAfterSetup(5));
+    h.room.start();
+    const first = h.room.deadlineAt()!;
+    h.timers.t += timing.turnTimeoutMs / 2;
+    for (let i = 0; i < 5; i++) h.room.reschedule();
+    expect(h.room.deadlineAt()).toBe(first);
+    expect(h.timers.pending()).toHaveLength(1);
+    expect(h.timers.pending()[0]!.at).toBe(first);
+
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+  });
+
+  it('Bot 延迟期间反复 reschedule，Bot 仍在原定时刻行动', async () => {
+    const h = makeHarness(5);
+    h.room.start();
+    const at = h.timers.pending()[0]!.at;
+    h.timers.t += timing.botStepDelayMs / 2;
+    for (let i = 0; i < 5; i++) h.room.reschedule();
+    expect(h.timers.pending()).toHaveLength(1);
+    expect(h.timers.pending()[0]!.at).toBe(at);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('bot');
+  });
+
+  it('reschedule 仍把连续被拒计数清零', async () => {
+    const h = makeHarness(5);
+    const rejectingGame: GameDef<SetupState> = {
+      ...game,
+      phases: Object.fromEntries(
+        Object.entries(game.phases).map(([k, v]) => [k, { ...v, moves: {} }]),
+      ) as GameDef<SetupState>['phases'],
+    };
+    const room = new MatchRoom('m3', makeSeats(5), newMatch(5), { ...h.deps, game: rejectingGame });
+    room.start();
+    for (let i = 0; i < 3; i++) {
+      h.timers.fireNext();
+      await room.idle();
+    }
+    expect(h.timers.pending()).toHaveLength(0);
+    room.reschedule();
+    expect(h.timers.pending()).toHaveLength(1);
+  });
+});
+
+describe('MatchRoom 异常处理', () => {
+  it('自动步里抛异常：记 ERROR、按被拒计数，3 次后停止排程', async () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const throwingGame: GameDef<SetupState> = {
+      ...game,
+      describe: () => {
+        throw new Error('describe boom');
+      },
+    };
+    const h = makeHarness(5, [], { game: throwingGame });
+    h.room.start();
+    for (let i = 0; i < 3; i++) {
+      expect(h.timers.pending()).toHaveLength(1);
+      h.timers.fireNext();
+      await h.room.idle();
+    }
+    expect(h.timers.pending()).toHaveLength(0);
+    expect(error.mock.calls.some((c) => String(c[1]).includes('automatic move threw'))).toBe(true);
+    expect(h.room.current().stateID).toBe(0);
+    error.mockRestore();
+  });
+
+  it('超时代发里抛异常：记 ERROR，不让房间失去重试机会', async () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const throwingGame: GameDef<SetupState> = {
+      ...game,
+      describe: () => {
+        throw new Error('describe boom');
+      },
+    };
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], { game: throwingGame }, stateAfterSetup(5));
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(error.mock.calls.some((c) => String(c[1]).includes('deadline move threw'))).toBe(true);
+    expect(h.timers.pending()).toHaveLength(1);
+    error.mockRestore();
+  });
+
+  it('落盘之后排程抛错：记 ERROR，onStep 照常调用，房间仍能接受提交', async () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    let explode = false;
+    const h = makeHarness(
+      5,
+      ['0', '1', '2', '3', '4'],
+      {
+        isTakenOver: () => {
+          if (explode) throw new Error('takeover lookup boom');
+          return false;
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const before = h.room.current();
+    const action = nextAutoAction(before, { humanPlayerIDs: [] })!;
+    explode = true;
+    const r = await h.room.submit(action.playerID, {
+      move: action.move,
+      args: action.args,
+      intentId: 'a',
+    });
+    expect(r).toEqual({ ok: true, stateID: before.stateID + 1 });
+    expect(h.steps).toHaveLength(1);
+    expect(error.mock.calls.some((c) => String(c[1]).includes('schedule failed'))).toBe(true);
+
+    explode = false;
+    const next = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    const r2 = await h.room.submit(next.playerID, {
+      move: next.move,
+      args: next.args,
+      intentId: 'b',
+    });
+    expect(r2.ok).toBe(true);
+    error.mockRestore();
+  });
+
+  it('reschedule 内部抛错不向调用方传播', () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    let explode = false;
+    const h = makeHarness(
+      5,
+      ['0', '1', '2', '3', '4'],
+      {
+        isTakenOver: () => {
+          if (explode) throw new Error('boom');
+          return false;
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    explode = true;
+    expect(() => h.room.reschedule()).not.toThrow();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+});
+
+describe('MatchRoom 幂等键按座位区分', () => {
+  it('两个座位用同一个 intentId 各自提交，互不影响', async () => {
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, stateAfterSetup(5));
+    h.room.start();
+    const s = h.room.current();
+    const owner = s.ctx.currentPlayer;
+    const other = owner === '0' ? '1' : '0';
+    const bad = await h.room.submit(other, { move: 'noSuchMove', args: [], intentId: 'same' });
+    expect(bad.ok).toBe(false);
+    const action = nextAutoAction(s, { humanPlayerIDs: [] })!;
+    const good = await h.room.submit(action.playerID, {
+      move: action.move,
+      args: action.args,
+      intentId: 'same',
+    });
+    expect(good.ok).toBe(true);
+    expect(h.steps).toHaveLength(1);
   });
 });

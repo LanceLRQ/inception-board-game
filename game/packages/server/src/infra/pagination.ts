@@ -1,6 +1,7 @@
 // Cursor 分页工具（参照设计文档 §7.3.1）
 
 import { z } from 'zod';
+import { AppError } from './errors.js';
 
 export const paginationSchema = z.object({
   cursor: z.string().optional(),
@@ -18,5 +19,14 @@ export function encodeCursor(fields: Record<string, string | number>): string {
 }
 
 export function decodeCursor(cursor: string): Record<string, string | number> {
-  return JSON.parse(Buffer.from(cursor, 'base64url').toString('utf-8'));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf-8'));
+  } catch {
+    throw new AppError('VALIDATION_ERROR', 'invalid cursor');
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new AppError('VALIDATION_ERROR', 'invalid cursor');
+  }
+  return parsed as Record<string, string | number>;
 }

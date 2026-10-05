@@ -214,6 +214,11 @@ export class MatchService {
       timers: deps.timers,
     });
     this.rooms.set(matchID, room);
+    // 真人座位先记为离线：没连上来的座位（建局后不来、重启后不回来）也能走到接管阈值；
+    // 连接建立时的 onReconnect 会清掉这条记录
+    for (const s of seats) {
+      if (!s.isBot) deps.bot.onDisconnect(matchID, s.seat);
+    }
     room.start();
   }
 
@@ -225,15 +230,20 @@ export class MatchService {
     room?: MatchRoom,
   ): Promise<void> {
     const { deps } = this;
+    let archived = true;
     try {
       await deps.archive.recordFinish(matchID, final, seats);
     } catch (err) {
-      logger.error({ matchID, err }, 'archive recordFinish failed');
+      archived = false;
+      logger.error({ matchID, err }, 'archive recordFinish failed, keeping match active for retry');
     }
-    try {
-      await deps.store.finish(matchID);
-    } catch (err) {
-      logger.error({ matchID, err }, 'store finish failed');
+    // 归档失败时对局留在活跃集合里，下次进程启动恢复到「已结束的快照」时会再走一遍结束流程
+    if (archived) {
+      try {
+        await deps.store.finish(matchID);
+      } catch (err) {
+        logger.error({ matchID, err }, 'store finish failed');
+      }
     }
     this.safely(matchID, 'bot dispose', () => deps.bot.disposeMatch(matchID));
     try {

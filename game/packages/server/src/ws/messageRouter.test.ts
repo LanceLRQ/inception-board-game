@@ -46,6 +46,19 @@ describe('WSMessageRouter', () => {
   });
 
   describe('icg:chatBroadcast', () => {
+    it('广播里的发送者是座位号，不带账号 id', async () => {
+      const broadcaster = vi.fn();
+      const chat = new ChatService(broadcaster as never, { cooldownMs: 3_000 });
+      const withChatRouter = new WSMessageRouter({ heartbeat: heartbeat as never, bot, chat });
+      await withChatRouter.route(
+        { ...ctx, faction: 'thief' },
+        { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' },
+      );
+      const sent = broadcaster.mock.calls[0]![1] as { message: { sender: string } };
+      expect(sent.message.sender).toBe('1');
+      expect(JSON.stringify(sent)).not.toContain('acct-1');
+    });
+
     it('returns empty (broadcast handled by ChatService) for valid preset', async () => {
       const broadcaster = vi.fn();
       const chat = new ChatService(broadcaster as never, { cooldownMs: 3_000 });

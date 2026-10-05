@@ -82,6 +82,11 @@ export class ConnectionRegistry {
     return out;
   }
 
+  /** 某个座位在对局里的全部连接，最早登记的在前 */
+  listSeatConnections(matchID: string, seat: string): ConnectionMeta[] {
+    return this.listMatchConnections(matchID).filter((m) => m.seat === seat);
+  }
+
   /** 全量玩家 ID（按对局去重） */
   getMatchPlayerIds(matchID: string): string[] {
     const metas = this.listMatchConnections(matchID);

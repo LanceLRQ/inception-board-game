@@ -29,13 +29,22 @@ async function main(): Promise<void> {
   logger.info({ port }, 'Server started (HTTP + WS)');
 }
 
-const shutdown = (signal: string) => {
+const shutdown = (signal: string, exitCode = 0) => {
   logger.info({ signal }, 'Shutting down');
   realtime
     .stop()
     .catch((err: unknown) => logger.error({ err }, 'shutdown failed'))
-    .finally(() => process.exit(0));
+    .finally(() => process.exit(exitCode));
 };
+
+// 兜底：任何没被接住的异常都要留下日志；未捕获异常之后进程状态不可信，走正常关停流程退出
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.error({ err: reason }, 'unhandled promise rejection');
+});
+process.on('uncaughtException', (err: Error) => {
+  logger.error({ err }, 'uncaught exception');
+  shutdown('uncaughtException', 1);
+});
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));

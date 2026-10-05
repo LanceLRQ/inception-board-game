@@ -186,6 +186,14 @@ describe('回放接口 · /range 区间', () => {
     expect(upper.json).toMatchObject({ hasPrev: false, hasNext: true });
   });
 
+  it('畸形游标 → 422，而不是 500', async () => {
+    const { server } = await setup();
+    for (const cursor of ['abc', 'bnVsbA', Buffer.from('[1]').toString('base64url')]) {
+      const res = await server.get(`/replays/${FINISHED_ID}/events?cursor=${cursor}`);
+      expect(res.status).toBe(422);
+    }
+  });
+
   it('from 大于 to 或不是整数 → 422', async () => {
     const { server } = await setup();
     expect((await server.get(`/replays/${FINISHED_ID}/range?from=3&to=2`)).status).toBe(422);

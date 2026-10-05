@@ -35,7 +35,7 @@ export interface GatewayDeps {
   readonly router: WSMessageRouter;
   readonly bot: BotManager;
   readonly heartbeat: HeartbeatManager;
-  readonly moveGateway: Pick<MoveGateway, 'accept' | 'commit'>;
+  readonly moveGateway: Pick<MoveGateway, 'accept' | 'commit' | 'consumeRate'>;
 }
 
 export interface GatewayOptions {
@@ -51,6 +51,8 @@ export interface AuthenticatedSocketData {
 }
 
 const DEFAULT_PATH = '/ws';
+/** 每个座位的并发连接数上限，超出时踢掉最旧的 */
+export const MAX_CONNECTIONS_PER_SEAT = 3;
 
 export class SocketGateway {
   private io: IOServer | null = null;
@@ -170,6 +172,21 @@ export class SocketGateway {
     });
   }
 
+  /** 座位已有的连接达到上限时，从最旧的开始踢，给新连接腾位置 */
+  private evictOldestConnections(matchID: string, seat: string): void {
+    const existing = this.deps.registry.listSeatConnections(matchID, seat);
+    const excess = existing.length - (MAX_CONNECTIONS_PER_SEAT - 1);
+    for (const old of existing.slice(0, Math.max(0, excess))) {
+      logger.warn({ matchID, seat, socketId: old.socketId }, 'ws connection replaced');
+      this.emitTo(old.socketId, {
+        type: 'icg:error',
+        code: 'REPLACED',
+        message: 'Too many connections for this seat',
+      });
+      this.io?.sockets.sockets.get(old.socketId)?.disconnect(true);
+    }
+  }
+
   /** 按连接发送任意服务端消息 */
   private emitTo(socketId: string, msg: ServerMessage): void {
     this.io?.to(socketId).emit(msg.type, msg);
@@ -183,6 +200,7 @@ export class SocketGateway {
       return;
     }
 
+    this.evictOldestConnections(matchID, seat);
     this.deps.registry.register({
       socketId: socket.id,
       playerID,

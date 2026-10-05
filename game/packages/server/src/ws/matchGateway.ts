@@ -132,9 +132,12 @@ export interface MatchMessageContext {
 
 export interface MatchMessageDeps {
   matches: Pick<MatchService, 'get'>;
-  moveGateway: Pick<MoveGateway, 'accept' | 'commit'>;
+  moveGateway: Pick<MoveGateway, 'accept' | 'commit' | 'consumeRate'>;
   seatsFor(room: MatchRoom): SeatInfo[];
 }
+
+/** 回给连接的消息：对局消息，或限流这类与具体 move 无关的错误 */
+export type MatchReply = ServerMatchMessage | { type: 'icg:error'; code: string; message: string };
 
 function rejected(intentId: string, code: MoveRejectCode): ServerMatchMessage {
   return { type: 'icg:moveResult', intentId, ok: false, code };
@@ -145,11 +148,15 @@ export async function handleMatchMessage(
   msg: ClientMatchMessage,
   ctx: MatchMessageContext,
   deps: MatchMessageDeps,
-): Promise<ServerMatchMessage> {
+): Promise<MatchReply> {
   const intentId = msg.type === 'icg:move' ? msg.intentId : '';
   try {
     const room = deps.matches.get(ctx.matchID);
     if (msg.type === 'icg:sync') {
+      // 每次同步都要重算整份视图，与 move 共用限流计数
+      if (!(await deps.moveGateway.consumeRate(ctx.playerID))) {
+        return { type: 'icg:error', code: 'RATE_LIMITED', message: 'Too many requests' };
+      }
       if (room === null) return rejected('', 'not_in_match');
       return stateMessage(room, ctx.seat, deps.seatsFor(room));
     }
