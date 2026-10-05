@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
+import { CURRENT_SCHEMA_VERSION } from '../migrations.js';
 import { createMatch, matchFromSnapshot, type GameDef, type MatchState } from './matchRunner.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
@@ -46,5 +47,61 @@ describe('对局运行器 · 快照校验', () => {
     ['版本号为负', broken((s) => (s.stateID = -1)), 'stateID'],
   ])('%s：抛错并指出字段', (_label, raw, field) => {
     expect(() => matchFromSnapshot(raw)).toThrow(field);
+  });
+
+  describe('迁移旧版本状态', () => {
+    const later = [
+      'pendingUnlock',
+      'pendingGraft',
+      'pendingResonance',
+      'pendingGravity',
+      'shiftSnapshot',
+      'pendingResponseWindow',
+      'pendingSudgerRolls',
+      'playedCardsThisTurn',
+      'lastPlayedCardThisTurn',
+      'lastShootRoll',
+      'removedFromGame',
+    ];
+    function oldSnapshot(version: number): unknown {
+      return broken((s) => {
+        const g = s.G as Record<string, unknown>;
+        for (const key of later) delete g[key];
+        g.schemaVersion = version;
+      });
+    }
+
+    it('传入 Game 定义后旧版本状态被迁移到当前版本并补齐字段', () => {
+      const m = matchFromSnapshot<SetupState>(oldSnapshot(7), game);
+      expect(m.G.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      expect(m.G.playedCardsThisTurn).toEqual([]);
+      expect(m.G.removedFromGame).toEqual([]);
+      expect(m.G.lastShootRoll).toBeNull();
+      expect(m.G.pendingUnlock).toBeNull();
+    });
+
+    it('当前版本的快照迁移后原样返回', () => {
+      const s = valid();
+      expect(matchFromSnapshot<SetupState>(JSON.parse(JSON.stringify(s)), game)).toEqual(s);
+    });
+
+    it('状态版本高于当前版本时抛错', () => {
+      const raw = broken((s) => {
+        (s.G as Record<string, unknown>).schemaVersion = CURRENT_SCHEMA_VERSION + 1;
+      });
+      expect(() => matchFromSnapshot<SetupState>(raw, game)).toThrow('快照版本');
+    });
+
+    it('不传 Game 定义时不迁移', () => {
+      const m = matchFromSnapshot<SetupState>(oldSnapshot(7));
+      expect(m.G.schemaVersion).toBe(7);
+      expect(m.G.playedCardsThisTurn).toBeUndefined();
+    });
+
+    it('Game 定义没有迁移钩子时不迁移', () => {
+      const withoutMigrate: GameDef<SetupState> = { ...game, migrate: undefined };
+      const m = matchFromSnapshot<SetupState>(oldSnapshot(7), withoutMigrate);
+      expect(m.G.schemaVersion).toBe(7);
+    });
   });
 });

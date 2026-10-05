@@ -95,6 +95,11 @@ export interface GameDef<G> {
    * 发起者不在 ctx.playOrder 里时运行器直接拒绝，不会问这个钩子。
    */
   actionRights?(args: { G: G; ctx: RunnerCtx; playerID: string; move: string }): boolean;
+  /**
+   * 状态迁移：把快照里保存的旧版本 G 升到当前版本，版本过高时应抛错。
+   * 没有提供时快照里的 G 原样使用。
+   */
+  migrate?(G: unknown): G;
 }
 
 export interface MoveRequest {
@@ -354,6 +359,7 @@ const GAME_KEYS = new Set([
   'phases',
   'endIf',
   'actionRights',
+  'migrate',
 ]);
 const PHASE_KEYS = new Set(['start', 'next', 'endIf', 'onBegin', 'onEnd', 'turn', 'moves']);
 const TURN_KEYS = new Set(['order', 'onBegin', 'onEnd']);
@@ -425,9 +431,9 @@ function invalidSnapshot(what: string): never {
 
 /**
  * 从已保存的快照恢复。状态本身就是普通对象，这里只校验运行器自己依赖的字段，
- * 对局状态 G 的内部结构由引擎负责。
+ * 对局状态 G 的内部结构由引擎负责；传入的 Game 定义有 migrate 时，用它迁移 G。
  */
-export function matchFromSnapshot<G>(raw: unknown): MatchState<G> {
+export function matchFromSnapshot<G>(raw: unknown, game?: GameDef<G>): MatchState<G> {
   if (typeof raw !== 'object' || raw === null) invalidSnapshot('不是对象');
   const s = raw as Partial<MatchState<G>>;
   if (typeof s.G !== 'object' || s.G === null) invalidSnapshot('缺少 G');
@@ -453,7 +459,10 @@ export function matchFromSnapshot<G>(raw: unknown): MatchState<G> {
 
   if (!Number.isInteger(s.rngState)) invalidSnapshot('rngState');
   if (!Number.isInteger(s.stateID) || (s.stateID as number) < 0) invalidSnapshot('stateID');
-  return s as MatchState<G>;
+  const match = s as MatchState<G>;
+  // 传入 Game 定义且它带迁移钩子时，把旧版本的 G 升到当前版本；迁移失败的错误原样抛出
+  if (game?.migrate) return { ...match, G: game.migrate(match.G) };
+  return match;
 }
 
 export function applyMove<G>(

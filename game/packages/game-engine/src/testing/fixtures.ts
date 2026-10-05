@@ -7,6 +7,7 @@
 import type { Layer, CardID, Faction } from '@icgame/shared';
 import type { SetupState, PlayerSetup, LayerSetup, VaultSetup, BribeSetup } from '../setup.js';
 import { LAYER_COUNT } from '../config.js';
+import { CURRENT_SCHEMA_VERSION } from '../migrations.js';
 import { InceptionCityGame } from '../game.js';
 
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
@@ -115,7 +116,7 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
 
   const base: SetupState = {
     matchId: 'test-match',
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     rngSeed: 'test-seed',
     phase: 'setup',
     turnPhase: 'turnStart',

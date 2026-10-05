@@ -15,6 +15,7 @@
 
 import { INVALID_MOVE } from './engine/invalidMove.js';
 import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
+import { migrateGameState } from './migrations.js';
 import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT } from './config.js';
 import {
   drawCards,
@@ -2919,6 +2920,9 @@ export const InceptionCityGame = {
     if (ctx.phase === 'playing') return denyAction(G, playerID, move) === null;
     return playerID === ctx.currentPlayer;
   },
+
+  // 恢复快照时把旧版本的对局状态迁移到当前版本
+  migrate: (G) => migrateGameState(G as Record<string, unknown>),
 } satisfies GameDef<SetupState>;
 
 function isAdjacent(from: number, to: number): boolean {

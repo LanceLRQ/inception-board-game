@@ -51,7 +51,7 @@ export {
 export { rollDice, resolveShoot } from './dice.js';
 export type { DiceResult, DiceModifier, ShootOutcome } from './dice.js';
 export * from './config.js';
-export { migrateGameState, getSchemaVersion } from './migrations.js';
+export { migrateGameState, getSchemaVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';
 
 // 服务端权威 · 零信任过滤（Phase 2 B5）
 export {

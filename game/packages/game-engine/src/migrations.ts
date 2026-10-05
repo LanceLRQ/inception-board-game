@@ -3,7 +3,7 @@
 
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -63,12 +63,50 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       pendingShootResponse: state.pendingShootResponse ?? null,
     }),
   ],
+  // v7 → v8：补齐此前各版没有补的顶层字段（它们在第一版之后才加入状态，旧快照里可能没有），
+  //   默认值与创建初始状态时一致；玩家对象里缺少的计数字段同样补上
+  [
+    8,
+    (state) => {
+      const players = state.players;
+      const filledPlayers =
+        typeof players === 'object' && players !== null
+          ? Object.fromEntries(
+              Object.entries(players as Record<string, Record<string, unknown>>).map(
+                ([id, player]) => [
+                  id,
+                  { ...player, successfulUnlocksThisTurn: player.successfulUnlocksThisTurn ?? 0 },
+                ],
+              ),
+            )
+          : players;
+      return {
+        ...state,
+        ...(filledPlayers === undefined ? {} : { players: filledPlayers }),
+        pendingUnlock: state.pendingUnlock ?? null,
+        pendingGraft: state.pendingGraft ?? null,
+        pendingResonance: state.pendingResonance ?? null,
+        pendingGravity: state.pendingGravity ?? null,
+        shiftSnapshot: state.shiftSnapshot ?? null,
+        pendingResponseWindow: state.pendingResponseWindow ?? null,
+        pendingSudgerRolls: state.pendingSudgerRolls ?? null,
+        playedCardsThisTurn: state.playedCardsThisTurn ?? [],
+        lastPlayedCardThisTurn: state.lastPlayedCardThisTurn ?? null,
+        lastShootRoll: state.lastShootRoll ?? null,
+        removedFromGame: state.removedFromGame ?? [],
+      };
+    },
+  ],
 ]);
 
-// 将任意 GameState 迁移到当前版本
+// 将任意 GameState 迁移到当前版本；版本号高于当前版本的状态无法降级，直接抛错
 export function migrateGameState(raw: Record<string, unknown>): SetupState {
   let state = { ...raw };
   let version = (state.schemaVersion as number) ?? 0;
+
+  if (version > CURRENT_SCHEMA_VERSION) {
+    throw new Error(`快照版本 ${version} 高于当前版本 ${CURRENT_SCHEMA_VERSION}，无法迁移`);
+  }
 
   while (version < CURRENT_SCHEMA_VERSION) {
     const migration = MIGRATIONS.get(version + 1);

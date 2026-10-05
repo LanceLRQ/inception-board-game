@@ -3,6 +3,7 @@
 
 import type { Layer, CardID, Faction } from '@icgame/shared';
 import { ACTION_CARDS } from '@icgame/shared';
+import { CURRENT_SCHEMA_VERSION } from './migrations.js';
 import {
   PLAYER_COUNT_CONFIGS,
   VAULT_SECRET_COUNT,
@@ -408,7 +409,7 @@ export function createInitialState(options: {
 
   return {
     matchId: '',
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     rngSeed,
     phase: 'setup',
     turnPhase: 'turnStart',
