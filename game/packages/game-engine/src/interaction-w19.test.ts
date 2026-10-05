@@ -222,12 +222,12 @@ describe('W19-A · 翻面 × 移形换影 交叉一致性', () => {
     expect(r!.players.p2!.isAlive).toBe(false);
   });
 
-  it('双子·命运：roll=3 → 减 2 心锁 + 翻面', () => {
+  it('双子·命运：roll=4 → 减 2 心锁 + 翻面', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_gemini');
     s = setLayer(s, 'pM', 3 as Layer); // master 必须高于 player
     const beforeHL = s.layers[1]!.heartLockValue;
-    const r = applyGeminiSync(s, 'p1', 3);
+    const r = applyGeminiSync(s, 'p1', 4);
     expect(r).not.toBeNull();
     expect(r!.layers[1]!.heartLockValue).toBe(Math.max(0, beforeHL - 2));
     expect(r!.players.p1!.characterId).toBe('thief_gemini_back');

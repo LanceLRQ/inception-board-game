@@ -207,29 +207,43 @@
       "activate_nightmare": { "name": "激活梦魇", "desc": "激活目标层的一张明置梦魇" },
       "secret_passage_teleport": {
         "name": "密道·传送",
-        "desc": "弃 1 张手牌 → 将 1 名玩家传送至相邻层（限 2 次/回合）"
+        "desc": "弃 1 张梦境穿梭剂 → 将 1 名盗梦者送入迷失层（限 2 次/回合）"
       },
       "deal_bribe": { "name": "派发贿赂", "desc": "从贿赂池随机派 1 张贿赂给指定盗梦者" }
     },
-    "thief_shade": { "skill_0": { "name": "影子·潜伏", "desc": "移动到梦主所在层" } },
+    "thief_shade": { "skill_0": { "name": "影子·随行", "desc": "移动到梦主所在层" } },
     "thief_apollo": { "skill_0": { "name": "阿波罗·崇拜", "desc": "指定一名目标玩家结算崇拜" } },
     "thief_tourist": {
       "skill_0": { "name": "穿行者·支助", "desc": "指定一名玩家进行支助（每回合限 1 次）" }
     },
     "thief_martyr": {
-      "skill_0": { "name": "殉道者·牺牲", "desc": "选择方向：当前层心锁 +1 或 -1" }
+      "skill_0": {
+        "name": "殉道者·牺牲",
+        "desc": "略过出牌阶段掷 1 颗骰子，3–6 则当层心锁 +2 或 -2，之后死亡并弃掉所有手牌"
+      }
     },
     "thief_chemist": { "skill_0": { "name": "药剂师·调剂", "desc": "指定 1 张手牌进行调剂" } },
     "thief_gemini": {
-      "skill_0": { "name": "双子·协同", "desc": "弃牌阶段：若梦主层数高于己方则可协同" }
+      "skill_0": {
+        "name": "双子·命运",
+        "desc": "弃牌阶段：若梦主所在层数字更大，可掷 1 颗骰子，4 / 5 / 6 则当层心锁 -2，之后翻面"
+      }
     },
     "thief_paprik": {
-      "skill_0": { "name": "灵魂牧师·救赎", "desc": "选 1 张手牌交给 1 名目标玩家" }
+      "skill_0": {
+        "name": "灵魂牧师·拯救",
+        "desc": "弃 1 张手牌，将 1 名迷失层玩家复活到你所在层，并收走其全部手牌"
+      }
     },
     "thief_architect": {
-      "skill_0": { "name": "筑梦师·迷宫", "desc": "选 1 张手牌 + 1 名目标玩家建造迷宫" }
+      "skill_0": { "name": "筑梦师·迷宫", "desc": "弃 1 张 SHOOT 类牌 + 选 1 名同层玩家建造迷宫" }
     },
-    "thief_darwin": { "skill_0": { "name": "达尔文·进化", "desc": "选择若干张手牌进行进化替换" } },
+    "thief_darwin": {
+      "skill_0": {
+        "name": "达尔文·淘汰",
+        "desc": "将牌库顶 2 张牌收为手牌，再选 2 张手牌放回牌库顶"
+      }
+    },
     "thief_haley": {
       "skill_0": {
         "name": "哈雷·冲击",
@@ -242,11 +256,11 @@
     "thief_athena": {
       "skill_0": {
         "name": "雅典娜·惊叹",
-        "desc": "展示 4 张手牌 + 1 张牌库顶，5 张同名可击杀同层玩家"
+        "desc": "展示 4 张手牌 + 1 张牌库顶，5 张皆不同名可击杀同层玩家"
       }
     },
     "thief_forger": {
-      "skill_0": { "name": "欺诈师·盗心", "desc": "选目标玩家 + 还 1 张手牌（回合限 1 次）" }
+      "skill_0": { "name": "欺诈师·诡计", "desc": "选目标玩家 + 还 1 张手牌（回合限 1 次）" }
     },
     "thief_libra": {
       "skill_0": { "name": "天秤·平衡", "desc": "指定 1 名目标玩家进行平衡分堆（回合限 1 次）" }
@@ -255,14 +269,19 @@
       "skill_0": { "name": "战争之王·黑市", "desc": "弃 2 张手牌 → 从弃牌堆取 1 张（回合限 1 次）" }
     },
     "thief_gaia": {
-      "skill_0": { "name": "盖亚·大地", "desc": "同层玩家各自 +1 或 -1 层（每回合限 2 次）" }
+      "skill_0": { "name": "盖亚·撼动", "desc": "同层玩家各自 +1 或 -1 层（每回合限 2 次）" }
     },
-    "dm_uranus_firmament": { "skill_0": { "name": "天王星·苍穹", "desc": "指定玩家移动到目标层" } },
+    "dm_uranus_firmament": { "skill_0": { "name": "天王星·权力", "desc": "指定玩家移动到目标层" } },
     "dm_mars_battlefield": {
       "skill_0": { "name": "火星·杀戮", "desc": "指定目标层进行杀戮结算" },
       "world": { "name": "火星·战场", "desc": "弃 2 张非 SHOOT → 从弃牌堆取 1 张 SHOOT" }
     },
-    "dm_pluto_hell": { "skill_0": { "name": "冥王星·炙烧", "desc": "弃 1 张手牌触发炙烧" } },
+    "dm_pluto_hell": {
+      "skill_0": {
+        "name": "冥王星·业火",
+        "desc": "弃 1 张手牌，令所有手牌不足 2 张的盗梦者各抽 2 张"
+      }
+    },
     "dm_saturn_territory": {
       "free_move": { "name": "土星·自由移动", "desc": "盗梦者持贿赂时可自由移动到目标层" }
     },

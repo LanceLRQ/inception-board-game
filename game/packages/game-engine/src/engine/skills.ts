@@ -1314,7 +1314,8 @@ export function applySpaceQueenStashTop(
 // 纯函数：白羊 / 射手 / 水瓶 / 格林射线（接入待响应窗口/扩展批次）
 
 // === 双子 · 协同 ===
-// 弃牌阶段：梦主层数 > self 层数时，可掷骰 → 3 → 当层 -2 心锁 → 翻面
+// 弃牌阶段：梦主层数 > self 层数时，可掷骰 → 4 / 5 / 6 → 当层 -2 心锁 → 翻面
+// 对照：docs/manual/05-dream-thieves.md 双子·命运（卡面为三个骰面 4、5、6）
 export const GEMINI_SKILL_ID = 'thief_gemini.skill_0';
 
 export function applyGeminiSync(
@@ -1332,7 +1333,7 @@ export function applyGeminiSync(
   if (!canUseSkill(player, GEMINI_SKILL_ID, 'ownTurnOncePerTurn')) return null;
 
   let s = markSkillUsed(state, selfID, GEMINI_SKILL_ID);
-  if (roll === 3) {
+  if (roll >= 4 && roll <= 6) {
     const layerInfo = s.layers[player.currentLayer]!;
     const nextHL = Math.max(0, layerInfo.heartLockValue - 2);
     s = {

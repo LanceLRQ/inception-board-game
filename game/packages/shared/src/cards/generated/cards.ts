@@ -100,7 +100,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_black_swan.skill_0',
           name: '纷飞',
           description:
-            '你可以略过抽牌阶段，并将所有手牌（最少1张）给予任意数量的其他盗梦者，然后从牌库顶抽取4张。',
+            '你可以略过抽牌阶段，并将所有手牌（最少1张）给予任意数量的其他盗梦者，然后从牌库顶抽取4张牌。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -283,7 +283,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
         {
           id: 'thief_sudger_of_mind.skill_0',
           name: '定罪',
-          description: '当你使用SHOOT类牌时，目标玩家改为掷2颗骰子，由你选择其中1颗作为掷骰结果。',
+          description: '当你使用SHOOT类牌时，目标玩家改为掷2骰子，由你选择其中1颗作为掷骰结果。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -514,7 +514,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_gemini.skill_0',
           name: '命运',
           description:
-            '你的弃牌阶段，若梦主处于比你数字更大的层数，你可以掷1颗骰子，结果为[3点]则减少当层梦境2个心锁。效果执行后将角色牌翻面。',
+            '你的弃牌阶段，若梦主处于比你数字更大的层数，你可以掷1颗骰子，结果为[4点][5点][6点]则减少当层梦境2个心锁。效果执行后将角色牌翻面。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -590,7 +590,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_leo.skill_0',
           name: '王道',
           description:
-            '你的抽牌阶段，从牌库顶额外抽取与梦主手牌数量相等的牌。若梦主没有手牌则从弃牌堆中额外选取1张收入手牌。回合限1次',
+            '你的抽牌阶段，从牌库顶额外抽取与梦主手牌数量相等的牌。若梦主没有手牌则从弃牌堆中额外选取1张收入手牌。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -621,7 +621,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_sagittarius.skill_1',
           name: '穿心',
           description:
-            '你每击杀1位玩家，可增加或减少任意一层的1个心锁。心锁数不能超过原有数量。回合限1次',
+            '你每击杀一位玩家，可增加或减少任意一层的1个心锁。心锁数不能超过原有数量。回合限1次',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -689,7 +689,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
         {
           id: 'thief_extractor.skill_0',
           name: '萃取',
-          description: '当你成功解锁后，可以从牌库顶抽取与当层梦境现有心锁相等数量的牌。',
+          description: '当你成功解锁后，可以从牌库顶抽取与当层梦境现有心锁数相等数量的牌。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -773,7 +773,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_soul_sculptor.skill_0',
           name: '雕琢',
           description:
-            '当你使用SHOOT类牌时，掷骰后，可以用目标玩家的手牌数量来作为最终掷骰结果，不能被其它效果所改变。',
+            '当你使用SHOOT类牌时，掷骰后，可以用该玩家的手牌数量来作为最终掷骰结果，不能被其它效果所改变。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -856,7 +856,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_taurus.skill_0',
           name: '号角',
           description:
-            '你使用【SHOOT】时，目标玩家掷骰后，你可以掷1颗骰子。若掷骰结果大于对手的掷骰结果，该玩家被你击杀，否则执行原SHOOT类牌效果。',
+            '你使用【SHOOT】时，目标玩家掷骰后，你可以掷1颗骰子。若掷骰结果大于对手的掷骰结果，该玩家被你击杀，否则执行原牌效果。',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,
@@ -1000,7 +1000,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_virgo.skill_0',
           name: '完美',
           description:
-            '当有玩家掷骰结果为[6点]时，则你可选择以下其中一项效果执行：复活一位玩家、从牌库顶抽2张牌、移动到任意一层梦境',
+            '当有玩家掷骰结果为[6点]，则你可选择以下其中一项效果执行：复活一位玩家、从牌库顶抽2张牌、移动到任意一层梦境',
           trigger: 'onActionPhase',
           usageScope: 'ownTurnOncePerTurn',
           isActive: true,

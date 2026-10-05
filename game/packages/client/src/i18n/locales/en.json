@@ -219,7 +219,7 @@
       },
       "secret_passage_teleport": {
         "name": "Secret Passage Teleport",
-        "desc": "Discard 1 card → teleport a player to an adjacent layer (up to 2/turn)"
+        "desc": "Discard 1 Dream Transit → send a thief to the Lost layer (up to 2/turn)"
       },
       "deal_bribe": {
         "name": "Deal Bribe",
@@ -227,7 +227,7 @@
       }
     },
     "thief_shade": {
-      "skill_0": { "name": "Shade · Shadow", "desc": "Move to the dream master's layer" }
+      "skill_0": { "name": "Shade · Follow", "desc": "Move to the dream master's layer" }
     },
     "thief_apollo": {
       "skill_0": { "name": "Apollo · Worship", "desc": "Pick a target player to resolve Worship" }
@@ -238,7 +238,7 @@
     "thief_martyr": {
       "skill_0": {
         "name": "Martyr · Sacrifice",
-        "desc": "Choose direction: +1 or -1 heart-lock on current layer"
+        "desc": "Skip your action phase and roll a die; on 3–6 add or remove 2 heart-locks here, then die and discard your hand"
       }
     },
     "thief_chemist": {
@@ -246,24 +246,27 @@
     },
     "thief_gemini": {
       "skill_0": {
-        "name": "Gemini · Sync",
-        "desc": "Discard phase: sync when master's layer is higher"
+        "name": "Gemini · Fate",
+        "desc": "Discard phase: if the master is on a higher-numbered layer, roll a die; on 4 / 5 / 6 remove 2 heart-locks here, then flip"
       }
     },
     "thief_paprik": {
       "skill_0": {
         "name": "Soul Priest · Salvation",
-        "desc": "Give a chosen hand card to a target player"
+        "desc": "Discard 1 hand card to revive a player from the Lost layer to your layer and take all their hand cards"
       }
     },
     "thief_architect": {
       "skill_0": {
         "name": "Architect · Maze",
-        "desc": "Pick 1 hand card + 1 target player to build a maze"
+        "desc": "Discard 1 SHOOT-class card + pick 1 same-layer player to build a maze"
       }
     },
     "thief_darwin": {
-      "skill_0": { "name": "Darwin · Evolve", "desc": "Select hand cards to evolve / swap" }
+      "skill_0": {
+        "name": "Darwin · Selection",
+        "desc": "Take the top 2 cards of the deck, then put 2 hand cards back on top"
+      }
     },
     "thief_haley": {
       "skill_0": {
@@ -280,12 +283,12 @@
     "thief_athena": {
       "skill_0": {
         "name": "Athena · Awe",
-        "desc": "Reveal 4 hand cards + top of deck; 5 of a kind kills a same-layer player"
+        "desc": "Reveal 4 hand cards + top of deck; if all 5 have different names, kill a same-layer player"
       }
     },
     "thief_forger": {
       "skill_0": {
-        "name": "Forger · Steal Heart",
+        "name": "Forger · Trick",
         "desc": "Choose target + return 1 hand card (1/turn)"
       }
     },
@@ -303,12 +306,12 @@
     },
     "thief_gaia": {
       "skill_0": {
-        "name": "Gaia · Earth",
+        "name": "Gaia · Quake",
         "desc": "Shift each same-layer player +1/-1 (up to 2/turn)"
       }
     },
     "dm_uranus_firmament": {
-      "skill_0": { "name": "Uranus · Firmament", "desc": "Move a chosen player to a target layer" }
+      "skill_0": { "name": "Uranus · Power", "desc": "Move a chosen player to a target layer" }
     },
     "dm_mars_battlefield": {
       "skill_0": { "name": "Mars · Slaughter", "desc": "Resolve slaughter on a target layer" },
@@ -318,7 +321,10 @@
       }
     },
     "dm_pluto_hell": {
-      "skill_0": { "name": "Pluto · Burning", "desc": "Discard 1 hand card to trigger Burning" }
+      "skill_0": {
+        "name": "Pluto · Hellfire",
+        "desc": "Discard 1 hand card; every thief with fewer than 2 hand cards draws 2"
+      }
     },
     "dm_saturn_territory": {
       "free_move": {

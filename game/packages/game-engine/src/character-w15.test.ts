@@ -70,18 +70,19 @@ describe('双子 · 协同（thief_gemini）', () => {
     return { ...s, turnPhase: 'discard' };
   }
 
-  it('骰 3：心锁 -2 + 翻面', () => {
+  // 对照：docs/manual/05-dream-thieves.md 双子·命运，成功骰面为 4 / 5 / 6
+  it.each([4, 5, 6])('骰 %i：心锁 -2 + 翻面', (roll) => {
     const s = setupGeminiScenario();
-    const r = applyGeminiSync(s, 'p1', 3);
+    const r = applyGeminiSync(s, 'p1', roll);
     expect(r).not.toBeNull();
     expect(r!.layers[1]!.heartLockValue).toBe(s.layers[1]!.heartLockValue - 2);
     expect(r!.players.p1!.characterId).toBe('thief_gemini_back');
     expect(r!.players.p1!.skillUsedThisTurn[GEMINI_SKILL_ID]).toBe(1);
   });
 
-  it('骰非 3：仅翻面，心锁不变', () => {
+  it.each([1, 2, 3])('骰 %i：仅翻面，心锁不变', (roll) => {
     const s = setupGeminiScenario();
-    const r = applyGeminiSync(s, 'p1', 5);
+    const r = applyGeminiSync(s, 'p1', roll);
     expect(r).not.toBeNull();
     expect(r!.layers[1]!.heartLockValue).toBe(s.layers[1]!.heartLockValue);
     expect(r!.players.p1!.characterId).toBe('thief_gemini_back');
@@ -96,9 +97,10 @@ describe('双子 · 协同（thief_gemini）', () => {
 
   it('move 接入：playGeminiSync', () => {
     const s = setupGeminiScenario();
-    const r = callMove(s, 'playGeminiSync', [], { rolls: [3] });
+    const r = callMove(s, 'playGeminiSync', [], { rolls: [4] });
     expectMoveOk(r);
     expect(r.players.p1!.characterId).toBe('thief_gemini_back');
+    expect(r.layers[1]!.heartLockValue).toBe(s.layers[1]!.heartLockValue - 2);
   });
 });
 
