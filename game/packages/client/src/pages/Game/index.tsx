@@ -1,10 +1,10 @@
 // Game · 对局容器
+// - 联机模式（?online=1&code=ABC123）：服务端权威对局，路由参数是对局编号
 // - friend 模式（?friend=1&players=N&code=ABC123）：1 人类 + (N-1) AI 本地对局
 // - 其他场景：保留原 mock + ThiefBoard/MasterBoard 调试路径
-//
-// 对照：docs/_internal/design/07-backend-network.md · docs/_internal/design/08-security-ai.md §8.5
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ThiefBoard } from './ThiefBoard/index.js';
 import { MasterBoard } from './MasterBoard/index.js';
@@ -15,30 +15,44 @@ import { useMediaQuery } from '../../hooks/useMediaQuery.js';
 import type { PlayIntent } from '../../hooks/useGameActions.js';
 import { CopyrightNotice } from '../../components/CopyrightNotice/index.js';
 import { LocalMatchRuntime } from '../../components/LocalMatchRuntime/index.js';
+import { RemoteMatchRuntime } from '../../components/RemoteMatchRuntime/index.js';
+import { getAuthToken } from '../../lib/api.js';
+import { realtimeUrl } from '../../lib/realtimeUrl.js';
+import { forgetOnlineMatch, rememberOnlineMatch } from '../../lib/onlineMatchMemo.js';
+import { logger } from '../../lib/logger.js';
+import { resolveGameMode } from './resolveGameMode.js';
 
 export default function Game() {
   const [search] = useSearchParams();
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
 
-  // === friend 模式：客户端本地跑对局 ===
-  const isFriendMode = search.get('friend') === '1';
-  const playerCountParam = parseInt(search.get('players') ?? '0', 10);
   const roomCode = search.get('code');
+  const token = getAuthToken();
+  const resolved = resolveGameMode(search, token);
 
-  if (isFriendMode && playerCountParam >= 3) {
+  if (resolved.mode === 'online' && matchId && token) {
+    return (
+      <OnlineMatch
+        matchID={matchId}
+        token={token}
+        roomCode={roomCode}
+        onExit={() => navigate('/lobby')}
+      />
+    );
+  }
+
+  if (resolved.mode === 'online' || resolved.mode === 'online-unavailable') {
+    return <OnlineUnavailable onBack={() => navigate('/lobby')} />;
+  }
+
+  if (resolved.mode === 'local') {
     return (
       <>
         <LocalMatchRuntime
-          playerCount={playerCountParam}
+          playerCount={resolved.players}
           matchId={matchId}
-          topRight={
-            roomCode && (
-              <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary">
-                {roomCode}
-              </span>
-            )
-          }
+          topRight={roomCode && <RoomCodeBadge code={roomCode} />}
           onRestart={() => navigate('/lobby')}
         />
         <div className="fixed inset-x-0 bottom-0 z-10 pb-safe">
@@ -50,6 +64,76 @@ export default function Game() {
 
   // === 原 mock 路径 === (?as=master / ?pending=1 调试用)
   return <GameMockView />;
+}
+
+function RoomCodeBadge({ code }: { code: string }) {
+  return (
+    <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary">
+      {code}
+    </span>
+  );
+}
+
+function OnlineMatch({
+  matchID,
+  token,
+  roomCode,
+  onExit,
+}: {
+  matchID: string;
+  token: string;
+  roomCode: string | null;
+  onExit: () => void;
+}) {
+  useEffect(() => {
+    logger.flow('game', 'enter online match', { matchID, code: roomCode });
+    rememberOnlineMatch({ matchID, code: roomCode });
+  }, [matchID, roomCode]);
+
+  const handleSettled = useCallback(
+    (reason: 'finished' | 'rejected') => {
+      logger.flow('game', 'online match settled', { matchID, reason });
+      forgetOnlineMatch();
+    },
+    [matchID],
+  );
+
+  return (
+    <>
+      <RemoteMatchRuntime
+        url={realtimeUrl()}
+        token={token}
+        matchID={matchID}
+        topRight={roomCode && <RoomCodeBadge code={roomCode} />}
+        onExit={onExit}
+        onSettled={handleSettled}
+      />
+      <div className="fixed inset-x-0 bottom-0 z-10 pb-safe">
+        <CopyrightNotice variant="footer" className="bg-background/70 py-1 backdrop-blur-sm" />
+      </div>
+    </>
+  );
+}
+
+function OnlineUnavailable({ onBack }: { onBack: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"
+      data-testid="online-unavailable"
+    >
+      <p className="text-sm">
+        {t('match.online_unavailable', { defaultValue: '需要连接服务器才能进入联机对局' })}
+      </p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="rounded-md border border-border bg-background px-4 py-2 text-sm hover:bg-muted"
+      >
+        {t('match.back_to_lobby', { defaultValue: '返回大厅' })}
+      </button>
+    </div>
+  );
 }
 
 function GameMockView() {

@@ -1,14 +1,14 @@
 // Lobby · 好友房入口
-// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3 /rooms REST
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, DoorOpen, Plus } from 'lucide-react';
+import { ArrowRight, DoorOpen, Plus, RotateCcw } from 'lucide-react';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi } from '../../lib/roomApi';
 import { logger } from '../../lib/logger';
+import { readOnlineMatch } from '../../lib/onlineMatchMemo';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 
@@ -24,6 +24,9 @@ export default function Lobby() {
   const [maxPlayers, setMaxPlayers] = useState(6);
   // 加入房间
   const [joinCode, setJoinCode] = useState('');
+
+  // 进行中的联机对局（刷新或误退后可回去）
+  const [resumable] = useState(() => readOnlineMatch());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +88,14 @@ export default function Lobby() {
     }
   }, [joinCode, playerId, nickname, avatarSeed, navigate, t]);
 
+  const handleResume = useCallback(() => {
+    if (!resumable) return;
+    logger.flow('lobby', 'resume online match', { matchID: resumable.matchID });
+    const params = new URLSearchParams({ online: '1' });
+    if (resumable.code) params.set('code', resumable.code);
+    navigate(`/game/${resumable.matchID}?${params.toString()}`);
+  }, [resumable, navigate]);
+
   if (!isInitialized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-primary text-text-secondary">
@@ -136,6 +147,18 @@ export default function Lobby() {
           {nickname}
         </span>
       </div>
+
+      {resumable && (
+        <button
+          type="button"
+          onClick={handleResume}
+          className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-3 font-bold text-white"
+          data-testid="resume-online-match"
+        >
+          <RotateCcw size={16} />
+          {t('lobby.resume_match', { defaultValue: '回到对局' })}
+        </button>
+      )}
 
       <section className="rounded-lg border border-white/10 bg-bg-secondary p-4">
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">

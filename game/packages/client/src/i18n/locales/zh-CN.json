@@ -28,6 +28,7 @@
     "codeHint": "请输入 6 位房间码",
     "codeInvalid": "房间码格式不对",
     "errorGeneric": "出错啦：{{message}}",
+    "resume_match": "回到对局",
     "loading": "正在联系服务器..."
   },
   "room": {
@@ -174,6 +175,7 @@
     "waiting_auto": "这一步暂时不能手动操作，到时间后由系统代为处理",
     "deadline": "剩余 {{seconds}} 秒",
     "connecting": "正在连接",
+    "online_unavailable": "需要连接服务器才能进入联机对局",
     "back_to_lobby": "返回大厅",
     "seat": {
       "bot": "机器人",

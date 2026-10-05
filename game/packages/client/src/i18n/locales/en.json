@@ -28,6 +28,7 @@
     "codeHint": "Enter a 6-digit room code",
     "codeInvalid": "Invalid room code",
     "errorGeneric": "Error: {{message}}",
+    "resume_match": "Back to match",
     "loading": "Connecting to server..."
   },
   "room": {
@@ -174,6 +175,7 @@
     "waiting_auto": "This step can't be handled manually; the system will resolve it when time runs out",
     "deadline": "{{seconds}}s left",
     "connecting": "Connecting",
+    "online_unavailable": "A server connection is required to join an online match",
     "back_to_lobby": "Back to Lobby",
     "seat": {
       "bot": "Bot",

@@ -1,4 +1,4 @@
-// API 请求封装（参照设计文档 §7.3.1）
+// API 请求封装
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -10,8 +10,17 @@ interface ApiError {
   };
 }
 
+/** 发请求与实时握手共用的登录令牌 */
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem('icgame-token');
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('icgame-token');
+  const token = getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),

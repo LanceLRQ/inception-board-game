@@ -274,6 +274,16 @@ describe('LobbyService', () => {
       expect((await service.getRoom(room.code))!.status).toBe('playing');
     });
 
+    it('records the match id on the room when the game starts', async () => {
+      const room = await roomWith(4);
+      matches.createFromRoom.mockResolvedValueOnce('match-xyz');
+
+      await expect(service.startGame(room.code, 'P1')).resolves.toBe('match-xyz');
+      const saved = await service.getRoom(room.code);
+      expect(saved!.matchId).toBe('match-xyz');
+      expect(saved!.status).toBe('playing');
+    });
+
     it('starts a game with robots filling the seats', async () => {
       const room = await roomWith(1);
       await service.fillAI(room.code, 'P1', 3);

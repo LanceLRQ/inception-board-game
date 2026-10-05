@@ -24,6 +24,8 @@ export interface RoomState {
   exCardsEnabled: boolean;
   expansionEnabled: boolean;
   status: 'waiting' | 'playing' | 'finished';
+  /** 开始游戏后写入：权威对局的编号 */
+  matchId?: string;
   players: RoomPlayer[];
   createdAt: number;
   expiresAt: number;
@@ -215,6 +217,7 @@ export class LobbyService {
     try {
       const matchId = await this.matches.createFromRoom(room);
       room.status = 'playing';
+      room.matchId = matchId;
       await this.saveRoom(room);
       logger.info({ roomId: room.id, matchId }, 'Game started');
       return matchId;

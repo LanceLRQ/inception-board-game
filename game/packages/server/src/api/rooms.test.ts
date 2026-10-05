@@ -104,6 +104,22 @@ describe('createRoomsRouter', () => {
     expect(res.json).toMatchObject({ code: 'ABC234', currentPlayers: 2 });
   });
 
+  it('按房间码查询：带上成员列表与对局号，供等待页轮询', async () => {
+    const players = [{ playerId: 'P1', nickname: 'A', seat: 0 }];
+    const getRoom = vi.fn(async () => ({
+      id: 'r',
+      code: 'ABC234',
+      ownerPlayerId: 'P1',
+      maxPlayers: 6,
+      players,
+      status: 'playing',
+      matchId: 'match-9',
+      expiresAt: 5,
+    }));
+    const res = await call({ getRoom }, 'GET', '/rooms/code/ABC234');
+    expect(res.json).toMatchObject({ status: 'playing', matchId: 'match-9', players });
+  });
+
   it('未带令牌返回 401', async () => {
     const app = new Koa();
     app.use(errorHandler);

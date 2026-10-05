@@ -2,8 +2,6 @@
 // - 优先走真实后端（`/rooms/...`）
 // - 若 VITE_USE_MOCK_API=1 或真实请求失败（网络/5xx/未部署），退化为 LocalStorage 本地实现
 // - 1 人类 + N AI 好友房模式下，Mock 路径即可覆盖完整流程
-//
-// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3
 
 import { api, ApiRequestError } from './api';
 import { logger } from './logger';
@@ -24,6 +22,8 @@ export interface RoomState {
   maxPlayers: number;
   ruleVariant: string;
   status: 'waiting' | 'playing' | 'finished';
+  /** 服务端开始游戏后给出的权威对局编号（本地模拟房间没有） */
+  matchId?: string;
   players: RoomPlayer[];
 }
 
@@ -34,6 +34,12 @@ export interface CreateRoomResponse {
   maxPlayers: number;
   currentPlayers: number;
   status: 'waiting' | 'playing' | 'finished';
+}
+
+export interface StartGameResult {
+  matchId: string;
+  /** 本次开始走通了真实后端（权威对局）；降级为本地模拟时为 false */
+  online: boolean;
 }
 
 export interface CreateRoomOptions {
@@ -131,6 +137,12 @@ const mockRoomApi = {
     return room;
   },
 
+  async getRoom(code: string): Promise<RoomState> {
+    const room = loadMockRooms()[code.toUpperCase()];
+    if (!room) throw new ApiRequestError(404, 'NOT_FOUND', '房间不存在或已过期');
+    return room;
+  },
+
   async fillAI(code: string): Promise<RoomState> {
     const rooms = loadMockRooms();
     const room = rooms[code.toUpperCase()];
@@ -152,7 +164,7 @@ const mockRoomApi = {
     return room;
   },
 
-  async startGame(code: string): Promise<{ matchId: string }> {
+  async startGame(code: string): Promise<StartGameResult> {
     const rooms = loadMockRooms();
     const room = rooms[code.toUpperCase()];
     if (!room) throw new ApiRequestError(404, 'NOT_FOUND', '房间不存在');
@@ -160,7 +172,7 @@ const mockRoomApi = {
     room.status = 'playing';
     saveMockRooms(rooms);
     logger.flow('room', 'mock startGame', { code, players: room.players.length });
-    return { matchId: room.id };
+    return { matchId: room.id, online: false };
   },
 
   async leaveRoom(code: string, playerId: string): Promise<void> {
@@ -185,12 +197,16 @@ const realRoomApi = {
     const res = await api.post<{ room: RoomState }>(`/rooms/${code}/join`);
     return res.room;
   },
+  async getRoom(code: string): Promise<RoomState> {
+    return api.get<RoomState>(`/rooms/code/${code}`);
+  },
   async fillAI(code: string): Promise<RoomState> {
     const res = await api.post<{ room: RoomState }>(`/rooms/${code}/fill-ai`);
     return res.room;
   },
-  async startGame(code: string): Promise<{ matchId: string }> {
-    return api.post<{ matchId: string }>(`/rooms/${code}/start`);
+  async startGame(code: string): Promise<StartGameResult> {
+    const res = await api.post<{ matchId: string }>(`/rooms/${code}/start`);
+    return { matchId: res.matchId, online: true };
   },
   async leaveRoom(code: string): Promise<void> {
     await api.post(`/rooms/${code}/leave`);
@@ -237,16 +253,24 @@ export const roomApi = {
       () => realRoomApi.joinRoom(code),
       () => mockRoomApi.joinRoom(code, me),
     ),
+  getRoom: (code: string) =>
+    withFallback(
+      () => realRoomApi.getRoom(code),
+      () => mockRoomApi.getRoom(code),
+    ),
   fillAI: (code: string) =>
     withFallback(
       () => realRoomApi.fillAI(code),
       () => mockRoomApi.fillAI(code),
     ),
-  startGame: (code: string) =>
-    withFallback(
+  startGame: async (code: string) => {
+    const res = await withFallback(
       () => realRoomApi.startGame(code),
       () => mockRoomApi.startGame(code),
-    ),
+    );
+    logger.flow('room', 'startGame', { code, matchId: res.matchId, online: res.online });
+    return res;
+  },
   leaveRoom: (code: string, playerId: string) =>
     withFallback(
       () => realRoomApi.leaveRoom(code),

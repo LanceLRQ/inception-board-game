@@ -1,5 +1,4 @@
-// 好友房流程 E2E（Lobby → Room）
-// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3 /rooms REST
+// 好友房流程 E2E（Lobby → Room → 联机对局）
 //
 // 本用例用 page.route 拦截 /identity/* 与 /rooms/* 的后端调用，
 // 验证前端 UI 流程（不依赖真实后端/Postgres/Redis）：
@@ -7,6 +6,7 @@
 //   2. 已认证 → 创建房间 → 跳转 /room/:code
 //   3. Room 页展示房间码 + 房主身份 + Start 禁用
 //   4. 补 AI → 3 人 → Start 可点
+//   5. 开始 → 进入联机对局页（没有真实 socket 服务端，只验证地址与容器）
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 
@@ -24,6 +24,7 @@ interface FakeRoom {
   maxPlayers: number;
   ruleVariant: string;
   status: 'waiting' | 'playing' | 'finished';
+  matchId?: string;
   players: Array<{
     playerId: string;
     nickname: string;
@@ -147,13 +148,23 @@ test.describe('好友房 Lobby / Room 流程', () => {
       });
     });
 
-    await page.route(`${API_BASE}/rooms/${FAKE_CODE}/start`, (r) =>
+    // 房间等待页的轮询查询：返回当前房间（开始之后带 playing 与对局号）
+    await page.route(`${API_BASE}/rooms/code/${FAKE_CODE}`, (r) =>
       r.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ matchId: FAKE_ROOM_ID }),
+        body: JSON.stringify(room),
       }),
     );
+
+    await page.route(`${API_BASE}/rooms/${FAKE_CODE}/start`, (r) => {
+      room = { ...room, status: 'playing', matchId: FAKE_ROOM_ID };
+      return r.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ matchId: FAKE_ROOM_ID }),
+      });
+    });
 
     // 1. 进 Lobby，显示昵称输入
     await page.goto('/lobby');
@@ -187,13 +198,12 @@ test.describe('好友房 Lobby / Room 流程', () => {
     // 7. Start 应可点
     await expect(page.getByTestId('room-start')).toBeEnabled();
 
-    // 8. 点 Start → 跳 Game 页（friend 模式）→ LocalMatchRuntime 挂载
+    // 8. 点 Start → 真实后端路径：跳联机对局页，对局号取自开始接口的返回
     await page.getByTestId('room-start').click();
-    await page.waitForURL(/\/game\/.*friend=1/, { timeout: 5_000 });
+    await page.waitForURL(/\/game\/[^/?]+\?.*online=1/, { timeout: 5_000 });
+    expect(new URL(page.url()).pathname).toBe(`/game/${FAKE_ROOM_ID}`);
 
-    // Runtime 挂载 + 顶部房间码 + 回合指示
-    await expect(page.getByTestId('local-runtime')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByTestId('turn-indicator')).toBeVisible();
-    await expect(page.getByText(FAKE_CODE)).toBeVisible();
+    // 联机运行时容器挂载（无 socket 服务端，会停在连接中或重连横幅，这里不断言对局内容）
+    await expect(page.getByTestId('remote-runtime')).toBeVisible({ timeout: 8_000 });
   });
 });

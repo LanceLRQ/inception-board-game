@@ -1,13 +1,13 @@
 // Room · 房间等待页
-// 对照：docs/_internal/design/07-backend-network.md §7.3.2.3 /rooms REST
 // 房主：可补 AI、开始游戏；非房主：等待开始；轮询每 3s 刷新房间状态。
+// 开始后：真实后端 → 全体进入同一局联机对局；本地模拟 → 本地人机对局。
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bot, Copy, LogOut, Play, Users } from 'lucide-react';
 import { ApiRequestError } from '../../lib/api';
-import { roomApi, type RoomState } from '../../lib/roomApi';
+import { isMockMode, roomApi, type RoomState } from '../../lib/roomApi';
 import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
@@ -27,8 +27,9 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // 房间详情靠轮询（下一轮接入 WS 后切推送）
-  const fetchRoom = useCallback(async () => {
+  // 进入页面时加入一次房间。已在房间里的人刷新页面可能因「游戏已开始」等原因加入失败，
+  // 此时若查得到房间且本人在成员里，就按已加入处理。
+  const joinRoom = useCallback(async () => {
     if (!code || !playerId) return;
     try {
       const next = await roomApi.joinRoom(code, {
@@ -39,26 +40,53 @@ export default function Room() {
       setRoom(next);
       setError(null);
     } catch (e) {
+      try {
+        const existing = await roomApi.getRoom(code);
+        if (existing.players.some((p) => p.playerId === playerId)) {
+          setRoom(existing);
+          setError(null);
+          return;
+        }
+      } catch {
+        /* 查询也失败时报告加入时的错误 */
+      }
       const msg = e instanceof ApiRequestError ? e.message : String(e);
       setError(msg);
     }
   }, [code, playerId, nickname, avatarSeed]);
 
+  // 房间详情靠轮询（只读查询，不再借加入接口刷新）
+  const pollRoom = useCallback(async () => {
+    if (!code) return;
+    try {
+      const next = await roomApi.getRoom(code);
+      setRoom(next);
+      setError(null);
+    } catch (e) {
+      const msg = e instanceof ApiRequestError ? e.message : String(e);
+      setError(msg);
+    }
+  }, [code]);
+
   useEffect(() => {
     if (!isInitialized || !isAuthenticated || !code) return;
-    // 轮询外部（服务端）房间状态；setState 由 fetchRoom 内部触发是合理模式
+    // 轮询外部（服务端）房间状态；setState 由回调内部触发是合理模式
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchRoom();
-    const timer = setInterval(() => void fetchRoom(), POLL_INTERVAL_MS);
+    void joinRoom();
+    const timer = setInterval(() => void pollRoom(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [isInitialized, isAuthenticated, code, fetchRoom]);
+  }, [isInitialized, isAuthenticated, code, joinRoom, pollRoom]);
 
-  // status 变为 playing 时自动跳 Game
+  // status 变为 playing 时跳 Game：真实后端进入联机对局，本地模拟保持原行为
   useEffect(() => {
-    if (room?.status === 'playing') {
+    if (room?.status !== 'playing') return;
+    if (isMockMode()) {
       navigate(`/game/${room.id}`);
+      return;
     }
-  }, [room?.status, room?.id, navigate]);
+    const params = new URLSearchParams({ online: '1', code: room.code });
+    navigate(`/game/${room.matchId ?? room.id}?${params.toString()}`);
+  }, [room?.status, room?.id, room?.matchId, room?.code, navigate]);
 
   const isOwner = !!room && !!playerId && room.ownerPlayerId === playerId;
   const canStart = !!room && room.players.length >= MIN_PLAYERS;
@@ -85,13 +113,16 @@ export default function Room() {
       const res = await roomApi.startGame(code);
       logger.flow('room', 'startGame ok', {
         matchId: res.matchId,
+        online: res.online,
         players: room.players.length,
       });
-      const params = new URLSearchParams({
-        friend: '1',
-        players: String(room.players.length),
-        code: room.code,
-      });
+      const params = res.online
+        ? new URLSearchParams({ online: '1', code: room.code })
+        : new URLSearchParams({
+            friend: '1',
+            players: String(room.players.length),
+            code: room.code,
+          });
       navigate(`/game/${res.matchId}?${params.toString()}`);
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);

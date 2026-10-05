@@ -50,6 +50,8 @@ export function createRoomsRouter(lobby: LobbyService): Router {
       maxPlayers: room.maxPlayers,
       currentPlayers: room.players.length,
       status: room.status,
+      matchId: room.matchId,
+      players: room.players,
       expiresAt: room.expiresAt,
     };
   });
