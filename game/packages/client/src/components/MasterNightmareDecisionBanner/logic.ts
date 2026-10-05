@@ -22,7 +22,7 @@ export interface NightmareDecisionState {
 /**
  * 计算决策状态
  * @param G 游戏状态快照
- * @param currentPlayerID boardgame.io ctx.currentPlayer
+ * @param currentPlayerID 对局 ctx.currentPlayer
  * @param dreamMasterID G.dreamMasterID
  */
 export function computeNightmareDecisionState(

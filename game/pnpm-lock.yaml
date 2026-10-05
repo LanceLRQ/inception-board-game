@@ -68,6 +68,9 @@ importers:
       '@fontsource-variable/geist':
         specifier: ^5.2.8
         version: 5.2.8
+      '@icgame/bot':
+        specifier: workspace:*
+        version: link:../bot
       '@icgame/game-engine':
         specifier: workspace:*
         version: link:../game-engine
@@ -83,9 +86,6 @@ importers:
       '@use-gesture/react':
         specifier: ^10.3.1
         version: 10.3.1(react@19.2.5)
-      boardgame.io:
-        specifier: ^0.50.2
-        version: 0.50.2
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -190,9 +190,6 @@ importers:
       '@prisma/client':
         specifier: ^7.7.0
         version: 7.7.0(prisma@7.7.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(typescript@5.9.3)
-      boardgame.io:
-        specifier: ^0.50.2
-        version: 0.50.2
       ioredis:
         specifier: ^5.10.1
         version: 5.10.1

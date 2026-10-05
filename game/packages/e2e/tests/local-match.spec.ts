@@ -53,7 +53,7 @@ test.describe('人机对战 LocalMatch', () => {
       if (msg.type() !== 'error') return;
       const text = msg.text();
       if (text.includes('favicon.ico')) return;
-      // BGIO master 端拒绝 move 会打 ERROR 日志（这是 bug 信号）
+      // Worker 在自动循环放弃继续时会打 ERROR 日志（这是 bug 信号）
       consoleErrors.push(text);
     });
 
@@ -73,11 +73,9 @@ test.describe('人机对战 LocalMatch', () => {
       .getByRole('button', { name: /抽牌|Draw/ })
       .waitFor({ state: 'visible', timeout: 15_000 });
 
-    // 关键断言：整个流程无 BGIO move 拒绝错误
-    const disallowed = consoleErrors.filter(
-      (e) => e.includes('disallowed move') || e.includes('canPlayerMakeMove=false'),
-    );
-    expect(disallowed).toEqual([]);
+    // 关键断言：整个流程无 move 被拒的错误（Worker 记录被拒时的文字为 'move rejected'）
+    const rejected = consoleErrors.filter((e) => e.includes('move rejected'));
+    expect(rejected).toEqual([]);
   });
 
   test('不同人数（5 人局）可正常开局', async ({ page }) => {

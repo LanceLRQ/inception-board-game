@@ -24,6 +24,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages ./packages
 COPY packages/shared ./packages/shared
 COPY packages/game-engine ./packages/game-engine
+COPY packages/bot ./packages/bot
 COPY packages/client ./packages/client
 # Vite 构建时的运行期 API base（通过构建参数注入）
 ARG VITE_API_BASE=""

@@ -136,7 +136,7 @@ describe('AudioManager', () => {
     const m = new AudioManager({ factory, warn });
     expect(() => m.play('victory', { volume: 1, muted: false })).not.toThrow();
     // 等 microtask queue
-    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setTimeout(r, 0));
     expect(created[0]!.play).toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
   });
