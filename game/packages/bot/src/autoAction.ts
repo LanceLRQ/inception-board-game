@@ -42,7 +42,7 @@ export function nextAutoAction(
   const owner = ctx.currentPlayer;
 
   // 对局已结束
-  if (ctx.gameover !== undefined && ctx.gameover !== null) return null;
+  if (ctx.gameover !== undefined) return null;
 
   // 布置阶段：由回合主人完成布置
   if (ctx.phase === 'setup') {
@@ -118,10 +118,10 @@ export function nextAutoAction(
     return { playerID: target, move: 'respondShootPass', args: [], why: `${target} 放弃闪避` };
   }
 
-  // 处女·完美：Bot 处女不发动
+  // 处女·完美：一律不发动。界面没有这个选择的入口，处女是真人时也由本人名义自动放弃
+  // （与天秤的处理一致），否则待结算闸门会挡住真人的其他 move，对局就此停住。
   const virgo = G.pendingVirgoChoice;
   if (virgo) {
-    if (isHuman(virgo.virgoID)) return null;
     return {
       playerID: virgo.virgoID,
       move: 'respondVirgoPerfect',

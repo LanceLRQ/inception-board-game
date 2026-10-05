@@ -3,7 +3,7 @@
 // 所有判断都在 LocalMatchSession 里；这里只负责 Comlink 外壳、自动循环的定时调度与日志。
 
 import * as Comlink from 'comlink';
-import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS } from './localMatchSession.js';
+import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS, buildMatchSeed } from './localMatchSession.js';
 
 export interface LocalMatchWorker {
   createLocalMatch: (playerCount: number, matchID?: string) => Promise<void>;
@@ -35,7 +35,7 @@ function logFlow(msg: string, ctx?: unknown): void {
 }
 /**
  * 统一 move dispatch 打点（INFO 级别）。
- *   actor 形如 "human(0)" / "bot(2)" / "auto-master(4)" / "auto-peeker(1)"
+ *   actor 形如 "human(0)"（真人）/ "auto(2)"（Bot 出牌与所有自动代发的待结算收尾）
  *   move  move 名称
  *   ctx   { args, source?, ... }
  */
@@ -70,7 +70,7 @@ function clearTimer(): void {
 /** 回合切换与终局的流程打点 */
 function logFlowChanges(current: LocalMatchSession): void {
   const { ctx } = current.view();
-  if (ctx.gameover !== undefined && ctx.gameover !== null) {
+  if (ctx.gameover !== undefined) {
     if (!gameoverLogged) {
       gameoverLogged = true;
       logFlow('gameover', ctx.gameover);
@@ -104,7 +104,7 @@ function runAutoStep(current: LocalMatchSession): void {
 
   if (result.action === null) {
     const { ctx } = current.view();
-    if (ctx.gameover === undefined || ctx.gameover === null) {
+    if (ctx.gameover === undefined) {
       logAI('waiting for human input or no auto action', {
         currentPlayer: ctx.currentPlayer,
         turn: ctx.turn,
@@ -143,8 +143,8 @@ const workerApi: LocalMatchWorker = {
     loggedTurn = null;
     gameoverLogged = false;
 
-    const seed = matchID ?? `local-${Date.now()}`;
-    logFlow('createLocalMatch', { playerCount, matchID: seed });
+    const seed = buildMatchSeed(matchID, Date.now());
+    logFlow('createLocalMatch', { playerCount, matchID, seed });
     session = new LocalMatchSession({
       playerCount,
       seed,

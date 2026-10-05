@@ -255,10 +255,27 @@ describe('nextAutoAction · 判定顺序', () => {
       });
     });
 
-    it('处女是真人：返回 null', () => {
+    it('处女是真人：同样以处女本人的名义自动选择 skip，避免对局停住', () => {
       const s = virgoState();
       const virgo = s.G.pendingVirgoChoice!.virgoID;
-      expect(nextAutoAction(s, { humanPlayerIDs: [virgo] })).toBeNull();
+      expect(nextAutoAction(s, { humanPlayerIDs: [virgo] })).toMatchObject({
+        playerID: virgo,
+        move: 'respondVirgoPerfect',
+        args: ['skip'],
+      });
+    });
+
+    it('真人是回合主人且是处女：自动动作被运行器接受，pendingVirgoChoice 被清空', () => {
+      const base = playingState();
+      const human = base.ctx.currentPlayer;
+      const s = withG(base, {
+        pendingVirgoChoice: { virgoID: human, triggerRoll: 6, shooterID: human },
+      });
+      const action = nextAutoAction(s, { humanPlayerIDs: [human] });
+      expect(action).not.toBeNull();
+      const res = applyMove(game, s, action!, { responseMoves: RESPONSE_MOVES });
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.state.G.pendingVirgoChoice).toBeNull();
     });
 
     it('经运行器执行后 pendingVirgoChoice 被清空', () => {

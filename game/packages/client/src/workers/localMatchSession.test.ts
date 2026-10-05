@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { AutoAction } from '@icgame/bot';
 import { HAND_LIMIT } from '@icgame/game-engine/config';
-import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS } from './localMatchSession.js';
+import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS, buildMatchSeed } from './localMatchSession.js';
 
 // 只替换 nextAutoAction，其余导出保持真实实现；override 为 null 时走真实判定
 const hooks = vi.hoisted(() => ({
@@ -58,6 +58,24 @@ function humanPolicy(session: LocalMatchSession): { move: string; args: unknown[
     }
   }
 }
+
+describe('buildMatchSeed', () => {
+  it('同一个 matchID 在不同时间得到不同种子，重开不会重复同一局', () => {
+    expect(buildMatchSeed('room-1', 1000)).not.toBe(buildMatchSeed('room-1', 1001));
+  });
+
+  it('同一个 matchID 与时间得到相同种子', () => {
+    expect(buildMatchSeed('room-1', 1000)).toBe(buildMatchSeed('room-1', 1000));
+  });
+
+  it('没有 matchID 时以 local- 开头', () => {
+    expect(buildMatchSeed(undefined, 1000).startsWith('local-')).toBe(true);
+  });
+
+  it('带 matchID 时以 matchID 开头', () => {
+    expect(buildMatchSeed('room-1', 1000).startsWith('room-1-')).toBe(true);
+  });
+});
 
 describe('LocalMatchSession', () => {
   it('建局后自动走出布置阶段，在真人的抽牌阶段停下', () => {

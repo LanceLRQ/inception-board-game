@@ -50,6 +50,15 @@ function describeReject(outcome: Extract<MoveOutcome<SetupState>, { ok: false }>
   return outcome.reason;
 }
 
+/**
+ * 对局随机种子：房间号加建局时刻。
+ * 好友房页面传入的是固定的房间号，只用房间号做种子会让重开或刷新后的角色、
+ * 金库位置、骰子序列完全重复，所以必须混入时间。
+ */
+export function buildMatchSeed(matchID: string | undefined, now: number): string {
+  return `${matchID ?? 'local'}-${now}`;
+}
+
 export class LocalMatchSession {
   private state: MatchState<SetupState>;
   private readonly humanPlayerID: string;
