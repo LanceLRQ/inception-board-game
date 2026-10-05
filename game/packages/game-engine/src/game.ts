@@ -639,22 +639,6 @@ export const InceptionCityGame = {
         endActionPhase: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            // 嫁接/万有引力未结算不得结束行动阶段
-            if (G.pendingGraft) return INVALID_MOVE;
-            if (G.pendingGravity) return INVALID_MOVE;
-            // SHOOT 发动方选层未完成前不得结束行动阶段
-            //   对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
-            if (G.pendingShootMove) return INVALID_MOVE;
-            // W19-B F4a：解封响应 / 梦境窥视三段式未结算不得结束行动阶段
-            // 防止 bot 自回合打完 playUnlock 或 playPeek 后直接 endActionPhase 跳过结算
-            if (G.pendingUnlock) return INVALID_MOVE;
-            if (G.pendingResponseWindow) return INVALID_MOVE;
-            if (G.pendingPeekDecision) return INVALID_MOVE;
-            if (G.peekReveal) return INVALID_MOVE;
-            // 处女·完美 三选一未决定不得结束行动阶段
-            if (G.pendingVirgoChoice) return INVALID_MOVE;
-            // 双鱼·闪避响应窗未决定不得结束行动阶段
-            if (G.pendingShootResponse) return INVALID_MOVE;
             // 共鸣归还：弃牌阶段前将 bonder 的全部手牌给予 target
             // 若 target 已进入迷失层（layer 0）或死亡则保留手牌
             // 对照：docs/manual/04-action-cards.md 共鸣 解析
@@ -697,7 +681,6 @@ export const InceptionCityGame = {
             preventMove?: boolean,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             // 射手·禁足：仅射手角色可阻止移动
             const shooter = G.players[ctx.currentPlayer];
             const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
@@ -723,8 +706,6 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove || G.pendingSudgerRolls)
-              return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (self.characterId !== 'thief_sudger_of_mind') return INVALID_MOVE;
@@ -863,7 +844,6 @@ export const InceptionCityGame = {
         playNightmareUnlock: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, layer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_nightmare_unlock') return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
@@ -972,7 +952,6 @@ export const InceptionCityGame = {
             // 允许任意阶段使用（manual: 你的任意阶段）
             if (G.phase !== 'playing') return INVALID_MOVE;
             if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shift') return INVALID_MOVE;
             if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
@@ -1024,7 +1003,6 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_dream_transit') return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
@@ -1064,7 +1042,6 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_king') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: false,
@@ -1085,7 +1062,6 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_armor') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
@@ -1106,7 +1082,6 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (cardId !== 'action_shoot_burst') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
@@ -1146,7 +1121,6 @@ export const InceptionCityGame = {
             targetLayer: number,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (self.characterId !== 'thief_green_ray') return INVALID_MOVE;
@@ -1294,8 +1268,6 @@ export const InceptionCityGame = {
             if (!self || self.characterId !== 'thief_haley') return INVALID_MOVE;
             if (!self.isAlive) return INVALID_MOVE;
             if (G.turnPhase !== 'action') return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove || G.pendingUnlock)
-              return INVALID_MOVE;
             const target = G.players[targetID];
             if (!target || !target.isAlive) return INVALID_MOVE;
             if (targetID === ctx.currentPlayer) return INVALID_MOVE;
@@ -1485,9 +1457,6 @@ export const InceptionCityGame = {
             if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
             const hasVault = G.vaults.some((v) => v.layer === targetLayer);
             if (!hasVault) return INVALID_MOVE;
-            // 防重入
-            if (G.pendingPeekDecision) return INVALID_MOVE;
-            if (G.peekReveal) return INVALID_MOVE;
 
             let s = discardCard(G, ctx.currentPlayer, cardId);
             const hasInPoolBribe = s.bribePool.some((b) => b.status === 'inPool');
@@ -1595,9 +1564,6 @@ export const InceptionCityGame = {
             if (target.faction !== 'thief') return INVALID_MOVE;
             const hasBribe = G.bribePool.some((b) => b.heldBy === targetThiefID);
             if (!hasBribe) return INVALID_MOVE;
-            // 防重入
-            if (G.pendingPeekDecision) return INVALID_MOVE;
-            if (G.peekReveal) return INVALID_MOVE;
 
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = {
@@ -1897,7 +1863,6 @@ export const InceptionCityGame = {
         playGraft: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
@@ -1951,7 +1916,6 @@ export const InceptionCityGame = {
             for (const tid of targetIds) {
               if (isMazeBlocked(G, tid, 'playGravity')) return INVALID_MOVE;
             }
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(targetIds) || targetIds.length < 1 || targetIds.length > 2) {
               return INVALID_MOVE;
             }
@@ -2044,7 +2008,6 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (isMazeBlocked(G, targetPlayerID, 'playResonance')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             // 每回合限 1 张
             if (G.pendingResonance) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
@@ -2086,7 +2049,6 @@ export const InceptionCityGame = {
         playTimeStorm: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (cardId !== 'action_time_storm') return INVALID_MOVE;
@@ -2155,7 +2117,6 @@ export const InceptionCityGame = {
         playLunaEclipse: {
           move: ({ G, ctx }: MoveCtx, shootCardIds: CardID[], targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(shootCardIds)) return INVALID_MOVE;
             const next = applyLunaEclipse(G, ctx.currentPlayer, shootCardIds, targetID);
             if (next === null) return INVALID_MOVE;
@@ -2169,7 +2130,6 @@ export const InceptionCityGame = {
         playGeminiChoice: {
           move: ({ G, ctx, random }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const roll1 = random.D6();
             const roll2 = random.D6();
             const next = applyGeminiChoice(G, ctx.currentPlayer, roll1, roll2);
@@ -2184,7 +2144,6 @@ export const InceptionCityGame = {
         playLunaFullMoon: {
           move: ({ G, ctx }: MoveCtx, discardCardIds: CardID[], reviveIDs: string[]) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(discardCardIds) || !Array.isArray(reviveIDs)) return INVALID_MOVE;
             const next = applyLunaFullMoon(G, ctx.currentPlayer, discardCardIds, reviveIDs);
             if (next === null) return INVALID_MOVE;
@@ -2198,7 +2157,6 @@ export const InceptionCityGame = {
         playPiscesBlessing: {
           move: ({ G, ctx }: MoveCtx, reviveID: string | null) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyPiscesBlessing(G, ctx.currentPlayer, reviveID ?? null);
             if (next === null) return INVALID_MOVE;
             return incrementMoveCounter(next);
@@ -2488,7 +2446,6 @@ export const InceptionCityGame = {
         playGaiaShift: {
           move: ({ G, ctx }: MoveCtx, picks: Record<string, -1 | 1>) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!picks || typeof picks !== 'object') return INVALID_MOVE;
             const next = applyGaiaShift(G, ctx.currentPlayer, picks);
             if (next === null) return INVALID_MOVE;
@@ -2502,7 +2459,6 @@ export const InceptionCityGame = {
         playDarwinEvolution: {
           move: ({ G, ctx }: MoveCtx, returnCards: CardID[]) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(returnCards)) return INVALID_MOVE;
             const next = applyDarwinEvolution(G, ctx.currentPlayer, returnCards);
             if (next === null) return INVALID_MOVE;
@@ -2516,7 +2472,6 @@ export const InceptionCityGame = {
         playShadeFollow: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyShadeFollow(G, ctx.currentPlayer);
             if (next === null) return INVALID_MOVE;
             return incrementMoveCounter(next);
@@ -2537,7 +2492,6 @@ export const InceptionCityGame = {
               return INVALID_MOVE;
             }
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyForgerExchange(G, ctx.currentPlayer, exchange);
             if (next === null) return INVALID_MOVE;
             return incrementMoveCounter(next);
@@ -2551,7 +2505,6 @@ export const InceptionCityGame = {
         playForgerExchangeSingle: {
           move: ({ G, ctx, random }: MoveCtx, targetID: string, returnedCardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const target = G.players[targetID];
             if (!target || !target.isAlive) return INVALID_MOVE;
             if (target.hand.length === 0) return INVALID_MOVE;
@@ -2574,8 +2527,6 @@ export const InceptionCityGame = {
         playLibraBalance: {
           move: ({ G, ctx }: MoveCtx, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove || G.pendingLibra)
-              return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetID];
             if (!self || !target) return INVALID_MOVE;
@@ -2668,7 +2619,6 @@ export const InceptionCityGame = {
         playArchitectMaze: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetID];
             if (!self || !target) return INVALID_MOVE;
@@ -2701,7 +2651,6 @@ export const InceptionCityGame = {
         playApolloWorship: {
           move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             // 用 D6 注入随机性（保证 BGIO 确定性）
             const pickIdx = random.D6() - 1;
             const next = applyApolloWorship(G, ctx.currentPlayer, targetID, pickIdx);
@@ -2716,7 +2665,6 @@ export const InceptionCityGame = {
         playMartyrSacrifice: {
           move: ({ G, ctx, random }: MoveCtx, direction: 'increase' | 'decrease') => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player) return INVALID_MOVE;
             // 取本人当前层"原始"心锁数为 cap：使用 PLAYER_COUNT_CONFIGS 的初始值
@@ -2740,7 +2688,6 @@ export const InceptionCityGame = {
         playAthenaAwe: {
           move: ({ G, ctx }: MoveCtx, shownHandIds: CardID[], targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(shownHandIds)) return INVALID_MOVE;
             const next = applyAthenaAwe(G, ctx.currentPlayer, shownHandIds, targetID);
             if (next === null) return INVALID_MOVE;
@@ -2754,7 +2701,6 @@ export const InceptionCityGame = {
         playChemistRefine: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyChemistRefine(G, ctx.currentPlayer, discardCardId);
             if (next === null) return INVALID_MOVE;
             return next;
@@ -2767,7 +2713,6 @@ export const InceptionCityGame = {
         playAquariusCoherence: {
           move: ({ G, ctx }: MoveCtx, pickCardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyAquariusCoherence(G, ctx.currentPlayer, pickCardId);
             if (next === null) return INVALID_MOVE;
             return next;
@@ -2780,7 +2725,6 @@ export const InceptionCityGame = {
         playChemistInject: {
           move: ({ G, ctx }: MoveCtx, targetID: string, toLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyChemistInject(G, ctx.currentPlayer, targetID, toLayer as Layer);
             if (next === null) return INVALID_MOVE;
             return incrementMoveCounter(next);
@@ -2793,7 +2737,6 @@ export const InceptionCityGame = {
         playLordOfWarBlackMarket: {
           move: ({ G, ctx }: MoveCtx, discardIds: CardID[], pickFromDiscard: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             if (!Array.isArray(discardIds)) return INVALID_MOVE;
             const next = applyLordOfWarBlackMarket(
               G,
@@ -2812,7 +2755,6 @@ export const InceptionCityGame = {
         playPaprikSalvation: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID, targetID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyPaprikSalvation(G, ctx.currentPlayer, discardCardId, targetID);
             if (next === null) return INVALID_MOVE;
             return next;
@@ -2825,7 +2767,6 @@ export const InceptionCityGame = {
         playTouristAssist: {
           move: ({ G, ctx }: MoveCtx, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (G.pendingGraft || G.pendingGravity || G.pendingShootMove) return INVALID_MOVE;
             const next = applyTouristAssist(G, ctx.currentPlayer, targetPlayerID);
             if (next === null) return INVALID_MOVE;
             return next;
