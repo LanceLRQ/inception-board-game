@@ -1,5 +1,4 @@
 // useReconnect - 重连状态机 + 用户可见状态标签
-// 对照：docs/_internal/design/07-backend-network.md §7.4.5 / 08-security-ai.md §8.5.3
 //
 // 状态：
 //   - healthy:      连接正常
@@ -10,7 +9,7 @@
 // 逻辑拆分：reconnectReducer 纯函数可单测
 
 import { useEffect, useMemo, useReducer } from 'react';
-import type { ConnectionState } from '../lib/wsClient';
+import type { ConnectionState } from '../match/matchSource';
 
 export type ReconnectStatus = 'healthy' | 'reconnecting' | 'stale' | 'dead';
 

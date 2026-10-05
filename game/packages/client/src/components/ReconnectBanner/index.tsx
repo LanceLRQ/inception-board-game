@@ -1,5 +1,4 @@
 // ReconnectBanner - 顶部重连状态横幅
-// 对照：docs/_internal/design/06-frontend-design.md 错误态与断线 UI
 //
 // 状态：
 //   - reconnecting: 黄色横幅 "正在重连..."
