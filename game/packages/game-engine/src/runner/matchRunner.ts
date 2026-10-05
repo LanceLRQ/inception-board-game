@@ -418,9 +418,41 @@ export function createMatch<G>(game: GameDef<G>, options: CreateMatchOptions): M
   return process(game, { G, ctx, rngState: hashSeed(seed), stateID: 0 }, [{ kind: 'startPhase' }]);
 }
 
-/** 从已保存的快照恢复。状态本身就是普通对象，这里只做类型上的确认 */
-export function matchFromSnapshot<G>(snapshot: MatchState<G>): MatchState<G> {
-  return snapshot;
+function invalidSnapshot(what: string): never {
+  throw new Error(`对局快照无效：${what}`);
+}
+
+/**
+ * 从已保存的快照恢复。状态本身就是普通对象，这里只校验运行器自己依赖的字段，
+ * 对局状态 G 的内部结构由引擎负责。
+ */
+export function matchFromSnapshot<G>(raw: unknown): MatchState<G> {
+  if (typeof raw !== 'object' || raw === null) invalidSnapshot('不是对象');
+  const s = raw as Partial<MatchState<G>>;
+  if (typeof s.G !== 'object' || s.G === null) invalidSnapshot('缺少 G');
+
+  const ctx = s.ctx;
+  if (typeof ctx !== 'object' || ctx === null) invalidSnapshot('缺少 ctx');
+  if (!Number.isInteger(ctx.numPlayers) || ctx.numPlayers <= 0) invalidSnapshot('ctx.numPlayers');
+  if (!Array.isArray(ctx.playOrder) || ctx.playOrder.some((p) => typeof p !== 'string')) {
+    invalidSnapshot('ctx.playOrder');
+  }
+  if (
+    !Number.isInteger(ctx.playOrderPos) ||
+    ctx.playOrderPos < 0 ||
+    ctx.playOrderPos >= ctx.playOrder.length
+  ) {
+    invalidSnapshot('ctx.playOrderPos');
+  }
+  if (typeof ctx.currentPlayer !== 'string' || !ctx.playOrder.includes(ctx.currentPlayer)) {
+    invalidSnapshot('ctx.currentPlayer');
+  }
+  if (ctx.phase !== null && typeof ctx.phase !== 'string') invalidSnapshot('ctx.phase');
+  if (!Number.isInteger(ctx.turn) || ctx.turn < 0) invalidSnapshot('ctx.turn');
+
+  if (!Number.isInteger(s.rngState)) invalidSnapshot('rngState');
+  if (!Number.isInteger(s.stateID) || (s.stateID as number) < 0) invalidSnapshot('stateID');
+  return s as MatchState<G>;
 }
 
 export function applyMove<G>(
