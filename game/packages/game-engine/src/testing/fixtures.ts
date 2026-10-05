@@ -79,10 +79,10 @@ export function makeDefaultLayers(): Record<number, LayerSetup> {
 /** 默认金库：1 秘密 + 3 金币，均分到 1-4 层 */
 export function makeDefaultVaults(): VaultSetup[] {
   return [
-    { id: 'v-secret', layer: 1 as Layer, contentType: 'secret', isOpened: false, openedBy: null },
-    { id: 'v-coin-1', layer: 2 as Layer, contentType: 'coin', isOpened: false, openedBy: null },
-    { id: 'v-coin-2', layer: 3 as Layer, contentType: 'coin', isOpened: false, openedBy: null },
-    { id: 'v-coin-3', layer: 4 as Layer, contentType: 'coin', isOpened: false, openedBy: null },
+    { id: 'v-1', layer: 1 as Layer, contentType: 'secret', isOpened: false, openedBy: null },
+    { id: 'v-2', layer: 2 as Layer, contentType: 'coin', isOpened: false, openedBy: null },
+    { id: 'v-3', layer: 3 as Layer, contentType: 'coin', isOpened: false, openedBy: null },
+    { id: 'v-4', layer: 4 as Layer, contentType: 'coin', isOpened: false, openedBy: null },
   ];
 }
 

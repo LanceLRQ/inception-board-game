@@ -387,18 +387,21 @@ export function createInitialState(options: {
   // 所有玩家初始在第 1 层
   layers[1]!.playersInLayer = [...playerOrder];
 
-  // 初始化金库（1 秘密 + 3 金币）
-  const vaults: VaultSetup[] = [];
-  for (let i = 0; i < VAULT_SECRET_COUNT + VAULT_COIN_COUNT; i++) {
-    const targetLayer = ((i % LAYER_COUNT) + 1) as Layer;
-    vaults.push({
-      id: `vault-${i}`,
-      layer: targetLayer,
-      contentType: i < VAULT_SECRET_COUNT ? 'secret' : 'coin',
-      isOpened: false,
-      openedBy: null,
-    });
-  }
+  // 初始化金库（每层一个：VAULT_SECRET_COUNT 个秘密 + 其余金币）。
+  // 内容与层的对应关系按开局种子的子种子洗乱；标识只按层号分配，
+  // 不携带内容信息，避免靠标识或位置推断秘密金库。
+  const vaultContents: VaultSetup['contentType'][] = [
+    ...Array.from({ length: VAULT_SECRET_COUNT }, () => 'secret' as const),
+    ...Array.from({ length: VAULT_COIN_COUNT }, () => 'coin' as const),
+  ];
+  const shuffledVaultContents = seededShuffle(vaultContents, rngSeed + ':vault');
+  const vaults: VaultSetup[] = shuffledVaultContents.map((contentType, i) => ({
+    id: `vault-${i + 1}`,
+    layer: ((i % LAYER_COUNT) + 1) as Layer,
+    contentType,
+    isOpened: false,
+    openedBy: null,
+  }));
 
   return {
     matchId: '',

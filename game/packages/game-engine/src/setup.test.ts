@@ -140,6 +140,58 @@ describe('setup', () => {
       expect(coins).toHaveLength(VAULT_COIN_COUNT);
     });
 
+    describe('金库摆放', () => {
+      const build = (seed: string) =>
+        createInitialState({
+          playerCount: 4,
+          playerIds: ['P1', 'P2', 'P3', 'P4'],
+          nicknames: ['A', 'B', 'C', 'D'],
+          rngSeed: seed,
+        });
+      const seeds = Array.from({ length: 40 }, (_, i) => `vault-seed-${i}`);
+
+      it('秘密金库出现在不止一个层上', () => {
+        const layersOfSecret = new Set(
+          seeds.map((seed) => build(seed).vaults.find((v) => v.contentType === 'secret')!.layer),
+        );
+        expect(layersOfSecret.size).toBeGreaterThan(1);
+      });
+
+      it('同一个种子两次建局的金库完全相同', () => {
+        for (const seed of seeds.slice(0, 5)) {
+          expect(build(seed).vaults).toEqual(build(seed).vaults);
+        }
+      });
+
+      it('每层恰好一个金库，秘密金库恰好一个', () => {
+        for (const seed of seeds) {
+          const { vaults } = build(seed);
+          expect(vaults).toHaveLength(VAULT_SECRET_COUNT + VAULT_COIN_COUNT);
+          const layers = vaults.map((v) => v.layer).sort();
+          expect(layers).toEqual(Array.from({ length: LAYER_COUNT }, (_, i) => i + 1));
+          expect(vaults.filter((v) => v.contentType === 'secret')).toHaveLength(VAULT_SECRET_COUNT);
+        }
+      });
+
+      it('标识互不重复，且不随内容固定', () => {
+        const idsOfSecret = new Set<string>();
+        for (const seed of seeds) {
+          const { vaults } = build(seed);
+          expect(new Set(vaults.map((v) => v.id)).size).toBe(vaults.length);
+          idsOfSecret.add(vaults.find((v) => v.contentType === 'secret')!.id);
+        }
+        expect(idsOfSecret.size).toBeGreaterThan(1);
+      });
+
+      it('标识不带内容字样', () => {
+        for (const seed of seeds.slice(0, 10)) {
+          for (const v of build(seed).vaults) {
+            expect(v.id).not.toMatch(/secret|coin/i);
+          }
+        }
+      });
+    });
+
     it('all vaults start closed', () => {
       const s = createInitialState({
         playerCount: 4,

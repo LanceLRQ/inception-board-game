@@ -36,7 +36,7 @@ const PEEK_CARD: CardID = 'action_dream_peek' as CardID;
  *   - p2 盗梦者 layer 2 · 空手
  *   - p3 盗梦者 layer 3 · 空手
  *   - pM 梦主 layer 4 · 空手
- *   - 4 个金库（v-secret L1 / v-coin-1 L2 / v-coin-2 L3 / v-coin-3 L4）
+ *   - 4 个金库（L1 秘密 / L2-L4 金币，标识 v-1 ~ v-4 按层号）
  *   - 默认不给 bribePool（各测试按需塞 withBribes）
  */
 function sceneBeforePeek(): SetupState {
@@ -363,7 +363,7 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
       const s = stateWithPeekReveal();
       const view = filterFor(s, 'p1');
       const vaultL2 = view.vaults.find((v) => v.layer === 2)!;
-      // 原始是 coin（createTestState 默认 v-coin-1@L2）
+      // 原始是 coin（createTestState 默认 L2 的金库）
       expect(vaultL2.contentType).toBe('coin');
     });
 

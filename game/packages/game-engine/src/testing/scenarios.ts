@@ -63,7 +63,7 @@ export function scenarioMidGameThiefAtL3(): SetupState {
 export function scenarioThiefNearWin(): SetupState {
   const base = scenarioStartOfGame3p();
   const vaults = base.vaults.map((v) =>
-    v.id === 'v-secret' ? { ...v, isOpened: true, openedBy: 'p1' } : v,
+    v.contentType === 'secret' ? { ...v, isOpened: true, openedBy: 'p1' } : v,
   );
   return {
     ...base,
