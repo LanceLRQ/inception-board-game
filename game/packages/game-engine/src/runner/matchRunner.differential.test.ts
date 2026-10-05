@@ -35,7 +35,8 @@ function withRandom(base: GameDef<SetupState>, random: RandomSource): GameDef<Se
         move: ((c: object, ...a: unknown[]) => original({ ...c, random }, ...a)) as never,
       };
     }
-    phases[name] = { ...phase, moves };
+    // boardgame.io 初始化时会原地改写 phase.turn，这里拷一份，避免污染共享的引擎定义
+    phases[name] = { ...phase, ...(phase.turn ? { turn: { ...phase.turn } } : {}), moves };
   }
   return { ...base, phases };
 }

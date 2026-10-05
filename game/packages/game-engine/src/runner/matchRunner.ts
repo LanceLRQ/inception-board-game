@@ -345,6 +345,55 @@ function process<G>(game: GameDef<G>, initial: MatchState<G>, steps: Step[]): Ma
 // 对外接口
 // ---------------------------------------------------------------------------
 
+const GAME_KEYS = new Set([
+  'name',
+  'minPlayers',
+  'maxPlayers',
+  'disableUndo',
+  'setup',
+  'phases',
+  'endIf',
+]);
+const PHASE_KEYS = new Set(['start', 'next', 'endIf', 'onBegin', 'onEnd', 'turn', 'moves']);
+const TURN_KEYS = new Set(['order', 'onBegin', 'onEnd']);
+const ORDER_KEYS = new Set(['first', 'next']);
+const MOVE_KEYS = new Set(['move', 'client']);
+
+/**
+ * 检查 Game 定义里有没有运行器不支持的配置，有就抛错并列出位置。
+ * 运行器只实现了一部分流程特性；遇到不认识的配置必须报错，不能悄悄忽略。
+ */
+export function assertSupportedGame<G>(game: GameDef<G>): void {
+  const problems: string[] = [];
+  const check = (obj: object, allowed: Set<string>, where: string): void => {
+    for (const key of Object.keys(obj)) {
+      if (!allowed.has(key)) problems.push(`${where}.${key}`);
+    }
+  };
+
+  check(game, GAME_KEYS, 'game');
+  for (const [phaseName, phase] of Object.entries(game.phases)) {
+    const at = `phases.${phaseName}`;
+    check(phase, PHASE_KEYS, at);
+    if (typeof phase.next === 'function') problems.push(`${at}.next`);
+    if (phase.turn) {
+      check(phase.turn, TURN_KEYS, `${at}.turn`);
+      if (phase.turn.order) check(phase.turn.order, ORDER_KEYS, `${at}.turn.order`);
+    }
+    for (const [moveName, def] of Object.entries(phase.moves ?? {})) {
+      if (typeof def !== 'object' || def === null) {
+        problems.push(`${at}.moves.${moveName}`);
+        continue;
+      }
+      check(def, MOVE_KEYS, `${at}.moves.${moveName}`);
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`对局运行器不支持以下配置：${problems.join('、')}`);
+  }
+}
+
 export interface CreateMatchOptions {
   numPlayers: number;
   setupData?: Record<string, unknown>;
@@ -353,6 +402,7 @@ export interface CreateMatchOptions {
 }
 
 export function createMatch<G>(game: GameDef<G>, options: CreateMatchOptions): MatchState<G> {
+  assertSupportedGame(game);
   const { numPlayers, setupData, seed } = options;
   const startingPhase =
     Object.entries(game.phases).find(([, def]) => def.start === true)?.[0] ?? null;
