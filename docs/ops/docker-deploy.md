@@ -89,6 +89,11 @@ curl -fsS http://localhost:3001/ready
 | `CLIENT_PORT` | 可选 | 前端对外端口，默认 80；如被占用改为 8080 |
 | `API_PORT` | 可选 | 后端对外端口，默认 3001 |
 | `LOG_LEVEL` | 可选 | 生产建议 `info`，调试用 `debug` |
+| `MATCH_BOT_STEP_DELAY_MS` | 可选 | Bot 每一步之间的间隔，默认 600 毫秒 |
+| `MATCH_PENDING_TIMEOUT_MS` | 可选 | 等待玩家应答（响应、选择目标等）的时限，默认 45000 毫秒；超时由服务端代为行动 |
+| `MATCH_TURN_TIMEOUT_MS` | 可选 | 一个回合的时限，默认 120000 毫秒；超时由服务端代为结束回合 |
+
+对局运行在单个服务进程内：进行中的对局状态存放在 Redis，每一步的记录写入 PostgreSQL。服务重启后会从 Redis 恢复未结束的对局；目前不支持多个服务实例同时承载对局。
 
 ---
 

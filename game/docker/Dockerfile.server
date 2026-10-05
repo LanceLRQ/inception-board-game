@@ -1,7 +1,6 @@
 # @icgame/server 运行镜像（MVP 版本）
-# 对照：docs/_internal/design/10-roadmap-risk.md W8.5-9 / docs/_internal/design/04-system-architecture.md §4.6 私有部署
 #
-# 策略（MVP）：直接用 tsx 运行 TypeScript 源码；Phase 3+ 再切真实的 tsc 编译流水线。
+# 策略（MVP）：直接用 tsx 运行 TypeScript 源码；以后再切到 tsc 编译流水线。
 # 多阶段：deps（仅 workspace 元信息，最大化 Docker cache） → runtime（源码 + node_modules）。
 
 FROM node:20-alpine AS base

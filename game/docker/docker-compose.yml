@@ -1,5 +1,4 @@
 # 盗梦都市 · 一键部署编排
-# 对照：docs/_internal/design/10-roadmap-risk.md W8.5-9 / docs/_internal/design/04-system-architecture.md §4.6
 #
 # 使用：
 #   1. 复制 .env.example 为 .env：cp .env.example .env
@@ -60,6 +59,10 @@ services:
       WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-*}
       WS_PATH: ${WS_PATH:-/ws}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # 对局节奏（毫秒）：Bot 每步间隔 / 待结算事项的应答时限 / 一个回合的时限；超时由服务端代为行动
+      MATCH_BOT_STEP_DELAY_MS: ${MATCH_BOT_STEP_DELAY_MS:-600}
+      MATCH_PENDING_TIMEOUT_MS: ${MATCH_PENDING_TIMEOUT_MS:-45000}
+      MATCH_TURN_TIMEOUT_MS: ${MATCH_TURN_TIMEOUT_MS:-120000}
     ports:
       - "${API_PORT:-3001}:3001"
     healthcheck:

@@ -1,5 +1,4 @@
 # @icgame/client 运行镜像（Vite build → nginx 托管）
-# 对照：docs/_internal/design/04-system-architecture.md §4.6 私有部署
 #
 # 产物：静态 SPA + PWA 资源；由 nginx:alpine 提供服务。
 # SPA fallback：所有未命中文件请求回落到 index.html（React Router 友好）。
