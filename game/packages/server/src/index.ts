@@ -4,6 +4,7 @@ import { prisma } from './infra/postgres.js';
 import { createRedisClient } from './infra/redis.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
+import { parseOrigins } from './middleware/cors.js';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
@@ -15,7 +16,11 @@ const realtime = buildRealtime({
   lobbyPrisma: prisma,
   heartbeatRedis: redis,
   timing: timingFromEnv(process.env),
-  ws: { corsOrigin: process.env.WS_CORS_ORIGIN ?? '*', path: process.env.WS_PATH ?? '/ws' },
+  ws: {
+    corsOrigin: parseOrigins(process.env.WS_CORS_ORIGIN ?? '*'),
+    path: process.env.WS_PATH ?? '/ws',
+  },
+  trustProxy: process.env.TRUST_PROXY === '1',
 });
 
 async function main(): Promise<void> {

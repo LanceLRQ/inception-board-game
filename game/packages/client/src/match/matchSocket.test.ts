@@ -305,6 +305,14 @@ describe('MatchSocket', () => {
     expect(ms.getSnapshot().connection).not.toBe('failed');
   });
 
+  it('首次连接就失败：进入 reconnecting，横幅与退出按钮才有机会出现', () => {
+    ms.connect();
+    expect(ms.getSnapshot().connection).toBe('connecting');
+    socket.fire('connect_error', new Error('xhr poll error'));
+    expect(ms.getSnapshot().connection).toBe('reconnecting');
+    expect(ms.getSnapshot().fatal).toBeNull();
+  });
+
   it('收到 REPLACED：fatal 为 REPLACED、failed，之后断开也不再重连', () => {
     ready(1);
     socket.fire('icg:error', { type: 'icg:error', code: 'REPLACED', message: 'x' });

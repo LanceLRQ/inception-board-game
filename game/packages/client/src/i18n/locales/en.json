@@ -74,6 +74,7 @@
     },
     "yourTurn": "Your Turn",
     "botTurn": "AI {{id}} Turn",
+    "playerTurn": "{{name}}'s Turn",
     "yourInfo": "Your Status",
     "faction": "Faction",
     "layer": "Layer",

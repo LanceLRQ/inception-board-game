@@ -13,6 +13,8 @@ interface Player {
   page: Page;
   /** 页面收到的全部 websocket 文本帧原文 */
   frames: string[];
+  /** 界面按钮被成功点击的次数 */
+  clicks: number;
 }
 
 interface StateFrame {
@@ -36,7 +38,7 @@ async function newPlayer(
     }
   });
   const page = await context.newPage();
-  const player: Player = { name, context, page, frames: [] };
+  const player: Player = { name, context, page, frames: [], clicks: 0 };
   page.on('websocket', (ws) => {
     ws.on('framereceived', (frame) => {
       if (typeof frame.payload === 'string') player.frames.push(frame.payload);
@@ -66,6 +68,27 @@ function stateFrames(player: Player): StateFrame[] {
     }
   }
   return out;
+}
+
+/** 服务端回给该玩家的 icg:moveResult 里 ok 为 true 的条数：真人的 move 确实被接受 */
+function acceptedMoves(player: Player): number {
+  let n = 0;
+  for (const raw of player.frames) {
+    const ev = parseEvent(raw);
+    if (ev?.event !== 'icg:moveResult') continue;
+    if ((ev.payload as { ok?: boolean }).ok === true) n += 1;
+  }
+  return n;
+}
+
+/** 该玩家最近一帧视图里某座位的手牌张数 */
+function latestHandCount(player: Player, seat: string): number | undefined {
+  const frames = stateFrames(player);
+  for (let i = frames.length - 1; i >= 0; i--) {
+    const count = frames[i]!.view.G.players?.[seat]?.handCount;
+    if (typeof count === 'number') return count;
+  }
+  return undefined;
 }
 
 async function createProfile(player: Player): Promise<void> {
@@ -130,7 +153,7 @@ async function playUntilOver(player: Player, state: { over: boolean }): Promise<
   while (!state.over) {
     try {
       if (await banner.isVisible()) return;
-      await actOnce(player.page);
+      if (await actOnce(player.page)) player.clicks += 1;
     } catch {
       /* 页面正在刷新或按钮刚好消失，下一轮重试 */
     }
@@ -189,7 +212,20 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
       await expect(
         me.page.getByTestId(`player-seat-${other}`).locator('[data-testid^="card-"]'),
       ).toHaveCount(0);
-      await expect(me.page.getByTestId(`player-seat-${other}`)).toContainText(/\d/);
+      // 页面上对方座位显示的数字里有该座位最新的手牌张数（手牌数随回合变化，所以轮询对齐）
+      await expect
+        .poll(
+          async () => {
+            const expected = latestHandCount(me, other);
+            const shown = await me.page
+              .getByTestId(`player-seat-${other}`)
+              .locator('.tabular-nums')
+              .allTextContents();
+            return expected !== undefined && shown.some((t) => t.trim() === String(expected));
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(true);
     }
 
     // 3. 轮到自己时做最简单的合法操作，直到出现结束画面
@@ -216,6 +252,12 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
     const bannerB = (await b.page.getByTestId('winner-banner').locator('h2').textContent()) ?? '';
     expect(bannerA.trim().length).toBeGreaterThan(0);
     expect(bannerA.trim()).toBe(bannerB.trim());
+
+    // 真人的操作确实被服务端接受（超时代发也能打完一局，所以单看胜负不能说明点击生效）
+    for (const p of [a, b]) {
+      expect(p.clicks, `${p.name} 应至少成功点击过一次操作按钮`).toBeGreaterThan(0);
+      expect(acceptedMoves(p), `${p.name} 应至少收到一条 ok 的 moveResult`).toBeGreaterThan(0);
+    }
 
     // 5. 信息隔离：两边收到的实时帧都不含随机种子与随机状态，且他人手牌从未以牌面出现
     for (const p of [a, b]) {

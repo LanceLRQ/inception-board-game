@@ -74,6 +74,7 @@
     },
     "yourTurn": "你的回合",
     "botTurn": "AI {{id}} 回合",
+    "playerTurn": "{{name}} 回合",
     "yourInfo": "你的状态",
     "faction": "阵营",
     "layer": "层",

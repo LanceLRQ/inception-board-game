@@ -7,6 +7,7 @@ import { useReconnect } from '../../hooks/useReconnect';
 import { logger } from '../../lib/logger';
 import { MatchRuntime } from '../MatchRuntime';
 import { ReconnectBanner } from '../ReconnectBanner';
+import { shouldShowHandshakeError } from './handshakeError';
 
 export interface RemoteMatchRuntimeProps {
   url: string;
@@ -54,7 +55,7 @@ export function RemoteMatchRuntime({
     }
   }, [finished, rejected, matchID, onSettled]);
 
-  if (source.error) {
+  if (source.error && shouldShowHandshakeError(source.error, source.view)) {
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"

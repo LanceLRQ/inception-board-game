@@ -5,13 +5,13 @@
 import type { Middleware } from 'koa';
 
 /** 把配置（单个源、逗号分隔的字符串或数组）整理成源列表 */
-function normalize(origin: string | string[]): string[] {
+export function parseOrigins(origin: string | string[]): string[] {
   const list = Array.isArray(origin) ? origin : origin.split(',');
   return list.map((o) => o.trim()).filter((o) => o.length > 0);
 }
 
 export function corsMiddleware(origin: string | string[]): Middleware {
-  const allowed = normalize(origin);
+  const allowed = parseOrigins(origin);
   const allowAll = allowed.includes('*');
 
   return async (ctx, next) => {

@@ -28,10 +28,17 @@ export interface AppDeps {
   identityPrisma?: IdentityPrisma;
   /** 允许跨域访问的页面源；不给时不处理跨域 */
   corsOrigin?: string | string[];
+  /** 位于反向代理之后时开启：来源地址取 X-Forwarded-For。后端端口直接暴露公网时不要开启 */
+  trustProxy?: boolean;
 }
 
 export function createApp(deps: AppDeps = {}): Koa {
   const app = new Koa();
+  if (deps.trustProxy) {
+    app.proxy = true;
+    // 只认最近一层反代追加的地址；客户端自己带来的转发头排在前面，不能当作来源
+    app.maxIpsCount = 1;
+  }
 
   // 全局中间件；跨域在最外层，预检不计入限流，出错的响应也带跨域头
   if (deps.corsOrigin) app.use(corsMiddleware(deps.corsOrigin));

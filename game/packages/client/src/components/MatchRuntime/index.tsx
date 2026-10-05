@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Bot, RotateCcw, Skull, Timer, Trophy, UserCog, WifiOff } from 'lucide-react';
+import {
+  ArrowRight,
+  Bot,
+  Check,
+  RotateCcw,
+  Skull,
+  Timer,
+  Trophy,
+  UserCog,
+  WifiOff,
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
@@ -33,6 +43,7 @@ import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
 import { awaitingNotice } from './awaitingNotice';
 import { remainingSeconds, useSecondClock } from './deadline';
 import { seatMarkers } from './seatMarkers';
+import { otherTurnLabel } from './turnLabel';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
 interface MatchRuntimeProps {
@@ -188,6 +199,8 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
   const turnPhase = (G?.turnPhase as string) ?? '';
   const currentPlayerID = (ctx?.currentPlayer as string) ?? '';
   const isMyTurn = mySeat !== null && currentPlayerID === mySeat;
+  const otherTurnText = otherTurnLabel(seatByID.get(currentPlayerID), currentPlayerID);
+  const otherTurn = t(otherTurnText.key, otherTurnText.params);
   const players = G?.players as Record<string, Record<string, unknown>> | undefined;
   const humanPlayer = mySeat === null ? undefined : players?.[mySeat];
   const layersRaw = G?.layers as Record<number, Record<string, unknown>> | undefined;
@@ -545,7 +558,14 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
           data-testid="asset-preload-progress"
         >
           <span className="text-muted-foreground">
-            {preloadProgress.loaded === preloadProgress.total ? '卡图就绪 ✓' : '卡图加载中'}
+            {preloadProgress.loaded === preloadProgress.total ? (
+              <span className="inline-flex items-center gap-1">
+                卡图就绪
+                <Check className="h-3 w-3" aria-hidden />
+              </span>
+            ) : (
+              '卡图加载中'
+            )}
           </span>
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
             <div
@@ -577,7 +597,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
             )}
             data-testid="turn-indicator"
           >
-            {isMyTurn ? t('localMatch.yourTurn') : t('localMatch.botTurn', { id: currentPlayerID })}
+            {isMyTurn ? t('localMatch.yourTurn') : otherTurn}
           </div>
           {deadlineSeconds !== null && (
             <div

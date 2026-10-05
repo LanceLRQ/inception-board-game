@@ -43,6 +43,8 @@ export interface RealtimeDeps {
   ws?: { corsOrigin?: string | string[]; path?: string };
   /** 全局 HTTP 限流中间件；默认基于 Redis 的 IP 限流 */
   httpRateLimit?: Middleware;
+  /** 位于反向代理之后：HTTP 来源地址取 X-Forwarded-For；默认关闭 */
+  trustProxy?: boolean;
 }
 
 export interface Realtime {
@@ -104,6 +106,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     archive: deps.archive,
     identityPrisma: deps.identityPrisma,
     corsOrigin: deps.ws?.corsOrigin,
+    trustProxy: deps.trustProxy,
   });
   const httpServer = createServer(app.callback());
   gateway.attach(httpServer);

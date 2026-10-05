@@ -86,6 +86,8 @@ curl -fsS http://localhost:3001/ready
 | `JWT_SECRET` | **是** | JWT 签名密钥；必须是 32+ 字节随机串 |
 | `POSTGRES_PASSWORD` | **是** | 数据库密码 |
 | `WS_CORS_ORIGIN` | 建议改 | 允许访问后端的页面来源，接口请求与联机实时连接共用；生产填前端域名（如 `https://ico.example.com`），开发用 `*` |
+| `TRUST_PROXY` | 可选 | 默认 `1`（后端前面是 nginx）：接口限流按 `X-Forwarded-For` 的真实来源地址计数。后端端口若直接暴露到公网，不要开启，否则来源地址可被伪造 |
+| `HTTP_RATE_LIMIT_PER_MINUTE` | 可选 | 接口限流：同一来源地址每分钟的请求额度，默认 300（同一出口下 10 人的等待页轮询约 200 次 / 分钟） |
 | `CLIENT_PORT` | 可选 | 前端对外端口，默认 80；如被占用改为 8080 |
 | `API_PORT` | 可选 | 后端对外端口，默认 3001 |
 | `LOG_LEVEL` | 可选 | 生产建议 `info`，调试用 `debug` |
@@ -191,6 +193,7 @@ docker compose -f docker/docker-compose.yml down -v
 | **日志收集** | 把 `docker compose logs` 接入 Loki / CloudWatch / 云监控 |
 | **监控告警** | 后续版本将落地 Grafana 面板；当前可用 `/health` + `/ready` 简单探活 |
 | **CORS 收敛** | `WS_CORS_ORIGIN` 禁用 `*`，改为具体前端域名 |
+| **后端端口** | 默认配置同时把后端端口（`API_PORT`，默认 3001）映射到宿主机并开启 `TRUST_PROXY`。公网环境应只对外开放前端端口：用防火墙挡住后端端口，或去掉 `api` 服务的端口映射；否则直连后端的请求可以伪造来源地址绕过接口限流 |
 | **资源限制** | 在 `docker-compose.yml` 里加 `deploy.resources.limits` 防止单服务吞内存 |
 | **Postgres 参数** | 对 4 GB+ 机器建议调 `shared_buffers` / `work_mem`，默认值足够 MVP |
 

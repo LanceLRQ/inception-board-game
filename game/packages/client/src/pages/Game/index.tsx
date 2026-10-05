@@ -140,7 +140,7 @@ function GameMockView() {
   const [search] = useSearchParams();
   const viewAs = search.get('as') === 'master' ? 'master' : 'thief';
   const withPendingUnlock = search.get('pending') === '1';
-  // Feature flag：?legacyUi=1 走旧 ThiefBoard/MasterBoard 一个 Sprint 降级期（ADR-043）
+  // Feature flag：?legacyUi=1 走旧 ThiefBoard/MasterBoard 降级通道
   const useLegacyUI = search.get('legacyUi') === '1';
 
   const state = useMockMatch({ viewAs, withPendingUnlock });

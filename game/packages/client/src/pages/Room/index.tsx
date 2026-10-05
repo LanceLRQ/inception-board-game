@@ -11,6 +11,7 @@ import { isMockMode, roomApi, type RoomState } from '../../lib/roomApi';
 import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
+import { isRoomMember, resolveGameRedirect } from './roomLogic';
 
 const POLL_INTERVAL_MS = 3_000;
 const MIN_PLAYERS = 3;
@@ -60,13 +61,16 @@ export default function Room() {
     if (!code) return;
     try {
       const next = await roomApi.getRoom(code);
+      // 只读查询对任何登录用户都成功；本人不在成员里说明没加入成功，保留加入时的错误
+      if (!isRoomMember(next, playerId)) return;
       setRoom(next);
       setError(null);
     } catch (e) {
+      // 轮询失败只显示错误，保留已有的房间信息；下一次轮询成功后自动恢复
       const msg = e instanceof ApiRequestError ? e.message : String(e);
       setError(msg);
     }
-  }, [code]);
+  }, [code, playerId]);
 
   useEffect(() => {
     if (!isInitialized || !isAuthenticated || !code) return;
@@ -79,14 +83,9 @@ export default function Room() {
 
   // status 变为 playing 时跳 Game：真实后端进入联机对局，本地模拟保持原行为
   useEffect(() => {
-    if (room?.status !== 'playing') return;
-    if (isMockMode()) {
-      navigate(`/game/${room.id}`);
-      return;
-    }
-    const params = new URLSearchParams({ online: '1', code: room.code });
-    navigate(`/game/${room.matchId ?? room.id}?${params.toString()}`);
-  }, [room?.status, room?.id, room?.matchId, room?.code, navigate]);
+    const target = resolveGameRedirect(room, playerId, isMockMode());
+    if (target) navigate(target, { replace: true });
+  }, [room, playerId, navigate]);
 
   const isOwner = !!room && !!playerId && room.ownerPlayerId === playerId;
   const canStart = !!room && room.players.length >= MIN_PLAYERS;
@@ -123,7 +122,7 @@ export default function Room() {
             players: String(room.players.length),
             code: room.code,
           });
-      navigate(`/game/${res.matchId}?${params.toString()}`);
+      navigate(`/game/${res.matchId}?${params.toString()}`, { replace: true });
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
       logger.error('room', 'startGame failed', e);

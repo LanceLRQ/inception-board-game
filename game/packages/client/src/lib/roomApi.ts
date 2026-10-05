@@ -216,6 +216,8 @@ const realRoomApi = {
 // ---------- 统一导出：带后端自动退化 ----------
 
 let fallbackToMock = MOCK_FLAG;
+// 本会话里真实后端是否成功响应过；成功过之后的网络抖动只报错，不切到本地模拟
+let realBackendReached = false;
 
 function isNetworkOrServerDown(err: unknown): boolean {
   if (err instanceof ApiRequestError) {
@@ -229,9 +231,11 @@ function isNetworkOrServerDown(err: unknown): boolean {
 async function withFallback<T>(real: () => Promise<T>, mock: () => Promise<T>): Promise<T> {
   if (fallbackToMock) return mock();
   try {
-    return await real();
+    const result = await real();
+    realBackendReached = true;
+    return result;
   } catch (err) {
-    if (isNetworkOrServerDown(err)) {
+    if (isNetworkOrServerDown(err) && !realBackendReached) {
       // 后端不可达 → 一次性切到 mock 模式（后续调用全走 localStorage）
       logger.warn('room', 'backend unavailable, fallback to mock');
       fallbackToMock = true;

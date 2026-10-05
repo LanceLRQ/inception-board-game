@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import Koa from 'koa';
-import { corsMiddleware } from './cors.js';
+import { corsMiddleware, parseOrigins } from './cors.js';
 import { errorHandler } from './errorHandler.js';
 import { AppError } from '../infra/errors.js';
 
@@ -95,5 +95,23 @@ describe('corsMiddleware', () => {
     });
     expect(res.status).toBe(401);
     expect(res.headers.get('access-control-allow-origin')).toBe('http://a.test');
+  });
+});
+
+describe('parseOrigins', () => {
+  it('逗号分隔的字符串拆成数组并去掉空白与空项', () => {
+    expect(parseOrigins('http://a.test, http://b.test ,,')).toEqual([
+      'http://a.test',
+      'http://b.test',
+    ]);
+  });
+
+  it('单个值与 * 保持原样', () => {
+    expect(parseOrigins('http://a.test')).toEqual(['http://a.test']);
+    expect(parseOrigins('*')).toEqual(['*']);
+  });
+
+  it('数组输入同样整理', () => {
+    expect(parseOrigins([' http://a.test ', ''])).toEqual(['http://a.test']);
   });
 });

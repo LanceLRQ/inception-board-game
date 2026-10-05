@@ -39,8 +39,9 @@ export function computeNightmareDecisionState(
   if (G.turnPhase !== 'action') {
     return { visible: false, pendingLayers: [] };
   }
-  // 该函数只读 vaults 与 layers 里的 nightmareId / nightmareRevealed / nightmareTriggered，
-  // 这些字段在梦主视角下都有；只有梦主会走到这里，所以把视图当作它要求的状态传入。
+  // 该函数只读 vaults 与 layers 里的 nightmareId / nightmareRevealed / nightmareTriggered。
+  // 这里没有检查观看者：盗梦者视角的视图会把未翻开的梦魇编号裁成空，所以盗梦者取不到待决项、
+  // 不会弹出提示；若以后放宽视图的裁剪，这里要先加上观看者判断。
   const pending = findCoinVaultsWithHiddenNightmare(G as unknown as SetupState);
   return {
     visible: pending.length > 0,

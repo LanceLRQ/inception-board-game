@@ -76,4 +76,29 @@ describe('roomApi', () => {
     await roomApi.createRoom(me);
     await expect(roomApi.getRoom('ZZZZZZ')).rejects.toMatchObject({ status: 404 });
   });
+
+  it('真实请求成功过之后遇到网络错误：直接抛错，不切到本地模拟', async () => {
+    get.mockResolvedValueOnce({ code: 'ABC234', status: 'waiting', players: [] });
+    const { roomApi, isMockMode } = await import('./roomApi');
+    await roomApi.getRoom('ABC234');
+
+    get.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(roomApi.getRoom('ABC234')).rejects.toBeInstanceOf(TypeError);
+    expect(isMockMode()).toBe(false);
+
+    // 网络恢复后继续走真实后端
+    get.mockResolvedValueOnce({ code: 'ABC234', status: 'playing', matchId: 'm-9', players: [] });
+    await expect(roomApi.getRoom('ABC234')).resolves.toMatchObject({ matchId: 'm-9' });
+  });
+
+  it('真实请求成功过之后遇到 5xx 同样直接抛错', async () => {
+    post.mockResolvedValueOnce({ matchId: 'm-1' });
+    const { roomApi, isMockMode } = await import('./roomApi');
+    await roomApi.startGame('ABC234');
+
+    const { ApiRequestError } = await import('./api');
+    get.mockRejectedValueOnce(new ApiRequestError(503, 'X', 'unavailable'));
+    await expect(roomApi.getRoom('ABC234')).rejects.toMatchObject({ status: 503 });
+    expect(isMockMode()).toBe(false);
+  });
 });

@@ -206,7 +206,11 @@ export class MatchSocket {
       return;
     }
     logger.warn('net/ws', 'connect error', { message });
-    if (this.snapshot.connection === 'connected') this.update({ connection: 'reconnecting' });
+    // 已连上后的掉线与首次就连不上，都进入重连状态
+    const { connection } = this.snapshot;
+    if (connection === 'connected' || connection === 'connecting') {
+      this.update({ connection: 'reconnecting' });
+    }
   }
 
   private onServerError(msg: { code?: string }): void {
