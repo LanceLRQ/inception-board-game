@@ -250,6 +250,10 @@ export type {
   MatchRecord,
 } from './runner/matchRunner.js';
 
+// 行动权：此刻在等谁、等什么（服务端据此决定计时与提示）
+export { listAwaiting } from './engine/actionRights.js';
+export type { Awaiting } from './engine/actionRights.js';
+
 // 白名单式对局视图：服务端发给每个观察者的状态
 export { viewFor, FIELD_DISPOSITION } from './engine/matchView.js';
 
