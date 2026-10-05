@@ -9,7 +9,7 @@ WORKDIR /app
 
 # === Stage 1: 安装 workspace 依赖 ===
 FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/game-engine/package.json packages/game-engine/
 COPY packages/bot/package.json packages/bot/
@@ -21,6 +21,8 @@ RUN pnpm install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages ./packages
+# 工作区根配置：包内脚本要靠它找到根目录安装的工具，各包的 tsconfig 也继承自根配置
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/game-engine ./packages/game-engine
 COPY packages/bot ./packages/bot

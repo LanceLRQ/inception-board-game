@@ -1,0 +1,12 @@
+# 宿主机的依赖与构建产物不进镜像：依赖在镜像内重新安装
+**/node_modules
+**/dist
+**/.turbo
+**/test-results
+**/playwright-report
+**/coverage
+.git
+.husky
+.env
+.env.*
+!.env.example
