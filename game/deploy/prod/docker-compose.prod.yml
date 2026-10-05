@@ -56,6 +56,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@icg-prod-redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 未设置，请先运行 ./scripts/prod.sh init}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      RECOVERY_CODE_PEPPER: ${RECOVERY_CODE_PEPPER:?RECOVERY_CODE_PEPPER 未设置，请运行 ./scripts/prod.sh secrets 补生成}
+      # 运营接口令牌，留空即关闭运营接口
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN:-}
+      OPERATOR_ID: ${OPERATOR_ID:-}
       WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-*}
       # api 前面是 nginx，限流按 X-Forwarded-For 的真实来源地址计数；后端端口直接暴露公网时不要开启
       TRUST_PROXY: ${TRUST_PROXY:-1}

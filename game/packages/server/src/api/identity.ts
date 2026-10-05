@@ -1,11 +1,23 @@
 import Router from '@koa/router';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { logger } from '../infra/logger.js';
 import { prisma as defaultPrisma } from '../infra/postgres.js';
 import { signToken } from '../infra/jwt.js';
-import { generateRecoveryCode } from '../infra/recoveryCode.js';
+import { nicknameSchema } from '../infra/nicknameSchema.js';
+import {
+  generateRecoveryCode,
+  hashRecoveryCode,
+  legacyHashRecoveryCode,
+} from '../infra/recoveryCode.js';
 import { AppError } from '../infra/errors.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { isBanActive } from '../services/BanChecker.js';
+import {
+  InMemoryRecoverAttemptLimiter,
+  recoverLimitKey,
+  type RecoverAttemptLimiter,
+} from '../services/RecoverAttemptLimiter.js';
 
 /** 身份接口读写的玩家行 */
 export interface IdentityPlayerRow {
@@ -15,6 +27,8 @@ export interface IdentityPlayerRow {
   locale: string;
   createdAt: Date;
   isBanned: boolean;
+  banUntil: Date | null;
+  banReason: string | null;
 }
 
 /** 身份路由实际用到的数据库操作；真实实现是 Prisma 客户端，测试与内存服务用内存表 */
@@ -26,7 +40,15 @@ export interface IdentityPrisma {
     findUnique(args: { where: { id: string } }): Promise<IdentityPlayerRow | null>;
     update(args: {
       where: { id: string };
-      data: { nickname?: string; avatarSeed?: string; locale?: string; lastSeenAt: Date };
+      data: {
+        nickname?: string;
+        avatarSeed?: string;
+        locale?: string;
+        lastSeenAt?: Date;
+        isBanned?: boolean;
+        banUntil?: Date | null;
+        banReason?: string | null;
+      };
     }): Promise<IdentityPlayerRow>;
   };
   recoveryCode: {
@@ -36,30 +58,35 @@ export interface IdentityPrisma {
       revokedAt: Date | null;
       player: IdentityPlayerRow;
     } | null>;
-    update(args: {
-      where: { codeHash: string };
-      data: { lastUsedAt: Date; useCount: { increment: number } };
-    }): Promise<unknown>;
+    /** 条件更新：用于一次性作废（只有仍有效的码才会命中）与旧哈希升级 */
     updateMany(args: {
-      where: { playerId: string; revokedAt: null };
-      data: { revokedAt: Date };
-    }): Promise<unknown>;
+      where: { playerId?: string; codeHash?: string; revokedAt: null };
+      data: {
+        revokedAt: Date;
+        codeHash?: string;
+        lastUsedAt?: Date;
+        useCount?: { increment: number };
+      };
+    }): Promise<{ count: number }>;
     findMany(args: {
       where: { playerId: string; revokedAt: null };
       orderBy: { createdAt: 'desc' };
       take: number;
-    }): Promise<Array<{ codeHash: string; createdAt: Date }>>;
+    }): Promise<Array<{ createdAt: Date }>>;
   };
 }
 
 /** 身份路由；数据库访问由调用方注入，缺省用全局客户端 */
-export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Router {
+export function createIdentityRouter(
+  deps: { prisma?: IdentityPrisma; recoverLimiter?: RecoverAttemptLimiter } = {},
+): Router {
   const prisma = deps.prisma ?? (defaultPrisma as unknown as IdentityPrisma);
+  const recoverLimiter = deps.recoverLimiter ?? new InMemoryRecoverAttemptLimiter();
   const router = new Router();
 
   // POST /identity/init - 首次访问建档
   const initSchema = z.object({
-    nickname: z.string().min(1).max(30).default('旅行者'),
+    nickname: nicknameSchema.default('旅行者'),
     locale: z.string().default('zh-CN'),
     fingerprint: z.string().optional(),
   });
@@ -81,7 +108,7 @@ export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Ro
 
     // 生成恢复码
     const recoveryCode = generateRecoveryCode();
-    const codeHash = crypto.createHash('sha256').update(recoveryCode).digest('hex');
+    const codeHash = hashRecoveryCode(recoveryCode);
 
     await prisma.recoveryCode.create({
       data: { codeHash, playerId: player.id },
@@ -107,22 +134,64 @@ export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Ro
   });
 
   router.post('/identity/recover', async (ctx) => {
-    const { code } = recoverSchema.parse(ctx.request.body);
-    const normalizedCode = code.toUpperCase();
-    const codeHash = crypto.createHash('sha256').update(normalizedCode).digest('hex');
-
-    const record = await prisma.recoveryCode.findUnique({
-      where: { codeHash },
-      include: { player: true },
-    });
-
-    if (!record || record.revokedAt || record.player.isBanned) {
-      throw new AppError('INVALID_RECOVERY_CODE', '恢复码无效或已失效');
+    const ip = recoverLimitKey(ctx.ip);
+    // 限速组件出故障时放行：不能因为 Redis 不可用把正常用户挡在门外
+    try {
+      if (await recoverLimiter.isBlocked(ip)) {
+        throw new AppError('RATE_LIMITED', '恢复尝试过于频繁，请稍后再试');
+      }
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      logger.warn({ err }, 'recover limiter check failed, allowing request');
     }
 
-    await prisma.recoveryCode.update({
-      where: { codeHash },
-      data: { lastUsedAt: new Date(), useCount: { increment: 1 } },
+    const { code } = recoverSchema.parse(ctx.request.body);
+
+    const fail = async (): Promise<never> => {
+      try {
+        await recoverLimiter.recordFailure(ip);
+      } catch (err) {
+        logger.warn({ err }, 'recover limiter record failed');
+      }
+      throw new AppError('INVALID_RECOVERY_CODE', '恢复码无效或已失效');
+    };
+
+    // 先按现行哈希查；查不到再按旧的无盐哈希查，命中的旧记录在下面改写为现行哈希
+    let storedHash = hashRecoveryCode(code);
+    let record = await prisma.recoveryCode.findUnique({
+      where: { codeHash: storedHash },
+      include: { player: true },
+    });
+    let legacy = false;
+    if (!record) {
+      const legacyHash = legacyHashRecoveryCode(code);
+      record = await prisma.recoveryCode.findUnique({
+        where: { codeHash: legacyHash },
+        include: { player: true },
+      });
+      if (record) {
+        legacy = true;
+        storedHash = legacyHash;
+      }
+    }
+
+    if (!record || record.revokedAt || isBanActive(record.player)) return fail();
+
+    // 一次性：条件更新只会让仍有效的码命中，并发提交同一个码只有一个成功
+    const used = await prisma.recoveryCode.updateMany({
+      where: { codeHash: storedHash, revokedAt: null },
+      data: {
+        revokedAt: new Date(),
+        lastUsedAt: new Date(),
+        useCount: { increment: 1 },
+        ...(legacy ? { codeHash: hashRecoveryCode(code) } : {}),
+      },
+    });
+    if (used.count === 0) return fail();
+
+    const newCode = generateRecoveryCode();
+    await prisma.recoveryCode.create({
+      data: { codeHash: hashRecoveryCode(newCode), playerId: record.playerId },
     });
 
     await prisma.player.update({
@@ -137,6 +206,8 @@ export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Ro
       nickname: record.player.nickname,
       token,
       expiresAt: Date.now() + 30 * 24 * 3600 * 1000,
+      recoveryCode: newCode,
+      recoveryCodeWarning: '此码只显示一次，请妥善保存；刚用过的恢复码已失效',
     };
   });
 
@@ -157,7 +228,7 @@ export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Ro
 
   // PATCH /identity/me - 修改昵称/头像
   const updateMeSchema = z.object({
-    nickname: z.string().min(1).max(30).optional(),
+    nickname: nicknameSchema.optional(),
     avatarSeed: z.string().optional(),
     locale: z.string().optional(),
   });
@@ -200,14 +271,14 @@ export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Ro
     });
 
     const newCode = generateRecoveryCode();
-    const codeHash = crypto.createHash('sha256').update(newCode).digest('hex');
+    const codeHash = hashRecoveryCode(newCode);
     await prisma.recoveryCode.create({ data: { codeHash, playerId } });
 
     ctx.body = { code: newCode, oldRevoked: true };
   });
 
-  // GET /identity/recovery-code - 查看当前恢复码
-  // 注：恢复码存储为 hash，无法逆推，此处仅返回元信息
+  // GET /identity/recovery-code - 查看当前是否有有效恢复码
+  // 恢复码只在签发时明文展示一次；哈希不对外返回，避免被拿去离线穷举
   router.get('/identity/recovery-code', authMiddleware, async (ctx) => {
     const { playerId } = ctx.state.player;
     const codes = await prisma.recoveryCode.findMany({
@@ -216,16 +287,8 @@ export function createIdentityRouter(deps: { prisma?: IdentityPrisma } = {}): Ro
       take: 1,
     });
 
-    if (codes.length === 0 || !codes[0]) {
-      ctx.body = { code: null, warning: '无有效恢复码，请先生成' };
-      return;
-    }
-
-    ctx.body = {
-      codeHash: codes[0].codeHash,
-      createdAt: codes[0].createdAt,
-      warning: '恢复码仅在建档时明文展示一次，如忘记请轮换生成新码',
-    };
+    const latest = codes[0];
+    ctx.body = { hasCode: !!latest, createdAt: latest?.createdAt ?? null };
   });
 
   return router;

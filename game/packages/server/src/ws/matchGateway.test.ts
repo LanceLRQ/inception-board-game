@@ -103,13 +103,19 @@ describe('authorizeHandshake', () => {
     if (token === 'good-stranger') return { playerId: 'acct-x', nickname: '路人' };
     throw new Error('bad token');
   };
+  const banned = new Set<string>();
   beforeEach(async () => {
+    banned.clear();
     h = await makeMatch();
   });
-  const deps = () => ({ verifyToken: verify, matches: h.svc });
+  const deps = () => ({
+    verifyToken: verify,
+    matches: h.svc,
+    bans: { isBanned: async (id: string) => banned.has(id) },
+  });
 
-  it('accepts a member and returns the seat', () => {
-    expect(authorizeHandshake({ token: 'good-0', matchID: 'room-1' }, deps())).toEqual({
+  it('accepts a member and returns the seat', async () => {
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 'room-1' }, deps())).toEqual({
       ok: true,
       playerID: 'acct-0',
       matchID: 'room-1',
@@ -118,40 +124,62 @@ describe('authorizeHandshake', () => {
     });
   });
 
-  it('rejects non-object auth or missing fields with AUTH_REQUIRED', () => {
+  it('rejects non-object auth or missing fields with AUTH_REQUIRED', async () => {
     for (const auth of [undefined, null, 'x', 5, {}, { token: 'good-0' }, { matchID: 'room-1' }]) {
-      expect(authorizeHandshake(auth, deps())).toEqual({ ok: false, error: 'AUTH_REQUIRED' });
+      expect(await authorizeHandshake(auth, deps())).toEqual({ ok: false, error: 'AUTH_REQUIRED' });
     }
-    expect(authorizeHandshake({ token: 'good-0', matchID: '' }, deps())).toEqual({
+    expect(await authorizeHandshake({ token: 'good-0', matchID: '' }, deps())).toEqual({
       ok: false,
       error: 'AUTH_REQUIRED',
     });
-    expect(authorizeHandshake({ token: 'good-0', matchID: 'x'.repeat(65) }, deps())).toEqual({
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 'x'.repeat(65) }, deps())).toEqual({
       ok: false,
       error: 'AUTH_REQUIRED',
     });
-    expect(authorizeHandshake({ token: 'good-0', matchID: 12 }, deps())).toEqual({
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 12 }, deps())).toEqual({
       ok: false,
       error: 'AUTH_REQUIRED',
     });
   });
 
-  it('rejects an invalid token with AUTH_INVALID', () => {
-    expect(authorizeHandshake({ token: 'nope', matchID: 'room-1' }, deps())).toEqual({
+  it('rejects an invalid token with AUTH_INVALID', async () => {
+    expect(await authorizeHandshake({ token: 'nope', matchID: 'room-1' }, deps())).toEqual({
       ok: false,
       error: 'AUTH_INVALID',
     });
   });
 
-  it('gives a non-member and a missing match the same error', () => {
-    const stranger = authorizeHandshake({ token: 'good-stranger', matchID: 'room-1' }, deps());
-    const missing = authorizeHandshake({ token: 'good-0', matchID: 'no-such-match' }, deps());
+  it('gives a non-member and a missing match the same error', async () => {
+    const stranger = await authorizeHandshake(
+      { token: 'good-stranger', matchID: 'room-1' },
+      deps(),
+    );
+    const missing = await authorizeHandshake({ token: 'good-0', matchID: 'no-such-match' }, deps());
     expect(stranger).toEqual({ ok: false, error: 'NOT_IN_MATCH' });
     expect(missing).toEqual(stranger);
   });
 
-  it('does not log the token on rejection', () => {
-    authorizeHandshake({ token: 'secret-token-value', matchID: 'room-1' }, deps());
+  it('rejects a banned account with BANNED before checking membership', async () => {
+    banned.add('acct-0');
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 'room-1' }, deps())).toEqual({
+      ok: false,
+      error: 'BANNED',
+    });
+  });
+
+  it('accepts the account again once the ban is lifted', async () => {
+    banned.add('acct-0');
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 'room-1' }, deps())).toEqual({
+      ok: false,
+      error: 'BANNED',
+    });
+    banned.delete('acct-0');
+    const res = await authorizeHandshake({ token: 'good-0', matchID: 'room-1' }, deps());
+    expect(res.ok).toBe(true);
+  });
+
+  it('does not log the token on rejection', async () => {
+    await authorizeHandshake({ token: 'secret-token-value', matchID: 'room-1' }, deps());
     expect(JSON.stringify(log.warn.mock.calls)).not.toContain('secret-token-value');
   });
 });

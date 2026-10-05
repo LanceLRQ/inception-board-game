@@ -16,6 +16,8 @@ export const RedisKeys = {
   roomStarting: (roomCode: string) => `${PREFIX}:room:${roomCode}:starting`,
   roomPlayers: (roomCode: string) => `${PREFIX}:room:${roomCode}:players`,
   shortLink: (code: string) => `${PREFIX}:link:${code}`,
+  // 恢复码失败计数（按来源地址）
+  recoverFailures: (ip: string) => `${PREFIX}:recover:fail:${ip}`,
   rateLimit: (key: string) => `${PREFIX}:ratelimit:${key}`,
   matchmakingQueue: () => `${PREFIX}:matchmaking:queue`,
 } as const;

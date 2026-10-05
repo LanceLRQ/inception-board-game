@@ -50,7 +50,7 @@ cd inception-board-game/game
 ./scripts/prod.sh init
 ```
 
-动作：创建数据目录 `deploy/prod/data/`；`.env` 不存在时从 `.env.example` 复制；`JWT_SECRET`、`POSTGRES_PASSWORD`、`REDIS_PASSWORD` 为空时各生成一个随机值写回 `.env`（已有值不覆盖）；最后写入锁文件 `deploy/prod/.init.lock`，重复运行会被拦下。
+动作：创建数据目录 `deploy/prod/data/`；`.env` 不存在时从 `.env.example` 复制；`JWT_SECRET`、`RECOVERY_CODE_PEPPER`、`POSTGRES_PASSWORD`、`REDIS_PASSWORD` 为空时各生成一个随机值写回 `.env`（已有值不覆盖）；最后写入锁文件 `deploy/prod/.init.lock`，重复运行会被拦下。
 
 随后按需检查 `.env`，生产至少把 `WS_CORS_ORIGIN` 改成前端域名。
 
@@ -82,6 +82,9 @@ cd inception-board-game/game
 | 变量 | 必改 | 说明 |
 | --- | --- | --- |
 | `JWT_SECRET` | 必填 | JWT 签名密钥；留空由 `prod.sh init` 生成 |
+| `RECOVERY_CODE_PEPPER` | 必填 | 恢复码哈希密钥；留空由 `prod.sh init` / `prod.sh secrets` 生成。生产环境缺失或短于 16 个字符时服务启动即退出。更换后已发出的恢复码全部失效，请勿随意修改 |
+| `OPERATOR_TOKEN` | 可选 | 运营接口（封禁 / 解封等）的访问令牌；留空即关闭运营接口。至少 16 个字符，更短的视为未配置（接口保持关闭，启动时打一条警告），建议用长随机串 |
+| `OPERATOR_ID` | 可选 | 运营操作员标识，写入封禁 / 解封的日志；留空用默认值 |
 | `POSTGRES_PASSWORD` | 必填 | 数据库密码；留空由 `prod.sh init` 生成 |
 | `REDIS_PASSWORD` | 必填 | Redis 密码；留空由 `prod.sh init` 生成。只用字母和数字：它会被拼进连接地址，特殊字符需要转义 |
 | `POSTGRES_DB` / `POSTGRES_USER` | 可选 | 数据库名与用户，默认 `icgame` |
@@ -159,13 +162,24 @@ REGISTRY_PASSWORD=...
 ./scripts/prod.sh compose exec postgres psql -U icgame
 ```
 
+### 补生成缺失密钥
+
+```bash
+./scripts/prod.sh secrets
+```
+
+给 `.env` 里为空或缺失的必填密钥（`JWT_SECRET`、`RECOVERY_CODE_PEPPER`、`POSTGRES_PASSWORD`、`REDIS_PASSWORD`）补生成随机值，已有值不动；不受初始化锁限制。
+
 ### 更新部署
 
 ```bash
 git pull
+./scripts/prod.sh secrets      # 补生成新版本新增的必填密钥（已有值不动；没有新增时什么都不会改）
 ./scripts/prod.sh build        # 或在配置了仓库后 ./scripts/prod.sh pull
 ./scripts/prod.sh restart
 ```
+
+`init` 只能运行一次（有锁文件），而新版本可能新增必填密钥（例如 `RECOVERY_CODE_PEPPER`）。已经初始化过的部署更新后，如果直接启动被提示「某某未设置」，运行 `./scripts/prod.sh secrets` 即可，它不受初始化锁限制，只给 `.env` 里为空或缺失的必填密钥补生成。
 
 ### 数据库迁移（手动触发）
 
@@ -228,7 +242,7 @@ cp .env.example .env              # 开发用的变量保持默认即可
 
 ### 启动时提示 `JWT_SECRET 未设置` / `POSTGRES_PASSWORD 未设置` / `REDIS_PASSWORD 未设置`
 
-`.env` 里没配对应项。运行 `./scripts/prod.sh init`，或手动补上（只有这三项没有默认值）。
+`.env` 里没配对应项。首次部署运行 `./scripts/prod.sh init`；已经初始化过的部署运行 `./scripts/prod.sh secrets`（只补缺失项，已有值不动），或手动补上。
 
 ### `api` 容器健康检查失败
 

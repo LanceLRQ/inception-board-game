@@ -1,7 +1,7 @@
 // 回放 API
 //
 // 端点：
-//   GET  /replays/:id            - 元信息（对局信息 + 事件条数）
+//   GET  /replays/:id            - 元信息（需登录；对局信息 + 事件条数，未结束时不含阵营与胜负）
 //   GET  /replays/:id/events     - 全部步骤（游标分页，按观察者座位裁剪）
 //   GET  /replays/:id/range      - 步进切片（版本号闭区间，按观察者座位裁剪）
 //   GET  /replays/:id/frames     - 帧总览（起止版本号与总步数，播放器进度条用）
@@ -20,6 +20,7 @@ import Router from '@koa/router';
 import { z } from 'zod';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
+import { isUuid } from '../infra/uuid.js';
 import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { MatchArchive, StepRow } from '../match/MatchArchive.js';
@@ -30,6 +31,7 @@ import {
   type ShortLinkTargetType,
 } from '../services/ShortLinkService.js';
 import { loadFinishedMatch, optionalAccountId, toStepView } from './archiveEvents.js';
+import { toMatchOutcome, toMatchPlayerViews, type MatchMetaRow } from './matchMeta.js';
 
 /** 导出文件里的对局信息 */
 export interface ReplayDownloadMeta {
@@ -46,6 +48,10 @@ export interface ReplaysRouterDeps {
   archive: MatchArchive;
   /** 导出时的对局信息；不给时读数据库 */
   loadDownloadMeta?: (matchID: string) => Promise<ReplayDownloadMeta | null>;
+  /** 读对局元信息（含玩家）；不给时读数据库 */
+  loadMatch?: (matchID: string) => Promise<MatchMetaRow | null>;
+  /** 统计对局事件条数；不给时读数据库 */
+  countEvents?: (matchID: string) => Promise<number>;
 }
 
 async function loadDownloadMetaFromDb(matchID: string): Promise<ReplayDownloadMeta | null> {
@@ -191,17 +197,19 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
   const router = new Router();
   const { archive } = deps;
   const loadDownloadMeta = deps.loadDownloadMeta ?? loadDownloadMetaFromDb;
+  const loadMatch =
+    deps.loadMatch ??
+    ((matchID: string) =>
+      prisma.match.findUnique({ where: { id: matchID }, include: { matchPlayers: true } }));
+  const countEvents =
+    deps.countEvents ??
+    ((matchID: string) => prisma.matchEvent.count({ where: { matchId: matchID } }));
 
-  // GET /replays/:id - 回放元信息
-  router.get('/replays/:id', async (ctx) => {
+  // GET /replays/:id - 回放元信息（需登录；未结束时不含阵营与胜负）
+  router.get('/replays/:id', authMiddleware, async (ctx) => {
     const { id } = ctx.params;
-    const match = await prisma.match.findUnique({
-      where: { id },
-      include: { matchPlayers: true },
-    });
+    const match = isUuid(id!) ? await loadMatch(id!) : null;
     if (!match) throw new AppError('NOT_FOUND', 'Replay not found');
-
-    const eventCount = await prisma.matchEvent.count({ where: { matchId: id } });
 
     ctx.body = {
       id: match.id,
@@ -210,17 +218,9 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
       playerCount: match.playerCount,
       startedAt: match.startedAt,
       endedAt: match.endedAt,
-      winner: match.winner,
-      winReason: match.winReason,
-      eventCount,
-      players: match.matchPlayers.map((mp) => ({
-        seat: mp.seat,
-        nickname: mp.nickname,
-        isBot: mp.isBot,
-        role: mp.role,
-        finalFaction: mp.finalFaction,
-        won: mp.won,
-      })),
+      ...toMatchOutcome(match),
+      eventCount: await countEvents(id!),
+      players: toMatchPlayerViews(match),
     };
   });
 

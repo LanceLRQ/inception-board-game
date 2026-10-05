@@ -8,12 +8,16 @@ import type Koa from 'koa';
 import type { Middleware } from 'koa';
 import { createApp } from './app.js';
 import type { IdentityPrisma } from './api/identity.js';
+import type { ReportsRouterDeps } from './api/reports.js';
 import { logger } from './infra/logger.js';
 import type { MatchArchive } from './match/MatchArchive.js';
 import type { RoomDeps } from './match/MatchRoom.js';
 import { MatchService } from './match/MatchService.js';
 import type { MatchStore } from './match/MatchStore.js';
 import { DEFAULT_TIMING, type TimingConfig } from './match/scheduling.js';
+import { prisma } from './infra/postgres.js';
+import { createBanChecker, type BanChecker } from './services/BanChecker.js';
+import type { RecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js';
 import { BotManager } from './services/BotManager.js';
 import { ChatService } from './services/ChatService.js';
 import { LobbyService, type LobbyPrisma, type LobbyRedis } from './services/LobbyService.js';
@@ -31,6 +35,12 @@ export interface RealtimeDeps {
   lobbyPrisma?: LobbyPrisma;
   /** 身份接口的数据库访问；默认全局数据库客户端 */
   identityPrisma?: IdentityPrisma;
+  /** 恢复码失败限速计数器；默认进程内实现（生产入口传 Redis 实现） */
+  recoverLimiter?: RecoverAttemptLimiter;
+  /** 封禁查询器；默认在身份数据库（未给时用全局数据库）上建带缓存的实现 */
+  bans?: BanChecker;
+  /** 举报接口依赖；不给时用全局数据库，null 表示不挂载 */
+  reports?: ReportsRouterDeps | null;
   heartbeatRedis?: HeartbeatRedis;
   /** 默认 InMemoryRateGuard */
   rateGuard?: RateGuardMutable;
@@ -71,12 +81,13 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
   const registry = new ConnectionRegistry();
   const heartbeat = new HeartbeatManager(deps.heartbeatRedis);
   const moveGateway = new MoveGateway(deps.rateGuard ?? new InMemoryRateGuard());
+  const bans = deps.bans ?? createBanChecker(deps.identityPrisma ?? prisma);
 
   // 聊天先挂一个转调网关的广播函数；网关建好之后才有真正的广播
   const chat = new ChatService((matchID, msg) => gateway.broadcastToMatch(matchID, msg));
   const router = new WSMessageRouter({ heartbeat, bot, chat });
   const gateway = new SocketGateway(
-    { registry, router, bot, heartbeat, moveGateway },
+    { registry, router, bot, heartbeat, moveGateway, bans },
     deps.ws ?? {},
   );
 
@@ -105,6 +116,10 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     rateLimit: deps.httpRateLimit,
     archive: deps.archive,
     identityPrisma: deps.identityPrisma,
+    recoverLimiter: deps.recoverLimiter,
+    bans,
+    disconnectPlayer: (playerId) => gateway.disconnectPlayer(playerId),
+    ...(deps.reports !== undefined ? { reports: deps.reports } : {}),
     corsOrigin: deps.ws?.corsOrigin,
     trustProxy: deps.trustProxy,
   });

@@ -9,10 +9,11 @@ import type { MatchEvent } from '@icgame/game-engine/runner';
 import { signToken } from '../infra/jwt.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import { InMemoryMatchArchive, type StepRow } from '../match/MatchArchive.js';
+import type { MatchMetaRow } from '../api/matchMeta.js';
 import { makeTestSnapshot } from '../match/MatchStore.contract.js';
 
-export const FINISHED_ID = 'm-finished';
-export const RUNNING_ID = 'm-running';
+export const FINISHED_ID = '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c01';
+export const RUNNING_ID = '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c02';
 export const STEP_COUNT = 5;
 
 export const ACCOUNT_SEAT0 = 'account-seat0';
@@ -56,7 +57,7 @@ function stepRow(matchID: string, stateID: number): StepRow {
   };
 }
 
-/** 建一个归档：m-finished 已结束、m-running 进行中，两局都有 5 步 */
+/** 建一个归档：FINISHED_ID 已结束、RUNNING_ID 进行中，两局都有 5 步 */
 export async function seedArchive(): Promise<InMemoryMatchArchive> {
   const archive = new InMemoryMatchArchive();
   for (const matchID of [FINISHED_ID, RUNNING_ID]) {
@@ -83,6 +84,8 @@ export interface JsonBody {
   steps: unknown[];
   matchID: string;
   winner: string | null;
+  winReason: string | null;
+  players: Array<Record<string, unknown>>;
 }
 
 export interface TestServer {
@@ -115,5 +118,43 @@ export async function serveRouter(router: Router): Promise<TestServer> {
       return { status: res.status, text, json: parseJson(text) };
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+/** 对局元信息夹具：结束的 FINISHED_ID 带阵营与胜负，进行中的 RUNNING_ID 也带，用来验证路由会不会漏出去 */
+export function fixtureMatchMeta(id: string): MatchMetaRow | null {
+  if (id !== FINISHED_ID && id !== RUNNING_ID) return null;
+  const finished = id === FINISHED_ID;
+  return {
+    id,
+    roomId: null,
+    ruleVariant: 'classic',
+    exEnabled: false,
+    expansionEnabled: false,
+    playerCount: 2,
+    startedAt: new Date(0),
+    endedAt: finished ? new Date(1000) : null,
+    winner: 'thief',
+    winReason: 'vault_opened',
+    matchPlayers: [
+      {
+        seat: 0,
+        nickname: 'A',
+        isBot: false,
+        role: 'master',
+        finalFaction: 'master',
+        won: false,
+        abandoned: false,
+      },
+      {
+        seat: 1,
+        nickname: 'B',
+        isBot: false,
+        role: 'thief',
+        finalFaction: 'thief',
+        won: true,
+        abandoned: false,
+      },
+    ],
   };
 }

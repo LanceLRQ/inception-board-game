@@ -6,6 +6,7 @@ import {
   ACCOUNT_OUTSIDER,
   ACCOUNT_SEAT1,
   FINISHED_ID,
+  fixtureMatchMeta,
   RUNNING_ID,
   SEAT1_SECRET,
   seedArchive,
@@ -26,7 +27,12 @@ afterEach(async () => {
 });
 
 async function setup(): Promise<TestServer> {
-  server = await serveRouter(createMatchesRouter({ archive: await seedArchive() }));
+  server = await serveRouter(
+    createMatchesRouter({
+      archive: await seedArchive(),
+      loadMatch: async (id) => fixtureMatchMeta(id),
+    }),
+  );
   return server;
 }
 
@@ -68,5 +74,49 @@ describe('GET /matches/:id/events', () => {
     expect(second.json.data.map((d: { stateID: number }) => d.stateID)).toEqual([4, 5]);
     expect(second.json.hasMore).toBe(false);
     expect(second.json.nextCursor).toBeNull();
+  });
+});
+
+describe('GET /matches/:id', () => {
+  it('未登录 → 401', async () => {
+    const s = await setup();
+    expect((await s.get(`/matches/${FINISHED_ID}`)).status).toBe(401);
+  });
+
+  it('对局不存在 → 404', async () => {
+    const s = await setup();
+    expect((await s.get('/matches/nope', tokenFor(ACCOUNT_OUTSIDER))).status).toBe(404);
+  });
+
+  it('ID 不是 UUID → 404，且不去查库', async () => {
+    const loadMatch = vi.fn(async () => null);
+    server = await serveRouter(createMatchesRouter({ archive: await seedArchive(), loadMatch }));
+    expect((await server.get('/matches/nope', tokenFor(ACCOUNT_OUTSIDER))).status).toBe(404);
+    expect(loadMatch).not.toHaveBeenCalled();
+  });
+
+  it('未结束：玩家不含阵营 / 角色 / 胜负字段，胜者与原因为空', async () => {
+    const s = await setup();
+    const res = await s.get(`/matches/${RUNNING_ID}`, tokenFor(ACCOUNT_OUTSIDER));
+    expect(res.status).toBe(200);
+    expect(res.json.winner).toBeNull();
+    expect(res.json.winReason).toBeNull();
+    for (const p of res.json.players) {
+      expect(Object.keys(p).sort()).toEqual(['isBot', 'nickname', 'seat']);
+    }
+  });
+
+  it('已结束：照常返回阵营、胜负与结算原因', async () => {
+    const s = await setup();
+    const res = await s.get(`/matches/${FINISHED_ID}`, tokenFor(ACCOUNT_OUTSIDER));
+    expect(res.status).toBe(200);
+    expect(res.json.winner).toBe('thief');
+    expect(res.json.winReason).toBe('vault_opened');
+    expect(res.json.players[1]).toMatchObject({
+      role: 'thief',
+      finalFaction: 'thief',
+      won: true,
+      abandoned: false,
+    });
   });
 });

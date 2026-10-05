@@ -82,6 +82,8 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     lobbyRedis: redis,
     lobbyPrisma: identity,
     identityPrisma: identity,
+    // 内存服务没有对局成员表，不挂举报接口
+    reports: null,
     heartbeatRedis: redis,
     rateGuard: new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
     timing: opts.timing ?? devTimingFromEnv(process.env),

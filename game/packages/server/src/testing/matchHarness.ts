@@ -20,11 +20,13 @@ import {
   type MatchEvent,
   type MatchState,
 } from '@icgame/game-engine/runner';
+import type { IdentityPrisma } from '../api/identity.js';
 import { buildRealtime, type Realtime } from '../bootstrap.js';
 import { signToken } from '../infra/jwt.js';
 import { InMemoryMatchArchive, type MatchArchive } from '../match/MatchArchive.js';
 import { InMemoryMatchStore, type MatchStore } from '../match/MatchStore.js';
 import type { TimingConfig } from '../match/scheduling.js';
+import { InMemoryBanChecker } from '../services/BanChecker.js';
 import { BotManager, type BotManagerOptions } from '../services/BotManager.js';
 import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
 import { InMemoryRateGuard, type RateGuardMutable } from '../services/RateGuardService.js';
@@ -45,6 +47,9 @@ export interface ServerOptions {
   archive?: MatchArchive;
   timing?: Partial<TimingConfig>;
   rateGuard?: RateGuardMutable;
+  bans?: InMemoryBanChecker;
+  /** 身份与运营接口读写的数据库；测试用内存实现，不给时用全局数据库 */
+  identityPrisma?: IdentityPrisma;
   bot?: BotManagerOptions;
   /** 起来后立即从存储恢复活跃对局 */
   restore?: boolean;
@@ -57,6 +62,8 @@ export interface TestServer {
   archive: MatchArchive;
   /** 服务端正在使用的排程时长对象；改它再让房间重新排程即可调整节奏 */
   timing: TimingConfig;
+  /** 服务端使用的封禁查询器 */
+  bans: InMemoryBanChecker;
   stop(): Promise<void>;
 }
 
@@ -64,6 +71,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<TestServer>
   const store = opts.store ?? new InMemoryMatchStore();
   const archive = opts.archive ?? new InMemoryMatchArchive();
   const timing: TimingConfig = { ...FAST_TIMING, ...opts.timing };
+  const bans = opts.bans ?? new InMemoryBanChecker();
   const noop = async (): Promise<null> => null;
   const rt = buildRealtime({
     store,
@@ -77,6 +85,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<TestServer>
     },
     heartbeatRedis: { get: noop, setex: async () => 'OK', del: async () => 1 },
     rateGuard: opts.rateGuard ?? new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
+    bans,
+    ...(opts.identityPrisma ? { identityPrisma: opts.identityPrisma } : {}),
     timing,
     // 周期 tick 在测试里没有意义：接管由测试手动调用 tick() 推进
     bot: new BotManager({ tickIntervalMs: 3_600_000, ...opts.bot }),
@@ -92,6 +102,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<TestServer>
     store,
     archive,
     timing,
+    bans,
     stop: () => rt.stop(),
   };
 }

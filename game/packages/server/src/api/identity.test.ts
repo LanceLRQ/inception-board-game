@@ -56,4 +56,43 @@ describe('身份路由使用注入的数据库', () => {
     expect(recovered.status).toBe(200);
     expect(await recovered.json()).toMatchObject({ playerId: created.playerId });
   });
+
+  async function post(base: string, path: string, body: unknown, token?: string, method = 'POST') {
+    return fetch(`${base}${path}`, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('建档时昵称存规范化后的值；全空白与违禁词被拒绝', async () => {
+    const base = await start();
+    const ok = await post(base, '/identity/init', { nickname: '  ＡＢ\u200B  c ' });
+    expect(ok.status).toBe(201);
+    expect(await ok.json()).toMatchObject({ nickname: 'AB c' });
+    expect((await post(base, '/identity/init', { nickname: '   ' })).status).toBe(400);
+    expect((await post(base, '/identity/init', { nickname: '官方客服' })).status).toBe(400);
+    expect((await post(base, '/identity/init', { nickname: 'x'.repeat(21) })).status).toBe(400);
+  });
+
+  it('修改昵称同样规范化并拒绝非法值，令牌里带新昵称', async () => {
+    const base = await start();
+    const created = (await (await post(base, '/identity/init', { nickname: '甲' })).json()) as {
+      token: string;
+    };
+    const bad = await post(
+      base,
+      '/identity/me',
+      { nickname: 'x'.repeat(21) },
+      created.token,
+      'PATCH',
+    );
+    expect(bad.status).toBe(400);
+    const good = await post(base, '/identity/me', { nickname: ' ＺＺ ' }, created.token, 'PATCH');
+    expect(good.status).toBe(200);
+    expect(await good.json()).toMatchObject({ nickname: 'ZZ' });
+  });
 });

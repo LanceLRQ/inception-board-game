@@ -16,6 +16,7 @@ import type { BroadcastableMessage, ClientMessage, ServerMessage } from './types
 import type { WSMessageRouter } from './messageRouter.js';
 import type { ConnectionRegistry } from './connectionRegistry.js';
 import type { BotManager } from '../services/BotManager.js';
+import type { BanChecker } from '../services/BanChecker.js';
 import type { MoveGateway } from '../services/MoveGateway.js';
 import type { HeartbeatManager } from './heartbeat.js';
 import type { MatchRoom, StepOutput } from '../match/MatchRoom.js';
@@ -36,6 +37,7 @@ export interface GatewayDeps {
   readonly bot: BotManager;
   readonly heartbeat: HeartbeatManager;
   readonly moveGateway: Pick<MoveGateway, 'accept' | 'commit' | 'consumeRate'>;
+  readonly bans: Pick<BanChecker, 'isBanned'>;
 }
 
 export interface GatewayOptions {
@@ -81,15 +83,22 @@ export class SocketGateway {
     io.use((socket, next) => {
       const matches = this.matches;
       if (matches === null) return next(new Error('NOT_IN_MATCH'));
-      const result = authorizeHandshake(socket.handshake.auth, { verifyToken, matches });
-      if (!result.ok) return next(new Error(result.error));
-      (socket.data as AuthenticatedSocketData) = {
-        playerID: result.playerID,
-        matchID: result.matchID,
-        nickname: result.nickname,
-        seat: result.seat,
-      };
-      next();
+      authorizeHandshake(socket.handshake.auth, { verifyToken, matches, bans: this.deps.bans })
+        .then((result) => {
+          if (!result.ok) return next(new Error(result.error));
+          (socket.data as AuthenticatedSocketData) = {
+            playerID: result.playerID,
+            matchID: result.matchID,
+            nickname: result.nickname,
+            seat: result.seat,
+          };
+          next();
+        })
+        .catch((err: unknown) => {
+          // 封禁查询失败时拒绝连接，而不是放行
+          logger.error({ err }, 'ws handshake check failed');
+          next(new Error('AUTH_INVALID'));
+        });
     });
 
     io.on('connection', (socket) => this.onConnection(socket));
@@ -140,6 +149,16 @@ export class SocketGateway {
     for (const sid of this.deps.registry.getSocketsByPlayer(playerID)) {
       this.emitTo(sid, msg);
     }
+  }
+
+  /** 断开某账号的全部连接（封禁生效时调用）；返回断开的连接数。座位随后走掉线托管 */
+  disconnectPlayer(playerID: string, code = 'BANNED', message = 'Account is banned'): number {
+    const sids = [...this.deps.registry.getSocketsByPlayer(playerID)];
+    for (const sid of sids) {
+      this.emitTo(sid, { type: 'icg:error', code, message });
+      this.io?.sockets.sockets.get(sid)?.disconnect(true);
+    }
+    return sids.length;
   }
 
   /** 一步完成后：按每条连接的座位各发一份视图与事件 */

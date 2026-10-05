@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
+import { nicknameSchema } from '../infra/nicknameSchema.js';
 import { AVATAR_PALETTES, generatePixelAvatar } from '@icgame/shared';
 
 const router = new Router();
@@ -24,9 +25,9 @@ router.get('/players/me', authMiddleware, async (ctx) => {
 });
 
 // PATCH /players/me - 更新头像 seed / 昵称
-const updateMeSchema = z.object({
+export const updateMeSchema = z.object({
   avatarSeed: z.string().min(1).max(128).optional(),
-  nickname: z.string().min(1).max(50).optional(),
+  nickname: nicknameSchema.optional(),
 });
 
 router.patch('/players/me', authMiddleware, async (ctx) => {

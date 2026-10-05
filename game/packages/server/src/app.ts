@@ -13,8 +13,15 @@ import { createMatchesRouter } from './api/matches.js';
 import { createReplaysRouter } from './api/replays.js';
 import { PrismaMatchArchive, type MatchArchive } from './match/MatchArchive.js';
 import { prisma } from './infra/postgres.js';
-import { reportsRouter } from './api/reports.js';
-import { adminRouter } from './api/admin.js';
+import {
+  createDefaultReportsDeps,
+  createReportsRouter,
+  type ReportsRouterDeps,
+} from './api/reports.js';
+import { createAdminRouter } from './api/admin.js';
+import { banCheckerContext } from './middleware/auth.js';
+import { createBanChecker, type BanChecker } from './services/BanChecker.js';
+import type { RecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js';
 import { chatRouter } from './api/chat.js';
 import { shortLinkRouter } from './api/shortLink.js';
 
@@ -26,6 +33,14 @@ export interface AppDeps {
   archive?: MatchArchive;
   /** 身份接口的数据库访问；不给时用全局数据库客户端 */
   identityPrisma?: IdentityPrisma;
+  /** 恢复码失败限速计数器；不给时用进程内实现 */
+  recoverLimiter?: RecoverAttemptLimiter;
+  /** 封禁查询器；鉴权中间件与运营接口共用。不给时用全局数据库 */
+  bans?: BanChecker;
+  /** 断开某账号现有的全部连接，返回断开数；封禁生效时由运营接口调用 */
+  disconnectPlayer?: (playerId: string) => number;
+  /** 举报接口的依赖；不给时用全局数据库；传 null 表示不挂举报路由（全内存服务没有对局成员表） */
+  reports?: ReportsRouterDeps | null;
   /** 允许跨域访问的页面源；不给时不处理跨域 */
   corsOrigin?: string | string[];
   /** 位于反向代理之后时开启：来源地址取 X-Forwarded-For。后端端口直接暴露公网时不要开启 */
@@ -54,8 +69,15 @@ export function createApp(deps: AppDeps = {}): Koa {
     logger.info({ method: ctx.method, url: ctx.url, status: ctx.status, ms }, 'request');
   });
 
+  // 封禁查询器挂到上下文，各路由里的 authMiddleware 据此拒绝被封禁的账号
+  const bans = deps.bans ?? createBanChecker(deps.identityPrisma ?? prisma);
+  app.use(banCheckerContext(bans));
+
   // API 路由（按前缀挂载）
-  const identityRouter = createIdentityRouter({ prisma: deps.identityPrisma });
+  const identityRouter = createIdentityRouter({
+    prisma: deps.identityPrisma,
+    recoverLimiter: deps.recoverLimiter,
+  });
   app.use(identityRouter.routes());
   app.use(identityRouter.allowedMethods());
 
@@ -71,10 +93,18 @@ export function createApp(deps: AppDeps = {}): Koa {
   app.use(matchesRouter.routes());
   app.use(matchesRouter.allowedMethods());
 
-  app.use(reportsRouter.routes());
-  app.use(reportsRouter.allowedMethods());
+  if (deps.reports !== null) {
+    const reportsRouter = createReportsRouter(deps.reports ?? createDefaultReportsDeps());
+    app.use(reportsRouter.routes());
+    app.use(reportsRouter.allowedMethods());
+  }
 
-  // 运营面板（W22-B Sprint 2）
+  // 运营面板：举报审核与账号封禁
+  const adminRouter = createAdminRouter({
+    ...(deps.identityPrisma ? { players: deps.identityPrisma.player } : {}),
+    bans,
+    ...(deps.disconnectPlayer ? { disconnectPlayer: deps.disconnectPlayer } : {}),
+  });
   app.use(adminRouter.routes());
   app.use(adminRouter.allowedMethods());
 

@@ -1,7 +1,7 @@
 // 对局 API
 //
 // 端点：
-//   GET  /matches/:id          - 对局元信息
+//   GET  /matches/:id          - 对局元信息（需登录；未结束时不含阵营与胜负）
 //   GET  /matches/:id/events   - 对局步骤（需登录；游标分页，按观察者座位裁剪）
 //   POST /matches/local-upload - 人机对局上传（骨架）
 //
@@ -12,25 +12,31 @@ import Router from '@koa/router';
 import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
+import { isUuid } from '../infra/uuid.js';
 import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
 import type { MatchArchive } from '../match/MatchArchive.js';
 import { loadFinishedMatch, toStepView } from './archiveEvents.js';
+import { toMatchOutcome, toMatchPlayerViews, type MatchMetaRow } from './matchMeta.js';
 
 export interface MatchesRouterDeps {
   archive: MatchArchive;
+  /** 读对局元信息（含玩家）；不给时读数据库 */
+  loadMatch?: (matchID: string) => Promise<MatchMetaRow | null>;
+}
+
+async function loadMatchFromDb(matchID: string): Promise<MatchMetaRow | null> {
+  return prisma.match.findUnique({ where: { id: matchID }, include: { matchPlayers: true } });
 }
 
 export function createMatchesRouter(deps: MatchesRouterDeps): Router {
   const router = new Router();
   const { archive } = deps;
+  const loadMatch = deps.loadMatch ?? loadMatchFromDb;
 
-  // GET /matches/:id - 对局元信息
-  router.get('/matches/:id', async (ctx) => {
-    const { id } = ctx.params;
-    const match = await prisma.match.findUnique({
-      where: { id },
-      include: { matchPlayers: true },
-    });
+  // GET /matches/:id - 对局元信息（需登录；未结束时不含阵营与胜负）
+  router.get('/matches/:id', authMiddleware, async (ctx) => {
+    const matchID = ctx.params.id!;
+    const match = isUuid(matchID) ? await loadMatch(matchID) : null;
     if (!match) throw new AppError('NOT_FOUND', 'Match not found');
 
     ctx.body = {
@@ -42,17 +48,8 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
       playerCount: match.playerCount,
       startedAt: match.startedAt,
       endedAt: match.endedAt,
-      winner: match.winner,
-      winReason: match.winReason,
-      players: match.matchPlayers.map((mp) => ({
-        seat: mp.seat,
-        nickname: mp.nickname,
-        isBot: mp.isBot,
-        role: mp.role,
-        finalFaction: mp.finalFaction,
-        won: mp.won,
-        abandoned: mp.abandoned,
-      })),
+      ...toMatchOutcome(match),
+      players: toMatchPlayerViews(match),
     };
   });
 

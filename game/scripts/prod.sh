@@ -48,6 +48,8 @@ set_env_value() {
     awk -v k="$key" -v v="$value" 'BEGIN{p=k"="} index($0,p)==1 {print p v; next} {print}' "$ENV_FILE" > "$tmp"
   else
     cat "$ENV_FILE" > "$tmp"
+    # 文件末尾没有换行时先补一个，避免新行被接到上一行后面
+    if [ -n "$(tail -c1 "$ENV_FILE" 2>/dev/null)" ]; then echo >> "$tmp"; fi
     echo "${key}=${value}" >> "$tmp"
   fi
   cat "$tmp" > "$ENV_FILE"
@@ -341,6 +343,36 @@ compose_up() {
 }
 
 # ============================================
+# 必填密钥
+# ============================================
+# init 与 secrets 共用同一份清单与生成逻辑：.env 里为空或缺失的才生成，已有值不动
+REQUIRED_SECRETS=(JWT_SECRET RECOVERY_CODE_PEPPER POSTGRES_PASSWORD REDIS_PASSWORD)
+
+ensure_secrets() {
+  local key current
+  for key in "${REQUIRED_SECRETS[@]}"; do
+    current=$(get_env_value "$key")
+    if [ -z "$current" ]; then
+      set_env_value "$key" "$(random_token 48)"
+      echo "[*] $key 为空，已生成随机值并写入 .env"
+    else
+      echo "[OK] $key 已存在，跳过生成"
+    fi
+  done
+  echo "    这些值只保存在 .env 里，请妥善保管，切勿外传或提交进仓库"
+}
+
+# 给已初始化过的部署补生成新版本新增的必填密钥；不受初始化锁限制
+secrets_prod() {
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "[X] 未找到 ${ENV_FILE}，请先运行 ./scripts/prod.sh init" >&2
+    return 1
+  fi
+  echo "[*] 检查必填密钥（已有值的不覆盖）..."
+  ensure_secrets
+}
+
+# ============================================
 # 初始化生产环境
 # ============================================
 init_prod() {
@@ -370,17 +402,7 @@ init_prod() {
   echo ""
 
   echo "[3/4] 生成必填密钥（已有值的不覆盖）..."
-  local key current
-  for key in JWT_SECRET POSTGRES_PASSWORD REDIS_PASSWORD; do
-    current=$(get_env_value "$key")
-    if [ -z "$current" ]; then
-      set_env_value "$key" "$(random_token 48)"
-      echo "[*] $key 为空，已生成随机值并写入 .env"
-    else
-      echo "[OK] $key 已存在，跳过生成"
-    fi
-  done
-  echo "    这些值只保存在 .env 里，请妥善保管，切勿外传或提交进仓库"
+  ensure_secrets
   echo ""
 
   echo "[4/4] 后续步骤指引"
@@ -620,6 +642,7 @@ menu_main() {
     print_menu_item 2 "镜像管理" "构建、推送、拉取、登录仓库"
     print_menu_item 3 "初始化生产环境" "init"
     print_menu_item 4 "日志查看" "api / client / postgres / redis / all"
+    print_menu_item 5 "补生成缺失密钥" "secrets（更新部署后使用）"
     print_exit
 
     local choice
@@ -630,6 +653,7 @@ menu_main() {
       2) menu_image;;
       3) print_running "初始化生产环境"; init_prod || true; pause_and_return;;
       4) menu_logs;;
+      5) print_running "补生成缺失密钥"; secrets_prod || true; pause_and_return;;
       0) echo ""; echo -e "  ${C_DIM}Bye~${C_RESET}"; echo ""; exit 0;;
       *) ;;
     esac
@@ -650,6 +674,8 @@ Usage: ./scripts/prod.sh [command] [options]
 
 初始化:
   init                       初始化生产环境（建数据目录、复制 .env、生成密钥、打印后续指引）
+  secrets                    给 .env 里为空或缺失的必填密钥补生成，已有值不动；
+                             更新到新版本后若提示缺少密钥就运行它（不受初始化锁限制）
 
 Docker Compose 命令:
   start, up                  启动生产容器（postgres、redis、api、client）
@@ -672,6 +698,7 @@ Other:
 Examples:
   ./scripts/prod.sh                 # 进入交互式菜单
   ./scripts/prod.sh init            # 初始化生产环境
+  ./scripts/prod.sh secrets         # 更新部署后补生成新增的必填密钥
   ./scripts/prod.sh build           # 构建 api 与 client 镜像
   ./scripts/prod.sh start           # 启动所有生产容器
   ./scripts/prod.sh health          # 探活
@@ -693,6 +720,8 @@ shift
 case "$cmd" in
   "init")
     init_prod;;
+  "secrets")
+    secrets_prod;;
   "start"|"up")
     compose_up "$@";;
   "stop"|"down")

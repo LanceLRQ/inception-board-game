@@ -1,4 +1,5 @@
 import type { Middleware } from 'koa';
+import { ZodError } from 'zod';
 import { isAppError } from '../infra/errors.js';
 import { logger } from '../infra/logger.js';
 
@@ -10,6 +11,15 @@ export const errorHandler: Middleware = async (ctx, next) => {
     if (isAppError(err)) {
       ctx.status = err.status;
       ctx.body = err.toJSON();
+      return;
+    }
+
+    // 请求体不合规是客户端的错，不能落成 500
+    if (err instanceof ZodError) {
+      ctx.status = 400;
+      ctx.body = {
+        error: { code: 'VALIDATION_ERROR', message: err.issues[0]?.message ?? 'Invalid request' },
+      };
       return;
     }
 

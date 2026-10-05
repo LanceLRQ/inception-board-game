@@ -1,17 +1,16 @@
 // ReportService - 举报收集 + 触发信誉分扣减
-// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
 // 规则：
 //   - 不能自举（senderID === targetID → 拒绝）
-//   - 同一局内同一举报者对同一目标只能举报 1 次
+//   - 同一局内同一举报者对同一目标只能举报 1 次（由归档的唯一约束保证）
 //   - 举报理由白名单（cheating / afk / abusive / other）
 //   - 每次有效举报 → targetID 信誉分 -10
-//   - W22-B：可选 archive 持久化（运营面板审核源）；不传则保持原 logger 归档行为
+//   - 先写归档再扣分；归档失败（含重复）不扣分
 //
-// W22-B 新增：ReportArchive 抽象 — 用于运营审核面板的查询 / 状态流转
+// ReportArchive 抽象：供运营审核面板查询与状态流转
 //   - insert / findById / list（按筛选） / count / updateStatus
 //   - InMemoryReportArchive 默认实现（开发 / 测试用）
-//   - Phase 5 可由 PrismaReportArchive 替换
+//   - 生产环境用 PrismaReportArchive 替换
 
 import { logger } from '../infra/logger.js';
 import type { ReputationService } from './ReputationService.js';
@@ -42,7 +41,7 @@ export type ReportResult =
       readonly code: 'SELF_REPORT' | 'DUPLICATE' | 'INVALID_REASON' | 'INVALID_TARGET';
     };
 
-// === W22-B · 持久化 archive ===
+// === 持久化 archive ===
 
 export type ReportStatus = 'pending' | 'resolved' | 'dismissed';
 
@@ -83,23 +82,30 @@ export interface ReportArchive {
   updateStatus(id: string, patch: ReportStatusPatch): Promise<ReportRecord | null>;
 }
 
+/** 归档层发现同一 (对局, 举报人, 目标) 已有记录时抛出；去重以存储的唯一约束为准 */
+export class DuplicateReportError extends Error {
+  constructor() {
+    super('duplicate report');
+    this.name = 'DuplicateReportError';
+  }
+}
+
 export interface ReportServiceOptions {
   readonly now?: () => Date;
+  /** 举报归档；不传则用进程内存实现（仅供测试 / 内存服务） */
   readonly archive?: ReportArchive;
 }
 
 export class ReportService {
-  /** `${matchID}:${reporterID}:${targetID}` → submitted at */
-  private readonly recent = new Map<string, number>();
   private readonly now: () => Date;
-  private readonly archive: ReportArchive | undefined;
+  private readonly archive: ReportArchive;
 
   constructor(
     private readonly reputation: ReputationService,
     opts: ReportServiceOptions = {},
   ) {
     this.now = opts.now ?? (() => new Date());
-    this.archive = opts.archive;
+    this.archive = opts.archive ?? new InMemoryReportArchive();
   }
 
   async submit(input: SubmitReportInput): Promise<ReportResult> {
@@ -113,33 +119,26 @@ export class ReportService {
       return { ok: false, code: 'SELF_REPORT' };
     }
 
-    const key = `${input.matchID}:${input.reporterID}:${input.targetID}`;
-    if (this.recent.has(key)) {
-      return { ok: false, code: 'DUPLICATE' };
+    // 先落库再扣分：落库失败（含重复）不得扣分；重复由存储的唯一约束判定
+    try {
+      await this.archive.insert({
+        matchID: input.matchID,
+        reporterID: input.reporterID,
+        targetID: input.targetID,
+        reason: input.reason,
+        description: input.description?.slice(0, 500) ?? null,
+        status: 'pending',
+        createdAt: this.now(),
+        resolvedAt: null,
+        resolvedByOperatorID: null,
+        notes: null,
+      });
+    } catch (err) {
+      if (err instanceof DuplicateReportError) return { ok: false, code: 'DUPLICATE' };
+      throw err;
     }
-    this.recent.set(key, this.now().getTime());
 
     const updated = await this.reputation.adjust(input.targetID, 'report');
-
-    // 持久化到 archive（运营可查询）；失败仅 warn，不阻塞主流程
-    if (this.archive) {
-      try {
-        await this.archive.insert({
-          matchID: input.matchID,
-          reporterID: input.reporterID,
-          targetID: input.targetID,
-          reason: input.reason,
-          description: input.description?.slice(0, 500) ?? null,
-          status: 'pending',
-          createdAt: this.now(),
-          resolvedAt: null,
-          resolvedByOperatorID: null,
-          notes: null,
-        });
-      } catch (err) {
-        logger.warn({ err, matchID: input.matchID }, 'report archive failed');
-      }
-    }
 
     logger.info(
       {
@@ -156,23 +155,24 @@ export class ReportService {
 
     return { ok: true, targetNewScore: updated.score };
   }
-
-  /** 对局结束：清理该 match 的重复防护记录（Phase 5 改 Redis 带 TTL） */
-  disposeMatch(matchID: string): void {
-    const prefix = `${matchID}:`;
-    for (const k of this.recent.keys()) {
-      if (k.startsWith(prefix)) this.recent.delete(k);
-    }
-  }
 }
 
-// === 内存 ReportArchive 实现（开发 / 测试用 · Phase 5 升级 PrismaReportArchive）===
+// === 内存 ReportArchive 实现（开发 / 测试用；生产用 PrismaReportArchive）===
 
 export class InMemoryReportArchive implements ReportArchive {
   private readonly records = new Map<string, ReportRecord>();
   private idCounter = 0;
 
   async insert(input: Omit<ReportRecord, 'id'>): Promise<ReportRecord> {
+    for (const r of this.records.values()) {
+      if (
+        r.matchID === input.matchID &&
+        r.reporterID === input.reporterID &&
+        r.targetID === input.targetID
+      ) {
+        throw new DuplicateReportError();
+      }
+    }
     this.idCounter += 1;
     const record: ReportRecord = { ...input, id: `r-${this.idCounter}` };
     this.records.set(record.id, record);

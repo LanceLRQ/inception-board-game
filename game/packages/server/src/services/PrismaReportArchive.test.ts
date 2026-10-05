@@ -1,8 +1,9 @@
 // PrismaReportArchive · 纯函数单元测试
-// W22-B Sprint 2（不连 DB，只覆盖映射 + where 构造）
+// 不连数据库，只覆盖映射与 where 构造
 
 import { describe, it, expect } from 'vitest';
-import { buildWhere, toReportRecord } from './PrismaReportArchive.js';
+import { PrismaReportArchive, buildWhere, toReportRecord } from './PrismaReportArchive.js';
+import { DuplicateReportError } from './ReportService.js';
 
 describe('PrismaReportArchive · buildWhere', () => {
   it('空 filter → 空 where', () => {
@@ -75,5 +76,44 @@ describe('PrismaReportArchive · toReportRecord', () => {
     expect(record.resolvedByOperatorID).toBe('op-1');
     expect(record.resolvedAt).toBe(NOW);
     expect(record.notes).toBe('verified');
+  });
+});
+
+describe('PrismaReportArchive · insert 重复判定', () => {
+  const input = {
+    matchID: 'm1',
+    reporterID: 'p1',
+    targetID: 'p2',
+    reason: 'afk' as const,
+    description: null,
+    status: 'pending' as const,
+    createdAt: new Date(0),
+    resolvedAt: null,
+    resolvedByOperatorID: null,
+    notes: null,
+  };
+
+  it('唯一约束冲突（P2002）转成 DuplicateReportError', async () => {
+    const prisma = {
+      report: {
+        create: async () => {
+          throw Object.assign(new Error('unique'), { code: 'P2002' });
+        },
+      },
+    };
+    const archive = new PrismaReportArchive(prisma as never);
+    await expect(archive.insert(input)).rejects.toBeInstanceOf(DuplicateReportError);
+  });
+
+  it('其他数据库错误原样抛出', async () => {
+    const prisma = {
+      report: {
+        create: async () => {
+          throw new Error('connection lost');
+        },
+      },
+    };
+    const archive = new PrismaReportArchive(prisma as never);
+    await expect(archive.insert(input)).rejects.toThrow('connection lost');
   });
 });

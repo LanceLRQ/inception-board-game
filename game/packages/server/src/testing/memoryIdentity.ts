@@ -20,7 +20,13 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
 
   const player: MemoryIdentityPrisma['player'] = {
     async create({ data }) {
-      const row: IdentityPlayerRow = { ...data, createdAt: new Date(), isBanned: false };
+      const row: IdentityPlayerRow = {
+        ...data,
+        createdAt: new Date(),
+        isBanned: false,
+        banUntil: null,
+        banReason: null,
+      };
       players.set(row.id, row);
       return row;
     },
@@ -35,6 +41,9 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
         nickname: data.nickname ?? row.nickname,
         avatarSeed: data.avatarSeed ?? row.avatarSeed,
         locale: data.locale ?? row.locale,
+        isBanned: data.isBanned ?? row.isBanned,
+        banUntil: data.banUntil === undefined ? row.banUntil : data.banUntil,
+        banReason: data.banReason === undefined ? row.banReason : data.banReason,
       };
       players.set(row.id, next);
       return next;
@@ -60,26 +69,30 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
         ? { playerId: row.playerId, revokedAt: row.revokedAt, player: owner }
         : null;
     },
-    async update({ where, data }) {
-      const row = codes.get(where.codeHash);
-      if (!row) throw new Error('Recovery code not found');
-      row.lastUsedAt = data.lastUsedAt;
-      row.useCount += data.useCount.increment;
-      return row;
-    },
     async updateMany({ where, data }) {
-      for (const row of codes.values()) {
-        if (row.playerId === where.playerId && row.revokedAt === null)
-          row.revokedAt = data.revokedAt;
+      let count = 0;
+      for (const row of [...codes.values()]) {
+        if (row.revokedAt !== null) continue;
+        if (where.playerId !== undefined && row.playerId !== where.playerId) continue;
+        if (where.codeHash !== undefined && row.codeHash !== where.codeHash) continue;
+        row.revokedAt = data.revokedAt;
+        if (data.lastUsedAt) row.lastUsedAt = data.lastUsedAt;
+        if (data.useCount) row.useCount += data.useCount.increment;
+        if (data.codeHash && data.codeHash !== row.codeHash) {
+          codes.delete(row.codeHash);
+          row.codeHash = data.codeHash;
+          codes.set(row.codeHash, row);
+        }
+        count += 1;
       }
-      return { count: 0 };
+      return { count };
     },
     async findMany({ where, take }) {
       return [...codes.values()]
         .filter((r) => r.playerId === where.playerId && r.revokedAt === null)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, take)
-        .map((r) => ({ codeHash: r.codeHash, createdAt: r.createdAt }));
+        .map((r) => ({ createdAt: r.createdAt }));
     },
   };
 

@@ -138,3 +138,7 @@ export type {
   GenerateResult,
   Suffix,
 } from './nickname/generator.js';
+
+// 昵称规范化与校验
+export { NICKNAME_MAX_LENGTH, normalizeNickname, validateNickname } from './nickname/validate.js';
+export type { NicknameValidation } from './nickname/validate.js';

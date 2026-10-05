@@ -1,9 +1,10 @@
-// REST API 错误码定义（参照设计文档 §7.3.1）
+// REST API 错误码定义
 
 export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
+  | 'BANNED'
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'ROOM_FULL'
@@ -17,6 +18,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   VALIDATION_ERROR: 422,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
+  BANNED: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
   ROOM_FULL: 409,

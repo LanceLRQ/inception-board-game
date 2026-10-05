@@ -1,17 +1,17 @@
 // PrismaReportArchive - 基于 Prisma 的 ReportArchive 生产实现
-// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
 //
-// W22-B Sprint 2：把 InMemoryReportArchive 的内存行为映射到 PostgreSQL。
+// 把 InMemoryReportArchive 的内存行为映射到 PostgreSQL。
 // 接口完全对齐 ReportArchive，方便 ReportService / admin API 任意切换注入。
 
 import type { PrismaClient } from '../generated/prisma/client.js';
-import type {
-  ReportArchive,
-  ReportListFilter,
-  ReportRecord,
-  ReportReason,
-  ReportStatus,
-  ReportStatusPatch,
+import {
+  DuplicateReportError,
+  type ReportArchive,
+  type ReportListFilter,
+  type ReportRecord,
+  type ReportReason,
+  type ReportStatus,
+  type ReportStatusPatch,
 } from './ReportService.js';
 
 type PrismaReportRow = {
@@ -49,21 +49,26 @@ export class PrismaReportArchive implements ReportArchive {
   constructor(private readonly prisma: PrismaClient) {}
 
   async insert(input: Omit<ReportRecord, 'id'>): Promise<ReportRecord> {
-    const row = await this.prisma.report.create({
-      data: {
-        matchId: input.matchID,
-        reporterId: input.reporterID,
-        targetId: input.targetID,
-        reason: input.reason,
-        description: input.description,
-        status: input.status,
-        createdAt: input.createdAt,
-        resolvedAt: input.resolvedAt,
-        resolvedByOperatorId: input.resolvedByOperatorID,
-        notes: input.notes,
-      },
-    });
-    return toReportRecord(row);
+    try {
+      const row = await this.prisma.report.create({
+        data: {
+          matchId: input.matchID,
+          reporterId: input.reporterID,
+          targetId: input.targetID,
+          reason: input.reason,
+          description: input.description,
+          status: input.status,
+          createdAt: input.createdAt,
+          resolvedAt: input.resolvedAt,
+          resolvedByOperatorId: input.resolvedByOperatorID,
+          notes: input.notes,
+        },
+      });
+      return toReportRecord(row);
+    } catch (err) {
+      if (isUniqueViolation(err)) throw new DuplicateReportError();
+      throw err;
+    }
   }
 
   async findById(id: string): Promise<ReportRecord | null> {
@@ -119,4 +124,9 @@ export function buildWhere(
   if (filter.targetID !== undefined) where.targetId = filter.targetID;
   if (filter.reporterID !== undefined) where.reporterId = filter.reporterID;
   return where;
+}
+
+/** Prisma 唯一约束冲突的错误码 */
+export function isUniqueViolation(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002';
 }

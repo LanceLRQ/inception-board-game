@@ -134,36 +134,22 @@ describe('ReportService', () => {
     });
   });
 
-  describe('disposeMatch', () => {
-    it('clears the dedup records for that match', async () => {
-      await svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' });
-      svc.disposeMatch('m1');
-      const r = await svc.submit({
-        matchID: 'm1',
-        reporterID: 'p1',
-        targetID: 'p2',
-        reason: 'afk',
-      });
-      // 已清理，应当再次允许（符合"对局结束清理"语义）
-      expect(r.ok).toBe(true);
-    });
-
-    it('does not clear other matches', async () => {
-      await svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' });
-      await svc.submit({ matchID: 'm2', reporterID: 'p1', targetID: 'p2', reason: 'afk' });
-      svc.disposeMatch('m1');
-      const r = await svc.submit({
-        matchID: 'm2',
-        reporterID: 'p1',
-        targetID: 'p2',
-        reason: 'afk',
-      });
-      expect(r.ok).toBe(false);
+  describe('落库失败不扣分', () => {
+    it('归档写入抛错时不扣信誉分，错误向上抛出', async () => {
+      const failing = new InMemoryReportArchive();
+      failing.insert = async () => {
+        throw new Error('db down');
+      };
+      const failingSvc = new ReportService(rep, { archive: failing });
+      await expect(
+        failingSvc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' }),
+      ).rejects.toThrow('db down');
+      expect((await rep.get('p2')).score).toBe(1000);
     });
   });
 });
 
-// === W22-B · ReportArchive 持久化 + 运营查询 ===
+// === ReportArchive 持久化 + 运营查询 ===
 
 describe('ReportService · 注入 ReportArchive 后', () => {
   let archive: InMemoryReportArchive;

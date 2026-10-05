@@ -17,9 +17,10 @@ import {
 import { logger } from '../infra/logger.js';
 import type { MatchRoom, StepOutput } from '../match/MatchRoom.js';
 import type { MatchService } from '../match/MatchService.js';
+import type { BanChecker } from '../services/BanChecker.js';
 import type { MoveGateway } from '../services/MoveGateway.js';
 
-export type HandshakeError = 'AUTH_REQUIRED' | 'AUTH_INVALID' | 'NOT_IN_MATCH';
+export type HandshakeError = 'AUTH_REQUIRED' | 'AUTH_INVALID' | 'BANNED' | 'NOT_IN_MATCH';
 
 export type HandshakeResult =
   | { ok: true; playerID: string; matchID: string; nickname: string; seat: string }
@@ -28,12 +29,16 @@ export type HandshakeResult =
 export interface HandshakeDeps {
   verifyToken(token: string): { playerId: string; nickname: string };
   matches: Pick<MatchService, 'seatOf'>;
+  bans: Pick<BanChecker, 'isBanned'>;
 }
 
 const MATCH_ID_MAX_LENGTH = 64;
 
-/** 握手校验：令牌有效，且账号是这局的真人成员。对局不存在与非成员不作区分 */
-export function authorizeHandshake(auth: unknown, deps: HandshakeDeps): HandshakeResult {
+/** 握手校验：令牌有效、账号未被封禁，且是这局的真人成员。对局不存在与非成员不作区分 */
+export async function authorizeHandshake(
+  auth: unknown,
+  deps: HandshakeDeps,
+): Promise<HandshakeResult> {
   if (auth === null || typeof auth !== 'object') return { ok: false, error: 'AUTH_REQUIRED' };
   const { token, matchID } = auth as { token?: unknown; matchID?: unknown };
   if (typeof token !== 'string' || token === '') return { ok: false, error: 'AUTH_REQUIRED' };
@@ -47,6 +52,11 @@ export function authorizeHandshake(auth: unknown, deps: HandshakeDeps): Handshak
   } catch {
     logger.warn({ matchID, reason: 'AUTH_INVALID' }, 'ws handshake rejected');
     return { ok: false, error: 'AUTH_INVALID' };
+  }
+
+  if (await deps.bans.isBanned(payload.playerId)) {
+    logger.warn({ matchID, playerId: payload.playerId, reason: 'BANNED' }, 'ws handshake rejected');
+    return { ok: false, error: 'BANNED' };
   }
 
   const seat = deps.matches.seatOf(matchID, payload.playerId);

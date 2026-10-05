@@ -47,6 +47,7 @@ describe('SocketGateway.broadcastToMatch', () => {
       bot: {} as never,
       heartbeat: {} as never,
       moveGateway: {} as never,
+      bans: {} as never,
     });
 
     gateway.broadcastToMatch('m1', { type: 'icg:aiTakeover', matchID: 'm1', playerID: '1' });
@@ -58,5 +59,43 @@ describe('SocketGateway.broadcastToMatch', () => {
     gateway.broadcastToMatch('m1', { type: 'icg:step' });
     // @ts-expect-error icg:moveResult 只回给提交者，不能广播
     gateway.broadcastToMatch('m1', { type: 'icg:moveResult' });
+  });
+});
+
+describe('SocketGateway.disconnectPlayer', () => {
+  it('tells every connection of the account it is banned and disconnects it', () => {
+    const emitted: Array<{ sid: string; event: string; payload: unknown }> = [];
+    const disconnected: string[] = [];
+    const registry = {
+      getSocketsByPlayer: (id: string) => (id === 'acct-1' ? ['s1', 's2'] : []),
+    } as unknown as ConnectionRegistry;
+    const gateway = new SocketGateway({
+      registry,
+      router: {} as never,
+      bot: {} as never,
+      heartbeat: {} as never,
+      moveGateway: {} as never,
+      bans: {} as never,
+    });
+    const fakeIo = {
+      to: (sid: string) => ({
+        emit: (event: string, payload: unknown) => emitted.push({ sid, event, payload }),
+      }),
+      sockets: {
+        sockets: new Map(
+          ['s1', 's2', 's3'].map((sid) => [sid, { disconnect: () => disconnected.push(sid) }]),
+        ),
+      },
+    };
+    (gateway as unknown as { io: unknown }).io = fakeIo;
+
+    expect(gateway.disconnectPlayer('acct-1')).toBe(2);
+    expect(disconnected).toEqual(['s1', 's2']);
+    expect(emitted.map((e) => [e.sid, e.event])).toEqual([
+      ['s1', 'icg:error'],
+      ['s2', 'icg:error'],
+    ]);
+    expect(emitted[0]!.payload).toMatchObject({ code: 'BANNED' });
+    expect(gateway.disconnectPlayer('nobody')).toBe(0);
   });
 });

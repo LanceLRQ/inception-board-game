@@ -12,6 +12,7 @@ import {
   ACCOUNT_SEAT1,
   ARGS_SECRET,
   FINISHED_ID,
+  fixtureMatchMeta,
   RUNNING_ID,
   SEAT1_SECRET,
   STEP_COUNT,
@@ -37,6 +38,8 @@ async function setup() {
   server = await serveRouter(
     createReplaysRouter({
       archive,
+      loadMatch: async (id) => fixtureMatchMeta(id),
+      countEvents: async () => STEP_COUNT,
       loadDownloadMeta: async (id) =>
         id === FINISHED_ID
           ? {
@@ -318,5 +321,43 @@ describe('replays · createReplayShareLink', () => {
       null,
     );
     expect(r1.code).not.toBe(r2.code);
+  });
+});
+
+describe('GET /replays/:id', () => {
+  it('未登录 → 401', async () => {
+    const { server: s } = await setup();
+    expect((await s.get(`/replays/${FINISHED_ID}`)).status).toBe(401);
+  });
+
+  it('对局不存在 → 404', async () => {
+    const { server: s } = await setup();
+    expect((await s.get('/replays/nope', tokenFor(ACCOUNT_OUTSIDER))).status).toBe(404);
+  });
+
+  it('ID 不是 UUID → 404，且不去查库', async () => {
+    const loadMatch = vi.fn(async () => null);
+    server = await serveRouter(createReplaysRouter({ archive: await seedArchive(), loadMatch }));
+    expect((await server.get('/replays/nope', tokenFor(ACCOUNT_OUTSIDER))).status).toBe(404);
+    expect(loadMatch).not.toHaveBeenCalled();
+  });
+
+  it('未结束：玩家不含阵营 / 角色 / 胜负字段，胜者与原因为空', async () => {
+    const { server: s } = await setup();
+    const res = await s.get(`/replays/${RUNNING_ID}`, tokenFor(ACCOUNT_OUTSIDER));
+    expect(res.status).toBe(200);
+    expect(res.json.winner).toBeNull();
+    expect(res.json.winReason).toBeNull();
+    for (const p of res.json.players) {
+      expect(Object.keys(p).sort()).toEqual(['isBot', 'nickname', 'seat']);
+    }
+  });
+
+  it('已结束：照常返回阵营与胜负', async () => {
+    const { server: s } = await setup();
+    const res = await s.get(`/replays/${FINISHED_ID}`, tokenFor(ACCOUNT_OUTSIDER));
+    expect(res.status).toBe(200);
+    expect(res.json.winner).toBe('thief');
+    expect(res.json.players[0]).toMatchObject({ role: 'master', finalFaction: 'master' });
   });
 });

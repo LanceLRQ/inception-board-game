@@ -7,6 +7,7 @@ import { signToken } from '../infra/jwt.js';
 import { InMemoryMatchStore } from './MatchStore.js';
 import { InMemoryMatchArchive } from './MatchArchive.js';
 import { InMemoryRateGuard } from '../services/RateGuardService.js';
+import { createMemoryIdentityPrisma } from '../testing/memoryIdentity.js';
 import {
   connect,
   decideMove,
@@ -484,4 +485,92 @@ describe('掉线接管', () => {
     );
     await back.waitFor((c) => c.acceptedCount > 0, '重连后的真人自己行动被接受', 20_000);
   }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// 封禁
+// ---------------------------------------------------------------------------
+
+describe('封禁', () => {
+  async function room() {
+    const server = await boot({
+      timing: { turnTimeoutMs: 60_000, pendingTimeoutMs: 60_000, responseTimeoutCapMs: 60_000 },
+    });
+    const { room: r, accounts } = makeRoom({ humans: 2, bots: 2 });
+    await server.rt.matches.createFromRoom(r);
+    return { server, matchID: r.id, accounts };
+  }
+
+  it('被封禁的账号握手被拒，错误为 BANNED；解封后可连接', async () => {
+    const { server, matchID, accounts } = await room();
+    const acct = accounts[0]!;
+    const token = signToken({ playerId: acct.playerId, nickname: acct.nickname });
+    server.bans.ban(acct.playerId);
+    const out = await tryConnect(server.url, token, matchID, acct.playerId);
+    expect(out).toEqual({ ok: false, reason: 'BANNED' });
+
+    server.bans.unban(acct.playerId);
+    const again = await tryConnect(server.url, token, matchID, acct.playerId);
+    expect(again.ok).toBe(true);
+    if (again.ok) track(again.client);
+  });
+
+  it('网关按账号断开现有连接：连接收到 BANNED 并被断开，其他账号不受影响', async () => {
+    const { server, matchID, accounts } = await room();
+    const [a, b] = await joinAll(server, accounts, matchID);
+    const second = track(await connect(server, accounts[0]!, matchID));
+
+    expect(server.rt.gateway.disconnectPlayer(accounts[0]!.playerId)).toBe(2);
+    await waitUntil(() => !a!.connected && !second.connected, '被封禁账号的连接全部断开');
+    expect(
+      a!.received.some(
+        (r) => r.event === 'icg:error' && (r.payload as { code: string }).code === 'BANNED',
+      ),
+    ).toBe(true);
+    expect(b!.connected).toBe(true);
+  });
+
+  it('运营封禁接口 → 该账号现有连接被断开，其他账号不受影响；解封不断开', async () => {
+    vi.stubEnv('OPERATOR_TOKEN', 'e2e-operator-token-0123');
+    try {
+      const db = createMemoryIdentityPrisma();
+      const server = await boot({
+        identityPrisma: db,
+        timing: { turnTimeoutMs: 60_000, pendingTimeoutMs: 60_000, responseTimeoutCapMs: 60_000 },
+      });
+      const { room: r, accounts } = makeRoom({ humans: 2, bots: 2 });
+      await server.rt.matches.createFromRoom(r);
+      for (const a of accounts) {
+        await db.player.create({
+          data: { id: a.playerId, nickname: a.nickname, avatarSeed: a.playerId, locale: 'zh-CN' },
+        });
+      }
+      const [a, b] = await joinAll(server, accounts, r.id);
+      const second = track(await connect(server, accounts[0]!, r.id));
+      const adminCall = (verb: 'ban' | 'unban', playerId: string) =>
+        fetch(`${server.url}/admin/players/${playerId}/${verb}`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: 'Bearer e2e-operator-token-0123',
+          },
+          body: '{}',
+        });
+
+      // 解封一个没被封的账号：连接不受影响
+      expect((await adminCall('unban', accounts[1]!.playerId)).status).toBe(200);
+      expect(b!.connected).toBe(true);
+
+      expect((await adminCall('ban', accounts[0]!.playerId)).status).toBe(200);
+      await waitUntil(() => !a!.connected && !second.connected, '被封禁账号的连接全部断开');
+      expect(
+        a!.received.some(
+          (m) => m.event === 'icg:error' && (m.payload as { code: string }).code === 'BANNED',
+        ),
+      ).toBe(true);
+      expect(b!.connected).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

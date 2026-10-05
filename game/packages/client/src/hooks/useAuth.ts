@@ -8,6 +8,8 @@ interface RecoverResponse {
   nickname: string;
   token: string;
   expiresAt: number;
+  recoveryCode: string;
+  recoveryCodeWarning: string;
 }
 
 export function useAuth() {
@@ -58,6 +60,8 @@ export function useAuth() {
         const res = await api.post<RecoverResponse>('/identity/recover', { code });
         localStorage.setItem('icgame-token', res.token);
         setIdentity(res.playerId, res.token, res.nickname);
+        // 恢复码一次性：用过的码已作废，这里返回的新码需要展示给用户保存
+        return { recoveryCode: res.recoveryCode, warning: res.recoveryCodeWarning };
       } finally {
         setIsLoading(false);
       }

@@ -1,7 +1,14 @@
 // Crockford's Base32 编码 + 恢复码生成测试
 
 import { describe, it, expect } from 'vitest';
-import { encodeCrockford, generateRecoveryCode } from './recoveryCode.js';
+import { createHash } from 'node:crypto';
+import {
+  encodeCrockford,
+  generateRecoveryCode,
+  hashRecoveryCode,
+  legacyHashRecoveryCode,
+  resolveRecoveryPepper,
+} from './recoveryCode.js';
 
 describe('recoveryCode', () => {
   describe('encodeCrockford', () => {
@@ -82,5 +89,59 @@ describe('recoveryCode', () => {
         }
       }
     });
+  });
+});
+
+describe('恢复码哈希', () => {
+  const env = { RECOVERY_CODE_PEPPER: 'pepper-a' } as NodeJS.ProcessEnv;
+
+  it('新哈希确定、64 位十六进制，且与旧的无盐哈希不同', () => {
+    const h = hashRecoveryCode('ABCD-1234', env);
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashRecoveryCode('ABCD-1234', env)).toBe(h);
+    expect(h).not.toBe(legacyHashRecoveryCode('ABCD-1234'));
+  });
+
+  it('规范化：连字符与大小写不影响结果', () => {
+    expect(hashRecoveryCode('abcd-1234', env)).toBe(hashRecoveryCode('ABCD1234', env));
+  });
+
+  it('换密钥后哈希不同', () => {
+    const other = { RECOVERY_CODE_PEPPER: 'pepper-b' } as NodeJS.ProcessEnv;
+    expect(hashRecoveryCode('ABCD-1234', other)).not.toBe(hashRecoveryCode('ABCD-1234', env));
+  });
+
+  it('旧哈希是带连字符大写形式的 SHA-256', () => {
+    expect(legacyHashRecoveryCode('abcd-1234')).toBe(
+      createHash('sha256').update('ABCD-1234').digest('hex'),
+    );
+  });
+
+  it('生产环境缺密钥时报错，其他环境用开发值', () => {
+    expect(() => resolveRecoveryPepper({ NODE_ENV: 'production' } as NodeJS.ProcessEnv)).toThrow(
+      /RECOVERY_CODE_PEPPER/,
+    );
+    expect(() =>
+      resolveRecoveryPepper({
+        NODE_ENV: 'production',
+        RECOVERY_CODE_PEPPER: 'x'.repeat(16),
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+    expect(resolveRecoveryPepper({ NODE_ENV: 'development' } as NodeJS.ProcessEnv)).toBeTruthy();
+  });
+
+  it('生产环境密钥短于 16 个字符时报错，非生产环境不限制', () => {
+    expect(() =>
+      resolveRecoveryPepper({
+        NODE_ENV: 'production',
+        RECOVERY_CODE_PEPPER: 'x'.repeat(15),
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/16/);
+    expect(
+      resolveRecoveryPepper({
+        NODE_ENV: 'development',
+        RECOVERY_CODE_PEPPER: 'short',
+      } as NodeJS.ProcessEnv),
+    ).toBe('short');
   });
 });

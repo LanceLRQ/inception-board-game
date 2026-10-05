@@ -4,9 +4,27 @@ import { prisma } from './infra/postgres.js';
 import { createRedisClient } from './infra/redis.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
+import { isOperatorTokenTooShort, MIN_OPERATOR_TOKEN_LENGTH } from './middleware/operatorAuth.js';
 import { parseOrigins } from './middleware/cors.js';
+import { resolveRecoveryPepper } from './infra/recoveryCode.js';
+import { RedisRecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
+
+// 生产环境缺少恢复码哈希密钥时直接退出，避免用开发值签发恢复码
+try {
+  resolveRecoveryPepper(process.env);
+} catch (err) {
+  logger.error({ err }, 'recovery code pepper missing');
+  process.exit(1);
+}
+
+if (isOperatorTokenTooShort(process.env)) {
+  logger.warn(
+    { minLength: MIN_OPERATOR_TOKEN_LENGTH },
+    'OPERATOR_TOKEN 太短，运营接口保持关闭；请换成更长的随机令牌',
+  );
+}
 
 const redis = createRedisClient();
 const realtime = buildRealtime({
@@ -15,6 +33,7 @@ const realtime = buildRealtime({
   lobbyRedis: redis,
   lobbyPrisma: prisma,
   heartbeatRedis: redis,
+  recoverLimiter: new RedisRecoverAttemptLimiter(redis),
   timing: timingFromEnv(process.env),
   ws: {
     corsOrigin: parseOrigins(process.env.WS_CORS_ORIGIN ?? '*'),
