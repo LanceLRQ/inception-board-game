@@ -57,6 +57,25 @@ describe('planNext', () => {
     expect(planNext(withWindow, allSeats(5), timing)).toEqual({ kind: 'deadline', delayMs: 7777 });
   });
 
+  it('响应窗口的时长受上限约束，上限更大时仍用窗口自己的', () => {
+    const s = afterSetup();
+    const withWindow = {
+      ...s,
+      G: {
+        ...s.G,
+        pendingResponseWindow: { responders: ['1'], responded: [], timeoutMs: 7777 },
+      },
+    } as unknown as MatchState<SetupState>;
+    expect(planNext(withWindow, allSeats(5), { ...timing, responseTimeoutCapMs: 50 })).toEqual({
+      kind: 'deadline',
+      delayMs: 50,
+    });
+    expect(planNext(withWindow, allSeats(5), { ...timing, responseTimeoutCapMs: 99_999 })).toEqual({
+      kind: 'deadline',
+      delayMs: 7777,
+    });
+  });
+
   it('其他待结算事项用待结算时长', () => {
     const s = afterSetup();
     const pending = {

@@ -165,8 +165,13 @@ export async function handleMatchMessage(
       logger.warn({ matchID: ctx.matchID, seat: ctx.seat, code: accepted.code }, 'move rejected');
       if (accepted.code === 'RATE_LIMIT_EXCEEDED') return rejected(intentId, 'rate_limited');
       if (accepted.code === 'RATE_INTENT_DUPLICATE') return rejected(intentId, 'duplicate_intent');
+      // 形状不对的请求同样消耗配额，否则可以无限发送而不被限流
+      await deps.moveGateway.commit({ playerID: ctx.playerID });
       return rejected(intentId, accepted.code as MoveRejectCode);
     }
+
+    // 每次尝试都计入限流，不论随后是否被运行器接受：被拒的请求同样要跑一遍合法性判定
+    await deps.moveGateway.commit(accepted.context);
 
     const result = await room.submit(ctx.seat, {
       move: accepted.request.move,
@@ -175,8 +180,6 @@ export async function handleMatchMessage(
       stateID: msg.stateID,
     });
     if (!result.ok) return rejected(intentId, result.code);
-
-    await deps.moveGateway.commit(accepted.context);
     return { type: 'icg:moveResult', intentId, ok: true, stateID: result.stateID };
   } catch (err) {
     logger.error({ err, matchID: ctx.matchID, seat: ctx.seat }, 'handle match message failed');

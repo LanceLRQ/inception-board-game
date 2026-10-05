@@ -10,11 +10,11 @@ const { log } = vi.hoisted(() => ({
   log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock('./infra/logger.js', () => ({ logger: log }));
-// 全局 IP 限流依赖真实 Redis，这里换成直通
-vi.mock('./middleware/rateLimit.js', () => ({
-  rateLimitMiddleware: async (_ctx: unknown, next: () => Promise<unknown>) => next(),
-  playerRateLimit: () => async (_ctx: unknown, next: () => Promise<unknown>) => next(),
-}));
+
+// 全局 IP 限流默认依赖真实 Redis，测试里注入直通的中间件
+const passThrough = vi.fn(async (_ctx: unknown, next: () => Promise<unknown>) => {
+  await next();
+});
 
 describe('buildRealtime', () => {
   it('starts on a system-assigned port, serves /health, and stops cleanly', async () => {
@@ -34,6 +34,7 @@ describe('buildRealtime', () => {
       heartbeatRedis: { get: vi.fn(), setex: vi.fn(), del: vi.fn() } as never,
       timers,
       bot,
+      httpRateLimit: passThrough,
     });
 
     const port = await rt.start(0);
@@ -42,6 +43,7 @@ describe('buildRealtime', () => {
     const res = await fetch(`http://127.0.0.1:${port}/health`);
     expect(res.ok).toBe(true);
     expect(await res.json()).toMatchObject({ status: 'ok' });
+    expect(passThrough).toHaveBeenCalled();
 
     await rt.stop();
     expect(rt.httpServer.listening).toBe(false);
@@ -61,6 +63,7 @@ describe('buildRealtime', () => {
         exists: vi.fn(),
       },
       heartbeatRedis: { get: vi.fn(), setex: vi.fn(), del: vi.fn() } as never,
+      httpRateLimit: passThrough,
     });
     expect(rt.matches.get('nope')).toBeNull();
     expect(() => rt.gateway.sendSeats('nope')).not.toThrow();

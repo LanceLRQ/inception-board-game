@@ -1,4 +1,4 @@
-import Koa from 'koa';
+import Koa, { type Middleware } from 'koa';
 import bodyParser from 'koa-bodyparser';
 import { logger } from './infra/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -17,6 +17,8 @@ import { shortLinkRouter } from './api/shortLink.js';
 
 export interface AppDeps {
   lobby?: LobbyService;
+  /** 全局限流中间件；不给时用基于 Redis 的 IP 限流 */
+  rateLimit?: Middleware;
 }
 
 export function createApp(deps: AppDeps = {}): Koa {
@@ -25,7 +27,7 @@ export function createApp(deps: AppDeps = {}): Koa {
   // 全局中间件
   app.use(errorHandler);
   app.use(bodyParser());
-  app.use(rateLimitMiddleware);
+  app.use(deps.rateLimit ?? rateLimitMiddleware);
 
   // 请求日志
   app.use(async (ctx, next) => {

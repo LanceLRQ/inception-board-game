@@ -298,6 +298,22 @@ describe('handleMatchMessage', () => {
     expect(await run('unknown_move')).toMatchObject({ code: 'unknown_move' });
   });
 
+  it('counts a malformed request against the rate limit', async () => {
+    const commit = vi.fn();
+    const out = await handleMatchMessage(move(), ctx, {
+      matches: {
+        get: () => ({ current: () => ({ ctx: { phase: 'playing' } }), submit: vi.fn() }) as never,
+      },
+      moveGateway: {
+        accept: vi.fn().mockResolvedValue({ ok: false, code: 'unknown_move', reason: 'x' }),
+        commit,
+      },
+      seatsFor: () => [],
+    });
+    expect(out).toMatchObject({ ok: false, code: 'unknown_move' });
+    expect(commit).toHaveBeenCalledWith({ playerID: 'acct-0' });
+  });
+
   it('rejects an unknown move through the real gateway', async () => {
     const h = await makeMatch();
     const out = await handleMatchMessage(move({ move: 'noSuchMove' }), ctx, {
@@ -343,7 +359,7 @@ describe('handleMatchMessage', () => {
     expect(commit).toHaveBeenCalledTimes(1);
   });
 
-  it('does not commit when the runner rejects', async () => {
+  it('counts the attempt against the rate limit even when the runner rejects', async () => {
     const commit = vi.fn();
     const out = await handleMatchMessage(move(), ctx, {
       matches: {
@@ -362,7 +378,7 @@ describe('handleMatchMessage', () => {
       seatsFor: () => [],
     });
     expect(out).toMatchObject({ ok: false, code: 'stale_state' });
-    expect(commit).not.toHaveBeenCalled();
+    expect(commit).toHaveBeenCalledTimes(1);
   });
 
   it('returns the same result for a repeated intentId without a second execution', async () => {

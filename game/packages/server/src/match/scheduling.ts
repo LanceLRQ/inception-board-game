@@ -14,6 +14,8 @@ export interface TimingConfig {
   pendingTimeoutMs: number;
   /** 回合主人正常行动的截止时长 */
   turnTimeoutMs: number;
+  /** 响应窗口截止时长的上限，取它与窗口自带时长中较小的；不给就不设上限（测试用，缩短等待） */
+  responseTimeoutCapMs?: number;
 }
 
 export const DEFAULT_TIMING: TimingConfig = {
@@ -36,7 +38,7 @@ function hasBlockingPending(G: SetupState): boolean {
 /** 截止时长：响应窗口用窗口自己的，其次待结算事项，否则回合主人的正常行动 */
 function deadlineMs(state: MatchState<SetupState>, timing: TimingConfig): number {
   const window = state.G.pendingResponseWindow;
-  if (window) return window.timeoutMs;
+  if (window) return Math.min(window.timeoutMs, timing.responseTimeoutCapMs ?? Infinity);
   if (hasBlockingPending(state.G)) return timing.pendingTimeoutMs;
   return timing.turnTimeoutMs;
 }

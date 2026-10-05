@@ -5,6 +5,7 @@
 import { createServer, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type Koa from 'koa';
+import type { Middleware } from 'koa';
 import { createApp } from './app.js';
 import { logger } from './infra/logger.js';
 import type { MatchArchive } from './match/MatchArchive.js';
@@ -37,6 +38,8 @@ export interface RealtimeDeps {
   /** 默认 new BotManager() */
   bot?: BotManager;
   ws?: { corsOrigin?: string | string[]; path?: string };
+  /** 全局 HTTP 限流中间件；默认基于 Redis 的 IP 限流 */
+  httpRateLimit?: Middleware;
 }
 
 export interface Realtime {
@@ -92,7 +95,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     prisma: deps.lobbyPrisma,
     matches,
   });
-  const app = createApp({ lobby });
+  const app = createApp({ lobby, rateLimit: deps.httpRateLimit });
   const httpServer = createServer(app.callback());
   gateway.attach(httpServer);
 
