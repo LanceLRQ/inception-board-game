@@ -102,7 +102,8 @@ export const TOURIST_ASSIST: ActiveSkillDescriptor = {
   nameKey: 'skill.thief_tourist.skill_0.name',
   descKey: 'skill.thief_tourist.skill_0.desc',
   argKind: 'targetPlayer',
-  extraCheck: (ctx) => (ctx.skillUsedThisTurn['thief_tourist.skill_0'] ?? 0) < 1,
+  // 不限次数；代价是交出全部手牌（至少 1 张）。对照：docs/manual/05-dream-thieves.md 穿行者
+  extraCheck: (ctx) => ctx.hand.length > 0,
 };
 
 export const MARTYR_SACRIFICE: ActiveSkillDescriptor = {

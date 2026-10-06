@@ -14,7 +14,7 @@ import {
   setTurnPhase,
   HEART_LOCK_REDUCED_BY_SKILL_KEY,
 } from '../moves.js';
-import { killPlayer, sendToLimbo } from './death.js';
+import { killPlayer, sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './death.js';
 import { resolveShootCustom } from '../dice.js';
 import { flipCharacter, isCharacterFace } from './abilities/dual-faced.js';
 import type { CardID, Layer } from '@icgame/shared';
@@ -97,7 +97,7 @@ export function applyPointmanAssault(
 // === 穿行者 · 支助 ===
 // 对照：docs/manual/05-dream-thieves.md 穿行者
 // 出牌阶段：可将所有手牌（最少 1 张）给另一位玩家，然后移动到该玩家所在层
-// 限制：本回合 1 次
+// 次数：卡面与说明书都没有「限一次」，不限次数；代价是交出全部手牌（至少 1 张）
 
 export const TOURIST_SKILL_ID = 'thief_tourist.skill_0';
 
@@ -110,7 +110,6 @@ export function canUseTouristAssist(state: SetupState, selfID: string, targetID:
   if (self.characterId !== 'thief_tourist') return false;
   if (!self.isAlive || !target.isAlive) return false;
   if (self.hand.length < 1) return false;
-  if (!canUseSkill(self, TOURIST_SKILL_ID, 'ownTurnOncePerTurn')) return false;
   return true;
 }
 
@@ -124,16 +123,15 @@ export function applyTouristAssist(
   const self = state.players[selfID]!;
   const target = state.players[targetID]!;
 
-  let s = markSkillUsed(state, selfID, TOURIST_SKILL_ID);
   // 转移手牌
-  s = {
-    ...s,
+  let s: SetupState = {
+    ...state,
     players: {
-      ...s.players,
-      [selfID]: { ...s.players[selfID]!, hand: [] },
+      ...state.players,
+      [selfID]: { ...state.players[selfID]!, hand: [] },
       [targetID]: {
-        ...s.players[targetID]!,
-        hand: [...s.players[targetID]!.hand, ...self.hand],
+        ...state.players[targetID]!,
+        hand: [...state.players[targetID]!.hand, ...self.hand],
       },
     },
   };
@@ -145,7 +143,7 @@ export function applyTouristAssist(
 // === 狮子 · 王道 ===
 // 对照：docs/manual/05-dream-thieves.md 狮子
 // 抽牌阶段：从牌库顶额外抽 = 梦主手牌数；梦主无手牌则从弃牌堆中额外选取 1 张
-// 限制：本回合 1 次
+// 次数：卡面没有「限一次」，不限次数（每个抽牌阶段触发一次）
 //
 // MVP 简化：弃牌堆挑选自动取顶 1 张（不进入 pending 中间态）
 
@@ -155,13 +153,12 @@ export const LEO_SKILL_ID = 'thief_leo.skill_0';
 export function applyLeoKingdom(state: SetupState, playerID: string): SetupState {
   const player = state.players[playerID];
   if (!player || player.characterId !== 'thief_leo') return state;
-  if (!canUseSkill(player, LEO_SKILL_ID, 'ownTurnOncePerTurn')) return state;
 
   const masterID = state.dreamMasterID;
   const master = state.players[masterID];
   if (!master) return state;
 
-  let s = markSkillUsed(state, playerID, LEO_SKILL_ID);
+  let s = state;
   const masterHandCount = master.hand.length;
 
   if (masterHandCount > 0) {
@@ -181,7 +178,7 @@ export function applyLeoKingdom(state: SetupState, playerID: string): SetupState
       },
     };
   }
-  // 弃牌堆也无 → 无效果，但技能算已使用
+  // 弃牌堆也无 → 无效果
   return s;
 }
 
@@ -474,11 +471,8 @@ export const INTERPRETER_SKILL_ID = 'thief_dream_interpreter.skill_0';
 export function applyInterpreterForeshadow(state: SetupState, playerID: string): SetupState {
   const player = state.players[playerID];
   if (!player || player.characterId !== 'thief_dream_interpreter') return state;
-  if (!canUseSkill(player, INTERPRETER_SKILL_ID, 'ownTurnOncePerTurn')) return state;
-
-  let s = markSkillUsed(state, playerID, INTERPRETER_SKILL_ID);
-  s = drawCards(s, playerID, 2);
-  return s;
+  // 卡面没有「限一次」：每次使用【解封】都抽 2 张
+  return drawCards(state, playerID, 2);
 }
 
 // === 要塞 · 冷酷 ===
@@ -515,11 +509,11 @@ export function applyFortressColdness(
   const target = state.players[targetPlayerID];
   if (!master || !target) return state;
   if (master.characterId !== 'dm_fortress') return state;
-  if (!canUseSkill(master, FORTRESS_SKILL_ID, 'ownTurnOncePerTurn')) return state;
   if (!target.isAlive) return state;
   if (target.faction !== 'thief') return state;
 
-  let s = markSkillUsed(state, masterID, FORTRESS_SKILL_ID);
+  // 卡面没有「限一次」：每次移动到另一层梦境都可以触发
+  let s = state;
 
   // 免费掷骰（受世界观 -1 影响）
   const rawRoll = d6();
@@ -1604,6 +1598,20 @@ export function ariesExtraDrawCount(state: SetupState): number {
 export const SAGITTARIUS_NO_MOVE_SKILL_ID = 'thief_sagittarius.skill_0';
 export const SAGITTARIUS_HEART_LOCK_SKILL_ID = 'thief_sagittarius.skill_1';
 
+/**
+ * 射手·穿心能否发动：本回合击杀过玩家（每次击杀换一次机会），且本回合还没发动过（回合限 1 次）。
+ * 「击杀」只算射手作为凶手的击杀（killPlayer），别人被梦魇 / 世界观送进迷失层不算。
+ * 对照：docs/manual/05-dream-thieves.md 射手 136 行
+ */
+export function canUseSagittariusHeartLock(state: SetupState, selfID: string): boolean {
+  const self = state.players[selfID];
+  if (!self || !self.isAlive || self.characterId !== 'thief_sagittarius') return false;
+  if (!canUseSkill(self, SAGITTARIUS_HEART_LOCK_SKILL_ID, 'ownTurnOncePerTurn')) return false;
+  const kills = self.skillUsedThisTurn[SAGITTARIUS_KILLS_THIS_TURN_KEY] ?? 0;
+  const used = self.skillUsedThisTurn[SAGITTARIUS_HEART_LOCK_SKILL_ID] ?? 0;
+  return kills > used;
+}
+
 /** 射手心锁修改：±1，受 cap 限制 */
 export function applySagittariusHeartLock(
   state: SetupState,
@@ -2163,8 +2171,8 @@ export function getUranusPowerUsesLeft(state: SetupState, player: PlayerSetup): 
 
 // === 冥王星·地狱 · 业火 ===
 // 弃 1 张手牌 → 让所有手牌不足 2 张的盗梦者从牌库顶各抽 2 张
-// 回合限 1 次（以技能定义为准；规则未明确次数，保守 ownTurnOncePerTurn）
-// 对照：cards-data.json dm_pluto_hell
+// 发动次数无限制，但必须有盗梦者手牌不足 2 张才能发动
+// 对照：docs/manual/06-dream-master.md 冥王星·地狱（详述：【业火】发动的次数无限制）
 
 export const PLUTO_BURNING_SKILL_ID = 'dm_pluto_hell.skill_0';
 const PLUTO_DRAW_THRESHOLD = 2;
@@ -2179,7 +2187,6 @@ export function applyPlutoBurning(
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_pluto_hell') return null;
   if (!master.isAlive) return null;
-  if (!canUseSkill(master, PLUTO_BURNING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
   if (!master.hand.includes(discardCardId)) return null;
 
   // 前置检查：必须存在至少 1 名手牌<2 的存活盗梦者（manual §30 "不产生效果的技能不能无故启动"）
@@ -2191,8 +2198,8 @@ export function applyPlutoBurning(
   if (preTargets.length === 0) return null;
 
   // 弃 1
+  // 发动次数无限制（docs/manual/06-dream-master.md 冥王星·地狱 详述），受上面的前置检查约束
   let s = discardCard(state, masterID, discardCardId);
-  s = markSkillUsed(s, masterID, PLUTO_BURNING_SKILL_ID);
 
   // 所有手牌<2 的存活盗梦者抽 2（再次快照防止中途状态漂移）
   const targets = s.playerOrder.filter((pid) => {
@@ -2663,11 +2670,17 @@ export function grantImperialShootCharge(state: SetupState, playerID: string): S
   };
 }
 
+/**
+ * 皇城世界观：收到贿赂牌的玩家视为使用 1 张【SHOOT】，对方掷骰结果 -3。
+ * 发起者是金牛时同样可以启动号角：金牛自己的骰不减；rollHorn 在对方未被击杀时才掷。
+ * 对照：docs/manual/05-dream-thieves.md 金牛 79 行
+ */
 export function applyImperialCityWorldShoot(
   state: SetupState,
   shooterID: string,
   targetID: string,
   roll: number,
+  rollHorn?: () => number,
 ): SetupState | null {
   const shooter = state.players[shooterID];
   const target = state.players[targetID];
@@ -2688,7 +2701,13 @@ export function applyImperialCityWorldShoot(
   };
   // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4]（规则 docs/manual/04-action-cards.md SHOOT 章）
   const modifiedRoll = Math.max(1, roll - 3);
-  const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
+  const baseResult = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
+  const hornKills =
+    baseResult !== 'kill' &&
+    shooter.characterId === 'thief_taurus' &&
+    rollHorn !== undefined &&
+    applyTaurusHorn(modifiedRoll, rollHorn()) === 'kill';
+  const result = hornKills ? 'kill' : baseResult;
   if (result === 'kill') {
     return killPlayer(spent, targetID, shooterID);
   }

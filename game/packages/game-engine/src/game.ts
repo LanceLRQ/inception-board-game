@@ -60,7 +60,6 @@ import {
   libraResolvePick,
   isShootClassCard,
   LIBRA_SKILL_ID,
-  ARCHITECT_SKILL_ID,
   applyShadeFollow,
   applyExtractorBounty,
   applyForgerExchange,
@@ -102,6 +101,7 @@ import {
   SUDGER_SKILL_ID,
   applySagittariusHeartLock,
   SAGITTARIUS_HEART_LOCK_SKILL_ID,
+  canUseSagittariusHeartLock,
   applySpaceQueenStashTop,
   applyBlackHoleLevy,
   applyBlackHoleAbsorb,
@@ -616,7 +616,9 @@ export const InceptionCityGame = {
             const master = G.players[G.dreamMasterID];
             if (!master || master.characterId !== 'dm_imperial_city') return INVALID_MOVE;
             const roll = random.D6();
-            const applied = applyImperialCityWorldShoot(G, ctx.currentPlayer, targetID, roll);
+            const applied = applyImperialCityWorldShoot(G, ctx.currentPlayer, targetID, roll, () =>
+              random.D6(),
+            );
             if (applied === null) return INVALID_MOVE;
             return incrementMoveCounter(applied);
           },
@@ -1773,7 +1775,7 @@ export const InceptionCityGame = {
           },
           client: false,
         },
-        // 射手·穿心：击杀后修改任意层心锁 ±1（回合限 1 次）
+        // 射手·穿心：本回合击杀过玩家时，修改任意一层心锁 ±1（回合限 1 次）
         // 对照：docs/manual/05-dream-thieves.md 射手
         useSagittariusHeartLock: {
           move: ({ G, ctx, random }: MoveCtx, layer: number, delta: -1 | 1) => {
@@ -1781,8 +1783,7 @@ export const InceptionCityGame = {
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (self.characterId !== 'thief_sagittarius') return INVALID_MOVE;
-            if (!canUseSkill(self, SAGITTARIUS_HEART_LOCK_SKILL_ID, 'ownTurnOncePerTurn'))
-              return INVALID_MOVE;
+            if (!canUseSagittariusHeartLock(G, ctx.currentPlayer)) return INVALID_MOVE;
             if (!G.layers[layer]) return INVALID_MOVE;
             // cap = 该层初始心锁数（对照 config）
             const heartLocksTuple = PLAYER_COUNT_CONFIGS[G.playerOrder.length]?.heartLocks;
@@ -2565,10 +2566,8 @@ export const InceptionCityGame = {
             if (self.currentLayer !== target.currentLayer) return INVALID_MOVE;
             if (!isShootClassCard(discardCardId)) return INVALID_MOVE;
             if (!self.hand.includes(discardCardId)) return INVALID_MOVE;
-            if (!canUseSkill(self, ARCHITECT_SKILL_ID, 'ownTurnOncePerTurn')) return INVALID_MOVE;
-
-            let s = markSkillUsed(G, ctx.currentPlayer, ARCHITECT_SKILL_ID);
-            s = discardCard(s, ctx.currentPlayer, discardCardId);
+            // 卡面没有「限一次」，不限次数；代价是每次弃 1 张 SHOOT 类牌
+            let s = discardCard(G, ctx.currentPlayer, discardCardId);
             // untilTurnNumber 取 target 的"下个回合 turnNumber"。简化：当前 turnNumber + N（N=玩家数）
             // 真实场景：迷宫维持到 target 下个回合 turnEnd；MVP 用 (G.turnNumber + playerOrder.length) 估算
             s = {
@@ -2978,7 +2977,10 @@ function applyNightmareEffect(
   }
 
   if (nid === 'nightmare_plague') {
-    // 梦主派发贿赂给当层盗梦者（bribedTargets 指定）；未派发的 → 迷失层
+    // 梦主先派发贿赂给当层盗梦者（bribedTargets 指定，可以一张不发），派发完之后
+    // 该层手里一张贿赂牌都没有的盗梦者进入迷失层；此前收到过贿赂牌的（含失败的）不受影响，
+    // 不算被击杀。贿赂池已空时点名的人拿不到牌，只在他本来就没有贿赂牌时进迷失层。
+    // 对照：docs/manual/07-nightmare-cards.md 邪念瘟疫（17-20 行）
     // params: { bribedTargets: string[] }
     const bribed = new Set((_params?.bribedTargets as string[]) ?? []);
     let s = G;
@@ -2987,46 +2989,45 @@ function applyNightmareEffect(
       return p && p.faction === 'thief' && p.isAlive;
     });
     for (const pid of layerThieves) {
-      if (bribed.has(pid)) {
-        // 从 pool 抽 1 张随机贿赂；空池则视为未派发 → 入迷失层（manual 说明）
-        const poolIdxs = s.bribePool
-          .map((b, i) => ({ b, i }))
-          .filter(({ b }) => b.status === 'inPool');
-        if (poolIdxs.length === 0) {
-          s = sendToLimbo(s, pid);
-          continue;
-        }
-        const pickIdx = (random.Die(poolIdxs.length) - 1) % poolIdxs.length;
-        const pick = poolIdxs[pickIdx]!;
-        const bribe = pick.b;
-        const isDeal = bribe.kind === 'deal';
-        const target = s.players[pid]!;
-        const nextPool = s.bribePool.map((b, i) =>
-          i === pick.i
-            ? {
-                ...b,
-                status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
-                heldBy: pid,
-                originalOwnerId: pid,
-              }
-            : b,
-        );
-        s = {
-          ...s,
-          bribePool: nextPool,
-          players: {
-            ...s.players,
-            [pid]: {
-              ...target,
-              bribeReceived: target.bribeReceived + 1,
-              faction: isDeal ? ('master' as Faction) : target.faction,
-            },
+      if (!bribed.has(pid)) continue;
+      const poolIdxs = s.bribePool
+        .map((b, i) => ({ b, i }))
+        .filter(({ b }) => b.status === 'inPool');
+      if (poolIdxs.length === 0) continue;
+      const pickIdx = (random.Die(poolIdxs.length) - 1) % poolIdxs.length;
+      const pick = poolIdxs[pickIdx]!;
+      const bribe = pick.b;
+      const isDeal = bribe.kind === 'deal';
+      const target = s.players[pid]!;
+      const nextPool = s.bribePool.map((b, i) =>
+        i === pick.i
+          ? {
+              ...b,
+              status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
+              heldBy: pid,
+              originalOwnerId: pid,
+            }
+          : b,
+      );
+      s = {
+        ...s,
+        bribePool: nextPool,
+        players: {
+          ...s.players,
+          [pid]: {
+            ...target,
+            bribeReceived: target.bribeReceived + 1,
+            faction: isDeal ? ('master' as Faction) : target.faction,
           },
-        };
-        s = grantImperialShootCharge(s, pid);
-      } else {
-        s = sendToLimbo(s, pid);
-      }
+        },
+      };
+      s = grantImperialShootCharge(s, pid);
+    }
+    // 「手里有贿赂牌」：收到过贿赂牌即算（bribeReceived 公开、不会减少；池里 heldBy 是同一信息的另一面）
+    for (const pid of layerThieves) {
+      const holdsBribe =
+        s.players[pid]!.bribeReceived > 0 || s.bribePool.some((b) => b.heldBy === pid);
+      if (!holdsBribe) s = sendToLimbo(s, pid);
     }
     return s;
   }
@@ -3132,6 +3133,14 @@ function violatesShootLayerLimit(
   return (
     !isCapricornusRhythmActive(shooter) && !isTerroristCrossLayerActive(shooter) && !jupiterRelaxed
   );
+}
+
+/**
+ * 金牛·号角适用的牌：普通 SHOOT 与按 SHOOT 结算的 SHOOT·梦境穿梭剂（选「移动」时不会走到结算）。
+ * 对照：docs/manual/05-dream-thieves.md 金牛 75 行「你使用【SHOOT】时」
+ */
+function isTaurusHornCard(cardId: CardID): boolean {
+  return cardId === 'action_shoot' || cardId === 'action_shoot_dream_transit';
 }
 
 function applyShootVariant(
@@ -3255,8 +3264,9 @@ function applyShootVariant(
     settledRoll = finalRoll;
     result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
     preState = markSkillUsed(preState, ctx.currentPlayer, SCORPIUS_SKILL_ID);
-  } else if (shooter.characterId === 'thief_taurus') {
+  } else if (shooter.characterId === 'thief_taurus' && isTaurusHornCard(cardId)) {
     // 金牛：先按 target 骰算 base result；若非 kill 再掷 self 骰看是否 override 为 kill
+    // 号角只对【SHOOT】生效，刺客之王 / 爆甲螺旋 / 炸裂弹头不触发（docs/manual/05-dream-thieves.md 金牛 75 行）
     settledRoll = baseRoll;
     const baseResult = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
     if (baseResult !== 'kill') {

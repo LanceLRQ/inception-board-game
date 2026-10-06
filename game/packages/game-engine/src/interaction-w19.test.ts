@@ -1333,7 +1333,7 @@ describe('穿行者·支助 happy path', () => {
     expect(r!.players.p1!.currentLayer).toBe(3);
   });
 
-  it('技能限 1 次/回合：第二次 apply → null', () => {
+  it('不限次数：手牌补回后第二次 apply 仍可发动', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_tourist');
     s = setHand(s, 'p1', ['action_unlock' as CardID]);
@@ -1342,7 +1342,7 @@ describe('穿行者·支助 happy path', () => {
     // 第二次从 r1 继续发动（但 p1 无手牌，也会 fail）
     s = setHand(r1!, 'p1', ['action_shoot' as CardID]);
     const r2 = applyTouristAssist(s, 'p1', 'p2');
-    expect(r2).toBeNull();
+    expect(r2).not.toBeNull();
   });
 });
 
@@ -1386,7 +1386,7 @@ describe('狮子·王道触发分支', () => {
     expect(r.deck.discardPile.length).toBe(1);
   });
 
-  it('狮子 + 梦主手牌=0 + 弃牌堆空 → 无效果但技能标记已用', () => {
+  it('狮子 + 梦主手牌=0 + 弃牌堆空 → 无效果', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_leo');
     s = setHand(s, 'p1', []);
@@ -1395,10 +1395,9 @@ describe('狮子·王道触发分支', () => {
     s = { ...s, deck: { cards: [], discardPile: [] } };
     const r = applyLeoKingdom(s, 'p1');
     expect(r.players.p1!.hand.length).toBe(0);
-    expect(r.players.p1!.skillUsedThisTurn['thief_leo.skill_0']).toBe(1);
   });
 
-  it('狮子 + 技能已用过 → 直接返回原状态', () => {
+  it('狮子 + 本回合有使用记录 → 仍然触发（不限次数）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_leo');
     s = setHand(s, 'p1', []);
@@ -1413,7 +1412,7 @@ describe('狮子·王道触发分支', () => {
     s = setHand(s, mid, Array(3).fill('action_shoot') as CardID[]);
     s = { ...s, deck: { cards: Array(5).fill('action_unlock') as CardID[], discardPile: [] } };
     const r = applyLeoKingdom(s, 'p1');
-    expect(r.players.p1!.hand.length).toBe(0); // 不触发
+    expect(r.players.p1!.hand.length).toBe(3);
   });
 });
 
@@ -1590,10 +1589,11 @@ describe('冥王星·业火 apply 分支', () => {
     expect(r).toBeNull();
   });
 
-  it('冥王星梦主 + 已用过一次 → null（限 1 次/回合）', () => {
+  it('冥王星梦主 + 已用过一次 → 仍可发动（业火不限次数）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     const mid = findMasterID(s)!;
     s = setHand(s, mid, ['action_unlock' as CardID]);
+    s = setHand(s, 'p1', []);
     s = {
       ...s,
       players: {
@@ -1605,7 +1605,7 @@ describe('冥王星·业火 apply 分支', () => {
       },
     };
     const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
-    expect(r).toBeNull();
+    expect(r).not.toBeNull();
   });
 });
 

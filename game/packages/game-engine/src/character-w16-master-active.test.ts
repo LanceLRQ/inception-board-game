@@ -295,7 +295,7 @@ describe('冥王星·地狱（dm_pluto_hell）·业火', () => {
     expect(r!.players.p2!.hand.length).toBe(2);
   });
 
-  it('回合限 1 次', () => {
+  it('不限次数：仍有盗梦者手牌不足 2 张时可以再次发动（docs/manual/06-dream-master.md 冥王星·地狱 详述）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setHand(s, 'pM', ['action_kick' as CardID, 'action_unlock' as CardID]);
     s = setHand(s, 'p1', []);
@@ -307,8 +307,16 @@ describe('冥王星·地狱（dm_pluto_hell）·业火', () => {
       },
     };
     const r = applyPlutoBurning(s, 'pM', 'action_kick')!;
-    const r2 = applyPlutoBurning(r, 'pM', 'action_unlock');
-    expect(r2).toBeNull();
+    // p1 已抽到 2 张，没有盗梦者手牌不足 2 张：前置条件不满足，不能无故启动
+    expect(applyPlutoBurning(r, 'pM', 'action_unlock')).toBeNull();
+    // 有盗梦者手牌又不足 2 张时，同一回合第二次发动合法
+    const refilled = {
+      ...setHand(r, 'p1', []),
+      deck: { cards: Array<CardID>(4).fill('action_kick' as CardID), discardPile: [] },
+    };
+    const again = applyPlutoBurning(refilled, 'pM', 'action_unlock');
+    expect(again).not.toBeNull();
+    expect(again!.players.p1!.hand.length).toBe(2);
   });
 
   it('手牌没目标 → null', () => {
@@ -325,12 +333,13 @@ describe('冥王星·地狱（dm_pluto_hell）·业火', () => {
     expect(r).toBeNull();
   });
 
-  it('已用过本回合 → null', () => {
+  it('本回合已有使用记录也不影响再次发动', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setHand(s, 'pM', ['action_kick' as CardID]);
+    s = setHand(s, 'p1', []);
     s = markSkillUsed(s, 'pM', PLUTO_BURNING_SKILL_ID);
     const r = applyPlutoBurning(s, 'pM', 'action_kick');
-    expect(r).toBeNull();
+    expect(r).not.toBeNull();
   });
 
   // 前置检查：无手牌<2 的盗梦者时拒绝发动（不浪费弃牌）

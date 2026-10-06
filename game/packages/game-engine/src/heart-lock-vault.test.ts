@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
 import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
+import { SAGITTARIUS_KILLS_THIS_TURN_KEY } from './engine/death.js';
 import { createTestState, makeLayer, makePlayer, withBribes } from './testing/fixtures.js';
 import {
   applyMove,
@@ -84,7 +85,15 @@ function scene(
     ...G,
     players: {
       ...G.players,
-      p1: makePlayer({ id: 'p1', faction: 'thief', characterId: c(characterId), hand }),
+      p1: makePlayer({
+        id: 'p1',
+        faction: 'thief',
+        characterId: c(characterId),
+        hand,
+        // 射手·穿心要本回合击杀过玩家才能发动：场景里把这个前提给足
+        skillUsedThisTurn:
+          characterId === 'thief_sagittarius' ? { [SAGITTARIUS_KILLS_THIS_TURN_KEY]: 1 } : {},
+      }),
     },
   };
   G = place(G, 'p1', layer);

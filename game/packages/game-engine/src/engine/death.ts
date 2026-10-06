@@ -13,6 +13,13 @@ import type { Layer } from '@icgame/shared';
 
 export const LOST_LAYER: Layer = 0 as Layer;
 
+/**
+ * 射手本回合的击杀计数，记在凶手的 skillUsedThisTurn 里（回合开始随之清零）。
+ * 射手·穿心「你每击杀 1 位玩家」据此判断本回合有没有机会。
+ * 对照：docs/manual/05-dream-thieves.md 射手 136 行
+ */
+export const SAGITTARIUS_KILLS_THIS_TURN_KEY = 'thief_sagittarius.kills';
+
 /** 击杀时被害者交给凶手的手牌张数 */
 export const KILL_HANDOVER_COUNT = 2;
 
@@ -125,6 +132,15 @@ export function killPlayer(
 
   const handover = victim.hand.slice(0, handoverCount);
   const limbo = sendToLimbo(state, victimID);
+  const killerAfter = limbo.players[killerID]!;
+  const skillUsedThisTurn =
+    killer.characterId === 'thief_sagittarius'
+      ? {
+          ...killerAfter.skillUsedThisTurn,
+          [SAGITTARIUS_KILLS_THIS_TURN_KEY]:
+            (killerAfter.skillUsedThisTurn[SAGITTARIUS_KILLS_THIS_TURN_KEY] ?? 0) + 1,
+        }
+      : killerAfter.skillUsedThisTurn;
   return {
     ...limbo,
     players: {
@@ -134,6 +150,7 @@ export function killPlayer(
         ...limbo.players[killerID]!,
         hand: [...limbo.players[killerID]!.hand, ...handover],
         shootCount: limbo.players[killerID]!.shootCount + 1,
+        skillUsedThisTurn,
       },
     },
   };

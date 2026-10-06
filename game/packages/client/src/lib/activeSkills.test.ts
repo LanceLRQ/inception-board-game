@@ -120,19 +120,27 @@ describe('描述符元数据', () => {
   });
 });
 
-describe('getAvailableActiveSkills · 穿行者·支助（回合限 1）', () => {
-  it('穿行者 + 未用过 → 含', () => {
-    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_tourist' }));
+describe('getAvailableActiveSkills · 穿行者·支助（不限次数，需要至少 1 张手牌）', () => {
+  it('穿行者 + 有手牌 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_tourist', hand: ['action_kick'] }),
+    );
     expect(list).toContain(TOURIST_ASSIST);
   });
 
-  it('穿行者 + 已用过 1 次 → 不含', () => {
+  it('穿行者 + 本回合已用过 + 又有手牌 → 仍含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
         characterId: 'thief_tourist',
+        hand: ['action_kick'],
         skillUsedThisTurn: { 'thief_tourist.skill_0': 1 },
       }),
     );
+    expect(list).toContain(TOURIST_ASSIST);
+  });
+
+  it('穿行者 + 没有手牌 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_tourist' }));
     expect(list).not.toContain(TOURIST_ASSIST);
   });
 });

@@ -318,7 +318,7 @@
     "thief_tourist": {
       "skill_0": {
         "name": "穿行者·支助",
-        "desc": "指定一名玩家进行支助（每回合限 1 次）"
+        "desc": "指定一名玩家进行支助"
       }
     },
     "thief_martyr": {

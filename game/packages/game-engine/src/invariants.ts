@@ -6,7 +6,7 @@
 //
 // 返回："" 表示无违规；否则返回人类可读违规条目数组。
 // 检查项：
-//   1. 恰好 1 名梦主（且在 players 里）
+//   1. dreamMasterID 指向的玩家存在且为梦主阵营；其余梦主阵营玩家（背叛者）必须持有成功的贿赂牌
 //   2. currentPlayerID 必须在 playerOrder 中（除非 phase=setup）
 //   3. 所有玩家的 currentLayer 在 [0, 4]（0=迷失层）
 //   4. 心锁值非负
@@ -36,16 +36,23 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     out.push({ rule, message });
   };
 
-  // ---------- 1. 恰好 1 名梦主 ----------
-  const masters = Object.values(state.players).filter((p) => p.faction === 'master');
+  // ---------- 1. 梦主身份 ----------
+  // 梦主以 dreamMasterID 为准；盗梦者抽到成功的贿赂牌后 faction 也会变成 master（背叛者），
+  // 所以不能数 faction。其余 master 阵营的玩家必须持有一张成功的贿赂牌。
+  // 对照：docs/manual/03-game-flow.md 贿赂&背叛者
   if (state.phase !== 'setup') {
-    if (masters.length !== 1) {
-      push('master_count', `Expected 1 master, got ${masters.length}`);
+    const declared = state.dreamMasterID ? state.players[state.dreamMasterID] : undefined;
+    if (!declared || declared.faction !== 'master') {
+      push('master_id', `dreamMasterID=${state.dreamMasterID} not a valid master`);
     }
-    if (state.dreamMasterID) {
-      const declared = state.players[state.dreamMasterID];
-      if (!declared || declared.faction !== 'master') {
-        push('master_id', `dreamMasterID=${state.dreamMasterID} not a valid master`);
+    for (const p of Object.values(state.players)) {
+      if (p.id === state.dreamMasterID || p.faction !== 'master') continue;
+      const holdsDeal = state.bribePool.some((b) => b.heldBy === p.id && b.kind === 'deal');
+      if (!holdsDeal) {
+        push(
+          'betrayer_without_deal',
+          `Player ${p.id} is on the master faction without holding a successful bribe`,
+        );
       }
     }
   }

@@ -15,6 +15,7 @@ import {
   terroristCrossLayer,
 } from '../index.js';
 import type { AbilityContext } from '../../types.js';
+import { SAGITTARIUS_KILLS_THIS_TURN_KEY } from '../../../death.js';
 
 function ctxFor(
   state: SetupState,
@@ -196,38 +197,63 @@ describe('空间女王·放置', () => {
 });
 
 // ==========================================================================
-// 射手 · 心锁（onKilled + perGame 限 1）
+// 射手 · 心锁（onKilled + 本回合击杀过玩家 + perTurn 限 1）
 // ==========================================================================
 
+/** 射手并记下本回合已击杀 1 位玩家（穿心的发动前提） */
+function sagittariusWhoKilled(): SetupState {
+  let s = scenarioStartOfGame3p();
+  s = setCharacter(s, 'p1', 'thief_sagittarius');
+  const p = s.players.p1!;
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...p, skillUsedThisTurn: { [SAGITTARIUS_KILLS_THIS_TURN_KEY]: 1 } },
+    },
+  };
+}
+
 describe('射手·心锁', () => {
-  it('canActivate ok：射手 + 未用过', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_sagittarius');
+  it('canActivate ok：射手 + 本回合击杀过 + 未用过', () => {
+    const s = sagittariusWhoKilled();
     const ctx = ctxFor(s, 'p1');
     expect(sagittariusHeartLock.canActivate(s, ctx).ok).toBe(true);
   });
 
-  it('apply：layer 2 delta=+1 → 心锁 +1', () => {
+  it('canActivate 拒绝：本回合没有击杀过玩家', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_sagittarius');
+    const ctx = ctxFor(s, 'p1');
+    expect(sagittariusHeartLock.canActivate(s, ctx).reason).toBe('no_kill_this_turn');
+  });
+
+  it('apply：layer 2 delta=+1 → 心锁 +1', () => {
+    let s = sagittariusWhoKilled();
+    s = setHeartLock(s, 2 as Layer, 2);
+    const ctx = ctxFor(s, 'p1');
+    const r = sagittariusHeartLock.apply(s, ctx, { layer: 2, delta: 1 });
+    expect(r.state!.layers[2]!.heartLockValue).toBe(3);
+  });
+
+  it('心锁数不能超过原有数量：已是初始值时 +1 保持不变', () => {
+    let s = sagittariusWhoKilled();
     s = setHeartLock(s, 2 as Layer, 3);
     const ctx = ctxFor(s, 'p1');
     const r = sagittariusHeartLock.apply(s, ctx, { layer: 2, delta: 1 });
-    expect(r.state!.layers[2]!.heartLockValue).toBe(4);
+    expect(r.state!.layers[2]!.heartLockValue).toBe(3);
   });
 
-  it('perGame 限 1 次：第 2 次拒绝', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_sagittarius');
-    s = setHeartLock(s, 2 as Layer, 3);
+  it('回合限 1 次：第 2 次拒绝', () => {
+    let s = sagittariusWhoKilled();
+    s = setHeartLock(s, 2 as Layer, 2);
     const ctx = ctxFor(s, 'p1');
     const r1 = sagittariusHeartLock.apply(s, ctx, { layer: 2, delta: 1 });
     expect(sagittariusHeartLock.canActivate(r1.state!, ctx).reason).toBe('usage_exhausted');
   });
 
-  it('delta=-1 + cap=6 + 心锁=0 → 保持 0（下限守护）', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_sagittarius');
+  it('delta=-1 + 心锁=0 → 保持 0（下限守护）', () => {
+    let s = sagittariusWhoKilled();
     s = setHeartLock(s, 2 as Layer, 0);
     const ctx = ctxFor(s, 'p1');
     const r = sagittariusHeartLock.apply(s, ctx, { layer: 2, delta: -1 });
