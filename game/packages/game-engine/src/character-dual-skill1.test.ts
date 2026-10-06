@@ -12,6 +12,7 @@ import {
   LUNA_FULL_MOON_SKILL_ID,
   PISCES_BLESSING_SKILL_ID,
 } from './engine/skills.js';
+import { callMove, cloneState, expectMoveOk } from './testing/fixtures.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
 
 function setCharacter(state: SetupState, playerID: string, characterId: CardID): SetupState {
@@ -140,6 +141,62 @@ describe('双子 · 抉择（skill_1）', () => {
     const res = applyGeminiChoice(s, 'p1', 6, 6); // 请求 12 张，只有 1 张
     expect(res).not.toBeNull();
     expect(res!.players.p1!.characterId).toBe('thief_gemini_back');
+  });
+
+  describe('move 接入：playGeminiChoice', () => {
+    function setupGemini(): SetupState {
+      let s = scenarioActionPhase();
+      s = setCharacter(s, 'p1', 'thief_gemini');
+      s = setLayer(s, 'p1', 3 as Layer);
+      s = setLayer(s, 'pM', 1 as Layer);
+      return withDeck(s, new Array(20).fill('action_unlock') as CardID[]);
+    }
+
+    it('行动阶段满足条件时被接受：按两骰之和抽牌、牌库减少、角色翻面', () => {
+      const s = setupGemini();
+      const r = callMove(s, 'playGeminiChoice', [], { rolls: [2, 3] });
+      expectMoveOk(r);
+      expect(r.players.p1!.hand).toEqual(new Array(5).fill('action_unlock'));
+      expect(r.deck.cards).toHaveLength(15);
+      expect(r.players.p1!.characterId).toBe('thief_gemini_back');
+      expect(r.players.p1!.skillUsedThisTurn[GEMINI_CHOICE_SKILL_ID]).toBe(1);
+    });
+
+    it('抽牌数取决于两次掷骰结果', () => {
+      const s = setupGemini();
+      const r = callMove(s, 'playGeminiChoice', [], { rolls: [6, 4] });
+      expectMoveOk(r);
+      expect(r.players.p1!.hand).toHaveLength(10);
+      expect(r.deck.cards).toHaveLength(10);
+    });
+
+    it('不在行动阶段时被拒且状态不变', () => {
+      for (const turnPhase of ['draw', 'discard'] as const) {
+        const s = { ...setupGemini(), turnPhase };
+        const before = cloneState(s);
+        expect(callMove(s, 'playGeminiChoice', [], { rolls: [2, 3] })).toBe('INVALID_MOVE');
+        expect(s).toEqual(before);
+      }
+    });
+
+    it('非当前回合玩家调用时被拒', () => {
+      const s = setupGemini();
+      expect(callMove(s, 'playGeminiChoice', [], { rolls: [2, 3], currentPlayer: 'p2' })).toBe(
+        'INVALID_MOVE',
+      );
+    });
+
+    it('梦主与双子同层时被拒且状态不变', () => {
+      const s = setLayer(setupGemini(), 'pM', 3 as Layer);
+      const before = cloneState(s);
+      expect(callMove(s, 'playGeminiChoice', [], { rolls: [2, 3] })).toBe('INVALID_MOVE');
+      expect(s).toEqual(before);
+    });
+
+    it('角色不是双子时被拒', () => {
+      const s = setCharacter(setupGemini(), 'p1', 'thief_pointman');
+      expect(callMove(s, 'playGeminiChoice', [], { rolls: [2, 3] })).toBe('INVALID_MOVE');
+    });
   });
 });
 
@@ -272,5 +329,82 @@ describe('露娜 · 满月（skill_1）', () => {
 
   it('PISCES_BLESSING_SKILL_ID 常量语法稳定（防常量改名）', () => {
     expect(PISCES_BLESSING_SKILL_ID).toBe('thief_pisces.skill_1');
+  });
+
+  describe('move 接入：playLunaFullMoon', () => {
+    const discard = ['action_unlock', 'action_dream_view'] as CardID[];
+
+    function setupLuna(): SetupState {
+      let s = scenarioActionPhase();
+      s = setCharacter(s, 'p1', 'thief_luna');
+      s = setLayer(s, 'p1', 2 as Layer);
+      s = setHand(s, 'p1', [...discard, 'action_kick'] as CardID[]);
+      return killTo(s, 'p2');
+    }
+
+    it('行动阶段满足条件时被接受：弃指定两张牌、复活到当前层、角色翻面、计数递增', () => {
+      const s = setupLuna();
+      const r = callMove(s, 'playLunaFullMoon', [discard, ['p2']]);
+      expectMoveOk(r);
+      expect(r.players.p1!.hand).toEqual(['action_kick']);
+      expect(r.deck.discardPile).toEqual(discard);
+      expect(r.players.p2!.isAlive).toBe(true);
+      expect(r.players.p2!.deathTurn).toBeNull();
+      expect(r.players.p2!.currentLayer).toBe(2);
+      expect(r.layers[2]!.playersInLayer).toContain('p2');
+      expect(r.players.p1!.characterId).toBe('thief_luna_back');
+      expect(r.players.p1!.skillUsedThisTurn[LUNA_FULL_MOON_SKILL_ID]).toBe(1);
+      expect(r.moveCounter).toBe(s.moveCounter + 1);
+    });
+
+    it('复活名单为空时只弃牌并翻面', () => {
+      const s = setupLuna();
+      const r = callMove(s, 'playLunaFullMoon', [discard, []]);
+      expectMoveOk(r);
+      expect(r.players.p1!.hand).toEqual(['action_kick']);
+      expect(r.players.p2!.isAlive).toBe(false);
+      expect(r.players.p1!.characterId).toBe('thief_luna_back');
+    });
+
+    it('不在行动阶段时被拒且状态不变', () => {
+      for (const turnPhase of ['draw', 'discard'] as const) {
+        const s = { ...setupLuna(), turnPhase };
+        const before = cloneState(s);
+        expect(callMove(s, 'playLunaFullMoon', [discard, ['p2']])).toBe('INVALID_MOVE');
+        expect(s).toEqual(before);
+      }
+    });
+
+    it('非当前回合玩家调用时被拒', () => {
+      const s = setupLuna();
+      expect(callMove(s, 'playLunaFullMoon', [discard, ['p2']], { currentPlayer: 'p2' })).toBe(
+        'INVALID_MOVE',
+      );
+    });
+
+    it('角色不是露娜时被拒且状态不变', () => {
+      const s = setCharacter(setupLuna(), 'p1', 'thief_pointman');
+      const before = cloneState(s);
+      expect(callMove(s, 'playLunaFullMoon', [discard, ['p2']])).toBe('INVALID_MOVE');
+      expect(s).toEqual(before);
+    });
+
+    it('弃牌含 SHOOT 时被拒', () => {
+      let s = setupLuna();
+      s = setHand(s, 'p1', ['action_unlock', 'action_shoot'] as CardID[]);
+      expect(
+        callMove(s, 'playLunaFullMoon', [['action_unlock', 'action_shoot'] as CardID[], ['p2']]),
+      ).toBe('INVALID_MOVE');
+    });
+
+    it('弃牌参数不是数组时被拒', () => {
+      const s = setupLuna();
+      expect(callMove(s, 'playLunaFullMoon', ['action_unlock', ['p2']])).toBe('INVALID_MOVE');
+    });
+
+    it('复活参数不是数组时被拒', () => {
+      const s = setupLuna();
+      expect(callMove(s, 'playLunaFullMoon', [discard, 'p2'])).toBe('INVALID_MOVE');
+    });
   });
 });

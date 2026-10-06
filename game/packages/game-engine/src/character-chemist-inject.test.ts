@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
 import type { SetupState } from './setup.js';
 import { applyChemistInject } from './engine/skills.js';
+import { callMove, cloneState, expectMoveOk } from './testing/fixtures.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
 
 function setCharacter(state: SetupState, playerID: string, characterId: CardID): SetupState {
@@ -120,5 +121,61 @@ describe('药剂师 · 注射（skill_1）', () => {
     // 这里只关注"不依赖 skillUsed 计数"的被动性：重新用手牌中第二张穿梭剂给任何同层 target 应可用
     // 由于 scenarioActionPhase 3 人局仅 p1/p2 盗梦者，此处用 r1 验证手牌已扣 1 即可
     expect(r1!.players.p1!.hand.filter((c) => c === 'action_dream_transit').length).toBe(1);
+  });
+
+  describe('move 接入：playChemistInject', () => {
+    function setupInject(): SetupState {
+      let s = scenarioActionPhase();
+      s = setCharacter(s, 'p1', 'thief_chemist');
+      s = setLayer(s, 'p1', 2 as Layer);
+      s = setLayer(s, 'p2', 2 as Layer);
+      return setHand(s, 'p1', ['action_dream_transit', 'action_unlock'] as CardID[]);
+    }
+
+    it('行动阶段满足条件时被接受：目标移到指定层、穿梭剂进弃牌堆、计数递增', () => {
+      const s = setupInject();
+      const r = callMove(s, 'playChemistInject', ['p2', 3]);
+      expectMoveOk(r);
+      expect(r.players.p2!.currentLayer).toBe(3);
+      expect(r.layers[2]!.playersInLayer).not.toContain('p2');
+      expect(r.layers[3]!.playersInLayer).toContain('p2');
+      expect(r.players.p1!.currentLayer).toBe(2);
+      expect(r.players.p1!.hand).toEqual(['action_unlock']);
+      expect(r.deck.discardPile).toEqual(['action_dream_transit']);
+      expect(r.moveCounter).toBe(s.moveCounter + 1);
+    });
+
+    it('不在行动阶段时被拒且状态不变', () => {
+      for (const turnPhase of ['draw', 'discard'] as const) {
+        const s = { ...setupInject(), turnPhase };
+        const before = cloneState(s);
+        expect(callMove(s, 'playChemistInject', ['p2', 3])).toBe('INVALID_MOVE');
+        expect(s).toEqual(before);
+      }
+    });
+
+    it('非当前回合玩家调用时被拒', () => {
+      const s = setupInject();
+      expect(callMove(s, 'playChemistInject', ['p2', 3], { currentPlayer: 'p2' })).toBe(
+        'INVALID_MOVE',
+      );
+    });
+
+    it('角色不是药剂师时被拒且状态不变', () => {
+      const s = setCharacter(setupInject(), 'p1', 'thief_pointman');
+      const before = cloneState(s);
+      expect(callMove(s, 'playChemistInject', ['p2', 3])).toBe('INVALID_MOVE');
+      expect(s).toEqual(before);
+    });
+
+    it('目标层非相邻时被拒', () => {
+      const s = setupInject();
+      expect(callMove(s, 'playChemistInject', ['p2', 4])).toBe('INVALID_MOVE');
+    });
+
+    it('目标与药剂师不同层时被拒', () => {
+      const s = setLayer(setupInject(), 'p2', 1 as Layer);
+      expect(callMove(s, 'playChemistInject', ['p2', 2])).toBe('INVALID_MOVE');
+    });
   });
 });
