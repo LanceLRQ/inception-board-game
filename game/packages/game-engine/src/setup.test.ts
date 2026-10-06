@@ -240,11 +240,11 @@ describe('setup', () => {
         nicknames: ['A', 'B', 'C', 'D'],
         rngSeed: 'seed',
       });
-      // 贿赂池：3 DEAL + 3 fail = 6 张，初始都在 inPool
-      expect(s.bribePool.length).toBe(6);
+      // 贿赂池：4 人局 1 DEAL + 1 fail = 2 张（人数配置表），初始都在 inPool
+      expect(s.bribePool.length).toBe(2);
       expect(s.bribePool.every((b) => b.status === 'inPool')).toBe(true);
-      expect(s.bribePool.filter((b) => b.kind === 'deal').length).toBe(3);
-      expect(s.bribePool.filter((b) => b.kind === 'fail').length).toBe(3);
+      expect(s.bribePool.filter((b) => b.kind === 'deal').length).toBe(1);
+      expect(s.bribePool.filter((b) => b.kind === 'fail').length).toBe(1);
       // 牌库被初始化为已洗牌的行动牌（不含 action_back 占位牌）
       expect(s.deck.cards.length).toBeGreaterThan(0);
       expect(s.deck.cards).not.toContain('action_back');

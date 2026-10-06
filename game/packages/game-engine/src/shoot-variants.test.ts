@@ -94,6 +94,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     endTurn: null,
     pendingResponseWindow: null,
     pendingPeekDecision: null,
+    pendingVaultDecision: null,
     peekReveal: null,
     pendingLibra: null,
     mazeState: null,

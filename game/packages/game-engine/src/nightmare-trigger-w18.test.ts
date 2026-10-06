@@ -132,44 +132,60 @@ describe('applyDiscardHiddenNightmare', () => {
   });
 });
 
-describe('move masterDiscardHiddenNightmare', () => {
-  it('梦主弃未翻开梦魇 → 成功', () => {
+describe('move masterVaultDecision · discard（弃掉金库层梦魇）', () => {
+  const waiting = (s: SetupState, layer: number): SetupState => ({
+    ...s,
+    pendingVaultDecision: { layer, openerID: 'p1' },
+  });
+
+  it('梦主弃未翻开梦魇 → 成功，清掉等待状态', () => {
     let s = scenarioStartOfGame3p();
     s = setActionPhasePM(s);
-    s = setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm');
-    const r = callMove(s, 'masterDiscardHiddenNightmare', [1], { currentPlayer: 'pM' });
+    s = waiting(setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm'), 1);
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'pM' });
     expectMoveOk(r);
     expect(r.layers[1]!.nightmareId).toBe(null);
+    expect(r.pendingVaultDecision).toBeNull();
   });
 
   it('非梦主调用 → INVALID', () => {
     let s = scenarioStartOfGame3p();
     s = { ...s, turnPhase: 'action', currentPlayerID: 'p1' };
-    s = setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm');
-    const r = callMove(s, 'masterDiscardHiddenNightmare', [1], { currentPlayer: 'p1' });
+    s = waiting(setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm'), 1);
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'p1' });
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('已翻开梦魇 → INVALID', () => {
+  it('已翻开的梦魇也一并弃掉', () => {
     let s = scenarioStartOfGame3p();
     s = setActionPhasePM(s);
-    s = setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm', true);
-    const r = callMove(s, 'masterDiscardHiddenNightmare', [1], { currentPlayer: 'pM' });
-    expect(r).toBe('INVALID_MOVE');
+    s = waiting(setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm', true), 1);
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'pM' });
+    expectMoveOk(r);
+    expect(r.layers[1]!.nightmareId).toBe(null);
+    expect(r.usedNightmareIds).toContain('nightmare_despair_storm');
   });
 
-  it('非 action 阶段 → INVALID', () => {
+  it('不看回合阶段：抽牌阶段同样可以应答', () => {
     let s = scenarioStartOfGame3p();
     s = { ...s, turnPhase: 'draw', currentPlayerID: 'pM' };
-    s = setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm');
-    const r = callMove(s, 'masterDiscardHiddenNightmare', [1], { currentPlayer: 'pM' });
-    expect(r).toBe('INVALID_MOVE');
+    s = waiting(setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm'), 1);
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'pM' });
+    expectMoveOk(r);
   });
 
-  it('该层没梦魇 → INVALID', () => {
+  it('该层没梦魇 → 成功，什么都不弃', () => {
     let s = scenarioStartOfGame3p();
-    s = setActionPhasePM(s);
-    const r = callMove(s, 'masterDiscardHiddenNightmare', [1], { currentPlayer: 'pM' });
+    s = waiting(setActionPhasePM(s), 1);
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'pM' });
+    expectMoveOk(r);
+    expect(r.usedNightmareIds).toEqual([]);
+  });
+
+  it('没有等待状态 → INVALID', () => {
+    let s = scenarioStartOfGame3p();
+    s = setLayerNightmare(setActionPhasePM(s), 1 as Layer, 'nightmare_despair_storm');
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'pM' });
     expect(r).toBe('INVALID_MOVE');
   });
 });
@@ -182,8 +198,8 @@ describe('端到端：开金币金库 → 检测 → 弃梦魇', () => {
     // 检测
     expect(findCoinVaultsWithHiddenNightmare(s)).toEqual([2]);
     // 梦主弃
-    s = setActionPhasePM(s);
-    const r = callMove(s, 'masterDiscardHiddenNightmare', [2], { currentPlayer: 'pM' });
+    s = { ...setActionPhasePM(s), pendingVaultDecision: { layer: 2, openerID: 'p1' } };
+    const r = callMove(s, 'masterVaultDecision', ['discard'], { currentPlayer: 'pM' });
     expectMoveOk(r);
     // 弃完后不再命中
     expect(findCoinVaultsWithHiddenNightmare(r)).toEqual([]);

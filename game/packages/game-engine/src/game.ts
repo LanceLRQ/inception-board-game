@@ -13,7 +13,12 @@
 //   4. 弃牌阶段完成后，move 内调 events.endTurn() 让 BGIO 推进回合
 
 import { INVALID_MOVE } from './engine/invalidMove.js';
-import { createInitialState, type SetupState, type BribeSetup, type PlayerSetup } from './setup.js';
+import {
+  createInitialState,
+  type SetupState,
+  type PlayerSetup,
+  type VaultDecisionChoice,
+} from './setup.js';
 import { migrateGameState } from './migrations.js';
 import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT, HAND_LIMIT } from './config.js';
 import {
@@ -84,7 +89,10 @@ import {
   applyM4CarbineModifier,
   isDreamMaster,
   isOutwardThief,
-  canImperialPickBribe,
+  canImperialPickFromPool,
+  dealBribeCard,
+  inPoolBribeIndexes,
+  discardNightmareOnLayer,
   applySecretPassageTeleport,
   applyUranusPower,
   applyPlutoBurning,
@@ -97,7 +105,6 @@ import {
   applySaturnFreeMove,
   applyUranusFirmamentMoveDiscard,
   applyMarsBattlefieldExchange,
-  applyDiscardHiddenNightmare,
   applyMercuryRouteExtraFailBribe,
   applySudgerVerdict,
   SUDGER_SKILL_ID,
@@ -108,7 +115,6 @@ import {
   applyBlackHoleLevy,
   applyBlackHoleAbsorb,
   applyImperialCityWorldShoot,
-  grantImperialShootCharge,
   applyKickEffect,
   applyRevive,
   applyVenusMirrorWorld,
@@ -183,51 +189,48 @@ function guardTurnPhase(G: SetupState, ctx: BGIOCtx, expected: SetupState['turnP
   return true;
 }
 
-// --- 内部 helper：M4-4 金币金库开启奖励 ---
-// 规则：打开金币类金库时，打开者额外获得 1 张贿赂（从 bribePool 随机抽 1 张）
-// 对照：docs/manual/08-appendix.md M4 梦主优势第 4 条
-// 实现：复用 masterDealBribe 的派发逻辑（inPool → dealt/deal 状态流转）；
-// 由 resolveUnlock / 其他金库打开路径在 applyUnlockSuccess 之后显式调用。
-function applyCoinVaultBribeReward(
-  state: SetupState,
+// --- 内部 helper：选出这次要派的贿赂牌 ---
+// 指定了下标（皇城·重金，派发贿赂时可指定 1 张）：梦主必须是皇城、该张必须还在池里，否则非法；
+// 没指定：从池里还没派出的牌里随机抽 1 张，池里一张都没有时返回 null。
+function resolveBribePick(
+  G: SetupState,
   random: BGIORandom,
-  targetPlayerID: string,
-): SetupState {
-  const target = state.players[targetPlayerID];
-  if (!target || !target.isAlive) return state;
-  const poolIdxs = state.bribePool
-    .map((b, i) => ({ b, i }))
-    .filter(({ b }) => b.status === 'inPool');
-  if (poolIdxs.length === 0) return state;
-  const shuffled = random.Shuffle(poolIdxs);
-  const pick = shuffled[0]!;
-  const bribe = pick.b;
-  const isDeal = bribe.kind === 'deal';
-  const nextPool = state.bribePool.map((b, i) =>
-    i === pick.i
-      ? {
-          ...b,
-          status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
-          heldBy: targetPlayerID,
-          originalOwnerId: targetPlayerID,
-        }
-      : b,
-  );
-  return grantImperialShootCharge(
-    {
-      ...state,
-      bribePool: nextPool,
-      players: {
-        ...state.players,
-        [targetPlayerID]: {
-          ...target,
-          bribeReceived: target.bribeReceived + 1,
-          faction: isDeal ? ('master' as Faction) : target.faction,
-        },
+  poolIndex: unknown,
+): number | null | 'invalid' {
+  if (poolIndex !== undefined && poolIndex !== null) {
+    if (typeof poolIndex !== 'number') return 'invalid';
+    return canImperialPickFromPool(G, G.dreamMasterID, poolIndex) ? poolIndex : 'invalid';
+  }
+  const inPool = inPoolBribeIndexes(G);
+  if (inPool.length === 0) return null;
+  return random.Shuffle(inPool)[0]!;
+}
+
+// --- 内部 helper：发动梦魇并清理 ---
+// 梦魇效果生效后，该层梦魇离开棋盘、记为已发动并计入已用梦魇；效果非法时整体非法。
+function activateNightmareOnLayer(
+  G: SetupState,
+  layer: number,
+  random: BGIORandom,
+  params?: Record<string, unknown>,
+): SetupState | typeof INVALID_MOVE {
+  const nid = G.layers[layer]?.nightmareId;
+  if (!nid) return INVALID_MOVE;
+  const next = applyNightmareEffect(G, layer, nid, random, params);
+  if (next === INVALID_MOVE) return INVALID_MOVE;
+  return {
+    ...next,
+    layers: {
+      ...next.layers,
+      [layer]: {
+        ...next.layers[layer]!,
+        nightmareId: null,
+        nightmareRevealed: false,
+        nightmareTriggered: true,
       },
     },
-    targetPlayerID,
-  );
+    usedNightmareIds: [...next.usedNightmareIds, nid],
+  };
 }
 
 /** 对比 before/after 的 vaults，返回本次刚打开的金币金库（若有） */
@@ -244,24 +247,30 @@ function findJustOpenedCoinVault(
 }
 
 // --- 内部 helper：金库刚被打开的结算 ---
-// 对比 before / after：本次刚打开的是金币金库时，给开启者 1 张贿赂牌。
+// 对比 before / after：本次刚打开的是金币金库、且打开者对外是盗梦者（含背叛者）时，
+// 挂起 pendingVaultDecision，由梦主在 masterVaultDecision 里三选一，这里不派贿赂牌也不动梦魇。
+// 打开者是梦主本人或没有打开者：什么都不发生，梦魇留在原处。
 // 秘密金库由 endIf 判盗梦者胜，不在这里处理。解封与技能把心锁减到 0 翻开金库都走这里。
-// 对照：docs/manual/03-game-flow.md:34-36
-function settleVaultOpened(before: SetupState, after: SetupState, random: BGIORandom): SetupState {
+// 对照：docs/manual/03-game-flow.md:33-36、94-103
+function settleVaultOpened(before: SetupState, after: SetupState): SetupState {
   const coinVault = findJustOpenedCoinVault(before.vaults, after.vaults);
-  if (coinVault?.openedBy) return applyCoinVaultBribeReward(after, random, coinVault.openedBy);
-  return after;
+  const openerID = coinVault?.openedBy;
+  if (!coinVault || !openerID || !isOutwardThief(after, openerID)) return after;
+  // 贿赂池已空、该层也没有梦魇牌：梦主没有可选的东西，不挂起
+  const canDeal = after.bribePool.some((b) => b.status === 'inPool');
+  if (!canDeal && !after.layers[coinVault.layer]?.nightmareId) return after;
+  return { ...after, pendingVaultDecision: { layer: coinVault.layer, openerID } };
 }
 
 // --- 内部 helper：解封成功完整副作用链 ---
 // 由 passResponse（全员 pass）与 resolveUnlock（兜底）共享。
-// 顺序：applyUnlockSuccess → M4-4 金币金库贿赂奖励 → 译梦师抽 2 → 梦境猎手·满载 → onUnlock passive。
+// 顺序：applyUnlockSuccess → 金币金库挂起梦主三选一 → 译梦师抽 2 → 梦境猎手·满载 → onUnlock passive。
 // 对照：docs/manual/04-action-cards.md 解封 + docs/manual/08-appendix.md M4-4
-function resolveUnlockFull(G: SetupState, random: BGIORandom): SetupState {
+function resolveUnlockFull(G: SetupState): SetupState {
   if (!G.pendingUnlock) return G;
   const unlockerId = G.pendingUnlock.playerID;
   let s = applyUnlockSuccess(G);
-  s = settleVaultOpened(G, s, random);
+  s = settleVaultOpened(G, s);
   s = applyInterpreterForeshadow(s, unlockerId);
   s = applyExtractorBounty(s, unlockerId);
   s = dispatchPassives(s, 'onUnlock').state;
@@ -869,54 +878,17 @@ export const InceptionCityGame = {
 
         // --- 梦魇系统（梦主限定）---
         // 对照：docs/manual/07-nightmare-cards.md
-        // 梦主行动阶段翻开指定层的梦魇牌（面朝下 → 面朝上）
-        masterRevealNightmare: {
-          move: ({ G, ctx }: MoveCtx, layer: number) => {
-            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
-            const ls = G.layers[layer];
-            if (!ls || !ls.nightmareId) return INVALID_MOVE;
-            if (ls.nightmareRevealed) return INVALID_MOVE;
-            return {
-              ...G,
-              layers: { ...G.layers, [layer]: { ...ls, nightmareRevealed: true } },
-            };
-          },
-          client: false,
-        },
+        // 梦魇牌只在盗梦者打开金币金库（masterVaultDecision）时、以及被技能或行动牌翻开后才发动；
+        // 梦主不能在自己回合随意翻开或弃掉未翻开的梦魇。下面两个 move 只处理「已被翻开」的梦魇。
+        // 对照：docs/manual/03-game-flow.md 梦魇牌（94-103 行）
         // 梦主弃掉已翻开的梦魇（不发动效果）
-        // 梦主弃掉未翻开的梦魇（玩家打开金币金库后，梦主选择不发动）
-        // 对照：docs/manual/03-game-flow.md 第 96-101 行
-        masterDiscardHiddenNightmare: {
-          move: ({ G, ctx }: MoveCtx, layer: number) => {
-            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
-            const result = applyDiscardHiddenNightmare(G, layer);
-            if (result === null) return INVALID_MOVE;
-            return result;
-          },
-          client: false,
-        },
         masterDiscardNightmare: {
           move: ({ G, ctx }: MoveCtx, layer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const ls = G.layers[layer];
             if (!ls || !ls.nightmareId || !ls.nightmareRevealed) return INVALID_MOVE;
-            const discardedId = ls.nightmareId;
-            return {
-              ...G,
-              layers: {
-                ...G.layers,
-                [layer]: {
-                  ...ls,
-                  nightmareId: null,
-                  nightmareRevealed: false,
-                  nightmareTriggered: true,
-                },
-              },
-              usedNightmareIds: [...G.usedNightmareIds, discardedId],
-            };
+            return discardNightmareOnLayer(G, layer);
           },
           client: false,
         },
@@ -928,23 +900,7 @@ export const InceptionCityGame = {
             if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const ls = G.layers[layer];
             if (!ls || !ls.nightmareId || !ls.nightmareRevealed) return INVALID_MOVE;
-            const nid = ls.nightmareId;
-            const next = applyNightmareEffect(G, layer, nid, random, params);
-            if (next === INVALID_MOVE) return INVALID_MOVE;
-            // 清除梦魇并计入已发动
-            return {
-              ...next,
-              layers: {
-                ...next.layers,
-                [layer]: {
-                  ...next.layers[layer]!,
-                  nightmareId: null,
-                  nightmareRevealed: false,
-                  nightmareTriggered: true,
-                },
-              },
-              usedNightmareIds: [...next.usedNightmareIds, nid],
-            };
+            return activateNightmareOnLayer(G, layer, random, params);
           },
           client: false,
         },
@@ -1202,7 +1158,7 @@ export const InceptionCityGame = {
         // playUnlock 成功后即刻打开响应窗口（对照：§解封 使用时机②
         //   "任意玩家使用【解封】的效果①时"），允许其他玩家出效果②抵消
         playUnlock: {
-          move: ({ G, ctx, random }: MoveCtx, cardId: CardID) => {
+          move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (!isCardForPlayMove('playUnlock', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
@@ -1249,7 +1205,7 @@ export const InceptionCityGame = {
               return recordCardPlayed(s, cardId);
             }
             // 没有可响应者：不开窗口，先记录出牌再直接结算，避免 pendingUnlock 悬空卡住对局
-            return resolveUnlockFull(recordCardPlayed(s, cardId), random);
+            return resolveUnlockFull(recordCardPlayed(s, cardId));
           },
           client: false,
         },
@@ -1257,13 +1213,13 @@ export const InceptionCityGame = {
         // 正常流程下由 passResponse 在"全员 pass"时自动触发 resolveUnlockFull。
         //   该 move 仍保留：供 bot/无响应窗口场景 fallback；会强制关闭可能残留的窗口。
         resolveUnlock: {
-          move: ({ G, random }: MoveCtx) => {
+          move: ({ G }: MoveCtx) => {
             if (!G.pendingUnlock) return INVALID_MOVE;
             // 强制退栈：若仍挂着响应窗口（兜底路径），回退到父窗口或 null
             let s: SetupState = G.pendingResponseWindow
               ? { ...G, pendingResponseWindow: G.pendingResponseWindow.parentWindow ?? null }
               : G;
-            s = resolveUnlockFull(s, random);
+            s = resolveUnlockFull(s);
             return s;
           },
           client: false,
@@ -1338,7 +1294,7 @@ export const InceptionCityGame = {
         // 校验 responder 合法 & 未重复 pass；全员 pass 时自动进入 resolveUnlockFull。
         //   无参数：响应者就是发起者（同 respondCancelUnlock）。
         passResponse: {
-          move: ({ G, ctx, random }: MoveCtx) => {
+          move: ({ G, ctx }: MoveCtx) => {
             const rid = ctx.currentPlayer;
             const w = G.pendingResponseWindow;
             if (!w) return INVALID_MOVE;
@@ -1349,7 +1305,7 @@ export const InceptionCityGame = {
             let s = passOnResponse(G, rid);
             // 全员 pass 且源是解封效果① → 自动结算为"解封成功"（含译梦师/M4-4 等副作用）
             if (isLastPass && w.sourceAbilityID === 'action_unlock_effect_1' && s.pendingUnlock) {
-              s = resolveUnlockFull(s, random);
+              s = resolveUnlockFull(s);
             }
             return s;
           },
@@ -1462,50 +1418,25 @@ export const InceptionCityGame = {
         // 对照：docs/manual/04-action-cards.md 梦境窥视 · 解析
         //   "梦主先决定是否让该盗梦者抽取 1 张贿赂牌，然后该盗梦者再查看任意一层梦境的金库"
         //   deal=true 随机派 1 张（命中 DEAL 转阵营）；deal=false 或 inPool=0 → 跳过派发。
+        //   皇城·重金：派发时可以用 poolIndex 指定池里的 1 张，替代随机抽取。
         //   两分支终态一致：清 pendingPeekDecision + 挂 peekReveal（由 peeker 通过 peekerAcknowledge 消费）。
         masterPeekBribeDecision: {
-          move: ({ G, random }: MoveCtx, deal: boolean) => {
+          move: ({ G, ctx, random }: MoveCtx, deal: boolean, poolIndex?: number) => {
             if (!G.pendingPeekDecision) return INVALID_MOVE;
-            // 回合外响应 move：只有梦主能发，由行动权表在进入这里之前校验，
-            //   这里不再核对发起者；是否派牌完全取决于参数 deal。
+            // 回合外响应 move：只有梦主能发
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const { peekerID, targetLayer } = G.pendingPeekDecision;
-            const peeker = G.players[peekerID];
-            if (!peeker) return INVALID_MOVE;
+            if (!G.players[peekerID]) return INVALID_MOVE;
 
             let s: SetupState = G;
             if (deal) {
-              const poolIdxs = G.bribePool
-                .map((b, i) => ({ b, i }))
-                .filter(({ b }) => b.status === 'inPool');
-              // inPool=0 竞态：当作 skip 处理（不改 bribePool / bribeReceived）
-              if (poolIdxs.length > 0) {
-                const shuffled = random.Shuffle(poolIdxs);
-                const pick = shuffled[0]!;
-                const bribe = pick.b;
-                const isDeal = bribe.kind === 'deal';
-                const nextPool = G.bribePool.map((b, i) =>
-                  i === pick.i
-                    ? {
-                        ...b,
-                        status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
-                        heldBy: peekerID,
-                        originalOwnerId: peekerID,
-                      }
-                    : b,
-                );
-                s = {
-                  ...G,
-                  bribePool: nextPool,
-                  players: {
-                    ...G.players,
-                    [peekerID]: {
-                      ...peeker,
-                      bribeReceived: peeker.bribeReceived + 1,
-                      faction: isDeal ? ('master' as Faction) : peeker.faction,
-                    },
-                  },
-                };
-                s = grantImperialShootCharge(s, peekerID);
+              const pick = resolveBribePick(G, random, poolIndex);
+              if (pick === 'invalid') return INVALID_MOVE;
+              // 池里已经没有可派的牌（竞态）：当作跳过处理，不改 bribePool / bribeReceived
+              if (pick !== null) {
+                const dealt = dealBribeCard(G, peekerID, pick);
+                if (dealt === null) return INVALID_MOVE;
+                s = dealt;
               }
             }
             // 清 pending + 挂 peekReveal（peeker 私密查看）
@@ -1518,6 +1449,46 @@ export const InceptionCityGame = {
                 vaultLayer: targetLayer,
               },
             };
+          },
+          client: false,
+        },
+        // 金币金库打开后，梦主在三项里选一项（回合外 move，不 guard turnPhase）
+        // 对照：docs/manual/03-game-flow.md 金库（33-36 行）、梦魇牌（94-103 行）
+        //   'bribe'    ：随机派 1 张贿赂牌给打开者（迷失层也派），并弃掉该层梦魇（不发动）；
+        //                皇城·重金可以用 params.poolIndex 指定池里的 1 张
+        //   'nightmare'：翻开并发动该层梦魇（params 透传给梦魇效果），不派贿赂牌
+        //   'discard'  ：弃掉该层梦魇，不派贿赂牌；该层没有梦魇时什么都不弃
+        //   三个分支都清掉等待状态；梦魇效果不合法时整个 move 非法、等待状态保留
+        masterVaultDecision: {
+          move: (
+            { G, ctx, random }: MoveCtx,
+            choice: VaultDecisionChoice,
+            params?: Record<string, unknown>,
+          ) => {
+            const pending = G.pendingVaultDecision;
+            if (!pending) return INVALID_MOVE;
+            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
+            const { layer, openerID } = pending;
+
+            let s: SetupState;
+            if (choice === 'bribe') {
+              // 贿赂牌只派给对外是盗梦者的人（含背叛者），梦主不能派给自己
+              if (!isOutwardThief(G, openerID)) return INVALID_MOVE;
+              const pick = resolveBribePick(G, random, params?.poolIndex);
+              if (pick === null || pick === 'invalid') return INVALID_MOVE;
+              const dealt = dealBribeCard(G, openerID, pick);
+              if (dealt === null) return INVALID_MOVE;
+              s = discardNightmareOnLayer(dealt, layer);
+            } else if (choice === 'nightmare') {
+              const activated = activateNightmareOnLayer(G, layer, random, params);
+              if (activated === INVALID_MOVE) return INVALID_MOVE;
+              s = activated;
+            } else if (choice === 'discard') {
+              s = discardNightmareOnLayer(G, layer);
+            } else {
+              return INVALID_MOVE;
+            }
+            return incrementMoveCounter({ ...s, pendingVaultDecision: null });
           },
           client: false,
         },
@@ -1569,102 +1540,9 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // --- 贿赂（MVP：梦主派发 + 即刻结算） ---
-        // 对照：docs/manual/03-game-flow.md 贿赂&背叛者
-        masterDealBribe: {
-          move: ({ G, ctx, random }: MoveCtx, targetPlayerID: string) => {
-            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
-            const target = G.players[targetPlayerID];
-            if (!target) return INVALID_MOVE;
-            if (!target.isAlive) return INVALID_MOVE;
-            // 一个盗梦者可以收到多张贿赂牌，背叛者对外是盗梦者，也能再收
-            if (!isOutwardThief(G, targetPlayerID)) return INVALID_MOVE;
-
-            // 从 pool 随机抽 1 张
-            const poolIdxs = G.bribePool
-              .map((b, i) => ({ b, i }))
-              .filter(({ b }) => b.status === 'inPool');
-            if (poolIdxs.length === 0) return INVALID_MOVE;
-            const shuffled = random.Shuffle(poolIdxs);
-            const pick = shuffled[0]!;
-            const bribe = pick.b;
-            const isDeal = bribe.kind === 'deal';
-
-            // 更新贿赂状态：派出 → dealt（命中 DEAL 转 deal）
-            const nextPool = G.bribePool.map((b, i) =>
-              i === pick.i
-                ? {
-                    ...b,
-                    status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
-                    heldBy: targetPlayerID,
-                    originalOwnerId: targetPlayerID,
-                  }
-                : b,
-            );
-
-            let s: SetupState = {
-              ...G,
-              bribePool: nextPool,
-              players: {
-                ...G.players,
-                [targetPlayerID]: {
-                  ...target,
-                  bribeReceived: target.bribeReceived + 1,
-                  // DEAL 立即转阵营为梦主
-                  faction: isDeal ? ('master' as Faction) : target.faction,
-                },
-              },
-            };
-            s = grantImperialShootCharge(s, targetPlayerID);
-            s = incrementMoveCounter(s);
-            return s;
-          },
-          client: false,
-        },
-
-        // 皇城·重金：派发贿赂时可指定 1 张牌（替代随机抽取）
-        // 对照：cards-data.json dm_imperial_city
-        masterDealBribeImperial: {
-          move: ({ G, ctx }: MoveCtx, targetPlayerID: string, poolIndex: number) => {
-            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
-            if (!canImperialPickBribe(G, ctx.currentPlayer, targetPlayerID, poolIndex))
-              return INVALID_MOVE;
-
-            const target = G.players[targetPlayerID]!;
-            const bribe = G.bribePool[poolIndex]!;
-            const isDeal = bribe.kind === 'deal';
-
-            const nextPool = G.bribePool.map((b, i) =>
-              i === poolIndex
-                ? {
-                    ...b,
-                    status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
-                    heldBy: targetPlayerID,
-                    originalOwnerId: targetPlayerID,
-                  }
-                : b,
-            );
-
-            let s: SetupState = {
-              ...G,
-              bribePool: nextPool,
-              players: {
-                ...G.players,
-                [targetPlayerID]: {
-                  ...target,
-                  bribeReceived: target.bribeReceived + 1,
-                  faction: isDeal ? ('master' as Faction) : target.faction,
-                },
-              },
-            };
-            s = grantImperialShootCharge(s, targetPlayerID);
-            s = incrementMoveCounter(s);
-            return s;
-          },
-          client: false,
-        },
+        // 贿赂牌只在金币金库打开（masterVaultDecision）与【梦境窥视】效果①（masterPeekBribeDecision）
+        // 时派发，梦主不能在自己回合随意派。
+        // 对照：docs/manual/03-game-flow.md 贿赂&背叛者（38-45 行）
 
         // 密道·传送：弃 1 穿梭剂送任一盗梦者到迷失层。回合限 2 次。
         // 对照：cards-data.json dm_secret_passage
@@ -1743,27 +1621,13 @@ export const InceptionCityGame = {
             if (!canMarsKill(G, ctx.currentPlayer)) return INVALID_MOVE;
             const ls = G.layers[layer];
             if (!ls || !ls.nightmareId) return INVALID_MOVE;
-            const nid = ls.nightmareId;
             // 弃 1 解封
             const afterDiscard = applyMarsKillDiscardUnlock(G, ctx.currentPlayer);
             if (afterDiscard === null) return INVALID_MOVE;
-            // 发动梦魇效果
-            const next = applyNightmareEffect(afterDiscard, layer, nid, random, params);
+            // 发动梦魇效果；该层梦魇离开棋盘并计入已发动
+            const next = activateNightmareOnLayer(afterDiscard, layer, random, params);
             if (next === INVALID_MOVE) return INVALID_MOVE;
-            // 清除该层梦魇并计入已发动
-            return incrementMoveCounter({
-              ...next,
-              layers: {
-                ...next.layers,
-                [layer]: {
-                  ...next.layers[layer]!,
-                  nightmareId: null,
-                  nightmareRevealed: false,
-                  nightmareTriggered: true,
-                },
-              },
-              usedNightmareIds: [...next.usedNightmareIds, nid],
-            });
+            return incrementMoveCounter(next);
           },
           client: false,
         },
@@ -1782,7 +1646,7 @@ export const InceptionCityGame = {
         // 射手·穿心：本回合击杀过玩家时，修改任意一层心锁 ±1（回合限 1 次）
         // 对照：docs/manual/05-dream-thieves.md 射手
         useSagittariusHeartLock: {
-          move: ({ G, ctx, random }: MoveCtx, layer: number, delta: -1 | 1) => {
+          move: ({ G, ctx }: MoveCtx, layer: number, delta: -1 | 1) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
@@ -1794,7 +1658,7 @@ export const InceptionCityGame = {
             const cap = heartLocksTuple?.[layer - 1] ?? 3;
             const result = applySagittariusHeartLock(G, ctx.currentPlayer, layer, delta, cap);
             if (result === null) return INVALID_MOVE;
-            const settled = settleVaultOpened(G, result, random);
+            const settled = settleVaultOpened(G, result);
             return markSkillUsed(settled, ctx.currentPlayer, SAGITTARIUS_HEART_LOCK_SKILL_ID);
           },
           client: false,
@@ -2069,7 +1933,7 @@ export const InceptionCityGame = {
             const roll = random.D6();
             const next = applyGeminiSync(G, ctx.currentPlayer, roll);
             if (next === null) return INVALID_MOVE;
-            return settleVaultOpened(G, next, random);
+            return settleVaultOpened(G, next);
           },
           client: false,
         },
@@ -2618,7 +2482,7 @@ export const InceptionCityGame = {
             const roll = random.D6();
             const r = applyMartyrSacrifice(G, ctx.currentPlayer, roll, direction, cap);
             if (r === null) return INVALID_MOVE;
-            return setTurnPhase(settleVaultOpened(G, r.state, random), 'discard');
+            return setTurnPhase(settleVaultOpened(G, r.state), 'discard');
           },
           client: false,
         },
@@ -2990,38 +2854,11 @@ function applyNightmareEffect(
     });
     for (const pid of layerThieves) {
       if (!bribed.has(pid)) continue;
-      const poolIdxs = s.bribePool
-        .map((b, i) => ({ b, i }))
-        .filter(({ b }) => b.status === 'inPool');
+      const poolIdxs = inPoolBribeIndexes(s);
       if (poolIdxs.length === 0) continue;
       const pickIdx = (random.Die(poolIdxs.length) - 1) % poolIdxs.length;
-      const pick = poolIdxs[pickIdx]!;
-      const bribe = pick.b;
-      const isDeal = bribe.kind === 'deal';
-      const target = s.players[pid]!;
-      const nextPool = s.bribePool.map((b, i) =>
-        i === pick.i
-          ? {
-              ...b,
-              status: (isDeal ? 'deal' : 'dealt') as BribeSetup['status'],
-              heldBy: pid,
-              originalOwnerId: pid,
-            }
-          : b,
-      );
-      s = {
-        ...s,
-        bribePool: nextPool,
-        players: {
-          ...s.players,
-          [pid]: {
-            ...target,
-            bribeReceived: target.bribeReceived + 1,
-            faction: isDeal ? ('master' as Faction) : target.faction,
-          },
-        },
-      };
-      s = grantImperialShootCharge(s, pid);
+      const dealt = dealBribeCard(s, pid, poolIdxs[pickIdx]!);
+      if (dealt !== null) s = dealt;
     }
     // 「手里有贿赂牌」：收到过贿赂牌即算（bribeReceived 公开、不会减少；池里 heldBy 是同一信息的另一面）
     for (const pid of layerThieves) {

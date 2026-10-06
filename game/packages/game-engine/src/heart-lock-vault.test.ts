@@ -146,7 +146,7 @@ describe('技能把心锁减到 0 · 翻开金库', () => {
     expect(res.state.ctx.gameover).toMatchObject({ winner: 'thief' });
   });
 
-  it('翻开的是金币金库：开启者与解封打开时一样拿到 1 张贿赂牌', () => {
+  it('翻开的是金币金库：与解封打开时一样挂起梦主三选一，不直接派贿赂牌', () => {
     // 解封打开作为对照
     let U = scene('thief_aries', 'action', 2, 1, [UNLOCK]);
     // 其余玩家都不在场：解封没有可响应者，当场结算
@@ -163,7 +163,8 @@ describe('技能把心锁减到 0 · 翻开金库', () => {
     expect(byUnlock.ok).toBe(true);
     if (!byUnlock.ok) return;
     expect(vaultOf(byUnlock.state.G, 2).isOpened).toBe(true);
-    expect(byUnlock.state.G.players.p1!.bribeReceived).toBe(1);
+    expect(byUnlock.state.G.pendingVaultDecision).toEqual({ layer: 2, openerID: 'p1' });
+    expect(byUnlock.state.G.players.p1!.bribeReceived).toBe(0);
 
     const bySkill = run(
       scene('thief_sagittarius', 'action', 2, 1),
@@ -172,8 +173,9 @@ describe('技能把心锁减到 0 · 翻开金库', () => {
     );
     expect(bySkill.ok).toBe(true);
     if (!bySkill.ok) return;
-    expect(bySkill.state.G.players.p1!.bribeReceived).toBe(1);
-    expect(bySkill.state.G.bribePool[0]!.heldBy).toBe('p1');
+    expect(bySkill.state.G.pendingVaultDecision).toEqual({ layer: 2, openerID: 'p1' });
+    expect(bySkill.state.G.players.p1!.bribeReceived).toBe(0);
+    expect(bySkill.state.G.bribePool[0]!.status).toBe('inPool');
   });
 
   it('减到 0 之外的心锁变化不翻金库（增加、没减到 0）', () => {

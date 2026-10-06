@@ -425,7 +425,7 @@ describe('事件 · 解封', () => {
     expect(ev?.data).toMatchObject({ success: false, player: 'p1', layer: 2 });
   });
 
-  it('vault_opened 与 bribe_dealt：心锁归零打开金币金库，成败只给收到的人', () => {
+  it('vault_opened：心锁归零打开金币金库，此时不派贿赂牌，等待梦主三选一', () => {
     const base = scene('action');
     const G: SetupState = withBribes(
       {
@@ -439,21 +439,29 @@ describe('事件 · 解封', () => {
     const last = steps.at(-1)!.events;
     const vault = one(last, 'vault_opened');
     expect(vault.data).toEqual({ vault: 'v-2', layer: 2, content: 'coin', openedBy: 'p1' });
-    const bribe = one(last, 'bribe_dealt');
-    expect(bribe.data).toEqual({ bribe: 'bribe-0', to: 'p1' });
-    expect(bribe.secret).toEqual({ to: ['p1'], data: { kind: 'fail' } });
-    expect(kindsOf(last).indexOf('vault_opened')).toBeLessThan(
-      kindsOf(last).indexOf('bribe_dealt'),
-    );
+    expect(all(last, 'bribe_dealt')).toHaveLength(0);
+    const awaiting = one(last, 'awaiting_changed').data.awaiting as {
+      field: string;
+      actors: string[];
+      moves: string[];
+    }[];
+    expect(awaiting).toEqual([
+      {
+        field: 'pendingVaultDecision',
+        actors: ['pM'],
+        moves: ['masterVaultDecision'],
+        blocking: true,
+      },
+    ]);
   });
 });
 
 describe('事件 · 贿赂', () => {
-  it('bribe_dealt：梦主给盗梦者派贿赂，成败只给持有者，梦主自己的视角也看不到', () => {
-    const G = withBribes(scene('action', { currentPlayerID: 'pM' }), [
+  it('bribe_dealt：金库打开后梦主选择派贿赂，成败只给持有者，梦主自己的视角也看不到', () => {
+    const G = withBribes(scene('action', { pendingVaultDecision: { layer: 2, openerID: 'p2' } }), [
       { id: 'bribe-0', kind: 'deal' },
     ]);
-    const { events } = step(load(G), 'pM', 'masterDealBribe', ['p2'], dice());
+    const { events } = step(load(G), 'pM', 'masterVaultDecision', ['bribe'], dice());
     const ev = one(events, 'bribe_dealt');
     expect(ev.data).toEqual({ bribe: 'bribe-0', to: 'p2' });
     expect(ev.secret).toEqual({ to: ['p2'], data: { kind: 'deal' } });
@@ -481,16 +489,24 @@ describe('事件 · 梦魇', () => {
     };
   };
 
-  it('nightmare_revealed：层与是哪一张都公开', () => {
-    const { events } = step(load(withNightmares()), 'pM', 'masterRevealNightmare', [2]);
+  const waiting = (): SetupState => ({
+    ...withNightmares(),
+    pendingVaultDecision: { layer: 2, openerID: 'p2' },
+  });
+
+  it('nightmare_revealed：金库打开后梦主选择发动，层与是哪一张都公开', () => {
+    const { events } = step(load(waiting()), 'pM', 'masterVaultDecision', ['nightmare']);
     expect(one(events, 'nightmare_revealed').data).toEqual({ layer: 2, nightmare: NIGHTMARE_B });
+    expect(one(events, 'nightmare_discarded').secret).toBeUndefined();
   });
 
   it('nightmare_discarded：没翻开就弃掉，哪张只给梦主', () => {
-    const { events } = step(load(withNightmares()), 'pM', 'masterDiscardHiddenNightmare', [1]);
+    const G = { ...withNightmares(), pendingVaultDecision: { layer: 1, openerID: 'p2' } };
+    const { events } = step(load(G), 'pM', 'masterVaultDecision', ['discard']);
     const ev = one(events, 'nightmare_discarded');
     expect(ev.data).toEqual({ layer: 1 });
     expect(ev.secret).toEqual({ to: ['pM'], data: { nightmare: NIGHTMARE_A } });
+    expect(all(events, 'nightmare_revealed')).toHaveLength(0);
   });
 
   it('nightmare_discarded：翻开过的梦魇被弃掉，没有私密内容', () => {

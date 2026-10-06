@@ -73,6 +73,16 @@ function attempt(G: SetupState, playerID: string, move: string, args: unknown[],
   return applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
+/** p 打开了第 1 层的金币金库，梦主在三选一里选择派贿赂 */
+function dealByVault(G: SetupState, opener: string) {
+  return attempt(
+    { ...G, pendingVaultDecision: { layer: 1, openerID: opener } },
+    'pM',
+    'masterVaultDecision',
+    ['bribe'],
+  );
+}
+
 describe('皇城世界观：收到贿赂牌后的一次 SHOOT', () => {
   it('没收到过贿赂牌的玩家发动被拒', () => {
     const res = attempt(scene('p2'), 'p2', 'useImperialCityWorldShoot', ['p1']);
@@ -80,7 +90,7 @@ describe('皇城世界观：收到贿赂牌后的一次 SHOOT', () => {
   });
 
   it('收到贿赂牌后获得一次发动机会，发动即消耗', () => {
-    const dealt = attempt(scene('pM'), 'pM', 'masterDealBribe', ['p2']);
+    const dealt = dealByVault(scene('pM'), 'p2');
     expect(dealt.ok).toBe(true);
     if (!dealt.ok) return;
     expect(dealt.state.G.players.p2!.bribeReceived).toBe(1);
@@ -105,12 +115,10 @@ describe('皇城世界观：收到贿赂牌后的一次 SHOOT', () => {
   });
 
   it('每收到一张贿赂牌就多一次机会', () => {
-    const first = attempt(scene('pM'), 'pM', 'masterDealBribe', ['p2']);
+    const first = dealByVault(scene('pM'), 'p2');
     expect(first.ok).toBe(true);
     if (!first.ok) return;
-    const second = attempt({ ...first.state.G, turnPhase: 'action' }, 'pM', 'masterDealBribe', [
-      'p2',
-    ]);
+    const second = dealByVault({ ...first.state.G, turnPhase: 'action' }, 'p2');
     expect(second.ok).toBe(true);
     if (!second.ok) return;
     expect(second.state.G.players.p2!.imperialShootCharges).toBe(2);
@@ -122,7 +130,7 @@ describe('皇城世界观：收到贿赂牌后的一次 SHOOT', () => {
       ...G,
       players: { ...G.players, pM: { ...G.players.pM!, characterId: c('dm_architect') } },
     };
-    const dealt = attempt(plain, 'pM', 'masterDealBribe', ['p2']);
+    const dealt = dealByVault(plain, 'p2');
     expect(dealt.ok).toBe(true);
     if (!dealt.ok) return;
     expect(dealt.state.G.players.p2!.imperialShootCharges ?? 0).toBe(0);

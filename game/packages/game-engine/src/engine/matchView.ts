@@ -135,6 +135,12 @@ export interface PendingPeekDecisionView {
   targetLayer: number;
 }
 
+/** 金币金库打开后等梦主三选一：只有层与打开者，不带任何梦魇或贿赂内容 */
+export interface PendingVaultDecisionView {
+  layer: number;
+  openerID: string;
+}
+
 export type PeekRevealView =
   | { peekerID: string; revealKind: 'vault'; vaultLayer: number }
   | { peekerID: string; revealKind: 'bribe'; targetThiefID: string };
@@ -240,6 +246,7 @@ export interface MatchView {
   shiftSnapshot: Record<string, CardID> | null;
   pendingResponseWindow: ResponseWindowView | null;
   pendingPeekDecision: PendingPeekDecisionView | null;
+  pendingVaultDecision: PendingVaultDecisionView | null;
   peekReveal: PeekRevealView | null;
   pendingLibra: PendingLibraView | null;
   pendingSudgerRolls: PendingSudgerRollsView | null;
@@ -298,6 +305,7 @@ export const FIELD_DISPOSITION: Record<keyof SetupState, Disposition> = {
   shiftSnapshot: 'conditional',
   pendingResponseWindow: 'public',
   pendingPeekDecision: 'public',
+  pendingVaultDecision: 'public',
   peekReveal: 'public',
   pendingLibra: 'conditional',
   pendingSudgerRolls: 'public',
@@ -585,6 +593,7 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
   const pendingResonance = G.pendingResonance;
   const pendingGravity = G.pendingGravity;
   const pendingPeekDecision = G.pendingPeekDecision;
+  const pendingVaultDecision = G.pendingVaultDecision;
   const sudger = G.pendingSudgerRolls ?? null;
   const shootMove = G.pendingShootMove ?? null;
   const maze = G.mazeState;
@@ -646,6 +655,9 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
     pendingResponseWindow: G.pendingResponseWindow ? viewWindow(G.pendingResponseWindow) : null,
     pendingPeekDecision: pendingPeekDecision
       ? { peekerID: pendingPeekDecision.peekerID, targetLayer: pendingPeekDecision.targetLayer }
+      : null,
+    pendingVaultDecision: pendingVaultDecision
+      ? { layer: pendingVaultDecision.layer, openerID: pendingVaultDecision.openerID }
       : null,
     peekReveal: G.peekReveal ? viewPeekReveal(G.peekReveal) : null,
     pendingLibra: G.pendingLibra ? viewLibra(G.pendingLibra, who) : null,

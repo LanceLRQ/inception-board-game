@@ -369,6 +369,10 @@ function checkPending(c: Collector, G: Rec): void {
     c.player('pendingPeekDecision.peekerID', o.peekerID);
     c.layer('pendingPeekDecision.targetLayer', o.targetLayer);
   });
+  c.optional('pendingVaultDecision', G.pendingVaultDecision, (o) => {
+    c.layer('pendingVaultDecision.layer', o.layer);
+    c.player('pendingVaultDecision.openerID', o.openerID);
+  });
   c.optional('peekReveal', G.peekReveal, (o) => {
     c.player('peekReveal.peekerID', o.peekerID);
     c.oneOf('peekReveal.revealKind', o.revealKind, ['vault', 'bribe']);

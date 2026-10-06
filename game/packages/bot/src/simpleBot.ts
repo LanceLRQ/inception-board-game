@@ -55,6 +55,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   // 梦境窥视三段式 move 注册（同上原则：响应类 999 不主动选）
   peekerAcknowledge: 999,
   masterPeekBribeDecision: 999,
+  masterVaultDecision: 999,
   playPeek: 80,
   playPeekMaster: 85,
   // 处女·完美 三选一响应窗（回合外 move，由自动行动判定以处女本人的名义发；此处 999 不主动选）

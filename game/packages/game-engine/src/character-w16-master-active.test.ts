@@ -90,14 +90,22 @@ describe('皇城（dm_imperial_city）·重金', () => {
     expect(canImperialPickBribe(s, 'pM', 'p1', 0)).toBe(false);
   });
 
-  it('move masterDealBribeImperial：派发指定 deal → 转阵营', () => {
+  // 皇城·重金并进派发时机：金币金库打开后的三选一与【梦境窥视】效果①都可以指定池里的 1 张
+  const waitingVault = (s: SetupState): SetupState => ({
+    ...s,
+    pendingVaultDecision: { layer: 2, openerID: 'p1' },
+  });
+
+  it('masterVaultDecision(bribe)：指定 deal → 转阵营', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
-    s = setActionPhase(s);
+    s = waitingVault(setActionPhase(s));
     s = setBribePool(s, [
       { id: 'bribe-fail-1', kind: 'fail', status: 'inPool' },
       { id: 'bribe-deal-1', kind: 'deal', status: 'inPool' },
     ]);
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 1], { currentPlayer: 'pM' });
+    const r = callMove(s, 'masterVaultDecision', ['bribe', { poolIndex: 1 }], {
+      currentPlayer: 'pM',
+    });
     expectMoveOk(r);
     expect(r.players.p1!.faction).toBe('master');
     expect(r.players.p1!.bribeReceived).toBe(1);
@@ -105,21 +113,25 @@ describe('皇城（dm_imperial_city）·重金', () => {
     expect(r.bribePool[1]!.heldBy).toBe('p1');
   });
 
-  it('move masterDealBribeImperial：派发 fail → 不转阵营', () => {
+  it('masterVaultDecision(bribe)：指定 fail → 不转阵营', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
-    s = setActionPhase(s);
+    s = waitingVault(setActionPhase(s));
     s = setBribePool(s, [{ id: 'bribe-fail-1', kind: 'fail', status: 'inPool' }]);
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
+    const r = callMove(s, 'masterVaultDecision', ['bribe', { poolIndex: 0 }], {
+      currentPlayer: 'pM',
+    });
     expectMoveOk(r);
     expect(r.players.p1!.faction).toBe('thief');
     expect(r.bribePool[0]!.status).toBe('dealt');
   });
 
-  it('move masterDealBribeImperial：非梦主调用 → INVALID', () => {
+  it('masterVaultDecision：非梦主调用 → INVALID', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
-    s = setActionPhase(s);
+    s = waitingVault(setActionPhase(s));
     s = setBribePool(s, [{ id: 'bribe-deal-1', kind: 'deal', status: 'inPool' }]);
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'p1' });
+    const r = callMove(s, 'masterVaultDecision', ['bribe', { poolIndex: 0 }], {
+      currentPlayer: 'p1',
+    });
     expect(r).toBe('INVALID_MOVE');
   });
 });

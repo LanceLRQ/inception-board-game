@@ -4,26 +4,28 @@ import { describe, it, expect } from 'vitest';
 import { createInitialState } from './setup.js';
 import { migrateGameState } from './migrations.js';
 
-function buildPool(seed: string) {
+/** 默认 10 人局：成功 3 张、失败 2 张，池里有足够多的牌看出排列是否随种子变化 */
+function buildPool(seed: string, playerCount = 10) {
+  const ids = Array.from({ length: playerCount }, (_, i) => String(i));
   return createInitialState({
-    playerCount: 4,
-    playerIds: ['0', '1', '2', '3'],
-    nicknames: ['a', 'b', 'c', 'd'],
+    playerCount,
+    playerIds: ids,
+    nicknames: ids.map((id) => `P${id}`),
     rngSeed: seed,
   }).bribePool;
 }
 
 describe('贿赂池', () => {
-  it('每张牌带 kind，成功 3 张、失败 3 张', () => {
+  it('每张牌带 kind，张数按人数配置：10 人局成功 3 张、失败 2 张', () => {
     const pool = buildPool('s');
-    expect(pool).toHaveLength(6);
+    expect(pool).toHaveLength(5);
     expect(pool.filter((b) => b.kind === 'deal')).toHaveLength(3);
-    expect(pool.filter((b) => b.kind === 'fail')).toHaveLength(3);
+    expect(pool.filter((b) => b.kind === 'fail')).toHaveLength(2);
   });
 
-  it('标识不含成败字样，形如 bribe-0 … bribe-5', () => {
+  it('标识不含成败字样，形如 bribe-0 … bribe-4', () => {
     const pool = buildPool('s');
-    expect(pool.map((b) => b.id)).toEqual([0, 1, 2, 3, 4, 5].map((i) => `bribe-${i}`));
+    expect(pool.map((b) => b.id)).toEqual([0, 1, 2, 3, 4].map((i) => `bribe-${i}`));
     for (const b of pool) expect(b.id).not.toMatch(/deal|fail/);
   });
 

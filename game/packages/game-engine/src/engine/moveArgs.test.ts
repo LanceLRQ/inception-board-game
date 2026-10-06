@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
-import { createTestState } from '../testing/fixtures.js';
+import { createTestState, withBribes } from '../testing/fixtures.js';
 import { applyMove, createMatch, type GameDef } from '../runner/matchRunner.js';
 import { moveParamNames } from '../runner/moveFuzzer.js';
 import type { SetupState } from '../setup.js';
@@ -105,8 +105,13 @@ describe('checkMoveArgs', () => {
     ['respondVirgoPerfect', ['teleport', { layer: 'x' }]],
     ['respondVirgoPerfect', ['cheat']],
     ['masterPeekBribeDecision', ['true']],
-    ['masterDealBribeImperial', [a, 99]],
-    ['masterDealBribeImperial', [a, -1]],
+    ['masterPeekBribeDecision', [true, 99]],
+    ['masterPeekBribeDecision', [true, -1]],
+    ['masterVaultDecision', ['steal']],
+    ['masterVaultDecision', [1]],
+    ['masterVaultDecision', ['bribe', { poolIndex: 99 }]],
+    ['masterVaultDecision', ['bribe', { poolIndex: -1 }]],
+    ['masterVaultDecision', ['nightmare', { targetLayer: 9 }]],
     ['useChessTranspose', [0, 99]],
     ['playGravity', ['action_gravity', [a, a, a, a, a, a, a, a, a, a, a, a]]],
     ['playGravity', ['action_gravity', ['nobody']]],
@@ -151,4 +156,36 @@ describe('经过运行器的参数拒绝', () => {
     expect(kick.ok).toBe(false);
     expect(JSON.stringify(kick.state.G)).toBe(before);
   });
+});
+
+describe('checkMoveArgs · 贿赂派发与金库三选一', () => {
+  const G = withBribes(createTestState({ phase: 'playing' }), [
+    { id: 'bribe-0', kind: 'fail' },
+    { id: 'bribe-1', kind: 'deal' },
+  ]);
+
+  const accepted: [string, unknown[]][] = [
+    ['masterVaultDecision', ['bribe']],
+    ['masterVaultDecision', ['discard', undefined]],
+    ['masterVaultDecision', ['bribe', { poolIndex: 1 }]],
+    ['masterVaultDecision', ['nightmare', { targetLayer: 2, action: 'add' }]],
+    ['masterPeekBribeDecision', [true]],
+    ['masterPeekBribeDecision', [true, 1]],
+  ];
+  for (const [move, args] of accepted) {
+    it(`放行合法形状：${move} ${JSON.stringify(args)}`, () => {
+      expect(checkMoveArgs(G, move, args)).toBe(true);
+    });
+  }
+
+  const rejected: [string, unknown[]][] = [
+    ['masterVaultDecision', ['bribe', { poolIndex: 2 }]],
+    ['masterVaultDecision', ['bribe', { poolIndex: 'x' }]],
+    ['masterPeekBribeDecision', [true, 2]],
+  ];
+  for (const [move, args] of rejected) {
+    it(`拒绝畸形形状：${move} ${JSON.stringify(args)}`, () => {
+      expect(checkMoveArgs(G, move, args)).toBe(false);
+    });
+  }
 });

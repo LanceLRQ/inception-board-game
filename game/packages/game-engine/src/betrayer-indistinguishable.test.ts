@@ -121,26 +121,34 @@ describe('梦主对盗梦者的操作', () => {
     expect(r).toEqual({ thief: true, betrayer: true });
   });
 
-  it('看完之后再派一张贿赂牌：背叛者与普通盗梦者都被接受，贿赂张数各加一', () => {
-    for (const target of ['p2', 'p3']) {
-      let G = okPlay(masterTurn(), 'pM', 'playPeekMaster', [PEEK, target]);
-      G = okPlay(G, 'pM', 'peekerAcknowledge', []);
-      const before = G.players[target]!.bribeReceived;
-      G = okPlay(G, 'pM', 'masterDealBribe', [target]);
-      expect(G.players[target]!.bribeReceived).toBe(before + 1);
-      expect(checkStateInvariants(G)).toEqual([]);
+  it('金库打开后派贿赂牌：背叛者与普通盗梦者作为打开者都被接受，贿赂张数各加一', () => {
+    for (const opener of ['p2', 'p3']) {
+      const G = { ...masterTurn(), pendingVaultDecision: { layer: 1, openerID: opener } };
+      const before = G.players[opener]!.bribeReceived;
+      const after = okPlay(G, 'pM', 'masterVaultDecision', ['bribe']);
+      expect(after.players[opener]!.bribeReceived).toBe(before + 1);
+      expect(checkStateInvariants(after)).toEqual([]);
     }
   });
 
-  it('皇城·重金指定派发：背叛者与普通盗梦者都被接受', () => {
+  it('皇城·重金指定派发：背叛者与普通盗梦者作为打开者都被接受', () => {
     const G = withPlayer(masterTurn(), 'pM', { characterId: c('dm_imperial_city') });
     const poolIndex = G.bribePool.findIndex((b) => b.status === 'inPool');
-    const r = acceptedFor((t) => play(G, 'pM', 'masterDealBribeImperial', [t, poolIndex]).ok);
+    const r = acceptedFor(
+      (t) =>
+        play(
+          { ...G, pendingVaultDecision: { layer: 1, openerID: t } },
+          'pM',
+          'masterVaultDecision',
+          ['bribe', { poolIndex }],
+        ).ok,
+    );
     expect(r).toEqual({ thief: true, betrayer: true });
   });
 
   it('梦主不能把贿赂牌派给自己', () => {
-    expect(play(masterTurn(), 'pM', 'masterDealBribe', ['pM']).ok).toBe(false);
+    const G = { ...masterTurn(), pendingVaultDecision: { layer: 1, openerID: 'pM' } };
+    expect(play(G, 'pM', 'masterVaultDecision', ['bribe']).ok).toBe(false);
   });
 });
 
@@ -220,9 +228,8 @@ describe('冥王星·地狱世界观', () => {
 describe('梦主专属 move 不对背叛者开放', () => {
   it('背叛者在自己的回合发梦主的 move：与普通盗梦者一样全部被拒绝', () => {
     const moves: [string, unknown[]][] = [
-      ['masterDealBribe', ['p1']],
+      ['masterVaultDecision', ['discard']],
       ['dreamMasterMove', [2]],
-      ['masterRevealNightmare', [1]],
       ['masterActivateNightmare', [1, { bribedTargets: [] }]],
     ];
     for (const id of ['p2', 'p3']) {

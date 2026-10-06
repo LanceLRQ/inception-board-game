@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 12;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -178,6 +178,15 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
         ),
       };
     },
+  ],
+  // v11 → v12：新增 pendingVaultDecision（金币金库打开后梦主三选一的等待态），旧存档补 null。
+  //   对照：docs/manual/03-game-flow.md 金库、梦魇牌
+  [
+    12,
+    (state) => ({
+      ...state,
+      pendingVaultDecision: state.pendingVaultDecision ?? null,
+    }),
   ],
 ]);
 

@@ -36,6 +36,7 @@ export { InceptionCityGame } from './game.js';
 export { INVALID_MOVE } from './engine/invalidMove.js';
 export type { SetupState } from './game.js';
 export { createInitialState } from './setup.js';
+export type { VaultDecisionChoice } from './setup.js';
 export {
   drawCards,
   discardCard,
@@ -268,6 +269,7 @@ export type {
   BribeView,
   DeckView,
   ResponseWindowView,
+  PendingVaultDecisionView,
 } from './engine/matchView.js';
 
 // 联机对局消息协议

@@ -26,12 +26,19 @@ const SHUFFLE_LABEL = {
  */
 /**
  * 构建初始贿赂池
- * 对照：docs/manual/03-game-flow.md 贿赂&背叛者
- * 3 张成功 + 3 张失败；先按种子洗乱，再按下标给不透明标识 `bribe-N`，
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者；docs/manual/02-game-setup.md 人数配置表（贿赂牌数成功 / 失败）
+ * 成功 / 失败张数按人数配置；先按种子洗乱，再按下标给不透明标识 `bribe-N`，
  * 这样标识和池内顺序都推不出成败，成败只记在 kind 字段里（由视图过滤掉）
  */
-function buildInitialBribePool(rngSeed: string): BribeSetup[] {
-  const kinds: BribeSetup['kind'][] = ['deal', 'deal', 'deal', 'fail', 'fail', 'fail'];
+function buildInitialBribePool(
+  rngSeed: string,
+  dealCount: number,
+  shatterCount: number,
+): BribeSetup[] {
+  const kinds: BribeSetup['kind'][] = [
+    ...Array<BribeSetup['kind']>(dealCount).fill('deal'),
+    ...Array<BribeSetup['kind']>(shatterCount).fill('fail'),
+  ];
   return seededShuffle(kinds, rngSeed, SHUFFLE_LABEL.bribe).map((kind, i) => ({
     id: `bribe-${i}`,
     kind,
@@ -51,6 +58,9 @@ function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] 
   }
   return seededShuffle(cards, rngSeed, SHUFFLE_LABEL.deck);
 }
+
+/** 金币金库打开后梦主的三个选项：派贿赂并弃梦魇 / 翻开并发动梦魇 / 弃梦魇 */
+export type VaultDecisionChoice = 'bribe' | 'nightmare' | 'discard';
 
 export interface SetupState {
   matchId: string;
@@ -113,6 +123,15 @@ export interface SetupState {
   pendingPeekDecision: {
     peekerID: string;
     targetLayer: number;
+  } | null;
+  // 金币金库打开 · 梦主三选一等待态
+  //   规则：盗梦者（含背叛者）打开放有金币的金库时，梦主在这三项里选一项：
+  //     派发 1 张贿赂牌并弃掉该层梦魇 / 翻开并发动该层梦魇 / 弃掉该层梦魇、不派贿赂牌
+  //   对照：docs/manual/03-game-flow.md 金库（33-36 行）、梦魇牌（94-103 行）
+  //   生命周期：解封结算或技能把心锁减到 0 翻开金币金库时挂起 → masterVaultDecision 清空
+  pendingVaultDecision: {
+    layer: number;
+    openerID: string;
   } | null;
   // 梦境窥视 · 私密展示态（对局视图按授权分支消费）
   //   revealKind='vault'：效果①（盗梦者使用），仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容
@@ -415,7 +434,7 @@ export function createInitialState(options: {
     expansionEnabled: options.expansionEnabled ?? false,
     layers,
     vaults,
-    bribePool: buildInitialBribePool(rngSeed),
+    bribePool: buildInitialBribePool(rngSeed, config.dealCount, config.shatterCount),
     deck: {
       cards: buildInitialDeck(options.expansionEnabled ?? false, rngSeed),
       discardPile: [],
@@ -432,6 +451,7 @@ export function createInitialState(options: {
     shiftSnapshot: null,
     pendingResponseWindow: null,
     pendingPeekDecision: null,
+    pendingVaultDecision: null,
     peekReveal: null,
     pendingLibra: null,
     pendingSudgerRolls: null,

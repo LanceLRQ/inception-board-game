@@ -17,7 +17,7 @@ describe('knownMoves', () => {
   it('对局阶段的名单与 move 表的键完全一致', () => {
     const expected = Object.keys(InceptionCityGame.phases.playing.moves).sort();
     expect([...knownMoves('playing')].sort()).toEqual(expected);
-    expect(expected.length).toBe(89);
+    expect(expected.length).toBe(86);
   });
 
   it('布置阶段的名单与 move 表的键完全一致', () => {

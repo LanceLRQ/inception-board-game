@@ -2084,6 +2084,19 @@ export function canSaturnFreeMove(state: SetupState, playerID: string): boolean 
 
 export const IMPERIAL_BRIBE_SKILL_ID = 'dm_imperial_city.skill_0';
 
+/** 皇城·重金：梦主是皇城、且指定的是池里还没派出的牌（不看收牌的人） */
+export function canImperialPickFromPool(
+  state: SetupState,
+  masterID: string,
+  poolIndex: number,
+): boolean {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_imperial_city') return false;
+  if (!master.isAlive) return false;
+  const bribe = state.bribePool[poolIndex];
+  return bribe !== undefined && bribe.status === 'inPool';
+}
+
 /** 皇城·重金：是否可以使用（梦主为皇城且目标合法） */
 export function canImperialPickBribe(
   state: SetupState,
@@ -2091,14 +2104,9 @@ export function canImperialPickBribe(
   targetID: string,
   poolIndex: number,
 ): boolean {
-  const master = state.players[masterID];
-  if (!master || master.characterId !== 'dm_imperial_city') return false;
-  if (!master.isAlive) return false;
   const target = state.players[targetID];
   if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return false;
-  const pool = state.bribePool;
-  if (poolIndex < 0 || poolIndex >= pool.length) return false;
-  return pool[poolIndex]!.status === 'inPool';
+  return canImperialPickFromPool(state, masterID, poolIndex);
 }
 
 // === 密道 · 传送 ===
@@ -2393,10 +2401,10 @@ export function isMarsBattlefieldWorldActive(state: SetupState): boolean {
 // 梦魇触发时机辅助（auto-detect + un-revealed discard）
 // ============================================================================
 // 对照：docs/manual/03-game-flow.md 第 94-102 行 / docs/manual/07-nightmare-cards.md
-// 触发：盗梦者打开放有金币的金库 → 同层有未翻开梦魇 → 梦主 3 选 1
-//   1. 派发贿赂牌然后弃掉梦魇（masterDealBribe + masterDiscardHiddenNightmare）
-//   2. 翻开梦魇并发动效果（masterRevealNightmare + masterActivateNightmare）
-//   3. 弃掉梦魇且不派发贿赂（masterDiscardHiddenNightmare）
+// 触发：盗梦者打开放有金币的金库 → 梦主三选一（move masterVaultDecision）
+//   1. 派发贿赂牌，然后弃掉该层梦魇
+//   2. 翻开该层梦魇并发动效果，不派发贿赂牌
+//   3. 弃掉该层梦魇，不派发贿赂牌
 
 /** 找出所有「金币金库已开 + 同层有未翻开梦魇」的层（待梦主决策） */
 export function findCoinVaultsWithHiddenNightmare(state: SetupState): number[] {
@@ -2414,12 +2422,10 @@ export function findCoinVaultsWithHiddenNightmare(state: SetupState): number[] {
   return result;
 }
 
-/** 弃掉指定层的未翻开梦魇（用于梦主选择"不发动"流程） */
-export function applyDiscardHiddenNightmare(state: SetupState, layer: number): SetupState | null {
+/** 弃掉指定层的梦魇（不发动）：离开棋盘、记为已发动并计入已用梦魇；该层没有梦魇时原样返回 */
+export function discardNightmareOnLayer(state: SetupState, layer: number): SetupState {
   const ls = state.layers[layer];
-  if (!ls) return null;
-  if (!ls.nightmareId) return null;
-  if (ls.nightmareRevealed) return null; // 已翻开走 masterDiscardNightmare
+  if (!ls || !ls.nightmareId) return state;
   const discardedId = ls.nightmareId;
   return {
     ...state,
@@ -2434,6 +2440,13 @@ export function applyDiscardHiddenNightmare(state: SetupState, layer: number): S
     },
     usedNightmareIds: [...state.usedNightmareIds, discardedId],
   };
+}
+
+/** 弃掉指定层的未翻开梦魇；该层没有梦魇或梦魇已翻开时返回 null（已翻开的走 masterDiscardNightmare） */
+export function applyDiscardHiddenNightmare(state: SetupState, layer: number): SetupState | null {
+  const ls = state.layers[layer];
+  if (!ls || !ls.nightmareId || ls.nightmareRevealed) return null;
+  return discardNightmareOnLayer(state, layer);
 }
 
 /** 火星·战场世界观：弃 2 非 SHOOT 换 1 SHOOT */
@@ -2687,6 +2700,57 @@ export function grantImperialShootCharge(state: SetupState, playerID: string): S
       [playerID]: { ...p, imperialShootCharges: (p.imperialShootCharges ?? 0) + 1 },
     },
   };
+}
+
+/** 贿赂池里还没派出的牌在池中的下标（保持池内顺序） */
+export function inPoolBribeIndexes(state: SetupState): number[] {
+  const indexes: number[] = [];
+  state.bribePool.forEach((b, i) => {
+    if (b.status === 'inPool') indexes.push(i);
+  });
+  return indexes;
+}
+
+/**
+ * 把贿赂池里第 poolIndex 张牌派给 targetID：成功的牌（DEAL）使其转为梦主阵营，
+ * 失败的牌无任何效果；记收到的张数，皇城世界观下再给 1 次视为 SHOOT 的机会。
+ * 该位置不是池中未派出的牌、或目标不存在时返回 null。
+ * 贿赂牌只在金币金库打开与【梦境窥视】效果①时派发，其余路径不得直接调用。
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者（38-45 行）
+ */
+export function dealBribeCard(
+  state: SetupState,
+  targetID: string,
+  poolIndex: number,
+): SetupState | null {
+  const target = state.players[targetID];
+  const bribe = state.bribePool[poolIndex];
+  if (!target || !bribe || bribe.status !== 'inPool') return null;
+  const isDeal = bribe.kind === 'deal';
+  return grantImperialShootCharge(
+    {
+      ...state,
+      bribePool: state.bribePool.map((b, i) =>
+        i === poolIndex
+          ? {
+              ...b,
+              status: isDeal ? ('deal' as const) : ('dealt' as const),
+              heldBy: targetID,
+              originalOwnerId: targetID,
+            }
+          : b,
+      ),
+      players: {
+        ...state.players,
+        [targetID]: {
+          ...target,
+          bribeReceived: target.bribeReceived + 1,
+          faction: isDeal ? ('master' as const) : target.faction,
+        },
+      },
+    },
+    targetID,
+  );
 }
 
 /**

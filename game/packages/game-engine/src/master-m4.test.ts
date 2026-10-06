@@ -119,6 +119,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     endTurn: null,
     pendingResponseWindow: null,
     pendingPeekDecision: null,
+    pendingVaultDecision: null,
     peekReveal: null,
     pendingLibra: null,
     mazeState: null,
@@ -215,7 +216,7 @@ describe('M4-3 梦主迷失层自动复活', () => {
   });
 });
 
-describe('M4-4 金币金库开启 → 派 1 张贿赂给打开者', () => {
+describe('M4-4 金币金库开启 → 挂起梦主三选一', () => {
   function makeCoinVaultState(): SetupState {
     return makeState({
       turnPhase: 'action',
@@ -267,7 +268,7 @@ describe('M4-4 金币金库开启 → 派 1 张贿赂给打开者', () => {
     });
   }
 
-  it('解封成功 + 打开 coin 金库 → openedBy 获得 1 张贿赂', () => {
+  it('解封成功 + 打开 coin 金库 → 挂起梦主三选一，openedBy 此时没有拿到贿赂', () => {
     const s = makeCoinVaultState();
     const before = s.players['1']!.bribeReceived;
     const r = runResolveUnlock(s);
@@ -275,36 +276,38 @@ describe('M4-4 金币金库开启 → 派 1 张贿赂给打开者', () => {
     const rState = r as SetupState;
     expect(rState.vaults[0]!.isOpened).toBe(true);
     expect(rState.vaults[0]!.openedBy).toBe('1');
-    // 目标收到 1 张贿赂
-    expect(rState.players['1']!.bribeReceived).toBe(before + 1);
-    // bribePool 中有一张从 inPool 转为 dealt 或 deal
-    const dealtOrDeal = rState.bribePool.filter((b) => b.status !== 'inPool').length;
-    expect(dealtOrDeal).toBe(1);
+    expect(rState.pendingVaultDecision).toEqual({ layer: 1, openerID: '1' });
+    expect(rState.players['1']!.bribeReceived).toBe(before);
+    expect(rState.bribePool.every((b) => b.status === 'inPool')).toBe(true);
   });
 
-  it('解封成功但心锁未归零（heartLock>1）→ 不开金库、不派贿赂', () => {
+  it('解封成功但心锁未归零（heartLock>1）→ 不开金库、不挂起、不派贿赂', () => {
     const s = makeCoinVaultState();
     s.layers[1]!.heartLockValue = 2;
     const r = runResolveUnlock(s) as SetupState;
     expect(r.vaults[0]!.isOpened).toBe(false);
+    expect(r.pendingVaultDecision).toBeNull();
     expect(r.players['1']!.bribeReceived).toBe(0);
     expect(r.bribePool.every((b) => b.status === 'inPool')).toBe(true);
   });
 
-  it('打开非 coin 金库（如 secret）→ 不触发 M4-4 贿赂派发', () => {
+  it('打开非 coin 金库（如 secret）→ 不挂起梦主三选一', () => {
     const s = makeCoinVaultState();
     s.vaults[0]!.contentType = 'secret';
     const r = runResolveUnlock(s) as SetupState;
     expect(r.vaults[0]!.isOpened).toBe(true);
-    // secret 金库开启属于盗梦者胜利条件，贿赂派发不触发
+    // secret 金库开启属于盗梦者胜利条件，不挂起
+    expect(r.pendingVaultDecision).toBeNull();
     expect(r.players['1']!.bribeReceived).toBe(0);
   });
 
-  it('bribePool 已空 → 开 coin 金库但不派贿赂（不抛错）', () => {
+  it('bribePool 已空且该层没有梦魇 → 梦主无可选项，开 coin 金库不挂起、不抛错', () => {
     const s = makeCoinVaultState();
     s.bribePool = s.bribePool.map((b) => ({ ...b, status: 'dealt' as const }));
     const r = runResolveUnlock(s) as SetupState;
     expect(r.vaults[0]!.isOpened).toBe(true);
+    expect(r.layers[1]!.nightmareId).toBeNull();
+    expect(r.pendingVaultDecision).toBeNull();
     expect(r.players['1']!.bribeReceived).toBe(0);
   });
 });

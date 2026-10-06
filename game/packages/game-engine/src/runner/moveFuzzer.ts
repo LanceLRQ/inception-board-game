@@ -151,6 +151,8 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   }
   // 注意 targetPlayerID 这类名字里也含有 layer，玩家 ID 必须留给下面的分支
   if (/layer/.test(n) && !/playerid/.test(n)) return Math.floor(rnd() * 6);
+  // 皇城·重金指定贿赂牌的下标：只有皇城梦主才合法，随机对局里不指定，走随机派发
+  if (n === 'poolindex') return undefined;
   if (/(idx|index)/.test(n)) return Math.floor(rnd() * 6);
   if (/(playerid|targetid|reviveid|thiefid)/.test(n)) {
     if (n === 'reviveid' && rnd() < 0.3) return null;
@@ -161,7 +163,11 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   if (n === 'direction') return rnd() < 0.5 ? 'increase' : 'decrease';
   if (n === 'mode') return rnd() < 0.5 ? 'shoot' : 'transit';
   if (n === 'pick') return pick(rnd, ['A', 'B', 'pile1', 'pile2']);
-  if (n === 'choice') return 'skip';
+  if (n === 'choice') {
+    // 金币金库打开后梦主三选一；其余带 choice 形参的 move（处女·完美）放弃
+    if (G.pendingVaultDecision) return pick(rnd, ['bribe', 'nightmare', 'discard']);
+    return 'skip';
+  }
   if (n === 'deal' || n === 'preventmove') return rnd() < 0.5;
   return undefined;
 }
@@ -197,7 +203,7 @@ export function fuzzCandidate(
 const PROGRESS_MOVES = new Set(['endActionPhase', 'skipDiscard', 'doDiscard', 'skipDraw']);
 
 /** 结算 / 响应类 move 的参数更难猜中，多试几次 */
-const SETTLE_MOVE = /^(resolve|respond|pass|peeker|masterPeek)/;
+const SETTLE_MOVE = /^(resolve|respond|pass|peeker|masterPeek|masterVault)/;
 
 export interface PickLegalMoveOptions {
   attemptsPerMove?: number;
