@@ -4,6 +4,7 @@
 // 开始锁保证同一房间并发两次开始只会建一局。
 
 import crypto from 'crypto';
+import { generateBatch } from '@icgame/shared';
 import { createRedisClient } from '../infra/redis.js';
 import { RedisKeys, RedisTTL } from '../infra/redisKeys.js';
 import { prisma as defaultPrisma } from '../infra/postgres.js';
@@ -255,11 +256,16 @@ export class LobbyService {
     const slots = count ?? room.maxPlayers - room.players.length;
     const actual = Math.min(slots, room.maxPlayers - room.players.length);
 
+    // 开局前还不知道阵营，用中立名字池；房间里已有的昵称（含真人）不重复
+    const names = generateBatch(Math.max(0, actual), {
+      faction: 'neutral',
+      initialExisting: new Set(room.players.map((p) => p.nickname)),
+    });
     for (let i = 0; i < actual; i++) {
       const seat = this.nextAvailableSeat(room);
       room.players.push({
         playerId: `bot-${crypto.randomUUID().slice(0, 8)}`,
-        nickname: `AI Lv.1-${i + 1}`,
+        nickname: names[i]!.nickname,
         avatarSeed: crypto.randomInt(1, 100000).toString(),
         seat,
         isBot: true,

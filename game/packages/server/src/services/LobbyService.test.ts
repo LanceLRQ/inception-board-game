@@ -455,6 +455,30 @@ describe('LobbyService', () => {
       expect(bots[0]!.playerId).toMatch(/^bot-/);
     });
 
+    it('gives each AI a distinct generated nickname instead of a numbered placeholder', async () => {
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await service.createRoom('P1', { maxPlayers: 10 });
+
+      const updated = await service.fillAI(room.code, 'P1', 9);
+      const names = updated.players.filter((p) => p.isBot).map((p) => p.nickname);
+      expect(names).toHaveLength(9);
+      expect(new Set(names).size).toBe(9);
+      for (const name of names) {
+        expect(name).not.toMatch(/^AI Lv/);
+        expect(name.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('does not reuse a nickname already taken in the room, across separate fills', async () => {
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await service.createRoom('P1', { maxPlayers: 10 });
+
+      await service.fillAI(room.code, 'P1', 4);
+      const updated = await service.fillAI(room.code, 'P1', 5);
+      const names = updated.players.map((p) => p.nickname);
+      expect(new Set(names).size).toBe(names.length);
+    });
+
     it('respects maxPlayers limit', async () => {
       prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
       const room = await service.createRoom('P1', { maxPlayers: 4 });
