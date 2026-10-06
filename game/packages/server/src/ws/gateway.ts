@@ -182,6 +182,34 @@ export class SocketGateway {
     });
   }
 
+  /** 存储不可用 / 已恢复：提示这局的所有连接 */
+  sendStorageHealth(matchID: string, healthy: boolean): void {
+    this.broadcastToMatch(matchID, { type: 'icg:storage', matchID, healthy });
+  }
+
+  /** 房间被原地换成从存储重新加载的新房间：给这局每条连接重发一份完整视图 */
+  resyncMatch(matchID: string): void {
+    const room = this.matches?.get(matchID) ?? null;
+    if (room === null) return;
+    const seats = this.seatsOf(room);
+    for (const conn of this.deps.registry.listMatchConnections(matchID)) {
+      // 重新加载后的版本号可能比客户端手里的低，带上 reset 让客户端无条件接受
+      this.emitTo(conn.socketId, { ...stateMessage(room, conn.seat, seats), reset: true });
+    }
+  }
+
+  /** 对局无法继续：通知这局的所有连接并断开 */
+  abortMatch(matchID: string): void {
+    for (const sid of [...this.deps.registry.getSocketsByMatch(matchID)]) {
+      this.emitTo(sid, {
+        type: 'icg:error',
+        code: 'MATCH_ABORTED',
+        message: 'Match interrupted',
+      });
+      this.io?.sockets.sockets.get(sid)?.disconnect(true);
+    }
+  }
+
   private seatsOf(room: MatchRoom) {
     const { registry, bot } = this.deps;
     return seatInfos(room, {
@@ -239,6 +267,10 @@ export class SocketGateway {
     const room = matches.get(matchID);
     if (room !== null) {
       this.emitTo(socket.id, stateMessage(room, seat, this.seatsOf(room)));
+      // 晚到的连接也要知道存储正处于不可用
+      if (!room.isStorageHealthy()) {
+        this.emitTo(socket.id, { type: 'icg:storage', matchID, healthy: false });
+      }
     }
 
     socket.onAny(async (event: string, payload: unknown) => {

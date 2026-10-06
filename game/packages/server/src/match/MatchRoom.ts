@@ -42,8 +42,15 @@ export interface RoomDeps {
   onGameOver(state: MatchState<SetupState>): void | Promise<void>;
   /** 某个真人座位此刻是否由 Bot 接管 */
   isTakenOver(seat: string): boolean;
-  /** 房间因写快照失败而自行关闭时调用一次；它抛错不影响关闭 */
-  onFatal?(reason: 'persist_conflict' | 'persist_error'): void;
+  /**
+   * 读取库里已存的版本号，没有快照返回 null。
+   * 写入重试时用来分辨「写成功但应答丢了」与真正的版本冲突。
+   */
+  loadStoredVersion?(): Promise<number | null>;
+  /** 写快照遇到真正的版本冲突、房间自行关闭时调用一次；它抛错不影响关闭 */
+  onFatal?(reason: 'persist_conflict'): void;
+  /** 存储在「不可用」与「正常」之间切换时各通知一次；它抛错不影响对局 */
+  onStorageHealth?(healthy: boolean): void;
   timing: TimingConfig;
   timers: {
     setTimeout(cb: () => void, ms: number): unknown;
@@ -63,6 +70,11 @@ export type SubmitResult =
 const INTENT_CAPACITY = 256;
 /** 自动步连续被拒、或截止到点连续取不到动作的上限 */
 const MAX_AUTO_FAILURES = 3;
+/** 一步内写快照失败后的快速重试间隔；用尽仍失败才算这一步失败 */
+const PERSIST_RETRY_DELAYS_MS = [100, 400] as const;
+/** 存储不可用期间自动步的退避：起点、上限（每次翻倍） */
+const STORAGE_BACKOFF_START_MS = 1_000;
+const STORAGE_BACKOFF_MAX_MS = 30_000;
 
 export class MatchRoom {
   readonly matchID: string;
@@ -82,6 +94,9 @@ export class MatchRoom {
   private generation = 0;
   private autoRejects = 0;
   private timeoutMisses = 0;
+  /** 快照存储当前是否不可用；不可用期间自动步不计入失败上限，改按退避重试 */
+  private storageUnhealthy = false;
+  private storageBackoffMs = STORAGE_BACKOFF_START_MS;
 
   /** `${座位}:${intentId}` → 结果，按插入顺序先进先出 */
   private readonly intents = new Map<string, SubmitResult>();
@@ -153,6 +168,11 @@ export class MatchRoom {
     return this.deadline;
   }
 
+  /** 快照存储此刻是否可用（供新连接建立时补发提示） */
+  isStorageHealthy(): boolean {
+    return !this.storageUnhealthy;
+  }
+
   seats(): readonly RoomSeat[] {
     return this.seatList;
   }
@@ -164,8 +184,8 @@ export class MatchRoom {
     logger.info({ matchID: this.matchID, stateID: this.state.stateID }, 'room closed');
   }
 
-  /** 因写快照失败而关闭：先关，再通知一次 */
-  private fatal(reason: 'persist_conflict' | 'persist_error'): void {
+  /** 因快照版本冲突而关闭：先关，再通知一次 */
+  private fatal(reason: 'persist_conflict'): void {
     const alreadyClosed = this.closed;
     this.close();
     if (alreadyClosed) return;
@@ -212,7 +232,15 @@ export class MatchRoom {
   }
 
   private remember(intentId: string, result: SubmitResult): void {
-    if (!result.ok && (result.code === 'stale_state' || result.code === 'match_over')) return;
+    // internal_error 是存储写入失败，这一步并没有生效：记住它会让存储恢复后的重试拿到旧的失败结果
+    if (
+      !result.ok &&
+      (result.code === 'stale_state' ||
+        result.code === 'match_over' ||
+        result.code === 'internal_error')
+    ) {
+      return;
+    }
     this.intents.set(intentId, result);
     if (this.intents.size > INTENT_CAPACITY) {
       const oldest = this.intents.keys().next().value;
@@ -230,6 +258,9 @@ export class MatchRoom {
       this.clearTimer();
       return;
     }
+
+    // 存储不可用时已挂着退避计时器：座位状态变化不能把它换成短延迟，否则会绕过退避
+    if (keepExisting && this.storageUnhealthy && this.timer !== null) return;
 
     const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
     if (
@@ -322,8 +353,72 @@ export class MatchRoom {
   /** 自动步被拒时累计次数；达到上限后停止排程 */
   private afterAutomatic(outcome: SubmitResult, kind: 'auto' | 'timeout'): void {
     if (outcome.ok || this.closed || this.over) return;
-    if (outcome.code === 'internal_error') return;
+    if (outcome.code === 'internal_error') {
+      // 房间还开着说明是存储写入失败：不计入失败上限，按退避继续重试
+      if (this.storageUnhealthy) this.scheduleStorageRetry(kind);
+      return;
+    }
     this.countAutoFailure(kind, outcome.code);
+  }
+
+  /** 存储不可用时重新排一次同类自动步，间隔 1 秒起每次翻倍、上限 30 秒 */
+  private scheduleStorageRetry(kind: 'auto' | 'timeout'): void {
+    this.clearTimer();
+    const delayMs = this.storageBackoffMs;
+    this.storageBackoffMs = Math.min(this.storageBackoffMs * 2, STORAGE_BACKOFF_MAX_MS);
+    const gen = this.generation;
+    logger.warn({ matchID: this.matchID, kind, delayMs }, 'storage unavailable, retry scheduled');
+    this.timer = this.deps.timers.setTimeout(() => {
+      this.timer = null;
+      void this.enqueue(() => (kind === 'auto' ? this.runAuto(gen) : this.runTimeout(gen)));
+    }, delayMs);
+  }
+
+  private setStorageHealth(healthy: boolean): void {
+    if (this.storageUnhealthy === !healthy) return;
+    this.storageUnhealthy = !healthy;
+    if (healthy) this.storageBackoffMs = STORAGE_BACKOFF_START_MS;
+    logger.warn({ matchID: this.matchID, healthy }, 'storage health changed');
+    try {
+      this.deps.onStorageHealth?.(healthy);
+    } catch (err) {
+      logger.error({ matchID: this.matchID, err }, 'onStorageHealth failed');
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      this.deps.timers.setTimeout(resolve, ms);
+    });
+  }
+
+  /**
+   * 写快照：抛错时按 100 ms、400 ms 快速重试。
+   * 之前的尝试抛过错时，后面得到 'conflict' 可能只是「上次其实写成功了、应答丢了」，
+   * 此时读一次库里的版本号，等于本步的新版本就当成功。
+   */
+  private async persistWithRetry(
+    next: MatchState<SetupState>,
+    expectedStateID: number,
+  ): Promise<'ok' | 'conflict' | 'error'> {
+    let threw = false;
+    for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
+      if (attempt > 0) await this.sleep(PERSIST_RETRY_DELAYS_MS[attempt - 1]!);
+      try {
+        const result = await this.deps.persist(next, expectedStateID);
+        if (result === 'ok') return 'ok';
+        if (!threw) return 'conflict';
+        const stored = (await this.deps.loadStoredVersion?.()) ?? null;
+        if (stored === next.stateID) return 'ok';
+        if (stored !== null && stored !== expectedStateID) return 'conflict';
+        // 库里仍是旧版本（或没读到）：写入没有生效，继续重试
+        threw = true;
+      } catch (err) {
+        threw = true;
+        logger.warn({ matchID: this.matchID, attempt: attempt + 1, err }, 'persist attempt failed');
+      }
+    }
+    return 'error';
   }
 
   /** 记一次自动步失败（被拒或抛异常）；未到上限就重新排程，排程本身出错只记日志 */
@@ -362,15 +457,17 @@ export class MatchRoom {
       return { ok: false, code: outcome.reason };
     }
 
-    let persisted: 'ok' | 'conflict';
-    try {
-      persisted = await this.deps.persist(outcome.state, before.stateID);
-    } catch (err) {
-      logger.error({ matchID: this.matchID, err }, 'persist failed, closing room');
-      this.fatal('persist_error');
+    const persisted = await this.persistWithRetry(outcome.state, before.stateID);
+    if (persisted === 'error') {
+      // 存储暂时不可用：这一步不生效，房间保持开着，等存储恢复
+      logger.error(
+        { matchID: this.matchID, stateID: before.stateID },
+        'persist failed after retries, step not applied',
+      );
+      this.setStorageHealth(false);
       return { ok: false, code: 'internal_error' };
     }
-    if (persisted !== 'ok') {
+    if (persisted === 'conflict') {
       logger.error(
         { matchID: this.matchID, stateID: before.stateID },
         'persist conflict, closing room',
@@ -378,6 +475,7 @@ export class MatchRoom {
       this.fatal('persist_conflict');
       return { ok: false, code: 'internal_error' };
     }
+    this.setStorageHealth(true);
 
     this.state = outcome.state;
     this.autoRejects = 0;

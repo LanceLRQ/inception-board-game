@@ -42,6 +42,12 @@ export interface MatchServiceDeps {
   onStep(matchID: string, output: StepOutput): void | Promise<void>;
   onSeatsChanged(matchID: string): void;
   onGameOver(matchID: string, state: MatchState<SetupState>): void | Promise<void>;
+  /** 快照存储在不可用与正常之间切换，由网关转成对连接的提示 */
+  onStorageHealth?(matchID: string, healthy: boolean): void;
+  /** 房间被从存储重新加载的新房间原地替换：连接需要重发一份完整视图 */
+  onResync?(matchID: string): void;
+  /** 对局无法继续（重新加载失败）：通知这一局的连接并断开 */
+  onAborted?(matchID: string): void;
 }
 
 export class MatchService {
@@ -169,32 +175,65 @@ export class MatchService {
     for (const matchID of ids) {
       if (this.rooms.has(matchID) || this.creating.has(matchID)) continue;
       try {
-        const snapshot = await this.deps.store.load(matchID);
-        if (snapshot === null) throw new Error('快照不存在');
-        if (!Array.isArray(snapshot.seats) || snapshot.seats.length === 0) {
-          throw new Error('快照里没有座位表');
-        }
-        const state = matchFromSnapshot<SetupState>(snapshot.state, game);
-
-        if (state.ctx.gameover !== undefined) {
-          logger.info({ matchID, stateID: state.stateID }, 'restored match already over');
-          await this.finishMatch(matchID, state, snapshot.seats);
-          continue;
-        }
-
-        this.deps.bot.registerMatch(matchID);
-        this.mount(matchID, snapshot.seats, state);
-        restored += 1;
-        logger.info(
-          { matchID, stateID: state.stateID, numPlayers: snapshot.seats.length },
-          'match restored',
-        );
+        if ((await this.restoreOne(matchID)) === 'mounted') restored += 1;
       } catch (err) {
         failed.push(matchID);
         logger.error({ matchID, err }, 'match restore failed');
       }
     }
     return { restored, failed };
+  }
+
+  /**
+   * 从存储恢复单局：读快照 → 还原状态 → 挂房间。
+   * inPlace 为真时是替换一个已在运行（但内存状态不可信）的房间：Bot 管理器里的登记与座位在线记录原样保留。
+   * 快照里已经是结束状态时只走结束流程，返回 'finished'。
+   */
+  private async restoreOne(matchID: string, inPlace = false): Promise<'mounted' | 'finished'> {
+    const snapshot = await this.deps.store.load(matchID);
+    if (snapshot === null) throw new Error('快照不存在');
+    if (!Array.isArray(snapshot.seats) || snapshot.seats.length === 0) {
+      throw new Error('快照里没有座位表');
+    }
+    const state = matchFromSnapshot<SetupState>(snapshot.state, game);
+
+    if (state.ctx.gameover !== undefined) {
+      logger.info({ matchID, stateID: state.stateID }, 'restored match already over');
+      await this.finishMatch(matchID, state, snapshot.seats);
+      return 'finished';
+    }
+
+    if (!inPlace) this.deps.bot.registerMatch(matchID);
+    this.mount(matchID, snapshot.seats, state, inPlace);
+    logger.info(
+      { matchID, stateID: state.stateID, numPlayers: snapshot.seats.length, inPlace },
+      'match restored',
+    );
+    return 'mounted';
+  }
+
+  /**
+   * 写快照遇到真正的版本冲突：内存状态已不可信，从存储重新加载并原地换房间。
+   * 重新加载失败才放弃：通知连接并断开，对局留在活跃集合里等进程重启恢复。
+   */
+  private async recoverFromConflict(matchID: string, stale: MatchRoom): Promise<void> {
+    try {
+      const result = await this.restoreOne(matchID, true);
+      if (result === 'finished') {
+        this.removeRoom(matchID, stale);
+        return;
+      }
+      this.deps.onResync?.(matchID);
+    } catch (err) {
+      logger.error({ matchID, err }, 'reload after persist conflict failed, aborting room');
+      this.removeRoom(matchID, stale);
+      this.safely(matchID, 'bot dispose', () => this.deps.bot.disposeMatch(matchID));
+      this.safely(matchID, 'abort notify', () => this.deps.onAborted?.(matchID));
+    }
+  }
+
+  private removeRoom(matchID: string, room: MatchRoom): void {
+    if (this.rooms.get(matchID) === room) this.rooms.delete(matchID);
   }
 
   /** 关闭所有房间、清掉延迟移除的计时器、清空注册表；不动存储 */
@@ -210,7 +249,12 @@ export class MatchService {
   // ---------------------------------------------------------------------------
 
   /** 建房间、登记到注册表并开始排程 */
-  private mount(matchID: string, seats: readonly RoomSeat[], state: MatchState<SetupState>): void {
+  private mount(
+    matchID: string,
+    seats: readonly RoomSeat[],
+    state: MatchState<SetupState>,
+    inPlace = false,
+  ): void {
     const { deps } = this;
     const room: MatchRoom = new MatchRoom(matchID, seats, state, {
       game,
@@ -235,10 +279,11 @@ export class MatchService {
       },
       onGameOver: (final): Promise<void> => this.finishMatch(matchID, final, seats, room),
       isTakenOver: (seat) => deps.bot.isBotControlled(matchID, seat),
+      loadStoredVersion: async () => (await deps.store.load(matchID))?.state.stateID ?? null,
+      onStorageHealth: (healthy) => deps.onStorageHealth?.(matchID, healthy),
       onFatal: (reason) => {
-        logger.error({ matchID, reason }, 'room closed after snapshot write failure');
-        this.safely(matchID, 'bot dispose', () => deps.bot.disposeMatch(matchID));
-        this.rooms.delete(matchID);
+        logger.error({ matchID, reason }, 'room closed after snapshot version conflict');
+        void this.recoverFromConflict(matchID, room);
       },
       timing: deps.timing,
       timers: deps.timers,
@@ -246,8 +291,11 @@ export class MatchService {
     this.rooms.set(matchID, room);
     // 真人座位先记为离线：没连上来的座位（建局后不来、重启后不回来）也能走到接管阈值；
     // 连接建立时的 onReconnect 会清掉这条记录
-    for (const s of seats) {
-      if (!s.isBot) deps.bot.onDisconnect(matchID, s.seat);
+    // （原地替换时座位的在线记录仍然有效，不重置）
+    if (!inPlace) {
+      for (const s of seats) {
+        if (!s.isBot) deps.bot.onDisconnect(matchID, s.seat);
+      }
     }
     room.start();
   }

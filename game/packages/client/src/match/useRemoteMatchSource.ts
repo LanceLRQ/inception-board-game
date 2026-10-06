@@ -23,6 +23,7 @@ export function toMatchSource(
     seats: snapshot.seats,
     deadlineAt: snapshot.deadlineAt,
     connection: snapshot.connection,
+    storageDegraded: snapshot.storageDegraded,
     error: snapshot.fatal === null ? null : `match.fatal.${snapshot.fatal}`,
     makeMove: sendMove,
   };
@@ -36,6 +37,7 @@ const EMPTY_SNAPSHOT: MatchSocketSnapshot = {
   seats: [],
   deadlineAt: null,
   connection: 'connecting',
+  storageDegraded: false,
   fatal: null,
 };
 

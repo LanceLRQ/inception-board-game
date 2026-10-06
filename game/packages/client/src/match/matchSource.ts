@@ -26,6 +26,8 @@ export interface MatchSource {
   /** 当前等待的截止时间（毫秒时间戳）；本地来源恒为 null */
   readonly deadlineAt: number | null;
   readonly connection: ConnectionState;
+  /** 服务端暂时无法保存进度、正在重试；本地来源恒为 false */
+  readonly storageDegraded: boolean;
   /** 无法继续时的错误文案键；正常为 null */
   readonly error: string | null;
   makeMove(move: string, args?: unknown[]): Promise<MoveOutcome>;

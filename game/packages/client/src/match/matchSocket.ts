@@ -46,7 +46,9 @@ export interface MatchSocketSnapshot {
   seats: readonly SeatInfo[];
   deadlineAt: number | null;
   connection: ConnectionState;
-  /** 无法继续的原因：握手被拒、协议版本不符，或连接被同座位的新连接替换 */
+  /** 服务端暂时无法保存进度（正在重试）；恢复或断线后为 false */
+  storageDegraded: boolean;
+  /** 无法继续的原因：握手被拒、协议版本不符、连接被同座位的新连接替换，或服务端判定对局中断 */
   fatal: string | null;
 }
 
@@ -59,6 +61,7 @@ const INITIAL: MatchSocketSnapshot = {
   seats: [],
   deadlineAt: null,
   connection: 'idle',
+  storageDegraded: false,
   fatal: null,
 };
 
@@ -102,6 +105,7 @@ export class MatchSocket {
     socket.on('icg:step', (msg: ServerMatchMessage) => this.onStep(msg));
     socket.on('icg:seats', (msg: ServerMatchMessage) => this.onSeats(msg));
     socket.on('icg:moveResult', (msg: ServerMatchMessage) => this.onMoveResult(msg));
+    socket.on('icg:storage', (msg: ServerMatchMessage) => this.onStorage(msg));
     socket.on('icg:error', (msg: { code?: string }) => this.onServerError(msg));
     this.update({ connection: 'connecting' });
     socket.connect();
@@ -123,6 +127,7 @@ export class MatchSocket {
       socket.off?.('icg:step');
       socket.off?.('icg:seats');
       socket.off?.('icg:moveResult');
+      socket.off?.('icg:storage');
       socket.off?.('icg:error');
       socket.disconnect();
     }
@@ -188,6 +193,8 @@ export class MatchSocket {
   private onDisconnect(reason: string): void {
     if (this.closed) return;
     this.settleAll({ ok: false, code: 'timeout' });
+    // 断线后提示由连接状态接管；重连成功时服务端会按需重新告知
+    if (this.snapshot.storageDegraded) this.update({ storageDegraded: false });
     if (this.snapshot.fatal !== null) return;
     if (reason === 'io client disconnect') {
       this.update({ connection: 'disconnected' });
@@ -215,8 +222,8 @@ export class MatchSocket {
 
   private onServerError(msg: { code?: string }): void {
     if (this.closed) return;
-    if (msg?.code === 'REPLACED') {
-      this.fail('REPLACED');
+    if (msg?.code === 'REPLACED' || msg?.code === 'MATCH_ABORTED') {
+      this.fail(msg.code);
       return;
     }
     logger.warn('net/ws', 'server error', { code: msg?.code });
@@ -228,7 +235,9 @@ export class MatchSocket {
       this.fail('PROTOCOL_MISMATCH');
       return;
     }
-    const current = this.snapshot.view;
+    // 服务端重新加载了这一局：手里的视图作废，事件的去重水位也回到这份视图的版本
+    if (msg.reset === true) this.deliveredStateID = msg.view.stateID;
+    const current = msg.reset === true ? null : this.snapshot.view;
     if (current !== null && msg.view.stateID < current.stateID) return;
     if (current !== null && msg.view.stateID === current.stateID) {
       // 同一版本：视图不动，只更新座位表与截止时间
@@ -272,6 +281,11 @@ export class MatchSocket {
   private onSeats(msg: ServerMatchMessage): void {
     if (this.closed || msg.type !== 'icg:seats') return;
     this.update({ seats: msg.seats });
+  }
+
+  private onStorage(msg: ServerMatchMessage): void {
+    if (this.closed || msg.type !== 'icg:storage') return;
+    this.update({ storageDegraded: !msg.healthy });
   }
 
   private onMoveResult(msg: ServerMatchMessage): void {

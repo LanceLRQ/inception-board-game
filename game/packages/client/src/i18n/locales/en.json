@@ -188,10 +188,12 @@
       "AUTH_INVALID": "Identity expired, please re-enter",
       "NOT_IN_MATCH": "You are not in this match",
       "PROTOCOL_MISMATCH": "Client version differs from the server, please refresh",
-      "REPLACED": "You joined this match from another page"
+      "REPLACED": "You joined this match from another page",
+      "MATCH_ABORTED": "The server cannot continue this match, please re-enter later"
     }
   },
   "network": {
+    "storage_degraded": "The server can't save progress right now, retrying",
     "back_to_lobby": "Back to Lobby"
   },
   "report": {

@@ -90,6 +90,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       seats,
       deadlineAt: null,
       connection,
+      storageDegraded: false,
       error,
       makeMove,
     };
@@ -163,6 +164,7 @@ const IDLE_SOURCE: MatchSource = {
   seats: [],
   deadlineAt: null,
   connection: 'idle',
+  storageDegraded: false,
   error: null,
   makeMove: async () => ({ ok: false, code: 'not_ready' }),
 };

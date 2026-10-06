@@ -188,10 +188,12 @@
       "AUTH_INVALID": "身份已失效，请重新进入",
       "NOT_IN_MATCH": "你不在这局对局中",
       "PROTOCOL_MISMATCH": "客户端版本与服务端不一致，请刷新页面",
-      "REPLACED": "你已在其他页面进入这局对局"
+      "REPLACED": "你已在其他页面进入这局对局",
+      "MATCH_ABORTED": "服务器无法继续这局对局，请稍后重新进入"
     }
   },
   "network": {
+    "storage_degraded": "服务器暂时无法保存进度，正在重试",
     "back_to_lobby": "返回大厅"
   },
   "report": {

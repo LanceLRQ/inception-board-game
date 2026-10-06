@@ -17,6 +17,7 @@ function snap(patch: Partial<MatchSocketSnapshot> = {}): MatchSocketSnapshot {
     seats,
     deadlineAt: 123,
     connection: 'connected',
+    storageDegraded: false,
     fatal: null,
     ...patch,
   };
@@ -32,6 +33,11 @@ describe('toMatchSource', () => {
     expect(source.deadlineAt).toBe(123);
     expect(source.connection).toBe('connected');
     expect(source.error).toBeNull();
+  });
+
+  it('storageDegraded 原样带过来', () => {
+    expect(toMatchSource(snap(), vi.fn()).storageDegraded).toBe(false);
+    expect(toMatchSource(snap({ storageDegraded: true }), vi.fn()).storageDegraded).toBe(true);
   });
 
   it('fatal 映射为 match.fatal.<码>', () => {

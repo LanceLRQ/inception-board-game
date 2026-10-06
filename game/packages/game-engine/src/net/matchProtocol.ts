@@ -32,11 +32,14 @@ export interface MatchSnapshotForViewer {
 
 /** 服务端 → 客户端 */
 export type ServerMatchMessage =
-  | ({ type: 'icg:state'; protocol: number } & MatchSnapshotForViewer)
+  /** reset 为真：服务端从存储重新加载了这一局，版本号可能比客户端手里的低，客户端无条件以这份为准 */
+  | ({ type: 'icg:state'; protocol: number; reset?: true } & MatchSnapshotForViewer)
   | ({ type: 'icg:step'; events: MatchEvent[] } & MatchSnapshotForViewer)
   | { type: 'icg:moveResult'; intentId: string; ok: true; stateID: number }
   | { type: 'icg:moveResult'; intentId: string; ok: false; code: MoveRejectCode }
-  | { type: 'icg:seats'; matchID: string; seats: SeatInfo[] };
+  | { type: 'icg:seats'; matchID: string; seats: SeatInfo[] }
+  /** 服务端暂时无法保存进度（healthy 为 false）或已恢复（true）；只含公开信息 */
+  | { type: 'icg:storage'; matchID: string; healthy: boolean };
 
 export type MoveRejectCode =
   | RequestShapeCode

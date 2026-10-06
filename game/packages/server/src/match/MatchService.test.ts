@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { InceptionCityGame } from '@icgame/game-engine';
+import { applyMove, type GameDef } from '@icgame/game-engine/runner';
+import type { SetupState } from '@icgame/game-engine/setup';
 import { AppError } from '../infra/errors.js';
 import { BotManager } from '../services/BotManager.js';
 import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
@@ -16,6 +19,10 @@ vi.mock('../infra/logger.js', () => ({ logger: log }));
 
 const timing: TimingConfig = { botStepDelayMs: 10, pendingTimeoutMs: 5_000, turnTimeoutMs: 20_000 };
 const SEED = 'ab'.repeat(32);
+const game: GameDef<SetupState> = InceptionCityGame;
+
+/** 让出一个宏任务，使已就绪的异步续体全部跑完 */
+const pump = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 function makeRoom(n: number, humans: readonly number[] = [], id = 'room-1'): RoomState {
   const players: RoomPlayer[] = Array.from({ length: n }, (_, i) => ({
@@ -44,6 +51,18 @@ function makeRoom(n: number, humans: readonly number[] = [], id = 'room-1'): Roo
 /** 按指令失败的存储替身：failDiscard 为真时撤销快照抛错 */
 class FlakyStore extends InMemoryMatchStore {
   failDiscard = false;
+  failLoad = false;
+  failSave = false;
+  override async load(matchID: string): Promise<MatchSnapshot | null> {
+    if (this.failLoad) throw new Error('load down');
+    return super.load(matchID);
+  }
+  override async save(
+    ...args: Parameters<InMemoryMatchStore['save']>
+  ): ReturnType<InMemoryMatchStore['save']> {
+    if (this.failSave) throw new Error('save down');
+    return super.save(...args);
+  }
   override async discard(matchID: string): Promise<void> {
     if (this.failDiscard) throw new Error('discard down');
     await super.discard(matchID);
@@ -476,27 +495,98 @@ describe('MatchService 对局结束', () => {
 });
 
 describe('MatchService 快照写入失败', () => {
-  it('写快照冲突：记 ERROR、释放 Bot 登记、移出注册表，不调 store.finish，快照留在活跃集合里', async () => {
-    const h = makeHarness();
-    const finish = vi.spyOn(h.store, 'finish');
+  /** 让库里的版本领先内存一步：先在存储里写入「完成布置」之后的状态 */
+  async function advanceStoreBehindRoomsBack(h: Harness, id: string) {
+    const snap = (await h.store.load(id))!;
+    const out = applyMove(game, snap.state, {
+      playerID: snap.state.ctx.currentPlayer,
+      move: 'completeSetup',
+      args: [],
+    });
+    if (!out.ok) throw new Error('setup failed');
+    await h.store.save(id, out.state, snap.state.stateID, h.timers.now());
+    return { stored: out.state, firstMover: snap.state.ctx.currentPlayer };
+  }
+
+  it('写快照遇到真冲突：从存储重新加载并原地换上新房间，状态等于库里的，连接重发完整视图', async () => {
+    const onResync = vi.fn();
+    const onAborted = vi.fn();
+    const h = makeHarness({ onResync, onAborted });
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const oldRoom = h.svc.get(id)!;
+    const { stored, firstMover } = await advanceStoreBehindRoomsBack(h, id);
+
+    const r = await oldRoom.submit(firstMover, {
+      move: 'completeSetup',
+      args: [],
+      intentId: 'x',
+    });
+    expect(r).toEqual({ ok: false, code: 'internal_error' });
+    await vi.waitFor(() => expect(onResync).toHaveBeenCalledWith(id));
+
+    const fresh = h.svc.get(id)!;
+    expect(fresh).not.toBe(oldRoom);
+    expect(fresh.current().stateID).toBe(stored.stateID);
+    expect(onAborted).not.toHaveBeenCalled();
+    expect(await h.store.listActive()).toEqual([id]);
+    // 新房间可以继续接收提交
+    const next = await fresh.submit(fresh.current().ctx.currentPlayer, {
+      move: 'endActionPhase',
+      args: [],
+      intentId: 'y',
+    });
+    expect(next.ok === false && next.code === 'match_over').toBe(false);
+  });
+
+  it('重新加载失败：房间移除、Bot 登记释放、通知中断，对局留在活跃集合里', async () => {
+    const onResync = vi.fn();
+    const onAborted = vi.fn();
+    const store = new FlakyStore();
+    const h = makeHarness({ onResync, onAborted }, { store });
     const dispose = vi.spyOn(h.bot, 'disposeMatch');
-    vi.spyOn(h.store, 'save').mockResolvedValue('conflict');
-    const id = await h.svc.createFromRoom(makeRoom(4));
-    await drain(h, id, () => h.svc.get(id) === null);
+    const finish = vi.spyOn(h.store, 'finish');
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const oldRoom = h.svc.get(id)!;
+    const { firstMover } = await advanceStoreBehindRoomsBack(h, id);
+    store.failLoad = true;
+
+    await oldRoom.submit(firstMover, { move: 'completeSetup', args: [], intentId: 'x' });
+    await vi.waitFor(() => expect(onAborted).toHaveBeenCalledWith(id));
+
     expect(h.svc.get(id)).toBeNull();
     expect(dispose).toHaveBeenCalledWith(id);
     expect(finish).not.toHaveBeenCalled();
+    expect(onResync).not.toHaveBeenCalled();
     expect(await h.store.listActive()).toEqual([id]);
     expect(log.error).toHaveBeenCalled();
   });
 
-  it('写快照抛错同样处理', async () => {
-    const h = makeHarness();
-    vi.spyOn(h.store, 'save').mockRejectedValue(new Error('redis down'));
+  it('写快照抛错：房间保留，存储恢复后自动步重新推进，健康状态各通知一次', async () => {
+    const onStorageHealth = vi.fn();
+    const store = new FlakyStore();
+    const h = makeHarness({ onStorageHealth }, { store });
     const id = await h.svc.createFromRoom(makeRoom(4));
-    await drain(h, id, () => h.svc.get(id) === null);
-    expect(h.svc.get(id)).toBeNull();
-    expect(await h.store.listActive()).toEqual([id]);
+    const room = h.svc.get(id)!;
+    store.failSave = true;
+
+    // 失败轮次：自动步到点、两次快速重试
+    for (let i = 0; i < 3; i++) {
+      h.timers.fireNext();
+      await pump();
+    }
+    expect(h.svc.get(id)).toBe(room);
+    expect(onStorageHealth.mock.calls).toEqual([[id, false]]);
+    expect(room.current().stateID).toBe(0);
+
+    store.failSave = false;
+    h.timers.fireNext(); // 退避到点
+    await pump();
+    expect(room.current().stateID).toBe(1);
+    expect(onStorageHealth.mock.calls).toEqual([
+      [id, false],
+      [id, true],
+    ]);
+    expect((await store.load(id))!.state.stateID).toBe(1);
   });
 
   it('persist 用计时器的 now 作为更新时间', async () => {

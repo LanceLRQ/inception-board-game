@@ -3,7 +3,13 @@ import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
 import { nextAutoAction } from '@icgame/bot';
-import { MatchRoom, type RoomDeps, type RoomSeat, type StepOutput } from './MatchRoom.js';
+import {
+  MatchRoom,
+  type RoomDeps,
+  type RoomSeat,
+  type StepOutput,
+  type SubmitResult,
+} from './MatchRoom.js';
 import type { TimingConfig } from './scheduling.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import { logger } from '../infra/logger.js';
@@ -386,57 +392,21 @@ describe('MatchRoom 提交', () => {
     expect(next).toEqual({ ok: false, code: 'match_over' });
   });
 
-  it('persist 抛错：同样不前进并关闭房间', async () => {
+  it('persist 冲突时调用一次 onFatal，并带上原因', async () => {
+    const onFatal = vi.fn();
     const h = makeHarness(
       5,
       ['0', '1', '2', '3', '4'],
-      {
-        persist: async () => {
-          throw new Error('redis down');
-        },
-      },
+      { persist: async () => 'conflict' as const, onFatal },
       stateAfterSetup(5),
     );
     h.room.start();
-    const before = h.room.current();
-    const action = nextAutoAction(before, { humanPlayerIDs: [] })!;
-    const r = await h.room.submit(action.playerID, {
-      move: action.move,
-      args: action.args,
-      intentId: 'x',
-    });
-    expect(r).toEqual({ ok: false, code: 'internal_error' });
-    expect(h.room.current()).toBe(before);
-    expect(h.timers.pending()).toHaveLength(0);
-  });
-
-  it('persist 冲突或抛错时各调用一次 onFatal，并带上原因', async () => {
-    for (const [patch, reason] of [
-      [{ persist: async () => 'conflict' as const }, 'persist_conflict'],
-      [
-        {
-          persist: async () => {
-            throw new Error('redis down');
-          },
-        },
-        'persist_error',
-      ],
-    ] as const) {
-      const onFatal = vi.fn();
-      const h = makeHarness(
-        5,
-        ['0', '1', '2', '3', '4'],
-        { ...patch, onFatal },
-        stateAfterSetup(5),
-      );
-      h.room.start();
-      const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
-      const move = { move: action.move, args: action.args };
-      await h.room.submit(action.playerID, { ...move, intentId: 'x' });
-      await h.room.submit(action.playerID, { ...move, intentId: 'y' });
-      expect(onFatal).toHaveBeenCalledTimes(1);
-      expect(onFatal).toHaveBeenCalledWith(reason);
-    }
+    const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    const move = { move: action.move, args: action.args };
+    await h.room.submit(action.playerID, { ...move, intentId: 'x' });
+    await h.room.submit(action.playerID, { ...move, intentId: 'y' });
+    expect(onFatal).toHaveBeenCalledTimes(1);
+    expect(onFatal).toHaveBeenCalledWith('persist_conflict');
   });
 
   it('onFatal 本身抛错不影响房间关闭', async () => {
@@ -711,5 +681,234 @@ describe('MatchRoom 幂等键按座位区分', () => {
     });
     expect(good.ok).toBe(true);
     expect(h.steps).toHaveLength(1);
+  });
+});
+
+/** 让出一个宏任务，使已就绪的异步续体全部跑完（不等待队列，队列里可能正挂着假时钟的休眠） */
+const pump = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/** 提交一步并在等待期间推进假时钟，直到它出结果 */
+async function submitAndSettle(
+  h: Harness,
+  seat: string,
+  input: { move: string; args: unknown[]; intentId: string },
+): Promise<SubmitResult> {
+  let result: SubmitResult | null = null;
+  void h.room.submit(seat, input).then((r) => {
+    result = r;
+  });
+  for (let i = 0; i < 20 && result === null; i++) {
+    await pump();
+    if (result === null) h.timers.fireNext();
+  }
+  await pump();
+  if (result === null) throw new Error('submit did not settle');
+  return result;
+}
+
+describe('MatchRoom 存储暂时不可用', () => {
+  const humans = ['0', '1', '2', '3', '4'];
+
+  it('写入连续失败：状态不推进、返回 internal_error、房间不关闭，只通知一次不可用', async () => {
+    const onStorageHealth = vi.fn();
+    const onFatal = vi.fn();
+    let calls = 0;
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        persist: async () => {
+          calls++;
+          throw new Error('redis down');
+        },
+        onStorageHealth,
+        onFatal,
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const before = h.room.current();
+    const action = nextAutoAction(before, { humanPlayerIDs: [] })!;
+    const move = { move: action.move, args: action.args };
+
+    const r1 = await submitAndSettle(h, action.playerID, { ...move, intentId: 'a' });
+    expect(r1).toEqual({ ok: false, code: 'internal_error' });
+    expect(calls).toBe(3);
+    expect(h.room.current()).toBe(before);
+    expect(h.room.isStorageHealthy()).toBe(false);
+    expect(onFatal).not.toHaveBeenCalled();
+
+    // 房间仍在接收提交（不是 match_over），再失败一次也不重复通知
+    const r2 = await submitAndSettle(h, action.playerID, { ...move, intentId: 'b' });
+    expect(r2).toEqual({ ok: false, code: 'internal_error' });
+    expect(onStorageHealth.mock.calls).toEqual([[false]]);
+  });
+
+  it('写入失败的那次提交不进幂等表：存储恢复后用同一个 intentId 重试能成功', async () => {
+    let down = true;
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        persist: async () => {
+          if (down) throw new Error('redis down');
+          return 'ok';
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const before = h.room.current();
+    const action = nextAutoAction(before, { humanPlayerIDs: [] })!;
+    const input = { move: action.move, args: action.args, intentId: 'same' };
+
+    expect(await submitAndSettle(h, action.playerID, input)).toEqual({
+      ok: false,
+      code: 'internal_error',
+    });
+    down = false;
+    expect(await submitAndSettle(h, action.playerID, input)).toEqual({
+      ok: true,
+      stateID: before.stateID + 1,
+    });
+  });
+
+  it('一步内的快速重试间隔是 100 毫秒与 400 毫秒', async () => {
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        persist: async () => {
+          throw new Error('redis down');
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const deadline = h.room.deadlineAt()!;
+    const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    const t0 = h.timers.now();
+    void h.room.submit(action.playerID, { move: action.move, args: action.args, intentId: 'a' });
+    await pump();
+    expect(
+      h.timers
+        .pending()
+        .map((p) => p.at)
+        .sort((x, y) => x - y),
+    ).toEqual([t0 + 100, deadline]);
+    h.timers.fireNext();
+    await pump();
+    expect(
+      h.timers
+        .pending()
+        .map((p) => p.at)
+        .sort((x, y) => x - y)[0],
+    ).toBe(t0 + 100 + 400);
+  });
+
+  it('不可用期间自动步不受失败上限约束，按退避持续排程；恢复后推进并通知一次恢复', async () => {
+    let failing = true;
+    const onStorageHealth = vi.fn();
+    const h = makeHarness(
+      5,
+      [],
+      {
+        persist: async () => {
+          if (failing) throw new Error('redis down');
+          return 'ok';
+        },
+        onStorageHealth,
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const startID = h.room.current().stateID;
+
+    // 失败 6 轮（超过 3 次上限）：每轮都在退避后重新排程
+    const gaps: number[] = [];
+    for (let round = 0; round < 6; round++) {
+      h.timers.fireNext(); // 自动步或退避到点
+      await pump();
+      h.timers.fireNext(); // 100 毫秒
+      await pump();
+      h.timers.fireNext(); // 400 毫秒
+      await pump();
+      const pending = h.timers.pending();
+      expect(pending).toHaveLength(1);
+      gaps.push(pending[0]!.at - h.timers.now());
+    }
+    expect(h.room.current().stateID).toBe(startID);
+    expect(h.room.isStorageHealthy()).toBe(false);
+    // 退避逐次翻倍并封顶 30 秒
+    expect(gaps).toEqual([1000, 2000, 4000, 8000, 16000, 30000]);
+    expect(onStorageHealth.mock.calls).toEqual([[false]]);
+
+    failing = false;
+    h.timers.fireNext();
+    await pump();
+    expect(h.room.current().stateID).toBeGreaterThan(startID);
+    expect(h.room.isStorageHealthy()).toBe(true);
+    expect(onStorageHealth.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it('写成功但应答丢了：重试得到冲突，库里已是新版本，这一步算成功且只推进一次', async () => {
+    let stored: number | null = null;
+    let calls = 0;
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        persist: async (state, expected) => {
+          calls++;
+          if (calls === 1) {
+            stored = state.stateID;
+            throw new Error('reply lost');
+          }
+          return stored === expected ? 'ok' : 'conflict';
+        },
+        loadStoredVersion: async () => stored,
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const before = h.room.current();
+    const action = nextAutoAction(before, { humanPlayerIDs: [] })!;
+    const r = await submitAndSettle(h, action.playerID, {
+      move: action.move,
+      args: action.args,
+      intentId: 'a',
+    });
+    expect(r).toEqual({ ok: true, stateID: before.stateID + 1 });
+    expect(h.room.current().stateID).toBe(before.stateID + 1);
+    expect(h.steps).toHaveLength(1);
+    expect(h.room.isStorageHealthy()).toBe(true);
+  });
+
+  it('抛过错之后的冲突若库里既不是旧版本也不是新版本，按真正的冲突处理', async () => {
+    let calls = 0;
+    const onFatal = vi.fn();
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        persist: async () => {
+          calls++;
+          if (calls === 1) throw new Error('reply lost');
+          return 'conflict';
+        },
+        loadStoredVersion: async () => 999,
+        onFatal,
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    const r = await submitAndSettle(h, action.playerID, {
+      move: action.move,
+      args: action.args,
+      intentId: 'a',
+    });
+    expect(r).toEqual({ ok: false, code: 'internal_error' });
+    expect(onFatal).toHaveBeenCalledWith('persist_conflict');
   });
 });

@@ -99,6 +99,9 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     timers: deps.timers ?? realTimers,
     onStep: (matchID, output) => gateway.sendStep(matchID, output),
     onSeatsChanged: (matchID) => gateway.sendSeats(matchID),
+    onStorageHealth: (matchID, healthy) => gateway.sendStorageHealth(matchID, healthy),
+    onResync: (matchID) => gateway.resyncMatch(matchID),
+    onAborted: (matchID) => gateway.abortMatch(matchID),
     // 对局结束的标记已在最后一条 icg:step 的视图里
     onGameOver: (matchID) => {
       logger.info({ matchID }, 'match over');

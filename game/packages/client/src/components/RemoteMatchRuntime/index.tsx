@@ -7,6 +7,7 @@ import { useReconnect } from '../../hooks/useReconnect';
 import { logger } from '../../lib/logger';
 import { MatchRuntime } from '../MatchRuntime';
 import { ReconnectBanner } from '../ReconnectBanner';
+import { StorageBanner } from '../StorageBanner';
 import { shouldShowHandshakeError } from './handshakeError';
 
 export interface RemoteMatchRuntimeProps {
@@ -78,6 +79,8 @@ export function RemoteMatchRuntime({
   return (
     <div data-testid="remote-runtime">
       <ReconnectBanner state={reconnect} onExit={onExit} />
+      {/* 断线提示优先：连接本身有问题时不叠加存储提示 */}
+      <StorageBanner visible={source.storageDegraded && reconnect.status === 'healthy'} />
       {source.view === null ? (
         <div
           className="flex min-h-screen items-center justify-center text-sm text-muted-foreground"

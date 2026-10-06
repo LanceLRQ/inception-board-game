@@ -212,6 +212,37 @@ describe('MatchSocket', () => {
     expect(s.deadlineAt).toBe(before.deadlineAt);
   });
 
+  it('icg:storage 不可用时置位、恢复后清除，视图与连接状态不受影响', () => {
+    ready(1);
+    const before = ms.getSnapshot();
+    expect(before.storageDegraded).toBe(false);
+    socket.fire('icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: false });
+    expect(ms.getSnapshot().storageDegraded).toBe(true);
+    expect(ms.getSnapshot().view).toBe(before.view);
+    expect(ms.getSnapshot().connection).toBe('connected');
+    socket.fire('icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: true });
+    expect(ms.getSnapshot().storageDegraded).toBe(false);
+  });
+
+  it('断线时清除存储不可用提示', () => {
+    ready(1);
+    socket.fire('icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: false });
+    socket.connected = false;
+    socket.fire('disconnect', 'transport close');
+    expect(ms.getSnapshot().storageDegraded).toBe(false);
+    expect(ms.getSnapshot().connection).toBe('reconnecting');
+  });
+
+  it('收到 MATCH_ABORTED：fatal 为 MATCH_ABORTED、failed，不再重连', () => {
+    ready(1);
+    socket.fire('icg:error', { type: 'icg:error', code: 'MATCH_ABORTED', message: 'x' });
+    expect(ms.getSnapshot().fatal).toBe('MATCH_ABORTED');
+    expect(ms.getSnapshot().connection).toBe('failed');
+    socket.connected = false;
+    socket.fire('disconnect', 'io server disconnect');
+    expect(socket.connectCalls).toBe(1);
+  });
+
   it('sendMove 发出带新 intentId 与当前 stateID 的 icg:move，收到结果后完成', async () => {
     ready(7);
     const p = ms.sendMove('play', [1, 2]);
@@ -276,6 +307,19 @@ describe('MatchSocket', () => {
     socket.fire('icg:state', snapshotMsg('icg:state', 3));
     expect(ms.getSnapshot().connection).toBe('connected');
     expect(ms.getSnapshot().view?.stateID).toBe(3);
+  });
+
+  it('带 reset 的 icg:state 即使版本号更小也接受，之后的 step 照常推进', () => {
+    ready(5);
+    socket.fire('icg:state', snapshotMsg('icg:state', 3));
+    expect(ms.getSnapshot().view?.stateID).toBe(5);
+    socket.fire('icg:state', snapshotMsg('icg:state', 3, { reset: true }));
+    expect(ms.getSnapshot().view?.stateID).toBe(3);
+    const seen: number[] = [];
+    ms.onEvents((_events, stateID) => seen.push(stateID));
+    socket.fire('icg:step', snapshotMsg('icg:step', 4, { events: [] }));
+    expect(ms.getSnapshot().view?.stateID).toBe(4);
+    expect(seen).toEqual([4]);
   });
 
   it('服务端主动断开（非被替换）时重新 connect', () => {

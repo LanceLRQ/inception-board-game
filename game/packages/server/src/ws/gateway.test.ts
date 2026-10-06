@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { InceptionCityGame } from '@icgame/game-engine';
+import { createMatch } from '@icgame/game-engine/runner';
+import { MatchRoom } from '../match/MatchRoom.js';
+import type { MatchService } from '../match/MatchService.js';
 import { SocketGateway, normalizeInbound } from './gateway.js';
 import type { ConnectionRegistry } from './connectionRegistry.js';
 
@@ -97,5 +101,100 @@ describe('SocketGateway.disconnectPlayer', () => {
     ]);
     expect(emitted[0]!.payload).toMatchObject({ code: 'BANNED' });
     expect(gateway.disconnectPlayer('nobody')).toBe(0);
+  });
+});
+
+describe('SocketGateway 存储与中断通知', () => {
+  type Emitted = { sid: string; event: string; payload: unknown };
+
+  function setup(opts: { room?: MatchRoom } = {}) {
+    const emitted: Emitted[] = [];
+    const disconnected: string[] = [];
+    const conns: Record<string, Array<{ socketId: string; seat: string }>> = {
+      m1: [
+        { socketId: 's1', seat: '0' },
+        { socketId: 's2', seat: '1' },
+      ],
+      m2: [{ socketId: 's3', seat: '0' }],
+    };
+    const registry = {
+      getSocketsByMatch: (m: string) => (conns[m] ?? []).map((c) => c.socketId),
+      listMatchConnections: (m: string) => conns[m] ?? [],
+    } as unknown as ConnectionRegistry;
+    const gateway = new SocketGateway({
+      registry,
+      router: {} as never,
+      bot: { isBotControlled: () => false } as never,
+      heartbeat: {} as never,
+      moveGateway: {} as never,
+      bans: {} as never,
+    });
+    (gateway as unknown as { io: unknown }).io = {
+      to: (sid: string) => ({
+        emit: (event: string, payload: unknown) => emitted.push({ sid, event, payload }),
+      }),
+      sockets: {
+        sockets: new Map(
+          ['s1', 's2', 's3'].map((sid) => [sid, { disconnect: () => disconnected.push(sid) }]),
+        ),
+      },
+    };
+    if (opts.room) gateway.bindMatches({ get: () => opts.room } as unknown as MatchService);
+    return { gateway, emitted, disconnected };
+  }
+
+  it('存储不可用 / 恢复只发给这一局的连接，且只带公开信息', () => {
+    const { gateway, emitted } = setup();
+    gateway.sendStorageHealth('m1', false);
+    gateway.sendStorageHealth('m1', true);
+    expect(emitted.map((e) => [e.sid, e.event, e.payload])).toEqual([
+      ['s1', 'icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: false }],
+      ['s2', 'icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: false }],
+      ['s1', 'icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: true }],
+      ['s2', 'icg:storage', { type: 'icg:storage', matchID: 'm1', healthy: true }],
+    ]);
+  });
+
+  it('对局中断：通知并断开这一局的连接，其他局不受影响', () => {
+    const { gateway, emitted, disconnected } = setup();
+    gateway.abortMatch('m1');
+    expect(emitted.map((e) => [e.sid, e.event])).toEqual([
+      ['s1', 'icg:error'],
+      ['s2', 'icg:error'],
+    ]);
+    expect(emitted[0]!.payload).toMatchObject({ code: 'MATCH_ABORTED' });
+    expect(disconnected).toEqual(['s1', 's2']);
+  });
+
+  it('重发完整视图：每条连接按自己的座位收到 icg:state，其他局不收', () => {
+    const state = createMatch(InceptionCityGame, {
+      numPlayers: 4,
+      setupData: { rngSeed: 'g' },
+      seed: 'g',
+    });
+    const seats = ['0', '1', '2', '3'].map((seat) => ({
+      seat,
+      playerId: `a${seat}`,
+      nickname: `P${seat}`,
+      isBot: false,
+    }));
+    const room = new MatchRoom('m1', seats, state, {
+      game: InceptionCityGame,
+      persist: async () => 'ok',
+      onStep: () => undefined,
+      onGameOver: () => undefined,
+      isTakenOver: () => false,
+      timing: { botStepDelayMs: 1, pendingTimeoutMs: 1, turnTimeoutMs: 1 },
+      timers: { setTimeout: () => 0, clearTimeout: () => undefined, now: () => 0 },
+    });
+    const { gateway, emitted } = setup({ room });
+    gateway.resyncMatch('m1');
+    expect(emitted.map((e) => [e.sid, e.event])).toEqual([
+      ['s1', 'icg:state'],
+      ['s2', 'icg:state'],
+    ]);
+    expect(emitted.map((e) => (e.payload as { seat: string }).seat)).toEqual(['0', '1']);
+    // 重新加载后的版本号可能比客户端手里的低，带上 reset 让客户端无条件接受
+    expect(emitted.every((e) => (e.payload as { reset?: boolean }).reset === true)).toBe(true);
   });
 });
