@@ -154,14 +154,13 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 
 ## 对局界面多路径地图（⚠️ 改 UI 前必读）
 
-**对局界面（Match UI）有三条并行渲染路径，任何视觉/布局改动都必须同步评估是否需要三路同改。路径 A 有本地与联机两个状态来源，共用同一套界面：**
+**对局界面（Match UI）有两条并行渲染路径，任何视觉/布局改动都必须同步评估是否需要两路同改。路径 A 有本地与联机两个状态来源，共用同一套界面：**
 
 | 路径 | 入口 URL | 驱动组件 | 状态源 | 用途 |
 |------|---------|---------|-------|------|
 | **A · 真实对局（本地）** | `/local` / `/game/:matchId?friend=1&players=N` | `components/LocalMatchRuntime/index.tsx` → `components/MatchRuntime/` | 本地 Worker（`workers/localMatch.worker.ts`），由对局运行器驱动真实引擎，只向界面交出按座位裁剪的视图 | 人机对战；后端不可达时好友房的本地模式 |
 | **A · 真实对局（联机）** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` → `components/MatchRuntime/` | 服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
 | **B · Mock 调试视图** | `/game/:matchId` 不带 `online` / `friend` 参数 | `pages/Game/index.tsx → GameMockView` | `hooks/useMockMatch.ts`（静态 mock） | 开发调试、UI 走查、视角切换（`?as=master` / `?pending=1`） |
-| **C · 旧降级 UI** | 任一路径 + `?legacyUi=1` | `pages/Game/{ThiefBoard,MasterBoard}` | 同上 | 新 UI 上线后的应急降级通道 |
 
 **核心组件（所有路径共用）：**
 
@@ -190,9 +189,8 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 
 1. 访问 `/local`（路径 A）确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
 2. 访问 `/game/debug?as=master`（路径 B）确认 mock 路径生效
-3. 访问任一路径 + `?legacyUi=1`（路径 C）确认降级通道仍可用
-4. PC 1280×800 + 移动 iPhone 12（390×844）两个视口都要走查
-5. 如果改动影响状态结构（`MockMatchState` / 对局状态 `G`），务必同步更新 `viewAdapter.ts` + 测试
+3. PC 1280×800 + 移动 iPhone 12（390×844）两个视口都要走查
+4. 如果改动影响状态结构（`MockMatchState` / 对局状态 `G`），务必同步更新 `viewAdapter.ts` + 测试
 
 **交互硬规范：**
 

@@ -23,7 +23,7 @@ describe('resolveGameMode', () => {
   it('friend=1 但人数不足、或没有任何参数 → mock', () => {
     expect(resolveGameMode(q('friend=1&players=2'), null)).toEqual({ mode: 'mock' });
     expect(resolveGameMode(q(''), 'jwt')).toEqual({ mode: 'mock' });
-    expect(resolveGameMode(q('as=master&legacyUi=1'), 'jwt')).toEqual({ mode: 'mock' });
+    expect(resolveGameMode(q('as=master'), 'jwt')).toEqual({ mode: 'mock' });
   });
 
   it('online 优先于 friend', () => {

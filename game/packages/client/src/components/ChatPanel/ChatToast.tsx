@@ -4,7 +4,7 @@
 // 设计：
 //   - 每玩家独立一个气泡槽位（同玩家连发只显示最新）
 //   - 3 秒后自动消失
-//   - 位置由消费者传入（通常附在 PlayerBar 或头像旁）
+//   - 位置由消费者传入（通常附在座位或头像旁）
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';

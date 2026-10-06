@@ -1,13 +1,11 @@
 // Game · 对局容器
 // - 联机模式（?online=1&code=ABC123）：服务端权威对局，路由参数是对局编号
 // - friend 模式（?friend=1&players=N&code=ABC123）：1 人类 + (N-1) AI 本地对局
-// - 其他场景：保留原 mock + ThiefBoard/MasterBoard 调试路径
+// - 其他场景：静态 mock 调试视图（?as=master / ?pending=1）
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ThiefBoard } from './ThiefBoard/index.js';
-import { MasterBoard } from './MasterBoard/index.js';
 import { MatchTable } from './Table/MatchTable.js';
 import { MatchTrack } from './Track/MatchTrack.js';
 import { useMockMatch } from '../../hooks/useMockMatch.js';
@@ -140,8 +138,6 @@ function GameMockView() {
   const [search] = useSearchParams();
   const viewAs = search.get('as') === 'master' ? 'master' : 'thief';
   const withPendingUnlock = search.get('pending') === '1';
-  // Feature flag：?legacyUi=1 走旧 ThiefBoard/MasterBoard 降级通道
-  const useLegacyUI = search.get('legacyUi') === '1';
 
   const state = useMockMatch({ viewAs, withPendingUnlock });
   const [lastIntent, setLastIntent] = useState<Required<PlayIntent> | null>(null);
@@ -150,23 +146,13 @@ function GameMockView() {
     setLastIntent(intent);
   }, []);
 
-  const isMaster = state.players[state.viewerID]?.faction === 'master';
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
-  let Board;
-  if (useLegacyUI) {
-    Board = isMaster ? (
-      <MasterBoard state={state} onDispatch={handleDispatch} />
-    ) : (
-      <ThiefBoard state={state} onDispatch={handleDispatch} />
-    );
-  } else {
-    Board = isDesktop ? (
-      <MatchTable state={state} onDispatch={handleDispatch} />
-    ) : (
-      <MatchTrack state={state} onDispatch={handleDispatch} />
-    );
-  }
+  const Board = isDesktop ? (
+    <MatchTable state={state} onDispatch={handleDispatch} />
+  ) : (
+    <MatchTrack state={state} onDispatch={handleDispatch} />
+  );
 
   return (
     <>
