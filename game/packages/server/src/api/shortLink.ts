@@ -2,77 +2,19 @@
 //
 // POST /shortlinks   - 创建短链（鉴权）
 // GET  /r/:code      - 短链跳转（公开）
+//
+// 已过期的短链访问时返回 410；记录本身由进程入口每小时清理一次。
 
 import Router from '@koa/router';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
-import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
-import {
-  ShortLinkService,
-  type ShortLinkRecord,
-  type ShortLinkStore,
-  type ShortLinkTargetType,
-} from '../services/ShortLinkService.js';
+import { prismaShortLinkStore } from '../services/PrismaShortLinkStore.js';
+import { ShortLinkService, type ShortLinkTargetType } from '../services/ShortLinkService.js';
 
 const router = new Router();
 
-// === Prisma 适配器 ===
-
-const prismaStore: ShortLinkStore = {
-  async findByCode(code: string): Promise<ShortLinkRecord | null> {
-    const row = await prisma.shortLink.findUnique({ where: { code } });
-    if (!row) return null;
-    return {
-      code: row.code,
-      targetType: row.targetType as ShortLinkTargetType,
-      targetId: row.targetId,
-      createdByPlayerId: row.createdByPlayerId,
-      createdAt: row.createdAt,
-      expiresAt: row.expiresAt,
-      hitCount: row.hitCount,
-      lastHitAt: row.lastHitAt,
-    };
-  },
-  async save(input) {
-    const row = await prisma.shortLink.create({
-      data: {
-        code: input.code,
-        targetType: input.targetType,
-        targetId: input.targetId,
-        createdByPlayerId: input.createdByPlayerId,
-        createdAt: input.createdAt,
-        expiresAt: input.expiresAt,
-      },
-    });
-    return {
-      code: row.code,
-      targetType: row.targetType as ShortLinkTargetType,
-      targetId: row.targetId,
-      createdByPlayerId: row.createdByPlayerId,
-      createdAt: row.createdAt,
-      expiresAt: row.expiresAt,
-      hitCount: row.hitCount,
-      lastHitAt: row.lastHitAt,
-    };
-  },
-  async recordHit(code) {
-    await prisma.shortLink
-      .update({
-        where: { code },
-        data: { hitCount: { increment: 1 }, lastHitAt: new Date() },
-      })
-      .catch(() => {
-        /* 统计失败不阻塞 */
-      });
-  },
-  async exists(code) {
-    const n = await prisma.shortLink.count({ where: { code } });
-    return n > 0;
-  },
-};
-
-const shortLinkService = new ShortLinkService(prismaStore);
+const shortLinkService = new ShortLinkService(prismaShortLinkStore);
 
 // === POST /shortlinks ===
 
@@ -136,5 +78,10 @@ router.get('/r/:code', async (ctx) => {
   }
   ctx.redirect(target);
 });
+
+/** 清掉已过期的短链；由进程入口定期调用 */
+export function purgeExpiredShortLinks(): Promise<number> {
+  return shortLinkService.purgeExpired();
+}
 
 export { router as shortLinkRouter };

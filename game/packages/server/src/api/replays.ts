@@ -24,12 +24,8 @@ import { isUuid } from '../infra/uuid.js';
 import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { MatchArchive, StepRow } from '../match/MatchArchive.js';
-import {
-  ShortLinkService,
-  type ShortLinkRecord,
-  type ShortLinkStore,
-  type ShortLinkTargetType,
-} from '../services/ShortLinkService.js';
+import { prismaShortLinkStore } from '../services/PrismaShortLinkStore.js';
+import { ShortLinkService } from '../services/ShortLinkService.js';
 import { loadFinishedMatch, optionalAccountId, toStepView } from './archiveEvents.js';
 import { toMatchOutcome, toMatchPlayerViews, type MatchMetaRow } from './matchMeta.js';
 
@@ -93,60 +89,11 @@ function parseOptionalInt(raw: unknown, name: string): number | undefined {
 // === 短链分享：复用 ShortLinkService（targetType='replay'）===
 //
 // 设计：
-//   - 此处建立模块内 ShortLinkStore（与 api/shortLink.ts 中的实现等价）
-//     之所以不抽公共模块，是为了保持 ShortLinkService 单测可注入 InMemoryStore
-//     的灵活性；后续若需统一可独立成 infra/shortLinkPrismaStore.ts
+//   - 与 api/shortLink.ts 共用同一个数据库适配器（services/PrismaShortLinkStore.ts）
 //   - TTL 默认走 ShortLinkService 的 7 天默认；调用方可显式覆盖
 //   - 创建前先验证 match 存在（防止生成指向不存在 replay 的死链）
 
-const replayShortLinkStore: ShortLinkStore = {
-  async findByCode(code: string): Promise<ShortLinkRecord | null> {
-    const row = await prisma.shortLink.findUnique({ where: { code } });
-    if (!row) return null;
-    return {
-      code: row.code,
-      targetType: row.targetType as ShortLinkTargetType,
-      targetId: row.targetId,
-      createdByPlayerId: row.createdByPlayerId,
-      createdAt: row.createdAt,
-      expiresAt: row.expiresAt,
-      hitCount: row.hitCount,
-      lastHitAt: row.lastHitAt,
-    };
-  },
-  async save(input) {
-    const row = await prisma.shortLink.create({
-      data: {
-        code: input.code,
-        targetType: input.targetType,
-        targetId: input.targetId,
-        createdByPlayerId: input.createdByPlayerId,
-        createdAt: input.createdAt,
-        expiresAt: input.expiresAt,
-      },
-    });
-    return {
-      code: row.code,
-      targetType: row.targetType as ShortLinkTargetType,
-      targetId: row.targetId,
-      createdByPlayerId: row.createdByPlayerId,
-      createdAt: row.createdAt,
-      expiresAt: row.expiresAt,
-      hitCount: row.hitCount,
-      lastHitAt: row.lastHitAt,
-    };
-  },
-  async recordHit(code) {
-    await prisma.shortLink
-      .update({ where: { code }, data: { hitCount: { increment: 1 }, lastHitAt: new Date() } })
-      .catch(() => {});
-  },
-  async exists(code) {
-    return (await prisma.shortLink.count({ where: { code } })) > 0;
-  },
-};
-
-const replayShortLinkService = new ShortLinkService(replayShortLinkStore);
+const replayShortLinkService = new ShortLinkService(prismaShortLinkStore);
 
 /**
  * 纯函数：拼接完整分享 URL。

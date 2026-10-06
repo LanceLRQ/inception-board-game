@@ -5,6 +5,7 @@
 //   - generate(): 用 base58 + 碰撞重试，默认 6 字符
 //   - resolve(): 查询 + 过期校验 + 命中统计
 //   - 过期策略：短链默认 7 天过期；room/match 类型可显式传 expiresAt
+//   - purgeExpired(): 删除已过期的记录，由进程入口定期调用
 
 import {
   generateUniqueShortCode,
@@ -38,6 +39,8 @@ export interface ShortLinkStore {
   save(record: Omit<ShortLinkRecord, 'hitCount' | 'lastHitAt'>): Promise<ShortLinkRecord>;
   recordHit(code: string): Promise<void>;
   exists(code: string): Promise<boolean>;
+  /** 删除过期时间不晚于 cutoff 的记录，返回删除条数；永不过期的记录不动 */
+  deleteExpired(cutoff: Date): Promise<number>;
 }
 
 export interface ShortLinkServiceOptions {
@@ -106,6 +109,11 @@ export class ShortLinkService {
     });
     return { ok: true, record };
   }
+
+  /** 清掉已过期的短链（与 resolve 的过期判定同一条边界），返回清掉的条数 */
+  purgeExpired(): Promise<number> {
+    return this.store.deleteExpired(this.now());
+  }
 }
 
 // === 测试用的内存实现 ===
@@ -135,6 +143,17 @@ export class InMemoryShortLinkStore implements ShortLinkStore {
 
   async exists(code: string): Promise<boolean> {
     return this.records.has(code);
+  }
+
+  async deleteExpired(cutoff: Date): Promise<number> {
+    let removed = 0;
+    for (const [code, rec] of this.records) {
+      if (rec.expiresAt && rec.expiresAt.getTime() <= cutoff.getTime()) {
+        this.records.delete(code);
+        removed += 1;
+      }
+    }
+    return removed;
   }
 
   size(): number {

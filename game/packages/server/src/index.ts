@@ -1,5 +1,7 @@
+import { purgeExpiredShortLinks } from './api/shortLink.js';
 import { buildRealtime, timingFromEnv } from './bootstrap.js';
 import { logger } from './infra/logger.js';
+import { startPeriodic } from './infra/periodic.js';
 import { prisma } from './infra/postgres.js';
 import { createRedisClient } from './infra/redis.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
@@ -42,6 +44,10 @@ const realtime = buildRealtime({
   trustProxy: process.env.TRUST_PROXY === '1',
 });
 
+/** 过期短链的清理间隔 */
+const SHORT_LINK_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+let stopShortLinkCleanup: () => void = () => {};
+
 async function main(): Promise<void> {
   try {
     const result = await realtime.matches.restoreAll();
@@ -50,11 +56,20 @@ async function main(): Promise<void> {
     logger.error({ err }, 'restoreAll failed, starting without restored matches');
   }
   const port = await realtime.start(PORT);
+  stopShortLinkCleanup = startPeriodic(
+    'short-link-cleanup',
+    SHORT_LINK_CLEANUP_INTERVAL_MS,
+    async () => {
+      const removed = await purgeExpiredShortLinks();
+      if (removed > 0) logger.info({ removed }, 'expired short links removed');
+    },
+  );
   logger.info({ port }, 'Server started (HTTP + WS)');
 }
 
 const shutdown = (signal: string, exitCode = 0) => {
   logger.info({ signal }, 'Shutting down');
+  stopShortLinkCleanup();
   realtime
     .stop()
     .catch((err: unknown) => logger.error({ err }, 'shutdown failed'))

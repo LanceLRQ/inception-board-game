@@ -164,4 +164,40 @@ describe('ShortLinkService', () => {
       expect(first.code).toHaveLength(6);
     });
   });
+
+  describe('purgeExpired', () => {
+    it('removes links whose expiry has passed and keeps the rest', async () => {
+      const short = await svc.create({ targetType: 'room', targetId: 'a', expiresInMs: 1_000 });
+      const long = await svc.create({ targetType: 'room', targetId: 'b', expiresInMs: 60_000 });
+      const forever = await svc.create({ targetType: 'room', targetId: 'c', expiresInMs: 0 });
+
+      now = new Date(now.getTime() + 5_000);
+      expect(await svc.purgeExpired()).toBe(1);
+
+      expect(await store.exists(short.code)).toBe(false);
+      expect(await store.exists(long.code)).toBe(true);
+      expect(await store.exists(forever.code)).toBe(true);
+    });
+
+    it('treats a link expiring exactly now as expired, same as resolve', async () => {
+      const rec = await svc.create({ targetType: 'room', targetId: 'a', expiresInMs: 1_000 });
+      now = new Date(now.getTime() + 1_000);
+      expect((await svc.resolve(rec.code)).ok).toBe(false);
+      expect(await svc.purgeExpired()).toBe(1);
+    });
+
+    it('returns 0 when nothing has expired', async () => {
+      await svc.create({ targetType: 'room', targetId: 'a' });
+      expect(await svc.purgeExpired()).toBe(0);
+      expect(store.size()).toBe(1);
+    });
+
+    it('frees the code for reuse after purge', async () => {
+      const rec = await svc.create({ targetType: 'room', targetId: 'a', expiresInMs: 1_000 });
+      now = new Date(now.getTime() + 2_000);
+      await svc.purgeExpired();
+      expect((await svc.resolve(rec.code)).ok).toBe(false);
+      expect(await store.findByCode(rec.code)).toBeNull();
+    });
+  });
 });
