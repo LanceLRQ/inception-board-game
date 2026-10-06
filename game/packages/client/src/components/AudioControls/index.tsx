@@ -22,7 +22,7 @@ export function AudioControls({ className }: { className?: string }) {
           onClick={toggleMuted}
           aria-pressed={muted}
           className={cn(
-            'rounded-full px-3 py-1 text-xs transition-colors',
+            'rounded-full px-3 py-1 text-xs transition-colors coarse:min-h-11 coarse:px-4',
             muted
               ? 'bg-destructive/20 text-destructive'
               : 'bg-primary/20 text-primary hover:bg-primary/30',
@@ -48,7 +48,7 @@ export function AudioControls({ className }: { className?: string }) {
           onMouseUp={() => play('dice-land')}
           onTouchEnd={() => play('dice-land')}
           disabled={muted}
-          className="flex-1 accent-primary disabled:opacity-50"
+          className="h-11 flex-1 accent-primary disabled:opacity-50"
           aria-label={t('settings.audio.volume', { defaultValue: '音量' })}
         />
         <span className="w-8 text-right text-xs text-muted-foreground">

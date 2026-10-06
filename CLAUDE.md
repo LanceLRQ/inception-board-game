@@ -162,7 +162,7 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | **联机** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` | `match/useRemoteMatchSource.ts`：服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
 | **固定场景** | `/game/:matchId` 不带 `online` / `friend` 参数（常用 `/game/debug`） | `components/FixtureMatchRuntime/index.tsx` | `match/useFixtureMatchSource.ts`：固定种子建局、调整局面后经引擎的视角过滤得到视图（构造见 `match/fixtures/buildScenario.ts`），发出的 move 只记日志、不推进状态 | 开发调试、UI 走查、视角 / 人数 / 待应答状态切换 |
 
-**固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
+**固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?discard=1` 盗梦者处于弃牌阶段、手牌超出上限（梦主视角与响应窗口参数优先）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
 
 ### 代码分层
 
@@ -175,6 +175,17 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | 布局 | `desktop/`（≥1024px）、`mobile/`（<1024px）；`index.tsx` 按 `(min-width: 1024px)` 分派 | 桌面：片头条 + 舞台（背景氛围 + 座位环 + 中央舞台 + 右上提示栈）+ 底部坞；移动：顶栏 + 层级标签 + 行动轴 + 层塔 + 一体式手牌坞。两个布局都用内联的解封响应窗口 / 响应条，不弹窗 |
 | 弹窗群 | `MatchDialogs.tsx` | 选目标 / 选模式 / 多步选择等响应类弹窗，与布局无关 |
 | 共用小件 | `shared/`（`PreloadLine` / `MatchOutcome` / `AwaitingNotice`）、`components/CardArt`、`components/Die`、`components/SeatStatusBadges` 等 | 两个布局共用 |
+
+**视口形态**（`viewportMode.ts`，查询串与 `styles/index.css` 的自定义变体 `tablet` / `short-land` 逐字一致，有测试守护）：
+
+| 视口 | 布局与形态 |
+|------|-----------|
+| ≥1024px（含平板横屏 1024×768、1180×820） | `DesktopLayout`。视口比 1280×800 大到 1.15 倍以上（1920×1080、2560×1440 等）时，整个舞台按 `desktopScale` 放大，子树里 `--ms-scale` 是系数，用 `dvh` / `vw` 的尺寸要除以它；`useElementSize` 取布局尺寸，不受放大影响 |
+| <1024px、宽 ≥768 且高 >500（平板竖屏 768×1024、820×1180） | `MobileLayout` 的 `tablet` 形态：行动轴加宽并横排、层塔字号与骰子放大、手牌更大，内容区限宽 960px 居中；样式写 `tablet:` |
+| <1024px、横屏且高 ≤500（844×390、667×375） | `MobileLayout` 的 `compact-landscape` 形态：顶栏之下左右分栏，左为层级标签 + 行动轴 + 层塔，右为提示 / 响应条 + 常驻展开的手牌坞（无把手）；样式写 `short-land:`，横屏时刘海在左右两侧，外壳用 `pl-safe` / `pr-safe` |
+| 其余 <1024px | `MobileLayout` 的 `phone` 形态：竖列堆叠，手牌坞可收起 |
+
+窄屏的差异一律走 `useMobileMode()` 与这两个变体，不要新增第三套布局组件，也不要改 1024px 的分派断点。触控场景（窄屏或粗指针设备）用 `coarse:` 变体把控件的命中区撑到不小于 44×44，`Button`、Dialog、Sheet、Popover 外壳已统一处理。
 
 桌面座位的几何在 `desktop/seatPlan.ts`（纯函数，有测试）：梦主在上居中，盗梦者分列两侧，**本人不占座位环**（由底部坞承载）；座位牌按舞台实际大小与人数取放得下的最大一档，并给皮肤的中央舞台留出区域，保证 4–10 人、1024×768 及以上的视口里不重叠、不出界。
 
@@ -232,7 +243,8 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 
 1. 访问 `/local` 确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
 2. 访问 `/game/debug`、`/game/debug?as=master`、`/game/debug?pending=1` 确认三个固定场景都正常；改座位环或坞时再看 `/game/debug?players=4` 与 `?players=10`
-3. 桌面 1024×768、1280×800、1440×900、1920×1080，移动 iPhone 12（390×844）都要走查：整页不滚动、座位不重叠、主操作按钮在视口内（`packages/e2e/tests/desktop-layout.spec.ts` 与 `mobile-layout.spec.ts` 守护）
+3. 桌面 1024×768、1280×800、1440×900、1920×1080，移动 iPhone 12（390×844）都要走查：整页不滚动、座位不重叠、主操作按钮在视口内（`packages/e2e/tests/desktop-layout.spec.ts` 与 `mobile-layout.spec.ts` 守护）；改了排布或尺寸时再补平板竖屏 768×1024 / 820×1180、平板横屏 1180×820、手机横屏 844×390 / 667×375、小手机 360×640、大屏 2560×1440，`?discard=1` 的弃牌阶段也要看（`responsive.spec.ts` 守护）
+   - 新增或改动可点击元素：命中区不小于 44×44（靠内边距 / `min-h` / 伪元素扩大，不放大视觉尺寸；注意 `overflow-hidden` 会裁掉伪元素的命中区），相邻目标的命中区不得重叠（`touch-targets.spec.ts` 守护）
 4. 改了 `StageState` / 对局状态 `G` / 盘面模型，同步更新 `model/` 下的推导与测试，以及固定场景的构造
 5. 改了钩子类名或皮肤样式，确认 `theme/skins/skins.test.ts` 通过
 

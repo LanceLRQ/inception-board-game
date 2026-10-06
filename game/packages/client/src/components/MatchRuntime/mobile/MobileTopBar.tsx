@@ -23,8 +23,8 @@ export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
 
   return (
     <div className="shrink-0 border-b border-line pt-safe">
-      <header className="flex h-11 items-center gap-2.5 px-3.5">
-        <div className="flex shrink-0 flex-col font-mono text-[9.5px] leading-tight tracking-[.08em] text-dim">
+      <header className="flex h-11 items-center gap-2.5 px-3.5 tablet:h-14 tablet:px-6 short-land:h-9">
+        <div className="flex shrink-0 flex-col font-mono text-[9.5px] leading-tight tracking-[.08em] text-dim tablet:text-xs">
           <span>
             {t('localMatch.turn')} {turn.number}
           </span>
@@ -33,7 +33,7 @@ export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
         <div className="flex min-w-0 flex-1 flex-col items-center leading-tight">
           <span
             className={cn(
-              'max-w-full truncate font-heading text-[13px] font-bold tracking-[.08em]',
+              'max-w-full truncate font-heading text-[13px] font-bold tracking-[.08em] tablet:text-base',
               turn.isMine ? 'text-acc-bright' : 'text-foreground',
             )}
             data-testid="turn-indicator"
@@ -43,7 +43,7 @@ export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
           </span>
           {turn.deadlineSeconds !== null && (
             <span
-              className="flex items-center gap-1 font-mono text-[9px] tabular-nums text-dim"
+              className="flex items-center gap-1 font-mono text-[9px] tabular-nums text-dim tablet:text-[11px]"
               data-testid="deadline"
             >
               <Timer className="size-2.5" aria-hidden />
@@ -51,7 +51,7 @@ export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
             </span>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-0.5 font-mono text-[9.5px] leading-tight tracking-[.05em] text-dim">
+        <div className="flex shrink-0 flex-col items-end gap-0.5 font-mono text-[9.5px] leading-tight tracking-[.05em] text-dim tablet:text-xs">
           <span aria-label={t('mobile.top.deckAria', { n: deckCount })}>
             {t('mobile.top.deck', { n: deckCount })}
           </span>

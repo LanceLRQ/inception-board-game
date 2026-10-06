@@ -11,6 +11,12 @@ function token(styles: CSSStyleDeclaration, name: string, fallback: string): str
   return value || fallback;
 }
 
+/** 容器所在布局的放大系数（--ms-scale）；没有或非法按 1 */
+function layoutScale(container: HTMLElement): number {
+  const raw = Number.parseFloat(getComputedStyle(container).getPropertyValue('--ms-scale'));
+  return raw >= 1 ? raw : 1;
+}
+
 export function createDomRainEnv(canvas: HTMLCanvasElement, container: HTMLElement): RainEnv {
   const root = document.documentElement;
   const motion =
@@ -19,13 +25,14 @@ export function createDomRainEnv(canvas: HTMLCanvasElement, container: HTMLEleme
   return {
     requestFrame: (callback) => window.requestAnimationFrame(callback),
     cancelFrame: (id) => window.cancelAnimationFrame(id),
-    devicePixelRatio: () => window.devicePixelRatio || 1,
+    // 桌面布局在大屏上整体放大（--ms-scale）：画布要按放大后的物理像素绘制才不发虚
+    devicePixelRatio: () => (window.devicePixelRatio || 1) * layoutScale(container),
     isHidden: () => document.visibilityState === 'hidden',
     prefersReducedMotion: () => motion?.matches ?? false,
     rootAttribute: (name) => root.getAttribute(name),
     size: () => {
-      const rect = container.getBoundingClientRect();
-      return { width: rect.width, height: rect.height };
+      // 布局尺寸（不含 transform 放大），与画布的 CSS 尺寸一致
+      return { width: container.offsetWidth, height: container.offsetHeight };
     },
     style: (): RainStyle => {
       const styles = getComputedStyle(canvas);

@@ -88,6 +88,8 @@ export function Dialog({
             'w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto',
             'rounded-xl border border-border bg-card text-card-foreground shadow-2xl',
             'p-5',
+            // 触控场景：弹窗里所有按钮的命中区不小于 44×44
+            'coarse:[&_button]:min-h-11 coarse:[&_button]:min-w-11',
             'transition-all duration-200',
             'data-[starting-style]:opacity-0 data-[starting-style]:scale-95',
             'data-[ending-style]:opacity-0 data-[ending-style]:scale-95',
@@ -97,7 +99,7 @@ export function Dialog({
         >
           {effectiveShowClose && (
             <BaseDialog.Close
-              className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="absolute right-3 top-3 flex items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:right-1 coarse:top-1"
               aria-label="关闭"
               data-testid={testId ? `${testId}-close` : undefined}
             >
@@ -120,7 +122,9 @@ export function DialogHeader({
   className?: string;
   children?: React.ReactNode;
 }) {
-  return <div className={cn('mb-3 flex flex-col gap-1 pr-6', className)}>{children}</div>;
+  return (
+    <div className={cn('mb-3 flex flex-col gap-1 pr-6 coarse:pr-10', className)}>{children}</div>
+  );
 }
 
 export function DialogTitle({

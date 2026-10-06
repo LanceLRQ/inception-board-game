@@ -50,7 +50,7 @@ export function DockInfoBar({ item, verdict, discard, onCommit }: DockInfoBarPro
   return (
     <div
       data-testid="hand-info"
-      className="flex shrink-0 items-center gap-3 border-b border-dashed border-line px-4 pb-2 pt-0.5 font-mono text-[10px] leading-relaxed tracking-[.03em] text-dim"
+      className="flex shrink-0 items-center gap-3 border-b border-dashed border-line px-4 pb-2 pt-0.5 font-mono text-[10px] leading-relaxed tracking-[.03em] text-dim tablet:px-6 tablet:text-xs short-land:px-3 short-land:py-1.5"
     >
       <p className="min-w-0 flex-1">{body}</p>
       {!discard && verdict?.canPlay && item && (
@@ -58,7 +58,7 @@ export function DockInfoBar({ item, verdict, discard, onCommit }: DockInfoBarPro
           type="button"
           onClick={onCommit}
           data-testid="hand-commit-play"
-          className="min-h-[42px] shrink-0 touch-manipulation border border-acc bg-acc px-4 text-[11.5px] font-semibold tracking-[.08em] text-background active:translate-y-px"
+          className="min-h-11 shrink-0 touch-manipulation border border-acc bg-acc px-4 text-[11.5px] font-semibold tracking-[.08em] text-background active:translate-y-px tablet:min-h-12 tablet:text-sm"
         >
           {t('dock.commit')}
         </button>

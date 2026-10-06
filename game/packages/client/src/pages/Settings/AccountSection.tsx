@@ -96,7 +96,10 @@ export function AccountSection() {
       {!signedIn ? (
         <div className="flex flex-col gap-3 text-sm">
           <p>{t('recovery.account.notSignedIn')}</p>
-          <Link to="/lobby" className="self-start text-primary underline-offset-4 hover:underline">
+          <Link
+            to="/lobby"
+            className="inline-flex min-h-11 min-w-11 items-center self-start text-primary underline-offset-4 hover:underline"
+          >
             {t('recovery.account.toLobby')}
           </Link>
         </div>

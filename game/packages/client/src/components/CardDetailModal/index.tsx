@@ -84,7 +84,7 @@ function ModalContent({
           type="button"
           size="xs"
           onClick={() => setShowBack((v) => !v)}
-          className="absolute right-12 top-2 z-20 rounded-full text-[11px]"
+          className="absolute right-12 top-2 z-20 rounded-full text-[11px] coarse:right-14"
           aria-label="翻面"
           data-testid="card-detail-flip"
           title="按 F 键也可翻面"
@@ -95,7 +95,7 @@ function ModalContent({
       )}
 
       {/* 卡图（翻面动画） */}
-      <div className="flex items-center justify-center bg-gradient-to-br from-panel-2 to-background p-4">
+      <div className="flex items-center justify-center bg-gradient-to-br from-panel-2 to-background p-4 short-land:w-[42%] short-land:shrink-0 short-land:p-3">
         <AnimatePresence mode="wait">
           <motion.div
             key={showBack ? 'back' : 'front'}
@@ -110,7 +110,7 @@ function ModalContent({
               <img
                 src={displayUrl}
                 alt={displayName}
-                className="h-auto w-full rounded-md shadow-lg"
+                className="h-auto w-full rounded-md shadow-lg short-land:max-h-[calc(100dvh-5rem)] short-land:w-auto short-land:object-contain"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
                 }}
@@ -163,7 +163,8 @@ export function CardDetailModal({ cardId, onClose, disableFlip }: CardDetailModa
       showClose={false}
       aria-label="卡牌详情"
       data-testid="card-detail-modal"
-      className="flex flex-col overflow-hidden p-0"
+      // 手机横屏高度不够竖排：卡图在左、文字说明在右
+      className="flex flex-col overflow-hidden p-0 short-land:max-w-2xl short-land:flex-row"
     >
       {displayId && (
         <ModalContent

@@ -1,5 +1,9 @@
 // 移动端对局布局（<1024px）：占满视口、整页不滚动的应用外壳，内部区域各自滚动
-// 从上到下：顶栏 → 层级标签 → 主体（行动轴 + 层塔）→ 提示 / 解封响应条 → 一体式手牌坞。
+// 同一套组件按视口形态（见 viewportMode.ts）有三种排布：
+//   手机竖屏 / 平板竖屏：顶栏 → 层级标签 → 主体（行动轴 + 层塔）→ 提示 / 解封响应条 → 一体式手牌坞。
+//     平板（≥768px）在此基础上加宽行动轴、放大层塔与手牌，内容区限宽居中。
+//   手机横屏（高度 ≤500px）：顶栏之下左右分栏，左边层级标签 + 行动轴 + 层塔，
+//     右边提示 / 响应条 + 手牌坞（常驻展开、没有把手），整页不滚动。
 // 只读控制层 MatchController；弹窗群由 MatchRuntime 另外挂载（解封响应改用本布局的响应条）。
 
 import { useMemo, useState, type ReactNode } from 'react';
@@ -12,6 +16,7 @@ import { markersBySeat } from '../seatMarkers';
 import type { MatchController } from '../controllerTypes';
 import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
+import { useMobileMode } from './useMobileMode';
 import { MobileDock } from './MobileDock';
 import { MobileLayerChips } from './MobileLayerChips';
 import { MobileNotices } from './MobileNotices';
@@ -32,6 +37,8 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
   const { t } = useTranslation();
   const { stage, winner } = controller;
   const [dockOpen, setDockOpen] = useState(false);
+  const mode = useMobileMode();
+  const compact = mode === 'compact-landscape';
   const MobileAmbient = useThemeSkin().MobileAmbient;
 
   const { state, board, focusLayer, focusOn } = useBoardModel(controller);
@@ -43,9 +50,10 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
 
   return (
     <div
-      className="relative isolate flex h-dvh touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground"
+      className="relative isolate mx-auto flex h-dvh w-full touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground tablet:max-w-[960px]"
       data-testid="local-runtime"
       data-layout="mobile"
+      data-mode={mode}
       data-tint-layer={tintLayerAttr(focusLayer)}
     >
       {MobileAmbient && <MobileAmbient />}
@@ -64,19 +72,40 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
       )}
 
       {state && board && (
-        <>
-          <MobileLayerChips
-            chips={buildLayerChips(board.layers)}
-            focusLayer={focusLayer}
-            onFocus={focusOn}
-          />
-          <div className="flex min-h-0 flex-1" data-testid="runtime-stage">
-            <MobileRail slots={slots} onOpenDetail={controller.preview.open} />
-            <MobileTower board={board} dockOpen={dockOpen} onOpenVault={controller.preview.open} />
+        <div className={compact ? 'flex min-h-0 flex-1' : 'contents'}>
+          <div className={compact ? 'flex min-w-0 flex-1 flex-col' : 'contents'}>
+            <MobileLayerChips
+              chips={buildLayerChips(board.layers)}
+              focusLayer={focusLayer}
+              onFocus={focusOn}
+            />
+            <div className="flex min-h-0 flex-1" data-testid="runtime-stage">
+              <MobileRail slots={slots} onOpenDetail={controller.preview.open} />
+              <MobileTower
+                board={board}
+                dockOpen={dockOpen && !compact}
+                mode={mode}
+                onOpenVault={controller.preview.open}
+              />
+            </div>
           </div>
-          <MobileNotices controller={controller} />
-          <MobileDock controller={controller} open={dockOpen} onOpenChange={setDockOpen} />
-        </>
+          <div
+            className={
+              compact
+                ? 'flex min-h-0 w-[44%] min-w-[300px] max-w-[420px] shrink-0 flex-col border-l border-line'
+                : 'contents'
+            }
+            data-testid="mobile-dock-pane"
+          >
+            <MobileNotices controller={controller} />
+            <MobileDock
+              controller={controller}
+              open={dockOpen}
+              onOpenChange={setDockOpen}
+              mode={mode}
+            />
+          </div>
+        </div>
       )}
 
       {winner && (

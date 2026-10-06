@@ -169,7 +169,7 @@ export default function Lobby() {
         <input
           id="lobby-nickname"
           type="text"
-          className="rounded-md border border-line-strong bg-panel px-3 py-2 text-foreground"
+          className="min-h-11 rounded-md border border-line-strong bg-panel px-3 py-2 text-foreground"
           placeholder={t('lobby.nicknamePlaceholder')}
           value={inputNickname}
           onChange={(e) => setInputNickname(e.target.value)}
@@ -211,7 +211,7 @@ export default function Lobby() {
               <input
                 id="lobby-restore-code"
                 type="text"
-                className="rounded-md border border-line-strong bg-panel px-3 py-2 font-mono text-lg uppercase tracking-widest text-foreground"
+                className="min-h-11 rounded-md border border-line-strong bg-panel px-3 py-2 font-mono text-lg uppercase tracking-widest text-foreground"
                 placeholder={t('recovery.restore.placeholder')}
                 value={restoreInput}
                 onChange={(e) => setRestoreInput(formatRecoveryCodeInput(e.target.value))}

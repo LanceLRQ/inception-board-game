@@ -34,7 +34,7 @@ export function MobileResponseBar({ controller }: MobileResponseBarProps) {
       role="group"
       aria-label={t('response.aria')}
       data-testid="unlock-response-bar"
-      className="relative shrink-0 border-t border-line bg-acc-soft px-3"
+      className="relative shrink-0 border-t border-line bg-acc-soft px-3 tablet:px-6"
     >
       {fraction !== null && (
         <i
@@ -43,8 +43,8 @@ export function MobileResponseBar({ controller }: MobileResponseBarProps) {
           data-testid="unlock-response-progress"
         />
       )}
-      <div className="flex items-center gap-2 py-2">
-        <div className="min-w-0 flex-1 text-[11px] leading-snug">
+      <div className="flex items-center gap-2 pb-3 pt-2">
+        <div className="min-w-0 flex-1 text-[11px] leading-snug tablet:text-sm">
           <b className="text-acc-bright">
             {t('response.title', { name, layer: state.layer ?? '?' })}
           </b>
@@ -57,7 +57,7 @@ export function MobileResponseBar({ controller }: MobileResponseBarProps) {
           onClick={() => void controller.makeMove('respondCancelUnlock', [])}
           data-testid="unlock-response-cancel"
           className={cn(
-            'min-h-[42px] shrink-0 touch-manipulation border px-3 text-[11.5px] font-semibold tracking-[.05em] whitespace-nowrap active:translate-y-px',
+            'min-h-11 shrink-0 touch-manipulation border px-3 text-[11.5px] font-semibold tracking-[.05em] whitespace-nowrap active:translate-y-px tablet:min-h-12 tablet:text-sm',
             'border-acc bg-acc text-background disabled:border-line-strong disabled:bg-panel disabled:font-normal disabled:text-faint',
           )}
         >
@@ -67,7 +67,7 @@ export function MobileResponseBar({ controller }: MobileResponseBarProps) {
           type="button"
           onClick={() => void controller.makeMove('passResponse', [])}
           data-testid="unlock-response-pass"
-          className="min-h-[42px] shrink-0 touch-manipulation border border-line-strong bg-panel px-3 text-[11.5px] tracking-[.05em] whitespace-nowrap text-dim active:translate-y-px"
+          className="min-h-11 shrink-0 touch-manipulation border border-line-strong bg-panel px-3 text-[11.5px] tracking-[.05em] whitespace-nowrap text-dim active:translate-y-px tablet:min-h-12 tablet:text-sm"
         >
           {t('response.pass')}
         </button>

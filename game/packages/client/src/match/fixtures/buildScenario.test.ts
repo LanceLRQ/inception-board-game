@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { checkInvariants, type MatchView } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
+import { HAND_LIMIT } from '../../components/MatchRuntime/controllerDerive';
 import { computeUnlockResponseState } from '../../components/UnlockResponse/logic';
 import {
   FIXTURE_DEFAULT_PLAYERS,
@@ -57,6 +58,17 @@ describe('buildFixtureScenario · 通用', () => {
       ).toBeGreaterThanOrEqual(3);
     },
   );
+});
+
+describe('buildFixtureScenario · 弃牌阶段', () => {
+  it('本人是盗梦者，处于弃牌阶段，手牌超出上限需要弃牌', () => {
+    const sc = buildFixtureScenario('thief-discard');
+    const G = sc.view.G as MatchView;
+    expect(G.players[sc.seat]!.faction).toBe('thief');
+    expect(G.turnPhase).toBe('discard');
+    expect(G.currentPlayerID).toBe(sc.seat);
+    expect(G.players[sc.seat]!.hand?.length ?? 0).toBeGreaterThan(HAND_LIMIT);
+  });
 });
 
 describe('buildFixtureScenario · 盗梦者视角', () => {

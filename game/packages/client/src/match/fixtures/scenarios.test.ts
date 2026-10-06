@@ -30,13 +30,20 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('as=master&pending=1')).toBe('master-pending');
   });
 
+  it('discard=1 进入盗梦者的弃牌阶段场景；梦主视角与响应窗口参数优先', () => {
+    expect(idOf('discard=1')).toBe('thief-discard');
+    expect(idOf('discard=1&as=master')).toBe('master');
+    expect(idOf('discard=1&pending=1')).toBe('thief-pending');
+    expect(idOf('discard=0')).toBe('thief');
+  });
+
   it('无法识别的取值按缺省处理', () => {
     expect(idOf('as=ghost&pending=yes')).toBe('thief');
     expect(idOf('as=thief&pending=0')).toBe('thief');
   });
 
   it('只会得到已登记的场景', () => {
-    for (const s of ['', 'as=master', 'pending=1', 'as=master&pending=1']) {
+    for (const s of ['', 'as=master', 'pending=1', 'as=master&pending=1', 'discard=1']) {
       expect(FIXTURE_SCENARIO_IDS).toContain(idOf(s));
     }
   });

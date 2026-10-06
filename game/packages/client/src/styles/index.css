@@ -20,6 +20,19 @@
 @custom-variant dark (&:where([data-scheme=dark], [data-scheme=dark] *));
 
 /*
+ * 对局界面的视口形态变体（查询串与 components/MatchRuntime/viewportMode.ts 逐字一致）
+ * tablet     平板竖屏：宽 ≥768px 且高度充足
+ * short-land 手机横屏：横向且高度 ≤500px，移动布局改成左右分栏
+ */
+@custom-variant tablet (@media (min-width: 768px) and (min-height: 501px));
+@custom-variant short-land (@media (orientation: landscape) and (max-height: 500px));
+/*
+ * coarse     触控场景：窄屏（<1024px）或粗指针设备。按钮 / 对话框里的控件在这个场景下命中区不小于 44×44，
+ *            桌面鼠标场景保持紧凑
+ */
+@custom-variant coarse (@media (max-width: 1023px), (pointer: coarse));
+
+/*
  * 盗梦都市 - 断点策略（移动端优先）
  * sm: 640px  (375-640 手机)
  * md: 768px  (平板竖屏)

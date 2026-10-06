@@ -36,7 +36,7 @@ export function DockSelf({
   return (
     <div
       className="ms-dock-self flex shrink-0 items-center gap-3 pr-4"
-      style={{ width: 'clamp(196px, 16vw, 264px)' }}
+      style={{ width: 'clamp(196px, calc(16vw / var(--ms-scale, 1)), 264px)' }}
       data-testid="dock-self"
     >
       <button
@@ -45,7 +45,7 @@ export function DockSelf({
         onClick={() => onPreview(self.characterId)}
         aria-label={t('seat.seeDetail', { name })}
         data-testid="human-character-preview"
-        className="ms-card relative block h-[clamp(64px,11dvh,112px)] shrink-0 aspect-[3/4] overflow-hidden disabled:cursor-default"
+        className="ms-card relative block h-[clamp(64px,calc(11dvh/var(--ms-scale,1)),112px)] shrink-0 aspect-[3/4] overflow-hidden disabled:cursor-default"
       >
         <CardArt src={getCardImageUrl(self.characterId)} className="size-full" />
       </button>

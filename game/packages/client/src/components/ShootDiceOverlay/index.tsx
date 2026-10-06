@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useViewportSize } from '../../hooks/useViewportSize';
 import { Die, type DieKind } from '../Die';
+import { desktopScale } from '../MatchRuntime/viewportMode';
 
 export interface ShootDiceOverlayProps {
   /** 原始骰值 1-6，有值时展示动画 */
@@ -18,7 +20,17 @@ const ROLL_ANIMATION_MS = 500;
 // 落定后展示终值的停留时间
 const SHOW_FINAL_MS = 1000;
 
+/** 骰子基准边长（像素） */
+export const SHOOT_DIE_BASE = 64;
+
+/** 骰子边长：桌面布局（≥1024px）在大屏上随舞台一起放大，窄屏保持基准 */
+export function shootDieSize(viewportW: number, viewportH: number): number {
+  const scale = viewportW >= 1024 ? desktopScale(viewportW, viewportH) : 1;
+  return Math.round(SHOOT_DIE_BASE * scale);
+}
+
 export function ShootDiceOverlay({ roll, kind = 'combat', onComplete }: ShootDiceOverlayProps) {
+  const viewport = useViewportSize();
   const [visible, setVisible] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [displayFace, setDisplayFace] = useState(1);
@@ -87,7 +99,12 @@ export function ShootDiceOverlay({ roll, kind = 'combat', onComplete }: ShootDic
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           >
-            <Die value={displayFace} kind={kind} size={64} className="select-none" />
+            <Die
+              value={displayFace}
+              kind={kind}
+              size={shootDieSize(viewport.w, viewport.h)}
+              className="select-none"
+            />
             <span className="text-sm font-medium text-foreground">
               {rolling ? '掷骰中...' : displayFace}
             </span>

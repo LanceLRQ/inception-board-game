@@ -68,14 +68,15 @@ export function MobileHandCard({
       aria-pressed={highlighted}
       className={cn(
         'relative block shrink-0 touch-manipulation select-none text-left transition-transform [-webkit-touch-callout:none]',
-        big ? 'w-[88px]' : 'w-[58px]',
+        // 宽度随坞（容器）的宽度走：360 宽手机上约 54 / 80px，平板上封顶 84 / 128px
+        big ? 'w-[clamp(80px,17cqw,128px)]' : 'w-[clamp(52px,15cqw,84px)]',
         highlighted && '-translate-y-[3px]',
       )}
     >
       <span
         className={cn(
-          'relative block overflow-hidden border bg-panel',
-          big ? 'h-[122px] w-[88px]' : 'h-20 w-[58px]',
+          'relative block w-full overflow-hidden border bg-panel',
+          big ? 'aspect-[88/122]' : 'aspect-[58/80]',
           highlighted
             ? 'border-acc shadow-[0_0_0_1px_var(--ms-acc),0_8px_20px_-8px_var(--ms-acc)]'
             : 'border-line-strong',
@@ -108,14 +109,14 @@ export function MobileHandCard({
       <span
         className={cn(
           'mt-[3px] block truncate text-center leading-[1.1] tracking-[.03em]',
-          big ? 'text-[10.5px]' : 'text-[9.5px]',
+          big ? 'text-[10.5px] tablet:text-xs' : 'text-[9.5px] tablet:text-[11px]',
           highlighted ? 'text-acc-bright' : big ? 'text-foreground' : 'text-dim',
         )}
       >
         {item.name}
       </span>
       {big && caption && (
-        <span className="mt-px block truncate text-center font-mono text-[7.5px] tracking-[.06em] text-faint">
+        <span className="mt-px block truncate text-center font-mono text-[7.5px] tracking-[.06em] text-faint tablet:text-[9px]">
           {caption}
         </span>
       )}

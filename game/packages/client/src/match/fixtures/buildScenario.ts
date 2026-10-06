@@ -156,6 +156,9 @@ function giveTurn(
 
 const isMasterScenario = (id: FixtureScenarioId): boolean =>
   id === 'master' || id === 'master-pending';
+const isDiscardScenario = (id: FixtureScenarioId): boolean => id === 'thief-discard';
+/** 弃牌场景里本人多摸的牌数：缺省 4 张手牌 + 3 = 7 张，超出手牌上限（5）2 张 */
+const DISCARD_EXTRA_CARDS = 3;
 const isPendingScenario = (id: FixtureScenarioId): boolean =>
   id === 'thief-pending' || id === 'master-pending';
 
@@ -186,6 +189,7 @@ export function buildFixtureMatch(
       ? cards('action_kick', 'action_dream_peek', UNLOCK_CARD)
       : cards('action_shoot', UNLOCK_CARD, 'action_dream_transit', 'action_kick'),
   );
+  if (isDiscardScenario(id)) G = dealTop(G, viewer, DISCARD_EXTRA_CARDS);
   if (actor !== viewer) G = dealSpecific(G, actor, cards(UNLOCK_CARD, 'action_kick'));
   const others = G.playerOrder.filter((seat) => seat !== viewer && seat !== actor);
   others.forEach((seat, i) => {
@@ -207,6 +211,7 @@ export function buildFixtureMatch(
   };
 
   let state = giveTurn(base, G, actor);
+  if (isDiscardScenario(id)) state = { ...state, G: { ...state.G, turnPhase: 'discard' } };
 
   if (isPendingScenario(id)) {
     const played = applyMove(game, state, {

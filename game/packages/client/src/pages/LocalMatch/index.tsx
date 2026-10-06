@@ -61,7 +61,7 @@ export default function LocalMatch() {
         <button
           type="button"
           onClick={() => setStarted(true)}
-          className="flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
+          className="flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
         >
           <Play className="h-4 w-4" />
           {t('localMatch.start', { defaultValue: '开始游戏' })}

@@ -23,7 +23,7 @@ export function DockSelfBlock({ self, skillName, onPreview }: DockSelfBlockProps
 
   return (
     <div
-      className="flex w-[108px] shrink-0 items-center gap-2 max-[359px]:w-auto"
+      className="flex w-[108px] shrink-0 items-center gap-2 max-[359px]:w-auto tablet:w-40 tablet:gap-3"
       data-testid="dock-self"
     >
       <button
@@ -32,15 +32,17 @@ export function DockSelfBlock({ self, skillName, onPreview }: DockSelfBlockProps
         onClick={() => onPreview(self.characterId)}
         aria-label={`${t('seat.seeDetail', { name })}`}
         data-testid="human-character-preview"
-        className="relative size-11 shrink-0 touch-manipulation overflow-hidden rounded-[10px] border border-acc bg-panel"
+        className="relative size-11 shrink-0 touch-manipulation overflow-hidden rounded-[10px] border border-acc bg-panel tablet:size-14"
       >
         {imageUrl && (
           <img src={imageUrl} alt="" draggable={false} className="size-full object-cover" />
         )}
       </button>
       <div className="min-w-0 max-[359px]:hidden" data-testid="human-character">
-        <b className="block truncate font-heading text-xs font-bold tracking-[.06em]">{name}</b>
-        <span className="mt-0.5 block truncate font-mono text-[8px] tracking-[.02em] text-dim">
+        <b className="block truncate font-heading text-xs font-bold tracking-[.06em] tablet:text-base">
+          {name}
+        </b>
+        <span className="mt-0.5 block truncate font-mono text-[8px] tracking-[.02em] text-dim tablet:text-[11px]">
           {layerText}
           {status && ` · ${status}`}
         </span>

@@ -41,7 +41,7 @@ export function DockOps({ controller, commitName, onCommit, skillReady }: DockOp
   return (
     <div
       className="ms-dock-ops flex shrink-0 flex-col justify-end gap-1.5 pl-4"
-      style={{ width: 'clamp(150px, 13vw, 210px)' }}
+      style={{ width: 'clamp(150px, calc(13vw / var(--ms-scale, 1)), 210px)' }}
       data-testid="dock-ops"
     >
       {commitName && (
