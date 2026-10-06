@@ -3,7 +3,8 @@
 // 供 UI 把 card ID 渲染为中文名 / 图标 / 可用行动
 
 import { getCardById, ensureRegistered } from '@icgame/shared';
-import type { CardDefinition, ActionCardDefinition } from '@icgame/shared';
+import type { CardDefinition, ActionCardDefinition, CardID } from '@icgame/shared';
+import { getBaseCharacterId, getCharacterFace } from '@icgame/game-engine';
 
 // 首次 import 时静态注册所有卡牌
 const regErrors = ensureRegistered();
@@ -22,17 +23,22 @@ export function getCardName(id: string): string {
   return getCardById(id)?.name ?? id;
 }
 
-/** 拿角色技能摘要（首个 skill 的 name + description） */
+/**
+ * 拿角色技能摘要。
+ * 双面角色翻到背面后 characterId 是 `*_back`，这里回到基础角色定义，取背面那一面的名字与技能。
+ */
 export function getCharacterSkillSummary(
   characterId: string,
 ): { name: string; skills: Array<{ name: string; description: string }> } | null {
-  const card = getCardById(characterId);
+  const card = getCardById(getBaseCharacterId(characterId as CardID));
   if (!card) return null;
   if (card.category !== 'thief_char' && card.category !== 'master_char') return null;
   const ch = card as import('@icgame/shared').CharacterDefinition;
+  const isBack = getCharacterFace(characterId as CardID) === 'back' && !!ch.back;
+  const side = isBack ? ch.back! : ch.front;
   return {
-    name: ch.name,
-    skills: ch.front.skills.map((s) => ({ name: s.name, description: s.description })),
+    name: isBack ? side.sideName : ch.name,
+    skills: side.skills.map((s) => ({ name: s.name, description: s.description })),
   };
 }
 

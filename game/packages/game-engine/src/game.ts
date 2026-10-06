@@ -26,6 +26,7 @@ import {
   incrementMoveCounter,
   applyUnlockSuccess,
   applyUnlockCancel,
+  setLayerHeartLock,
   recordCardPlayed,
 } from './moves.js';
 import { killPlayer, sendToLimbo } from './engine/death.js';
@@ -74,8 +75,7 @@ import {
   applyAriesStardustReveal,
   applyGaiaShift,
   applyDarwinEvolution,
-  isAquariusUnlimitedActive,
-  getEffectiveMaxUnlockPerTurn,
+  canMakeSuccessfulUnlock,
   checkHarborWin,
   checkNeptuneWin,
   isJupiterPeakWorldActive,
@@ -233,6 +233,16 @@ function findJustOpenedCoinVault(
   return null;
 }
 
+// --- 内部 helper：金库刚被打开的结算 ---
+// 对比 before / after：本次刚打开的是金币金库时，给开启者 1 张贿赂牌。
+// 秘密金库由 endIf 判盗梦者胜，不在这里处理。解封与技能把心锁减到 0 翻开金库都走这里。
+// 对照：docs/manual/03-game-flow.md:34-36
+function settleVaultOpened(before: SetupState, after: SetupState, random: BGIORandom): SetupState {
+  const coinVault = findJustOpenedCoinVault(before.vaults, after.vaults);
+  if (coinVault?.openedBy) return applyCoinVaultBribeReward(after, random, coinVault.openedBy);
+  return after;
+}
+
 // --- 内部 helper：解封成功完整副作用链 ---
 // 由 passResponse（全员 pass）与 resolveUnlock（兜底）共享。
 // 顺序：applyUnlockSuccess → M4-4 金币金库贿赂奖励 → 译梦师抽 2 → 梦境猎手·满载 → onUnlock passive。
@@ -241,10 +251,7 @@ function resolveUnlockFull(G: SetupState, random: BGIORandom): SetupState {
   if (!G.pendingUnlock) return G;
   const unlockerId = G.pendingUnlock.playerID;
   let s = applyUnlockSuccess(G);
-  const coinVault = findJustOpenedCoinVault(G.vaults, s.vaults);
-  if (coinVault?.openedBy) {
-    s = applyCoinVaultBribeReward(s, random, coinVault.openedBy);
-  }
+  s = settleVaultOpened(G, s, random);
   s = applyInterpreterForeshadow(s, unlockerId);
   s = applyExtractorBounty(s, unlockerId);
   s = dispatchPassives(s, 'onUnlock').state;
@@ -867,7 +874,7 @@ export const InceptionCityGame = {
               s = { ...s, pendingSudgerRolls: null };
             }
 
-            s = dispatchPassives(s, 'onAfterShoot').state;
+            s = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: chosenRoll }).state;
             return recordCardPlayed(incrementMoveCounter(s), pending.cardId);
           },
           client: false,
@@ -1138,7 +1145,8 @@ export const InceptionCityGame = {
             if (!Number.isInteger(layer) || !p.choices.includes(layer)) return INVALID_MOVE;
             let s: SetupState = movePlayerToLayer(G, p.targetPlayerID, layer);
             s = { ...s, pendingShootMove: null };
-            // 延后的 onAfterShoot passive 在此触发一次（处女·完美监听等）
+            // 延后的 onAfterShoot passive 在此触发一次。命中「移动」的点数不会是 6，
+            // 处女·完美不会在这里触发，所以不传 shootRoll
             s = dispatchPassives(s, 'onAfterShoot').state;
             return incrementMoveCounter(s);
           },
@@ -1237,14 +1245,8 @@ export const InceptionCityGame = {
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
             // 摩羯·节奏 / 水瓶·同流：被动豁免解封次数限制
             // 黑洞·DM 世界观：上限提升至 2
-            const effectiveMax = getEffectiveMaxUnlockPerTurn(G, G.maxUnlockPerTurn);
-            if (
-              player.successfulUnlocksThisTurn >= effectiveMax &&
-              !isCapricornusRhythmActive(player) &&
-              !isAquariusUnlimitedActive(player)
-            ) {
-              return INVALID_MOVE;
-            }
+            // 技能减少心锁也占用同一份次数（R-23）
+            if (!canMakeSuccessfulUnlock(G, player)) return INVALID_MOVE;
 
             const currentLayer = player.currentLayer;
             const layerState = G.layers[currentLayer];
@@ -1821,7 +1823,7 @@ export const InceptionCityGame = {
         // 射手·穿心：击杀后修改任意层心锁 ±1（回合限 1 次）
         // 对照：docs/manual/05-dream-thieves.md 射手
         useSagittariusHeartLock: {
-          move: ({ G, ctx }: MoveCtx, layer: number, delta: -1 | 1) => {
+          move: ({ G, ctx, random }: MoveCtx, layer: number, delta: -1 | 1) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
@@ -1832,9 +1834,10 @@ export const InceptionCityGame = {
             // cap = 该层初始心锁数（对照 config）
             const heartLocksTuple = PLAYER_COUNT_CONFIGS[G.playerOrder.length]?.heartLocks;
             const cap = heartLocksTuple?.[layer - 1] ?? 3;
-            const result = applySagittariusHeartLock(G, layer, delta, cap);
+            const result = applySagittariusHeartLock(G, ctx.currentPlayer, layer, delta, cap);
             if (result === null) return INVALID_MOVE;
-            return markSkillUsed(result, ctx.currentPlayer, SAGITTARIUS_HEART_LOCK_SKILL_ID);
+            const settled = settleVaultOpened(G, result, random);
+            return markSkillUsed(settled, ctx.currentPlayer, SAGITTARIUS_HEART_LOCK_SKILL_ID);
           },
           client: false,
         },
@@ -2131,7 +2134,7 @@ export const InceptionCityGame = {
             const roll = random.D6();
             const next = applyGeminiSync(G, ctx.currentPlayer, roll);
             if (next === null) return INVALID_MOVE;
-            return next;
+            return settleVaultOpened(G, next, random);
           },
           client: false,
         },
@@ -2259,7 +2262,7 @@ export const InceptionCityGame = {
             if (s === null) return INVALID_MOVE;
             // 2) shooter 弃 SHOOT 卡（避免免费再用）
             s = discardCard(s, pending.shooterID, pending.cardId);
-            // 3) 清空 pending + 触发 onAfterShoot（处女·完美等监听者）
+            // 3) 清空 pending + 触发 onAfterShoot；躲开没有掷骰，不给 shootRoll（处女·完美不触发）
             s = { ...s, pendingShootResponse: null };
             s = dispatchPassives(s, 'onAfterShoot').state;
             // void random 防止未使用警告（保持签名一致）
@@ -2421,7 +2424,7 @@ export const InceptionCityGame = {
 
         // 处女·完美（skill_0）· 三选一响应窗
         // 对照：docs/manual/05-dream-thieves.md 处女
-        // 触发：dispatchPassives(onAfterShoot) 在 lastShootRoll===6 时挂起 pendingVirgoChoice
+        // 触发：dispatchPassives(onAfterShoot) 在本次 SHOOT 的最终结算点数为 6 时挂起 pendingVirgoChoice
         // 约束：
         //   - 仅 pendingVirgoChoice.virgoID 本人可发起（回合外 move，不 guard turnPhase）
         //   - choice='revive' 需 targetID 参数（己方死亡角色）
@@ -2682,7 +2685,7 @@ export const InceptionCityGame = {
             const roll = random.D6();
             const r = applyMartyrSacrifice(G, ctx.currentPlayer, roll, direction, cap);
             if (r === null) return INVALID_MOVE;
-            return setTurnPhase(r.state, 'discard');
+            return setTurnPhase(settleVaultOpened(G, r.state, random), 'discard');
           },
           client: false,
         },
@@ -3066,10 +3069,7 @@ function applyNightmareEffect(
       const original = cfg?.heartLocks[targetLayer - 1] ?? tls.heartLockValue;
       newValue = Math.max(tls.heartLockValue, original);
     }
-    return {
-      ...G,
-      layers: { ...G.layers, [targetLayer]: { ...tls, heartLockValue: newValue } },
-    };
+    return setLayerHeartLock(G, targetLayer, newValue);
   }
 
   if (nid === 'nightmare_plague') {
@@ -3318,8 +3318,8 @@ function applyShootVariant(
   // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
   const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const rawD6 = random.D6();
-  // 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1（不 floor，可能产生 0 → miss）
-  const baseRoll = opts.terroristPenalty ? rawD6 - 1 : rawD6;
+  // 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1，点数修正最低为 1（与 M4、要塞、哈雷等修正一致）
+  const baseRoll = opts.terroristPenalty ? Math.max(1, rawD6 - 1) : rawD6;
   // M4 卡宾枪全局化 —— 梦主使用 SHOOT 时目标骰 -1（基线梦主优势）
   // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪道具；§111 印证 M4 先于效果处理
   // 仅在"未被角色技能重写骰值"的通用路径生效，不影响灵雕师 override / 天蝎毒针等特殊处理
@@ -3338,10 +3338,13 @@ function applyShootVariant(
   // hook 注入: opts.diceModifierHint 用于哈雷·冲击的免费 SHOOT
   let result: 'kill' | 'move' | 'miss';
   let preState: SetupState = s0;
+  // 本次 SHOOT 的最终结算点数（处女·完美据此判断）
+  let settledRoll: number;
 
   // 灵雕师·雕琢：override 模式，直接用 target 手牌数当骰值
   if (shooter.characterId === 'thief_soul_sculptor') {
     const finalRoll = applySoulSculptorCarve(target.hand.length);
+    settledRoll = finalRoll;
     result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
   } else if (
     shooter.characterId === 'thief_scorpius' &&
@@ -3349,10 +3352,12 @@ function applyShootVariant(
   ) {
     const roll2 = random.D6();
     const finalRoll = applyScorpiusPoison(baseRoll, roll2);
+    settledRoll = finalRoll;
     result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
     preState = markSkillUsed(preState, ctx.currentPlayer, SCORPIUS_SKILL_ID);
   } else if (shooter.characterId === 'thief_taurus') {
     // 金牛：先按 target 骰算 base result；若非 kill 再掷 self 骰看是否 override 为 kill
+    settledRoll = baseRoll;
     const baseResult = resolveShootCustom(baseRoll, deathFaces, opts.moveFaces);
     if (baseResult !== 'kill') {
       const selfRoll = random.D6();
@@ -3364,9 +3369,11 @@ function applyShootVariant(
     // hook：哈雷·冲击附带 -2 修饰（仅由解封触发的免费 SHOOT 使用）
     // 哈雷为盗梦者，postM4Roll === baseRoll；保持原 dicePreModifier 输入
     const finalRoll = opts.dicePreModifier(baseRoll);
+    settledRoll = finalRoll;
     result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
   } else {
     // 通用路径：使用 M4 修饰后骰值（梦主 SHOOT 时 -1，盗梦者 SHOOT 时恒等）
+    settledRoll = postM4Roll;
     result = resolveShootCustom(postM4Roll, deathFaces, opts.moveFaces);
   }
 
@@ -3447,9 +3454,10 @@ function applyShootVariant(
     }
   }
 
-  // abilities registry：SHOOT 结算完成后触发 onAfterShoot passive（处女·完美监听 roll=6）
-  //   注意：choices.length>=2 的挂起分支已在上方 return，此处仅覆盖 kill / miss / L1L4 自动移动 / preventMove 情形
-  s = dispatchPassives(s, 'onAfterShoot').state;
+  // abilities registry：SHOOT 结算完成后触发 onAfterShoot passive（处女·完美按最终点数判断是否为 6）
+  //   注意：choices.length>=2 的挂起分支已在上方 return（命中「移动」的点数不会是 6，不会触发完美），
+  //   此处仅覆盖 kill / miss / L1L4 自动移动 / preventMove 情形
+  s = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: settledRoll }).state;
   return incrementMoveCounter(s);
 }
 

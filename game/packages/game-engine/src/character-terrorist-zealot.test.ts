@@ -180,7 +180,7 @@ describe('恐怖分子 · 狂热 · respondTerroristDiscard', () => {
 // ============================================================================
 
 describe('恐怖分子 · 狂热 · respondTerroristAccept', () => {
-  it('正确路径：target 拒弃 → 重入 SHOOT 应用 -1 惩罚（rolls=1 → 0 miss）', () => {
+  it('正确路径：target 拒弃 → 重入 SHOOT 应用 -1 惩罚（rolls=1 → 下限 1 → kill）', () => {
     const initial = sceneTerroristVsThief();
     const r1 = callMove(initial, 'playShoot', ['p2', SHOOT], { currentPlayer: 'p1' });
     const after1 = r1 as SetupState;
@@ -192,8 +192,8 @@ describe('恐怖分子 · 狂热 · respondTerroristAccept', () => {
     expect(r2).not.toBe('INVALID_MOVE');
     const next = r2 as SetupState;
     expect(next.pendingShootResponse).toBeNull();
-    // -1 后 0 miss（不在 deathFaces 也不在 moveFaces）
-    expect(next.players.p2!.isAlive).toBe(true);
+    // 点数修正最低为 1：掷出 1 仍命中 deathFaces=[1]，被击杀
+    expect(next.players.p2!.isAlive).toBe(false);
     // SHOOT 卡已弃
     expect(next.players.p1!.hand).not.toContain(SHOOT);
     // lastShootRoll 记录原始 D6（1）供动画展示

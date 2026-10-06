@@ -34,8 +34,9 @@ function killPlayer(state: SetupState, playerID: string): SetupState {
   };
 }
 
-function virgoCtx(state: SetupState, virgoID: string) {
+function virgoCtx(state: SetupState, virgoID: string, shootRoll?: number) {
   return {
+    ...(shootRoll === undefined ? {} : { shootRoll }),
     invokerID: virgoID,
     turnNumber: state.turnNumber,
     turnPhase: state.turnPhase,
@@ -155,11 +156,11 @@ describe('处女 · 完美 · applyVirgoTeleport', () => {
 // ============================================================================
 
 describe('处女 · 完美 · ability.apply', () => {
-  it('lastShootRoll=6 + 角色匹配 → 挂起 pendingVirgoChoice', () => {
+  it('最终点数=6 + 角色匹配 → 挂起 pendingVirgoChoice', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
-    s = { ...s, lastShootRoll: 6, currentPlayerID: 'p2' };
-    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1'), {});
+    s = { ...s, currentPlayerID: 'p2' };
+    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1', 6), {});
     expect(r.state).not.toBeNull();
     expect(r.state!.pendingVirgoChoice).toEqual({
       virgoID: 'p1',
@@ -168,11 +169,11 @@ describe('处女 · 完美 · ability.apply', () => {
     });
   });
 
-  it('lastShootRoll≠6 → no-op', () => {
+  it('最终点数≠6 → no-op', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
-    s = { ...s, lastShootRoll: 5 };
-    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1'), {});
+    s = { ...s, lastShootRoll: 6 };
+    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1', 5), {});
     expect(r.state).not.toBeNull();
     expect(r.state!.pendingVirgoChoice).toBeNull();
   });
@@ -195,26 +196,24 @@ describe('处女 · 完美 · ability.apply', () => {
 // ============================================================================
 
 describe('处女 · 完美 · dispatchPassives 集成', () => {
-  it('lastShootRoll=6 + 处女在场 → dispatchPassives 自动挂起', () => {
+  it('最终点数=6 + 处女在场 → dispatchPassives 自动挂起', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
-    s = { ...s, lastShootRoll: 6 };
-    const r = dispatchPassives(s, 'onAfterShoot');
+    const r = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: 6 });
     expect(r.state.pendingVirgoChoice).not.toBeNull();
     expect(r.state.pendingVirgoChoice!.virgoID).toBe('p1');
   });
 
-  it('lastShootRoll=5 + 处女在场 → 不触发', () => {
+  it('最终点数=5 + 处女在场 → 不触发', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
-    s = { ...s, lastShootRoll: 5 };
-    const r = dispatchPassives(s, 'onAfterShoot');
+    const r = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: 5 });
     expect(r.state.pendingVirgoChoice).toBeNull();
   });
 
-  it('无处女角色 + lastShootRoll=6 → 不触发', () => {
-    const s = { ...scenarioActionPhase(), lastShootRoll: 6 };
-    const r = dispatchPassives(s, 'onAfterShoot');
+  it('无处女角色 + 最终点数=6 → 不触发', () => {
+    const s = scenarioActionPhase();
+    const r = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: 6 });
     expect(r.state.pendingVirgoChoice).toBeNull();
   });
 });

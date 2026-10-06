@@ -321,17 +321,17 @@ describe('射手 · 神射（thief_sagittarius）', () => {
   it('心锁 +1 in cap', () => {
     const s = scenarioActionPhase();
     // layer 1 默认 hl=5, cap=5 → +1 不变
-    expect(applySagittariusHeartLock(s, 1, 1, 5)?.layers[1]?.heartLockValue).toBe(5);
+    expect(applySagittariusHeartLock(s, 'p1', 1, 1, 5)?.layers[1]?.heartLockValue).toBe(5);
   });
   it('心锁 -1 减少', () => {
     const s = scenarioActionPhase();
-    const r = applySagittariusHeartLock(s, 1, -1, 5);
+    const r = applySagittariusHeartLock(s, 'p1', 1, -1, 5);
     expect(r?.layers[1]?.heartLockValue).toBe(4);
   });
   it('心锁 -1 但已为 0 → 无变化', () => {
     let s = scenarioActionPhase();
     s = { ...s, layers: { ...s.layers, 1: { ...s.layers[1]!, heartLockValue: 0 } } };
-    const r = applySagittariusHeartLock(s, 1, -1, 5);
+    const r = applySagittariusHeartLock(s, 'p1', 1, -1, 5);
     expect(r).toBe(s);
   });
 });

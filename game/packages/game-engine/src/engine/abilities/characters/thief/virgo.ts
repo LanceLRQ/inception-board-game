@@ -4,7 +4,9 @@
 //
 // 实装：
 //   - scope='passive' + triggers=['onAfterShoot']：每次 SHOOT 结算后由 dispatchPassives 自动检查
-//   - canActivate 校验：处女存活 + lastShootRoll === 6 + 当前无 pending（避免重入）
+//   - canActivate 校验：处女存活 + 本次 SHOOT 的最终点数（ctx.shootRoll）=== 6 + 当前无 pending（避免重入）
+//     最终点数是经 M4、狂热、雕琢、毒针等修正之后的结果，不是原始 D6（G.lastShootRoll 只供动画）
+//     没有掷骰的结算（双鱼·游离躲开）不给 shootRoll，因此不触发
 //   - apply 不直接施加副作用，而是挂起 pendingVirgoChoice 等待玩家选择
 //   - 三选一副作用由 game.ts 的 respondVirgoPerfect move 调用 skills.ts 的 helper 执行
 
@@ -30,9 +32,9 @@ export const virgoPerfect: AbilityDefinition = {
     if (!player.isAlive) return { ok: false, reason: 'dead' };
     // 已挂起则不重入（同一次 SHOOT 多次进入 dispatchPassives 时跳过）
     if (state.pendingVirgoChoice) return { ok: false, reason: 'already_pending' };
-    // 触发条件：本回合最近一次 SHOOT 骰值 = 6
-    const roll = state.lastShootRoll;
-    if (roll === null || roll === undefined || !isVirgoPerfectTriggered(roll)) {
+    // 触发条件：本次 SHOOT 的最终结算点数 = 6
+    const roll = ctx.shootRoll;
+    if (roll === undefined || !isVirgoPerfectTriggered(roll)) {
       return { ok: false, reason: 'condition_not_met' };
     }
     return { ok: true };
@@ -50,8 +52,8 @@ export const virgoPerfect: AbilityDefinition = {
 
   apply(state: SetupState, ctx: AbilityContext) {
     // 防御性二次校验
-    const roll = state.lastShootRoll;
-    if (roll === null || roll === undefined || !isVirgoPerfectTriggered(roll)) {
+    const roll = ctx.shootRoll;
+    if (roll === undefined || !isVirgoPerfectTriggered(roll)) {
       return { state, events: [] };
     }
     if (state.pendingVirgoChoice) {

@@ -51,7 +51,7 @@ export const sagittariusHeartLock: AbilityDefinition = {
     if (!layerInfo) return { state, events: [] };
     // cap 采用游戏常量 6（单层心锁上限）
     const cap = 6;
-    const next = applySagittariusHeartLock(state, layer, delta, cap);
+    const next = applySagittariusHeartLock(state, ctx.invokerID, layer, delta, cap);
     if (!next) return { state, events: [] };
     const counted = incrementUsage(
       next,

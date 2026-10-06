@@ -4,10 +4,16 @@
 
 import type { SetupState, PlayerSetup, BribeSetup } from '../setup.js';
 import { seededShuffle } from '../prng.js';
-import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
+import {
+  drawCards,
+  movePlayerToLayer,
+  incrementMoveCounter,
+  setLayerHeartLock,
+  HEART_LOCK_REDUCED_BY_SKILL_KEY,
+} from '../moves.js';
 import { killPlayer, sendToLimbo } from './death.js';
 import { resolveShootCustom } from '../dice.js';
-import { flipCharacter } from './abilities/dual-faced.js';
+import { flipCharacter, isCharacterFace } from './abilities/dual-faced.js';
 import type { CardID, Layer } from '@icgame/shared';
 
 // === 技能使用前检查 ===
@@ -673,6 +679,8 @@ export function applyMartyrSacrifice(
 
   const layer = state.layers[player.currentLayer];
   if (!layer) return null;
+  // 减少心锁算本回合的成功解锁（R-23）：本回合已经解锁过就不能选减少
+  if (direction === 'decrease' && !canMakeSuccessfulUnlock(state, player)) return null;
 
   let s = markSkillUsed(state, selfID, MARTYR_SKILL_ID);
 
@@ -693,13 +701,7 @@ export function applyMartyrSacrifice(
     next = Math.max(0, Math.min(originalHeartLockCap, next));
     if (next !== cur) {
       heartLockChanged = true;
-      s = {
-        ...s,
-        layers: {
-          ...s.layers,
-          [player.currentLayer]: { ...s.layers[player.currentLayer]!, heartLockValue: next },
-        },
-      };
+      s = setLayerHeartLock(s, player.currentLayer, next, { actorID: selfID, bySkill: true });
     }
   }
 
@@ -1243,6 +1245,11 @@ export function applySpaceQueenStashTop(
 // === 双子 · 协同 ===
 // 弃牌阶段：梦主层数 > self 层数时，可掷骰 → 4 / 5 / 6 → 当层 -2 心锁 → 翻面
 // 对照：docs/manual/05-dream-thieves.md 双子·命运（卡面为三个骰面 4、5、6）
+/** 双面角色的正面 id；按面区分技能靠 isCharacterFace */
+const GEMINI_FRONT_ID = 'thief_gemini' as CardID;
+const PISCES_FRONT_ID = 'thief_pisces' as CardID;
+const LUNA_FRONT_ID = 'thief_luna' as CardID;
+
 export const GEMINI_SKILL_ID = 'thief_gemini.skill_0';
 
 export function applyGeminiSync(
@@ -1251,22 +1258,23 @@ export function applyGeminiSync(
   roll: number,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_gemini') return null;
+  if (!player || !isCharacterFace(player.characterId, GEMINI_FRONT_ID, 'front')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1) return null;
   const master = state.players[state.dreamMasterID];
   if (!master) return null;
   if (master.currentLayer <= player.currentLayer) return null;
   if (!canUseSkill(player, GEMINI_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  // 减少心锁算本回合的成功解锁（R-23）：本回合已经解锁过就不能发动
+  if (!canMakeSuccessfulUnlock(state, player)) return null;
 
   let s = markSkillUsed(state, selfID, GEMINI_SKILL_ID);
   if (roll >= 4 && roll <= 6) {
     const layerInfo = s.layers[player.currentLayer]!;
-    const nextHL = Math.max(0, layerInfo.heartLockValue - 2);
-    s = {
-      ...s,
-      layers: { ...s.layers, [player.currentLayer]: { ...layerInfo, heartLockValue: nextHL } },
-    };
+    s = setLayerHeartLock(s, player.currentLayer, layerInfo.heartLockValue - 2, {
+      actorID: selfID,
+      bySkill: true,
+    });
   }
   // 翻面（无论骰值）
   s = flipCharacter(s, selfID);
@@ -1285,7 +1293,7 @@ export function applyGeminiChoice(
   roll2: number,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_gemini') return null;
+  if (!player || !isCharacterFace(player.characterId, GEMINI_FRONT_ID, 'back')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1) return null;
   const master = state.players[state.dreamMasterID];
@@ -1309,9 +1317,9 @@ export function applyGeminiChoice(
 // 接入：在 applyShootVariant 前置 hook 检查（被动）
 export const PISCES_SKILL_ID = 'thief_pisces.skill_0';
 
-/** 双鱼是否可发动（是 thief_pisces 且未翻面 + 当前层 > 1） */
+/** 双鱼·游离是否可发动（正面朝上 + 当前层 > 1） */
 export function canPiscesEvade(player: PlayerSetup): boolean {
-  if (player.characterId !== 'thief_pisces') return false;
+  if (!isCharacterFace(player.characterId, PISCES_FRONT_ID, 'front')) return false;
   if (!player.isAlive) return false;
   if (player.currentLayer <= 1) return false;
   if (!canUseSkill(player, PISCES_SKILL_ID, 'ownTurnOncePerTurn')) return false;
@@ -1340,7 +1348,7 @@ export function applyPiscesBlessing(
   reviveID: string | null,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_pisces') return null;
+  if (!player || !isCharacterFace(player.characterId, PISCES_FRONT_ID, 'back')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1 || player.currentLayer >= 4) return null;
   if (!canUseSkill(player, PISCES_BLESSING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
@@ -1379,7 +1387,7 @@ export function applyLunaEclipse(
   targetID: string,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_luna') return null;
+  if (!player || !isCharacterFace(player.characterId, LUNA_FRONT_ID, 'front')) return null;
   if (!player.isAlive) return null;
   if (selfID === targetID) return null;
   if (!canUseSkill(player, LUNA_SKILL_ID, 'ownTurnOncePerTurn')) return null;
@@ -1426,7 +1434,7 @@ export function applyLunaFullMoon(
   reviveIDs: readonly string[],
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_luna') return null;
+  if (!player || !isCharacterFace(player.characterId, LUNA_FRONT_ID, 'back')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1) return null;
   if (!canUseSkill(player, LUNA_FULL_MOON_SKILL_ID, 'ownTurnOncePerTurn')) return null;
@@ -1568,18 +1576,19 @@ export const SAGITTARIUS_HEART_LOCK_SKILL_ID = 'thief_sagittarius.skill_1';
 /** 射手心锁修改：±1，受 cap 限制 */
 export function applySagittariusHeartLock(
   state: SetupState,
+  selfID: string,
   layer: number,
   delta: -1 | 1,
   cap: number,
 ): SetupState | null {
   const layerInfo = state.layers[layer];
   if (!layerInfo) return null;
+  const actor = state.players[selfID];
+  if (!actor) return null;
+  // 减少心锁算本回合的成功解锁（R-23）：本回合已经解锁过就不能减少
+  if (delta < 0 && !canMakeSuccessfulUnlock(state, actor)) return null;
   const next = Math.max(0, Math.min(cap, layerInfo.heartLockValue + delta));
-  if (next === layerInfo.heartLockValue) return state;
-  return {
-    ...state,
-    layers: { ...state.layers, [layer]: { ...layerInfo, heartLockValue: next } },
-  };
+  return setLayerHeartLock(state, layer, next, { actorID: selfID, bySkill: true });
 }
 
 // === 水瓶 · 同流（纯函数） ===
@@ -1885,13 +1894,7 @@ export function applyBlackHoleReverse(
     const cap = originalHeartLocks[layerNum] ?? layerInfo.heartLockValue;
     const next = Math.min(cap, layerInfo.heartLockValue + BLACK_HOLE_HEART_LOCK_REGEN);
     if (next === layerInfo.heartLockValue) continue;
-    s = {
-      ...s,
-      layers: {
-        ...s.layers,
-        [layerNum]: { ...layerInfo, heartLockValue: next },
-      },
-    };
+    s = setLayerHeartLock(s, layerNum, next);
   }
   return s;
 }
@@ -1899,6 +1902,19 @@ export function applyBlackHoleReverse(
 /** 黑洞世界观：解封次数上限改为 2 */
 export function isBlackHoleWorldActive(state: SetupState): boolean {
   return getMasterCharacterID(state) === 'dm_black_hole';
+}
+
+/**
+ * 本回合还能不能再做一次「成功解锁」：解封成功与技能减少心锁共用同一份次数（R-23）。
+ * 摩羯·节奏、水瓶·同流豁免次数上限。
+ * 对照：docs/manual/03-game-flow.md:26-28
+ */
+export function canMakeSuccessfulUnlock(state: SetupState, player: PlayerSetup): boolean {
+  if (isCapricornusRhythmActive(player) || isAquariusUnlimitedActive(player)) return true;
+  const used =
+    player.successfulUnlocksThisTurn +
+    (player.skillUsedThisTurn[HEART_LOCK_REDUCED_BY_SKILL_KEY] ?? 0);
+  return used < getEffectiveMaxUnlockPerTurn(state, state.maxUnlockPerTurn);
 }
 
 /** 获取当前实际解封次数上限（黑洞世界观时为 2，否则用 G.maxUnlockPerTurn） */

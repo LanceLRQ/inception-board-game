@@ -165,6 +165,66 @@ export function incrementMoveCounter(state: SetupState): SetupState {
   return { ...state, moveCounter: state.moveCounter + 1 };
 }
 
+// === 改变某层心锁 ===
+// 全引擎所有改变心锁的路径（解封、技能、梦魇、世界观）都经这里。
+// 减少到 0 时翻开该层第一个未开金库并记录 openedBy。
+// 对照：docs/manual/03-game-flow.md:34 当某一层的心锁全部被解开时，该层的金库便被打开
+//
+// 只管心锁与金库；金库打开后的结算（金币给贿赂牌、秘密判胜）由调用方在其后处理，
+// 「解封成功」才触发的被动（译梦师·伏笔、梦境猎手·满载、onUnlock）也不在这里。
+//
+// actorID：减少心锁的发动者，翻开的金库记在他名下。
+// bySkill：发动者靠技能减少心锁。裁定 R-23：这也算本回合的成功解锁，
+//   占用解锁次数（见 skills.ts 的 canMakeSuccessfulUnlock）；心锁实际没减少则不计。
+//   对照：docs/manual/03-game-flow.md:26-28 一旦本回合心锁减少后，盗梦者不能再以技能或行动的方式解锁
+export const HEART_LOCK_REDUCED_BY_SKILL_KEY = 'heartLockReducedBySkill';
+
+export function setLayerHeartLock(
+  state: SetupState,
+  layer: number,
+  nextValue: number,
+  opts: { actorID?: string; bySkill?: boolean } = {},
+): SetupState {
+  const layerState = state.layers[layer];
+  if (!layerState) return state;
+  const next = Math.max(0, nextValue);
+  if (next === layerState.heartLockValue) return state;
+
+  const reduced = next < layerState.heartLockValue;
+  let vaults = state.vaults;
+  if (reduced && next === 0) {
+    const vaultIdx = vaults.findIndex((v) => v.layer === layer && !v.isOpened);
+    if (vaultIdx !== -1) {
+      vaults = vaults.map((v, i) =>
+        i === vaultIdx ? { ...v, isOpened: true, openedBy: opts.actorID ?? null } : v,
+      );
+    }
+  }
+
+  let players = state.players;
+  const actor = opts.actorID ? players[opts.actorID] : undefined;
+  if (reduced && opts.bySkill && actor) {
+    players = {
+      ...players,
+      [actor.id]: {
+        ...actor,
+        skillUsedThisTurn: {
+          ...actor.skillUsedThisTurn,
+          [HEART_LOCK_REDUCED_BY_SKILL_KEY]:
+            (actor.skillUsedThisTurn[HEART_LOCK_REDUCED_BY_SKILL_KEY] ?? 0) + 1,
+        },
+      },
+    };
+  }
+
+  return {
+    ...state,
+    layers: { ...state.layers, [layer]: { ...layerState, heartLockValue: next } },
+    vaults,
+    players,
+  };
+}
+
 // === 解封成功结算 ===
 // 对照：docs/manual/04-action-cards.md 解封
 export function applyUnlockSuccess(state: SetupState): SetupState {
@@ -175,34 +235,16 @@ export function applyUnlockSuccess(state: SetupState): SetupState {
   const layerState = state.layers[layer];
   if (!layerState) return state;
 
-  const newHeartLock = Math.max(0, layerState.heartLockValue - 1);
-
-  // 心锁归零 → 打开该层第一个未开金库
-  let updatedVaults = state.vaults;
-  if (newHeartLock === 0) {
-    const vaultIdx = state.vaults.findIndex((v) => v.layer === layer && !v.isOpened);
-    if (vaultIdx !== -1) {
-      updatedVaults = state.vaults.map((v, i) =>
-        i === vaultIdx ? { ...v, isOpened: true, openedBy: playerID } : v,
-      );
-    }
-  }
-
-  const player = state.players[playerID]!;
+  const lowered = setLayerHeartLock(state, layer, layerState.heartLockValue - 1, {
+    actorID: playerID,
+  });
+  const player = lowered.players[playerID]!;
 
   return {
-    ...state,
+    ...lowered,
     pendingUnlock: null,
-    layers: {
-      ...state.layers,
-      [layer]: {
-        ...layerState,
-        heartLockValue: newHeartLock,
-      },
-    },
-    vaults: updatedVaults,
     players: {
-      ...state.players,
+      ...lowered.players,
       [playerID]: {
         ...player,
         successfulUnlocksThisTurn: player.successfulUnlocksThisTurn + 1,

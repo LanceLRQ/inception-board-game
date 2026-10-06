@@ -94,6 +94,16 @@ export {
 } from './engine/timeout.js';
 export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
 
+// 双面角色
+export {
+  getCharacterFace,
+  getBaseCharacterId,
+  isCharacterFace,
+  getDualFacedConfig,
+  flipCharacter,
+} from './engine/abilities/dual-faced.js';
+export type { CharacterFace } from './engine/abilities/dual-faced.js';
+
 // 规则不变量
 export { checkInvariants, assertInvariants } from './invariants.js';
 export type { InvariantViolation } from './invariants.js';

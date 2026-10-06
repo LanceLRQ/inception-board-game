@@ -804,3 +804,24 @@ describe('getAvailableActiveSkills · 欺诈师·盗心（盲抽）', () => {
     expect(FORGER_EXCHANGE.argKind).toBe('playerAndCard');
   });
 });
+
+describe('getAvailableActiveSkills · 双面角色按面出现', () => {
+  it('双子背面朝上时不出现正面技能·命运', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gemini_back',
+        turnPhase: 'discard',
+        humanLayer: 1,
+        masterLayer: 3,
+      }),
+    );
+    expect(list).not.toContain(GEMINI_SYNC);
+  });
+
+  it('露娜背面朝上时不出现正面技能·月蚀', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_luna_back', hand: ['action_shoot', 'action_shoot'] }),
+    );
+    expect(list).not.toContain(LUNA_ECLIPSE);
+  });
+});

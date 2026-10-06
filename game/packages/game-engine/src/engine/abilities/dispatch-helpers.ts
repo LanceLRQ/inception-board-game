@@ -77,6 +77,7 @@ export function dispatchPassives(
   state: SetupState,
   timing: TriggerTiming,
   registry: InMemoryAbilityRegistry = getDefaultRegistry(),
+  extras: Partial<AbilityContext> = {},
 ): { state: SetupState; events: Array<{ type: string; playerID: string }> } {
   let currentState = state;
   const events: Array<{ type: string; playerID: string }> = [];
@@ -86,7 +87,7 @@ export function dispatchPassives(
   for (const playerID of state.playerOrder) {
     const player = state.players[playerID];
     if (!player || !player.isAlive) continue;
-    const ctx = buildAbilityContext(currentState, playerID);
+    const ctx = buildAbilityContext(currentState, playerID, extras);
     for (const ability of candidates) {
       if (!ability.id.startsWith(player.characterId + '.')) continue;
       const validation = ability.canActivate(currentState, ctx);

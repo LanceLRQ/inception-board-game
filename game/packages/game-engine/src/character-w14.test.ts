@@ -270,15 +270,13 @@ describe('恐怖分子 · 远程（thief_terrorist）', () => {
     expect(r.pendingShootResponse!.responseType).toBe('terrorist');
     // p2 仍存活（pre-roll 挂起）
     expect(r.players.p2!.isAlive).toBe(true);
-    // target 接受惩罚 → 重入 SHOOT，rolls=[1] kill 直接命中
+    // target 接受惩罚 → 重入 SHOOT，rolls=[1]：点数修正最低为 1，仍命中 deathFaces=[1]
     const r2 = callMove(r, 'respondTerroristAccept', [], {
       currentPlayer: 'p2',
       rolls: [1],
     });
     expectMoveOk(r2);
-    // 1-1=0，miss（不在 deathFaces=[1] 也不在 moveFaces=[2,3,4]）
-    expect(r2.players.p2!.isAlive).toBe(true);
-    // 验证 -1 惩罚生效：原 rolls=[1] 应 kill；现在因 -1=0 → miss
+    expect(r2.players.p2!.isAlive).toBe(false);
     expect(r2.pendingShootResponse).toBeNull();
   });
 });

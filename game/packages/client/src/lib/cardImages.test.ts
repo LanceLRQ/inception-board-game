@@ -3,6 +3,8 @@ import {
   getCardImageUrl,
   getCardImageCount,
   getAllCardImageUrls,
+  getCardBackImageUrl,
+  hasCardBackImage,
   preloadAllCardImages,
 } from './cardImages.js';
 
@@ -35,6 +37,19 @@ describe('cardImages', () => {
       const url = getCardImageUrl('thief_space_queen');
       // encodeURI 保留中文字符原样（其实是 %XX 转义）；至少不能有原始空格或其它非法 URI 字符
       expect(url).not.toMatch(/\s/);
+    });
+  });
+
+  describe('双面角色翻面后的 id', () => {
+    it.each(['thief_gemini', 'thief_pisces', 'thief_luna'])('%s_back 显示背面卡图', (front) => {
+      const frontUrl = getCardImageUrl(front);
+      const backUrl = getCardImageUrl(`${front}_back`);
+      expect(backUrl).toBeDefined();
+      expect(backUrl).not.toBe(frontUrl);
+      expect(backUrl).toBe(getCardBackImageUrl(front));
+      // 翻面预览：背面的「另一面」就是正面
+      expect(getCardBackImageUrl(`${front}_back`)).toBe(frontUrl);
+      expect(hasCardBackImage(`${front}_back`)).toBe(true);
     });
   });
 
