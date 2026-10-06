@@ -26,6 +26,7 @@ const game: GameDef<SetupState> = InceptionCityGame;
 const SHOOT = 'action_shoot' as CardID;
 const KICK = 'action_kick' as CardID;
 const UNLOCK = 'action_unlock' as CardID;
+const CREATION = 'action_creation' as CardID;
 const NIGHTMARE_A = 'nightmare_despair_storm' as CardID;
 const NIGHTMARE_B = 'nightmare_hunger_bite' as CardID;
 
@@ -227,14 +228,14 @@ describe('事件 · 抽牌与阶段', () => {
     // 凭空造物：打出一张、抽两张，手牌净增一张；抽到的牌里还有一张与打出的牌同种
     const G = scene(
       'action',
-      { deck: { cards: [UNLOCK, SHOOT, KICK, KICK], discardPile: [] } },
-      { p1: { hand: [UNLOCK, KICK] } },
+      { deck: { cards: [CREATION, SHOOT, KICK, KICK], discardPile: [] } },
+      { p1: { hand: [CREATION, KICK] } },
     );
-    const { events, state } = step(load(G), 'p1', 'playCreation', [UNLOCK]);
-    expect(state.G.players.p1!.hand).toEqual([KICK, UNLOCK, SHOOT]);
+    const { events, state } = step(load(G), 'p1', 'playCreation', [CREATION]);
+    expect(state.G.players.p1!.hand).toEqual([KICK, CREATION, SHOOT]);
     const drawn = one(events, 'cards_drawn');
     expect(drawn.data).toEqual({ player: 'p1', count: 2 });
-    expect(drawn.secret).toEqual({ to: ['p1'], data: { cards: [UNLOCK, SHOOT] } });
+    expect(drawn.secret).toEqual({ to: ['p1'], data: { cards: [CREATION, SHOOT] } });
   });
 
   it('cards_drawn：别的玩家手里转来的牌不算抽牌（牌库没动时没有事件）', () => {

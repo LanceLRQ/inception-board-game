@@ -238,6 +238,7 @@ export type {
 
 // 行动权：此刻在等谁、等什么（服务端据此决定计时与提示）
 export { listAwaiting } from './engine/actionRights.js';
+export { PLAY_MOVE_CARD_IDS, isCardForPlayMove } from './engine/playCardKinds.js';
 export type { Awaiting } from './engine/actionRights.js';
 
 // 白名单式对局视图：服务端发给每个观察者的状态

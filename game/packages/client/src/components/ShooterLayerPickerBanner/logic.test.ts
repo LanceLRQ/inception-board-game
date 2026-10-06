@@ -48,7 +48,7 @@ describe('computeShooterLayerPickerState', () => {
       pendingShootMove: {
         shooterID: '0',
         targetPlayerID: '1',
-        cardId: 'action_shoot_king',
+        cardId: 'action_shoot_assassin',
         extraOnMove: null,
         choices: [2, 4],
       },

@@ -528,8 +528,17 @@ function viewShiftSnapshot(
   G: SetupState,
   who: Audience,
 ): Record<string, CardID> {
+  // 已翻开玩家的条目记着他换牌前的角色；该角色此刻若落在一个未翻开的别人身上，
+  // 带着这条就等于告诉观察者那人的角色，所以这种条目只给本人和对局结束后的视图
+  const heldHiddenByOther = (character: CardID): boolean =>
+    Object.values(G.players).some(
+      (p) => p.characterId === character && !p.isRevealed && p.id !== who.who,
+    );
   const kept = Object.keys(snapshot).filter(
-    (id) => who.open || who.who === id || G.players[id]?.isRevealed === true,
+    (id) =>
+      who.open ||
+      who.who === id ||
+      (G.players[id]?.isRevealed === true && !heldHiddenByOther(snapshot[id]!)),
   );
   return Object.fromEntries(kept.map((id) => [id, snapshot[id]!]));
 }

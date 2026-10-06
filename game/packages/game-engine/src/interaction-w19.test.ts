@@ -1086,8 +1086,8 @@ describe('角色被动触发守卫', () => {
 describe('牌型分类 + 骰值 clamp', () => {
   it('isShootClassCard：所有 shoot 变体 → true', () => {
     expect(isShootClassCard('action_shoot' as CardID)).toBe(true);
-    expect(isShootClassCard('action_shoot_king' as CardID)).toBe(true);
-    expect(isShootClassCard('action_shoot_armor' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_assassin' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_drill' as CardID)).toBe(true);
     expect(isShootClassCard('action_shoot_burst' as CardID)).toBe(true);
     expect(isShootClassCard('action_shoot_dream_transit' as CardID)).toBe(true);
   });
@@ -1837,12 +1837,12 @@ describe('火星·战场世界观交换', () => {
   it('火星 + 弃的任一张是 SHOOT → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
     s = setHand(s, 'p1', ['action_shoot' as CardID, 'action_shift' as CardID]);
-    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot_king' as CardID] } };
+    s = { ...s, deck: { ...s.deck, discardPile: ['action_shoot_assassin' as CardID] } };
     const r = applyMarsBattlefieldExchange(
       s,
       'p1',
       ['action_shoot' as CardID, 'action_shift' as CardID],
-      'action_shoot_king' as CardID,
+      'action_shoot_assassin' as CardID,
     );
     expect(r).toBeNull();
   });

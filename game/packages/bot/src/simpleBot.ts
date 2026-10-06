@@ -18,9 +18,9 @@ export type MoveDescriptor = {
 const CARD_PRIORITY: Record<string, number> = {
   action_shoot: 1,
   action_shoot_assassin: 1,
-  action_shoot_armor: 1,
-  action_shoot_explosive: 1,
-  action_shoot_transit: 1,
+  action_shoot_drill: 1,
+  action_shoot_burst: 1,
+  action_shoot_dream_transit: 1,
   action_unlock: 2,
   action_dream_transit: 3,
   action_creation: 4,

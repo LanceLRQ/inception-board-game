@@ -13,7 +13,7 @@
 //   4. 弃牌阶段完成后，move 内调 events.endTurn() 让 BGIO 推进回合
 
 import { INVALID_MOVE } from './engine/invalidMove.js';
-import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
+import { createInitialState, type SetupState, type BribeSetup, type PlayerSetup } from './setup.js';
 import { migrateGameState } from './migrations.js';
 import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT, HAND_LIMIT } from './config.js';
 import {
@@ -126,6 +126,7 @@ import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
 import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { denyAction } from './engine/actionRights.js';
+import { isCardForPlayMove } from './engine/playCardKinds.js';
 import { viewFor } from './engine/matchView.js';
 import { matchOutcome } from './engine/outcome.js';
 import { describeMatchEvents } from './engine/matchEvents.js';
@@ -514,7 +515,8 @@ export const InceptionCityGame = {
             // 对照：cards-data.json dm_pluto_hell 世界观
             const currentPlayer = G.players[G.currentPlayerID];
             const isThief = currentPlayer?.faction === 'thief';
-            const isMaster = currentPlayer?.faction === 'master';
+            // 盛夏·充盈是梦主本人的技能：背叛者虽属梦主阵营，没有梦主的技能
+            const isMaster = G.currentPlayerID === G.dreamMasterID;
             const plutoOverride = isPlutoHellWorldActive(G) && isThief ? random.D6() : null;
             // 盛夏·充盈：梦主多抽 = 未派发贿赂数
             // 盛夏·世界观：盗梦者多抽 +1
@@ -722,6 +724,7 @@ export const InceptionCityGame = {
             preventMove?: boolean,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playShoot', cardId)) return INVALID_MOVE;
             // 射手·禁足：仅射手角色可阻止移动
             const shooter = G.players[ctx.currentPlayer];
             const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
@@ -755,6 +758,9 @@ export const InceptionCityGame = {
             const target = G.players[targetPlayerID];
             if (!target || !target.isAlive || targetPlayerID === ctx.currentPlayer)
               return INVALID_MOVE;
+            // 与普通路径同一套层数限制：只有刺客之王不要求同层（意念判官不具备摩羯 / 恐怖分子的豁免）
+            if (violatesShootLayerLimit(G, self, target, cardId !== 'action_shoot_assassin'))
+              return INVALID_MOVE;
 
             // 死亡宣言校验
             const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
@@ -775,8 +781,12 @@ export const InceptionCityGame = {
                 moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
-              action_shoot_king: { deathFaces: [1, 2], moveFaces: [3, 4, 5], extraOnMove: null },
-              action_shoot_armor: {
+              action_shoot_assassin: {
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: null,
+              },
+              action_shoot_drill: {
                 deathFaces: [1, 2],
                 moveFaces: [3, 4, 5],
                 extraOnMove: 'discard_unlocks',
@@ -885,7 +895,7 @@ export const InceptionCityGame = {
         playNightmareUnlock: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, layer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_nightmare_unlock') return INVALID_MOVE;
+            if (!isCardForPlayMove('playNightmareUnlock', cardId)) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (!self.hand.includes(cardId)) return INVALID_MOVE;
@@ -993,7 +1003,7 @@ export const InceptionCityGame = {
             // 允许任意阶段使用（manual: 你的任意阶段）
             if (G.phase !== 'playing') return INVALID_MOVE;
             if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
-            if (cardId !== 'action_shift') return INVALID_MOVE;
+            if (!isCardForPlayMove('playShift', cardId)) return INVALID_MOVE;
             if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetPlayerID];
@@ -1044,7 +1054,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_shoot_dream_transit') return INVALID_MOVE;
+            if (!isCardForPlayMove('playShootDreamTransit', cardId)) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             if (!self || !self.isAlive) return INVALID_MOVE;
             if (!self.hand.includes(cardId)) return INVALID_MOVE;
@@ -1083,7 +1093,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_shoot_king') return INVALID_MOVE;
+            if (!isCardForPlayMove('playShootKing', cardId)) return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: false,
               deathFaces: [1, 2],
@@ -1103,7 +1113,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_shoot_armor') return INVALID_MOVE;
+            if (!isCardForPlayMove('playShootArmor', cardId)) return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
               deathFaces: [1, 2],
@@ -1123,7 +1133,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_shoot_burst') return INVALID_MOVE;
+            if (!isCardForPlayMove('playShootBurst', cardId)) return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
               deathFaces: [1, 2],
@@ -1193,13 +1203,13 @@ export const InceptionCityGame = {
                 moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
-              action_shoot_king: {
+              action_shoot_assassin: {
                 sameLayerRequired: false,
                 deathFaces: [1, 2],
                 moveFaces: [3, 4, 5],
                 extraOnMove: null,
               },
-              action_shoot_armor: {
+              action_shoot_drill: {
                 sameLayerRequired: true,
                 deathFaces: [1, 2],
                 moveFaces: [3, 4, 5],
@@ -1238,6 +1248,7 @@ export const InceptionCityGame = {
         playUnlock: {
           move: ({ G, ctx, random }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playUnlock', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (player.faction !== 'thief') return INVALID_MOVE;
@@ -1413,6 +1424,7 @@ export const InceptionCityGame = {
         playDreamTransit: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playDreamTransit', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
@@ -1435,6 +1447,7 @@ export const InceptionCityGame = {
         playKick: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playKick', cardId)) return INVALID_MOVE;
             if (isMazeBlocked(G, targetPlayerID, 'playKick')) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetPlayerID];
@@ -1465,6 +1478,7 @@ export const InceptionCityGame = {
         playTelekinesis: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playTelekinesis', cardId)) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
             const target = G.players[targetPlayerID];
             if (!self || !target) return INVALID_MOVE;
@@ -1491,7 +1505,7 @@ export const InceptionCityGame = {
         playPeek: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetLayer: number) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_dream_peek') return INVALID_MOVE;
+            if (!isCardForPlayMove('playPeek', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             // 效果①仅盗梦者；梦主效果②通过独立 move 处理（F10 待实装）
@@ -1595,7 +1609,7 @@ export const InceptionCityGame = {
         playPeekMaster: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetThiefID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_dream_peek') return INVALID_MOVE;
+            if (!isCardForPlayMove('playPeekMaster', cardId)) return INVALID_MOVE;
             if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
             const master = G.players[ctx.currentPlayer];
             if (!master || !master.isAlive) return INVALID_MOVE;
@@ -1906,6 +1920,7 @@ export const InceptionCityGame = {
         playGraft: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playGraft', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
@@ -1956,6 +1971,7 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetIds: string[]) => {
             if (!isStringArray(targetIds)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playGravity', cardId)) return INVALID_MOVE;
             for (const tid of targetIds) {
               if (isMazeBlocked(G, tid, 'playGravity')) return INVALID_MOVE;
             }
@@ -2050,6 +2066,7 @@ export const InceptionCityGame = {
         playResonance: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playResonance', cardId)) return INVALID_MOVE;
             if (isMazeBlocked(G, targetPlayerID, 'playResonance')) return INVALID_MOVE;
             // 每回合限 1 张
             if (G.pendingResonance) return INVALID_MOVE;
@@ -2094,7 +2111,7 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
-            if (cardId !== 'action_time_storm') return INVALID_MOVE;
+            if (!isCardForPlayMove('playTimeStorm', cardId)) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
 
             // 从手牌中移除该牌（注：此牌效果结算后"移出游戏"，不入弃牌堆）
@@ -2130,6 +2147,7 @@ export const InceptionCityGame = {
         playCreation: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
+            if (!isCardForPlayMove('playCreation', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
@@ -3232,6 +3250,27 @@ interface ShootVariantOpts {
 /** SHOOT 变体共享结算：kill/move/miss + 可选 on-move 弃牌副作用 + 死亡宣言
  *  对照：docs/manual/04-action-cards.md SHOOT 变体 + 死亡宣言
  */
+/**
+ * SHOOT 类牌的目标层数限制：要求同层的牌打向别的层时是否违规。
+ * 摩羯·节奏：手牌数 >= 所在层数字时，SHOOT 类不受层数限制
+ * 恐怖分子·远程：被动免除层数限制
+ * 木星·巅峰世界观：SHOOT 类可对相邻层使用
+ * 对照：docs/manual/04-action-cards.md SHOOT 使用目标
+ */
+function violatesShootLayerLimit(
+  G: SetupState,
+  shooter: PlayerSetup,
+  target: PlayerSetup,
+  sameLayerRequired: boolean,
+): boolean {
+  if (!sameLayerRequired || shooter.currentLayer === target.currentLayer) return false;
+  const jupiterRelaxed =
+    isJupiterPeakWorldActive(G) && isJupiterPeakLayerOK(shooter.currentLayer, target.currentLayer);
+  return (
+    !isCapricornusRhythmActive(shooter) && !isTerroristCrossLayerActive(shooter) && !jupiterRelaxed
+  );
+}
+
 function applyShootVariant(
   G: SetupState,
   ctx: BGIOCtx,
@@ -3252,21 +3291,7 @@ function applyShootVariant(
   if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
   if (!target.isAlive) return INVALID_MOVE;
   if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
-  if (opts.sameLayerRequired && shooter.currentLayer !== target.currentLayer) {
-    // 摩羯·节奏：手牌数 >= 所在层数字时，SHOOT 类不受层数限制
-    // 恐怖分子·远程：被动免除层数限制
-    // 木星·巅峰世界观：SHOOT 类可对相邻层使用
-    const jupiterRelaxed =
-      isJupiterPeakWorldActive(G) &&
-      isJupiterPeakLayerOK(shooter.currentLayer, target.currentLayer);
-    if (
-      !isCapricornusRhythmActive(shooter) &&
-      !isTerroristCrossLayerActive(shooter) &&
-      !jupiterRelaxed
-    ) {
-      return INVALID_MOVE;
-    }
-  }
+  if (violatesShootLayerLimit(G, shooter, target, opts.sameLayerRequired)) return INVALID_MOVE;
 
   // 死亡宣言校验 + 附加死亡面
   const decreeCheck = validateDecree(G, ctx.currentPlayer, opts.decreeId);
@@ -3336,7 +3361,8 @@ function applyShootVariant(
   // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪道具；§111 印证 M4 先于效果处理
   // 仅在"未被角色技能重写骰值"的通用路径生效，不影响灵雕师 override / 天蝎毒针等特殊处理
   //   （这些路径的 shooter 都是盗梦者，M4 本来就不触发）
-  const shooterIsMaster = shooter.faction === 'master';
+  // M4 卡宾枪属于梦主本人，背叛者（梦主阵营的原盗梦者）没有
+  const shooterIsMaster = ctx.currentPlayer === G.dreamMasterID;
   const postM4Roll = applyM4CarbineModifier(shooterIsMaster, baseRoll);
 
   // 记录原始骰值供客户端骰子动画使用（展示未修饰的真实 D6 结果）
@@ -3440,13 +3466,7 @@ function applyShootVariant(
       const dropped: CardID[] = [];
       for (const id of tp.hand) {
         const shouldDrop =
-          opts.extraOnMove === 'discard_unlocks'
-            ? id === 'action_unlock'
-            : id === 'action_shoot' ||
-              id === 'action_shoot_king' ||
-              id === 'action_shoot_armor' ||
-              id === 'action_shoot_burst' ||
-              id === 'action_shoot_dream_transit';
+          opts.extraOnMove === 'discard_unlocks' ? id === 'action_unlock' : isShootClassCard(id);
         (shouldDrop ? dropped : keep).push(id);
       }
       if (dropped.length > 0) {

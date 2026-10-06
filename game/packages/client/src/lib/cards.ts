@@ -77,10 +77,10 @@ export function actionMoveFor(id: string): ActionMoveSpec | null {
   if (action.id === 'action_nightmare_unlock') {
     return { move: 'playNightmareUnlock', needsTarget: 'layer', argOrder: 'card_first' };
   }
-  if (action.id === 'action_shoot_king') {
+  if (action.id === 'action_shoot_assassin') {
     return { move: 'playShootKing', needsTarget: 'player', argOrder: 'target_first' };
   }
-  if (action.id === 'action_shoot_armor') {
+  if (action.id === 'action_shoot_drill') {
     return { move: 'playShootArmor', needsTarget: 'player', argOrder: 'target_first' };
   }
   if (action.id === 'action_shoot_burst') {
@@ -104,8 +104,5 @@ export function actionMoveFor(id: string): ActionMoveSpec | null {
   if (action.id === 'action_death_decree_3') return null;
   if (action.id === 'action_death_decree_4') return null;
   if (action.id === 'action_death_decree_5') return null;
-  if (action.subType?.startsWith('shoot_')) {
-    return { move: 'playShoot', needsTarget: 'player', argOrder: 'target_first' };
-  }
   return null;
 }

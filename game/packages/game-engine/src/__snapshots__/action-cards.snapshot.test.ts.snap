@@ -282,7 +282,7 @@ exports[`行动牌快照回归 · 21 卡 > 4. playShootKing · 跨层 · 骰 1 �
   "currentPlayerID": "p1",
   "deckSize": 20,
   "discardPile": [
-    "action_shoot_king",
+    "action_shoot_assassin",
   ],
   "layers": {
     "0": {
@@ -379,7 +379,7 @@ exports[`行动牌快照回归 · 21 卡 > 5. playShootArmor · 骰 4 → target
   "currentPlayerID": "p1",
   "deckSize": 20,
   "discardPile": [
-    "action_shoot_armor",
+    "action_shoot_drill",
     "action_unlock",
     "action_unlock",
   ],
@@ -475,8 +475,8 @@ exports[`行动牌快照回归 · 21 卡 > 6. playShootBurst · 骰 5 → target
   "discardPile": [
     "action_shoot_burst",
     "action_shoot",
-    "action_shoot_king",
-    "action_shoot_armor",
+    "action_shoot_assassin",
+    "action_shoot_drill",
   ],
   "layers": {
     "1": {

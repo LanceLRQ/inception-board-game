@@ -951,15 +951,23 @@ export function applyVirgoTeleport(
 // 弃 1 SHOOT 类牌；同层 1 玩家在其下回合结束前不受行动牌+技能影响、不能移动
 export const ARCHITECT_SKILL_ID = 'thief_architect.skill_0';
 
-/** 是否 SHOOT 类牌（迷宫弃牌门禁） */
+/**
+ * SHOOT 类牌的 id（与牌库配置一致：SHOOT / 刺客之王 / 爆甲螺旋 / 炸裂弹头 / 梦境穿梭剂）。
+ * 引擎里所有「SHOOT 类」的判断都复用 isShootClassCard，不要各自再列清单。
+ * 死亡宣言只作为附加牌随 SHOOT 打出、不单独出，不在此列。
+ * 对照：docs/manual/04-action-cards.md；docs/manual/06-dream-master.md 梦境穿梭剂视为 SHOOT 类
+ */
+const SHOOT_CLASS_CARD_IDS: ReadonlySet<string> = new Set([
+  'action_shoot',
+  'action_shoot_assassin',
+  'action_shoot_drill',
+  'action_shoot_burst',
+  'action_shoot_dream_transit',
+]);
+
+/** 是否 SHOOT 类牌（迷宫弃牌门禁、炸裂弹头弃牌等） */
 export function isShootClassCard(cardId: CardID): boolean {
-  return (
-    cardId === 'action_shoot' ||
-    cardId === 'action_shoot_king' ||
-    cardId === 'action_shoot_armor' ||
-    cardId === 'action_shoot_burst' ||
-    cardId === 'action_shoot_dream_transit'
-  );
+  return SHOOT_CLASS_CARD_IDS.has(cardId);
 }
 
 // 迷宫允许的行动牌（对照：docs/manual/05-dream-thieves.md 筑梦师）
@@ -1749,14 +1757,7 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
   if (player.characterId !== 'thief_green_ray') return false;
   if (!player.isAlive) return false;
   const hasTransit = player.hand.some((c) => c === 'action_dream_transit');
-  const hasShoot = player.hand.some(
-    (c) =>
-      c === 'action_shoot' ||
-      c === 'action_shoot_king' ||
-      c === 'action_shoot_armor' ||
-      c === 'action_shoot_burst' ||
-      c === 'action_shoot_dream_transit',
-  );
+  const hasShoot = player.hand.some(isShootClassCard);
   return hasTransit && hasShoot;
 }
 
@@ -1766,13 +1767,13 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
 // 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
 // 对照：docs/manual/06-dream-master.md
 
-/** 找当前梦主玩家 ID（faction === 'master'，alive 优先） */
+/**
+ * 找当前梦主玩家 ID。以 dreamMasterID 为准：盗梦者收到成功贿赂牌后 faction 也会变成 master，
+ * 按阵营扫描会把座次靠前的背叛者认成梦主。
+ */
 export function findMasterID(state: SetupState): string | null {
-  for (const pid of state.playerOrder) {
-    const p = state.players[pid];
-    if (p?.faction === 'master') return pid;
-  }
-  return null;
+  const id = state.dreamMasterID;
+  return id && state.players[id] ? id : null;
 }
 
 /** 找当前梦主角色 ID */
@@ -2848,18 +2849,11 @@ export function applyRevive(
 // 弃 2 张牌，重复执行本回合内之前用过的 SHOOT/KICK 效果
 export const VENUS_MIRROR_WORLD_SKILL_ID = 'dm_venus_mirror.world_0';
 
-// 可复制的行动牌前缀
-const MIRRORABLE_SHOOT_PREFIXES = [
-  'action_shoot',
-  'action_shoot_king',
-  'action_shoot_armor',
-  'action_shoot_burst',
-  'action_shoot_dream_transit',
-];
+// 可复制的行动牌：SHOOT 类 + KICK
 const MIRRORABLE_KICK = 'action_kick';
 
 function isMirrorableCard(cardId: CardID): boolean {
-  return MIRRORABLE_SHOOT_PREFIXES.includes(cardId) || cardId === MIRRORABLE_KICK;
+  return isShootClassCard(cardId) || cardId === MIRRORABLE_KICK;
 }
 
 export function applyVenusMirrorWorld(

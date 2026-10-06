@@ -113,16 +113,16 @@ describe('playGreenRayArrest move', () => {
         ...s.players,
         p1: {
           ...s.players.p1!,
-          hand: ['action_dream_transit' as CardID, 'action_shoot_king' as CardID],
+          hand: ['action_dream_transit' as CardID, 'action_shoot_assassin' as CardID],
         },
       },
     };
-    const r = callMove(s, 'playGreenRayArrest', ['action_shoot_king', 'p2', 4], {
+    const r = callMove(s, 'playGreenRayArrest', ['action_shoot_assassin', 'p2', 4], {
       currentPlayer: 'p1',
     });
     expectMoveOk(r);
     expect(r.players.p1!.currentLayer).toBe(4);
-    expect(r.playedCardsThisTurn).toContain('action_shoot_king');
+    expect(r.playedCardsThisTurn).toContain('action_shoot_assassin');
   });
 
   it('使用 SHOOT·爆甲螺旋 → 正确结算', () => {

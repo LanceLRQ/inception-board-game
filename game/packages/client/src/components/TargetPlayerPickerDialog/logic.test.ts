@@ -6,11 +6,11 @@ describe('TargetPlayerPickerDialog · logic', () => {
     it('action_shoot → 同层', () => {
       expect(isSameLayerRequired('action_shoot')).toBe(true);
     });
-    it('action_shoot_king → 跨层', () => {
-      expect(isSameLayerRequired('action_shoot_king')).toBe(false);
+    it('action_shoot_assassin → 跨层', () => {
+      expect(isSameLayerRequired('action_shoot_assassin')).toBe(false);
     });
-    it('action_shoot_armor / burst / dream_transit → 同层', () => {
-      expect(isSameLayerRequired('action_shoot_armor')).toBe(true);
+    it('action_shoot_drill / burst / dream_transit → 同层', () => {
+      expect(isSameLayerRequired('action_shoot_drill')).toBe(true);
       expect(isSameLayerRequired('action_shoot_burst')).toBe(true);
       expect(isSameLayerRequired('action_shoot_dream_transit')).toBe(true);
     });
@@ -56,7 +56,7 @@ describe('TargetPlayerPickerDialog · logic', () => {
 
     it('刺客之王：跨层目标全部 enabled', () => {
       const opts = computeTargetOptions({
-        cardId: 'action_shoot_king',
+        cardId: 'action_shoot_assassin',
         viewerLayer: 2,
         viewerPlayerID: '0',
         players,

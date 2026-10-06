@@ -308,7 +308,7 @@ describe('雅典娜 · 惊叹（thief_athena · 2/2 技能）', () => {
       'action_creation',
       'action_peek',
     ] as CardID[]);
-    s = setHand(s, 'p2', ['action_shoot_king'] as CardID[]);
+    s = setHand(s, 'p2', ['action_shoot_assassin'] as CardID[]);
     s = {
       ...s,
       deck: { cards: ['action_shoot'] as CardID[], discardPile: [] },
@@ -321,7 +321,7 @@ describe('雅典娜 · 惊叹（thief_athena · 2/2 技能）', () => {
     );
     expect(r).not.toBeNull();
     expect(r!.players.p2!.isAlive).toBe(false);
-    expect(r!.players.p1!.hand).toContain('action_shoot_king');
+    expect(r!.players.p1!.hand).toContain('action_shoot_assassin');
     expect(r!.players.p1!.skillUsedThisTurn[ATHENA_AWE_SKILL_ID]).toBe(1);
   });
 
@@ -405,8 +405,8 @@ describe('处女 · 完美 触发条件（thief_virgo）', () => {
 describe('筑梦师 · 迷宫 SHOOT 类判定（thief_architect）', () => {
   it('SHOOT 5 变体均判 true', () => {
     expect(isShootClassCard('action_shoot' as CardID)).toBe(true);
-    expect(isShootClassCard('action_shoot_king' as CardID)).toBe(true);
-    expect(isShootClassCard('action_shoot_armor' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_assassin' as CardID)).toBe(true);
+    expect(isShootClassCard('action_shoot_drill' as CardID)).toBe(true);
     expect(isShootClassCard('action_shoot_burst' as CardID)).toBe(true);
     expect(isShootClassCard('action_shoot_dream_transit' as CardID)).toBe(true);
   });

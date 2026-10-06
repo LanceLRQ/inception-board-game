@@ -70,7 +70,7 @@ describe('真人对手显示昵称', () => {
     const { sc, view, opponent } = withHumanOpponent();
     expect(nicknameMap(view.players)[opponent]).toBe('小明');
     const options = computeTargetOptions({
-      cardId: 'action_shoot_king',
+      cardId: 'action_shoot_assassin',
       viewerLayer: 1,
       viewerPlayerID: sc.seat,
       players: view.players,

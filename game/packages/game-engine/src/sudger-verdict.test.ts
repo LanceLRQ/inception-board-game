@@ -108,9 +108,12 @@ describe('playShootSudger（第 1 步：掷双骰存 pending）', () => {
     let s = setupSudger();
     s = {
       ...s,
-      players: { ...s.players, p1: { ...s.players.p1!, hand: ['action_shoot_king' as CardID] } },
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, hand: ['action_shoot_assassin' as CardID] },
+      },
     };
-    const r = callMove(s, 'playShootSudger', ['p2', 'action_shoot_king'], {
+    const r = callMove(s, 'playShootSudger', ['p2', 'action_shoot_assassin'], {
       currentPlayer: 'p1',
       rolls: [2, 6],
     });

@@ -70,9 +70,9 @@ describe('天蝎 · 毒针接入 applyShootVariant', () => {
     // 实际上 SHOOT 默认 deathFaces=[1] moveFaces=[2..5] 6=miss，但天蝎差值最大 5，永不 miss。
     // 改为高 deathFaces 测试：用 playShootKing（deathFaces=[1,2]）观察差值=2 触发 kill
     let s = scorpiusBaseline();
-    s = setHand(s, 'p1', ['action_shoot_king'] as CardID[]);
+    s = setHand(s, 'p1', ['action_shoot_assassin'] as CardID[]);
     // 跨层（刺客之王不要求同层），p2 在 layer 1
-    const r = callMove(s, 'playShootKing', ['p2', 'action_shoot_king' as CardID], {
+    const r = callMove(s, 'playShootKing', ['p2', 'action_shoot_assassin' as CardID], {
       rolls: [3, 1],
     });
     expectMoveOk(r);
@@ -83,15 +83,17 @@ describe('天蝎 · 毒针接入 applyShootVariant', () => {
   it('回合限 1 次：第二张 SHOOT 不再触发双骰', () => {
     let s = scorpiusBaseline();
     // 用刺客之王（跨层 SHOOT）避免 move 后同层校验失败
-    s = setHand(s, 'p1', ['action_shoot_king', 'action_shoot_king'] as CardID[]);
+    s = setHand(s, 'p1', ['action_shoot_assassin', 'action_shoot_assassin'] as CardID[]);
     // 第 1 张：base=6, second=1 → diff=5 → 命中 moveFaces=[3,4,5] → move（消耗 1 次双骰）
-    const r1 = callMove(s, 'playShootKing', ['p2', 'action_shoot_king' as CardID], {
+    const r1 = callMove(s, 'playShootKing', ['p2', 'action_shoot_assassin' as CardID], {
       rolls: [6, 1],
     });
     expectMoveOk(r1);
     expect(r1.players.p1!.skillUsedThisTurn[SCORPIUS_SKILL_ID]).toBe(1);
     // 第 2 张：技能已用 → 走单骰；rolls=[6] → 6=miss
-    const r2 = callMove(r1, 'playShootKing', ['p2', 'action_shoot_king' as CardID], { rolls: [6] });
+    const r2 = callMove(r1, 'playShootKing', ['p2', 'action_shoot_assassin' as CardID], {
+      rolls: [6],
+    });
     expectMoveOk(r2);
     expect(r2.players.p2!.isAlive).toBe(true);
     // 第二次走单骰：rolls 只消费 1 颗（若双骰则会消费 2 颗导致结果不同）

@@ -10,7 +10,7 @@ import {
 describe('cardCategoryOf', () => {
   it('射击 / 踢 / 死亡宣言是攻击，两种解封是解封，其余是辅助', () => {
     expect(cardCategoryOf('action_shoot')).toBe('attack');
-    expect(cardCategoryOf('action_shoot_king')).toBe('attack');
+    expect(cardCategoryOf('action_shoot_assassin')).toBe('attack');
     expect(cardCategoryOf('action_kick')).toBe('attack');
     expect(cardCategoryOf('action_death_decree_3')).toBe('attack');
     expect(cardCategoryOf('action_unlock')).toBe('unlock');
