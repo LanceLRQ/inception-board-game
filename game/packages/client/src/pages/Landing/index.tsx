@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { CopyrightNotice, CopyrightModal } from '../../components/CopyrightNotice';
 import { hasAcknowledgedCopyright } from '../../lib/copyright';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function Landing() {
   // 首次渲染时一次性读取 localStorage（lazy init，避免 effect 中 setState）
@@ -14,13 +16,16 @@ export default function Landing() {
         <div className="flex gap-4">
           <a
             href="/local"
-            className="rounded-lg bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-acc-bright"
+            className={cn(buttonVariants({ variant: 'default' }), 'h-auto px-6 py-3 font-bold')}
           >
             单机练习
           </a>
           <a
             href="/lobby"
-            className="rounded-lg border border-line-strong px-6 py-3 font-bold text-foreground hover:bg-foreground/10"
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'h-auto border-line-strong px-6 py-3 font-bold',
+            )}
           >
             多人房间
           </a>

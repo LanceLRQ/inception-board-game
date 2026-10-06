@@ -5,12 +5,14 @@
 //
 // 梦境层固定按 4→1 排序（顶层数字大、底层数字小，贴合梦境越深层数越小的物理直觉）。
 
+import { TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { GameCard } from '../../../components/GameCard/index.js';
 import { diceSvgPath } from '../../../components/Dice3D/index.js';
 import { getCardImageUrl } from '../../../lib/cardImages.js';
 import { getCardName } from '../../../lib/cards.js';
 import { cn } from '../../../lib/utils.js';
+import { Dialog, DialogHeader, DialogTitle } from '../../../components/ui/dialog.js';
 import type { MockMatchState, MockVault } from '../../../hooks/useMockMatch.js';
 import type { CardID } from '@icgame/shared';
 
@@ -153,7 +155,10 @@ export function CenterPanel({
                   })()}
                 </div>
                 {layerState?.nightmareRevealed && (
-                  <span className="text-[9px] text-destructive">⚠ 梦魇已揭露</span>
+                  <span className="inline-flex items-center gap-0.5 text-[9px] text-destructive">
+                    <TriangleAlert className="h-2.5 w-2.5" aria-hidden />
+                    梦魇已揭露
+                  </span>
                 )}
               </div>
             </div>
@@ -228,61 +233,47 @@ export function CenterPanel({
         </button>
       </div>
 
-      {/* 弃牌历史弹层：最后打出的在最顶 */}
-      {showDiscard && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"
-          onClick={() => setShowDiscard(false)}
-          data-testid="discard-history-overlay"
-        >
-          <div
-            className="relative mx-4 max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line-strong bg-panel p-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-foreground">
-                过牌历史（{discardList.length} 张）
-              </h4>
-              <button
-                type="button"
-                onClick={() => setShowDiscard(false)}
-                className="rounded-full p-1 text-muted-foreground hover:bg-panel-2 hover:text-foreground"
-                aria-label="关闭"
+      {/* 弃牌历史弹层：最后打出的在最顶；点背景 / Esc / 右上角关闭 */}
+      <Dialog
+        open={showDiscard}
+        onOpenChange={setShowDiscard}
+        blocking={false}
+        size="md"
+        data-testid="discard-history-overlay"
+        className="max-h-[70vh] border-line-strong bg-panel"
+      >
+        <DialogHeader>
+          <DialogTitle className="text-sm text-foreground">
+            过牌历史（{discardList.length} 张）
+          </DialogTitle>
+        </DialogHeader>
+        {discardList.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">暂无弃牌</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {discardList.map((cardId, i) => (
+              <div
+                key={`${cardId}-${i}`}
+                className="flex items-center gap-3 rounded-lg border border-line-strong bg-panel/50 px-2 py-1.5"
               >
-                ✕
-              </button>
-            </div>
-            {discardList.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">暂无弃牌</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {discardList.map((cardId, i) => (
-                  <div
-                    key={`${cardId}-${i}`}
-                    className="flex items-center gap-3 rounded-lg border border-line-strong bg-panel/50 px-2 py-1.5"
-                  >
-                    <GameCard
-                      cardId={cardId}
-                      imageUrl={getCardImageUrl(cardId)}
-                      size="sm"
-                      orientation="portrait"
-                      disableDetail
-                    />
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-medium text-foreground">
-                        {getCardName(cardId)}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground">
-                        第 {discardList.length - i} 张
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                <GameCard
+                  cardId={cardId}
+                  imageUrl={getCardImageUrl(cardId)}
+                  size="sm"
+                  orientation="portrait"
+                  disableDetail
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium text-foreground">{getCardName(cardId)}</span>
+                  <span className="text-[9px] text-muted-foreground">
+                    第 {discardList.length - i} 张
+                  </span>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </Dialog>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, X } from 'lucide-react';
 import type { CardID } from '@icgame/shared';
+import { Button } from '../ui/button';
+import { Dialog } from '../ui/dialog';
 import { getCardImageUrl, getCardBackImageUrl, hasCardBackImage } from '../../lib/cardImages';
 import { getCardName, getCharacterSkillSummary } from '../../lib/cards';
 
@@ -34,23 +36,27 @@ function ModalContent({
   cardId,
   onClose,
   disableFlip = false,
+  active,
 }: {
   cardId: CardID;
   onClose: () => void;
   disableFlip?: boolean;
+  /** 弹层是否处于打开状态；关闭动画期间不再响应翻面快捷键 */
+  active: boolean;
 }) {
   const [showBack, setShowBack] = useState(false);
 
+  // Esc / 点背景关闭由 Dialog 处理，这里只负责 F 键翻面
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
       if (!disableFlip && (e.key === 'f' || e.key === 'F') && hasCardBackImage(cardId)) {
         setShowBack((v) => !v);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cardId, onClose, disableFlip]);
+  }, [cardId, disableFlip, active]);
 
   const hasBack = shouldShowFlipButton(cardId, disableFlip);
   const displayUrl = showBack ? getCardBackImageUrl(cardId) : getCardImageUrl(cardId);
@@ -58,110 +64,116 @@ function ModalContent({
   const displayName = getCardName(cardId);
 
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="卡牌详情"
-      data-testid="card-detail-modal"
-    >
-      <motion.div
-        className="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-card shadow-2xl"
-        initial={{ scale: 0.85, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.85, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
+    <>
+      {/* 关闭按钮 */}
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon-sm"
+        onClick={onClose}
+        className="absolute right-2 top-2 z-20 rounded-full bg-background/80"
+        aria-label="关闭"
+        data-testid="card-detail-close"
       >
-        {/* 关闭按钮 */}
-        <button
+        <X className="h-4 w-4" />
+      </Button>
+
+      {/* 翻面按钮（仅双面角色） */}
+      {hasBack && (
+        <Button
           type="button"
-          onClick={onClose}
-          className="absolute right-2 top-2 z-20 rounded-full bg-background/80 p-1.5 text-foreground hover:bg-background/80"
-          aria-label="关闭"
-          data-testid="card-detail-close"
+          size="xs"
+          onClick={() => setShowBack((v) => !v)}
+          className="absolute right-12 top-2 z-20 rounded-full text-[11px]"
+          aria-label="翻面"
+          data-testid="card-detail-flip"
+          title="按 F 键也可翻面"
         >
-          <X className="h-4 w-4" />
-        </button>
+          <RotateCw className="h-3 w-3" />
+          {showBack ? '看正面' : '看背面'}
+        </Button>
+      )}
 
-        {/* 翻面按钮（仅双面角色） */}
-        {hasBack && (
-          <button
-            type="button"
-            onClick={() => setShowBack((v) => !v)}
-            className="absolute right-12 top-2 z-20 flex items-center gap-1 rounded-full bg-primary/80 px-2 py-1 text-[11px] text-primary-foreground hover:bg-primary"
-            aria-label="翻面"
-            data-testid="card-detail-flip"
-            title="按 F 键也可翻面"
+      {/* 卡图（翻面动画） */}
+      <div className="flex items-center justify-center bg-gradient-to-br from-panel-2 to-background p-4">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={showBack ? 'back' : 'front'}
+            initial={{ rotateY: -90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            exit={{ rotateY: 90, opacity: 0 }}
+            transition={{ duration: 0.28 }}
+            style={{ perspective: 1000 }}
+            className="flex w-full max-w-[260px] items-center justify-center"
           >
-            <RotateCw className="h-3 w-3" />
-            {showBack ? '看正面' : '看背面'}
-          </button>
+            {displayUrl ? (
+              <img
+                src={displayUrl}
+                alt={displayName}
+                className="h-auto w-full rounded-md shadow-lg"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="flex h-60 w-full items-center justify-center rounded-md bg-panel-2 text-dim">
+                <span className="text-sm">{displayName || cardId}</span>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* 文字说明 */}
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+        <h3 className="text-lg font-semibold text-foreground">{summary?.name ?? displayName}</h3>
+        {summary?.skills.map((s) => (
+          <div key={s.name} className="rounded border border-border bg-muted/40 p-2">
+            <div className="mb-1 text-sm font-medium text-primary">{s.name}</div>
+            <p className="text-xs leading-relaxed text-muted-foreground">{s.description}</p>
+          </div>
+        ))}
+        {!summary && (
+          <p className="text-xs text-muted-foreground">
+            {cardId.startsWith('action_')
+              ? '行动牌，详细效果见规则说明'
+              : cardId.startsWith('nightmare_')
+                ? '梦魇牌，由梦主激活'
+                : '卡牌详情'}
+          </p>
         )}
-
-        {/* 卡图（翻面动画） */}
-        <div className="flex items-center justify-center bg-gradient-to-br from-panel-2 to-background p-4">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={showBack ? 'back' : 'front'}
-              initial={{ rotateY: -90, opacity: 0 }}
-              animate={{ rotateY: 0, opacity: 1 }}
-              exit={{ rotateY: 90, opacity: 0 }}
-              transition={{ duration: 0.28 }}
-              style={{ perspective: 1000 }}
-              className="flex w-full max-w-[260px] items-center justify-center"
-            >
-              {displayUrl ? (
-                <img
-                  src={displayUrl}
-                  alt={displayName}
-                  className="h-auto w-full rounded-md shadow-lg"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="flex h-60 w-full items-center justify-center rounded-md bg-panel-2 text-dim">
-                  <span className="text-sm">{displayName || cardId}</span>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* 文字说明 */}
-        <div className="flex-1 space-y-2 overflow-y-auto p-4">
-          <h3 className="text-lg font-semibold text-foreground">{summary?.name ?? displayName}</h3>
-          {summary?.skills.map((s) => (
-            <div key={s.name} className="rounded border border-border bg-muted/40 p-2">
-              <div className="mb-1 text-sm font-medium text-primary">{s.name}</div>
-              <p className="text-xs leading-relaxed text-muted-foreground">{s.description}</p>
-            </div>
-          ))}
-          {!summary && (
-            <p className="text-xs text-muted-foreground">
-              {cardId.startsWith('action_')
-                ? '行动牌，详细效果见规则说明'
-                : cardId.startsWith('nightmare_')
-                  ? '梦魇牌，由梦主激活'
-                  : '卡牌详情'}
-            </p>
-          )}
-        </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </>
   );
 }
 
 export function CardDetailModal({ cardId, onClose, disableFlip }: CardDetailModalProps) {
+  // 关闭过渡期间 cardId 已为 null，仍需渲染最后一张卡，否则内容会先消失再淡出
+  const [lastCardId, setLastCardId] = useState<CardID | null>(cardId);
+  if (cardId && cardId !== lastCardId) setLastCardId(cardId);
+  const displayId = cardId ?? lastCardId;
+
   return (
-    <AnimatePresence>
-      {cardId && (
-        <ModalContent key={cardId} cardId={cardId} onClose={onClose} disableFlip={disableFlip} />
+    <Dialog
+      open={Boolean(cardId)}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      blocking={false}
+      showClose={false}
+      aria-label="卡牌详情"
+      data-testid="card-detail-modal"
+      className="flex flex-col overflow-hidden p-0"
+    >
+      {displayId && (
+        <ModalContent
+          key={displayId}
+          cardId={displayId}
+          onClose={onClose}
+          disableFlip={disableFlip}
+          active={Boolean(cardId)}
+        />
       )}
-    </AnimatePresence>
+    </Dialog>
   );
 }

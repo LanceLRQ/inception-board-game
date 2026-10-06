@@ -4,9 +4,10 @@
 // 展开：全屏 Drawer，内部挂 MasterConsole（mobile-drawer layout）
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { cn } from '../../../lib/utils.js';
+import { Button } from '../../../components/ui/button.js';
+import { Sheet, SheetContent } from '../../../components/ui/sheet.js';
 import { MasterConsole } from '../shared/MasterConsole.js';
 import type { MockMatchState } from '../../../hooks/useMockMatch.js';
 
@@ -46,48 +47,39 @@ export function MasterPanelCollapsible({
         <ChevronDown className="h-4 w-4" aria-hidden />
       </button>
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            className="fixed inset-0 z-40 bg-background/80 p-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setExpanded(false)}
-            role="dialog"
-            aria-modal="true"
-            aria-label="梦主专区"
-            data-testid="master-panel-expanded"
-          >
-            <motion.div
-              initial={{ y: -40, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -40, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative"
+      <Sheet open={expanded} onOpenChange={setExpanded}>
+        <SheetContent
+          side="top"
+          showCloseButton={false}
+          aria-label="梦主专区"
+          data-testid="master-panel-expanded"
+          className="max-h-dvh gap-2 overflow-y-auto p-3"
+        >
+          <div className="relative">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              onClick={() => setExpanded(false)}
+              className="absolute right-2 top-2 z-10 rounded-full bg-background/80"
+              aria-label="收起"
             >
-              <button
-                type="button"
-                onClick={() => setExpanded(false)}
-                className="absolute right-2 top-2 z-10 rounded-full bg-background/80 p-1.5 text-foreground"
-                aria-label="收起"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <MasterConsole state={state} layout="mobile-drawer" onOpenDetail={onOpenDetail} />
-              <button
-                type="button"
-                onClick={() => setExpanded(false)}
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-md bg-card py-2 text-xs text-muted-foreground"
-              >
-                <ChevronUp className="h-3 w-3" aria-hidden />
-                收起
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <X className="h-4 w-4" />
+            </Button>
+            <MasterConsole state={state} layout="mobile-drawer" onOpenDetail={onOpenDetail} />
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setExpanded(false)}
+            className="w-full text-xs text-muted-foreground"
+          >
+            <ChevronUp className="h-3 w-3" aria-hidden />
+            收起
+          </Button>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

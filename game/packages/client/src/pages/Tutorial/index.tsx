@@ -8,6 +8,7 @@ import { TutorialOverlay } from '../../components/TutorialOverlay';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { useTutorialStore } from '../../stores/useTutorialStore';
 import { PartyPopper } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function Tutorial() {
   const progress = useTutorialStore((s) => s.progress);
@@ -36,23 +37,20 @@ export default function Tutorial() {
         </h1>
         <p className="mb-6 text-sm text-muted-foreground">已掌握基础规则，可以开始真正的对局啦～</p>
         <div className="flex gap-3">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => {
               reset();
               start(BASICS_TUTORIAL);
             }}
-            className="rounded-full border border-border px-4 py-2 text-sm hover:bg-muted"
+            className="rounded-full px-4"
           >
             重新教学
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="rounded-full bg-primary px-6 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-          >
+          </Button>
+          <Button type="button" onClick={() => navigate('/')} className="rounded-full px-6">
             返回首页
-          </button>
+          </Button>
         </div>
         <CopyrightNotice variant="footer" className="mt-8" />
       </div>

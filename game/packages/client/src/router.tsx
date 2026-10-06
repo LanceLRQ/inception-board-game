@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { lazy, Suspense } from 'react';
 import App from './App';
+import { RouteErrorFallback } from './components/ErrorBoundary';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Lobby = lazy(() => import('./pages/Lobby'));
@@ -23,6 +24,8 @@ function PageLoader() {
 export const router = createBrowserRouter([
   {
     element: <App />,
+    // 路由内的渲染错误与 404 都落到这里
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         path: '/',

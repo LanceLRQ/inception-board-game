@@ -7,6 +7,7 @@
 //   - 未翻露的盗梦者显示背面
 //   - isCurrent 时金色脉冲光
 
+import { Skull } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils.js';
 import { GameCard } from '../GameCard/index.js';
@@ -98,7 +99,9 @@ export function PlayerSeat({
           {player.isRevealed && !seat.isMaster && (
             <span className="ml-1 text-[9px] text-acc-bright">已翻</span>
           )}
-          {!player.isAlive && <span className="ml-1 text-[9px] text-destructive">💀</span>}
+          {!player.isAlive && (
+            <Skull className="ml-1 inline h-2.5 w-2.5 text-destructive" aria-label="已死亡" />
+          )}
         </span>
       </div>
     </motion.div>

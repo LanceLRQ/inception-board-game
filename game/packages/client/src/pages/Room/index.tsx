@@ -12,6 +12,7 @@ import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 import { isRoomMember, resolveGameRedirect } from './roomLogic';
+import { Button } from '@/components/ui/button';
 
 const POLL_INTERVAL_MS = 3_000;
 const MIN_PLAYERS = 3;
@@ -181,15 +182,16 @@ export default function Room() {
     <div className="mx-auto flex min-h-screen max-w-md flex-col gap-4 bg-background p-6 text-foreground">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">{t('room.title', { code: room.code })}</h1>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleLeave}
-          className="flex items-center gap-1 rounded-md border border-line-strong px-3 py-1.5 text-sm text-foreground hover:bg-foreground/10"
+          className="h-8 border-line-strong px-3"
           data-testid="room-leave"
         >
           <LogOut size={14} />
           {t('room.leave')}
-        </button>
+        </Button>
       </div>
 
       <button
@@ -246,27 +248,28 @@ export default function Room() {
       {isOwner ? (
         <div className="flex flex-col gap-2">
           {emptySeats > 0 && (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleFillAI}
               disabled={busy}
-              className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-2 font-bold text-foreground disabled:opacity-50"
+              className="h-10 gap-2 border-primary/50 bg-primary/20 px-4 font-bold text-foreground hover:bg-primary/30"
               data-testid="room-fill-ai"
             >
               <Bot size={16} />
               {t('room.fillAi')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             onClick={handleStart}
             disabled={busy || !canStart}
-            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 font-bold text-primary-foreground hover:bg-acc-bright disabled:opacity-50"
+            className="h-11 gap-2 px-4 font-bold"
             data-testid="room-start"
           >
             <Play size={16} />
             {t('room.start')}
-          </button>
+          </Button>
           {!canStart && (
             <p className="text-center text-xs text-dim">
               {t('room.needPlayers', { n: MIN_PLAYERS })}

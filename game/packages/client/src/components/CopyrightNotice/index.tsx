@@ -15,6 +15,8 @@ import {
   getTutorialCopyrightText,
 } from '../../lib/copyright';
 import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export interface CopyrightNoticeProps {
   readonly variant: 'footer' | 'full';
@@ -78,44 +80,30 @@ export function CopyrightModal({ open, onAcknowledge }: CopyrightModalProps) {
   const { t } = useTranslation();
   const [confirmed, setConfirmed] = useState(false);
 
-  if (!open) return null;
-
   const handleConfirm = () => {
     setConfirmed(true);
     acknowledgeCopyright();
     onAcknowledge();
   };
 
+  // 首次进入必须点按钮确认：不可点背景或按 Esc 关闭
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('copyright.modal_title', { defaultValue: '版权与使用声明' })}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
-    >
-      <div className="max-w-lg rounded-2xl bg-card p-6 shadow-2xl">
-        <h2 className="mb-3 text-lg font-bold text-foreground">
+    <Dialog open={open} blocking size="lg" className="p-6">
+      <DialogHeader>
+        <DialogTitle className="text-lg font-bold text-foreground">
           {t('copyright.modal_title', { defaultValue: '版权与使用声明' })}
-        </h2>
+        </DialogTitle>
+      </DialogHeader>
+      <DialogBody>
         <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
           {getTutorialCopyrightText()}
         </pre>
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            disabled={confirmed}
-            onClick={handleConfirm}
-            className={cn(
-              'rounded-full px-4 py-2 text-sm transition-colors',
-              confirmed
-                ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95',
-            )}
-          >
-            {t('copyright.ack', { defaultValue: '我已阅读并同意' })}
-          </button>
-        </div>
-      </div>
-    </div>
+      </DialogBody>
+      <DialogFooter>
+        <Button type="button" disabled={confirmed} onClick={handleConfirm} className="rounded-full">
+          {t('copyright.ack', { defaultValue: '我已阅读并同意' })}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

@@ -8,7 +8,7 @@
 //   - TargetPickerDialog（新 UI 路径）：由 useGameActions.intent.step='selectTarget' 驱动，显示角色卡面
 
 import { useEffect } from 'react';
-import { Target } from 'lucide-react';
+import { Target, Skull } from 'lucide-react';
 import {
   Dialog,
   DialogBody,
@@ -118,7 +118,9 @@ export function TargetPickerDialog({
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <LayerBadge layer={c.currentLayer} size="sm" />
-                    {!c.isAlive && <span className="text-destructive">💀</span>}
+                    {!c.isAlive && (
+                      <Skull className="h-3 w-3 text-destructive" aria-label="已死亡" />
+                    )}
                     {c.isRevealed && <span className="text-acc-bright">已翻</span>}
                   </div>
                 </button>

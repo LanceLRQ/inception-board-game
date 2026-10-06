@@ -9,6 +9,13 @@
   "a11y": {
     "skip_to_main": "跳到主内容"
   },
+  "error": {
+    "title": "页面出了点问题",
+    "description": "发生了意料之外的错误。可以重新加载页面，或回到首页再试一次。",
+    "reload": "重新加载",
+    "home": "返回首页",
+    "not_found": "页面不存在"
+  },
   "landing": {
     "title": "盗梦都市",
     "subtitle": "Inception City Online",

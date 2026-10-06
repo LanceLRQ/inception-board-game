@@ -1,6 +1,7 @@
 // ReportButton - 举报按钮（配合 ReportDialog 弹窗）
 // 举报入口
 
+import { Flag } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReportDialog, type ReportReason } from './ReportDialog';
@@ -63,7 +64,8 @@ export function ReportButton({
         )}
         aria-label={t('report.button_aria', { defaultValue: '举报玩家' })}
       >
-        ⚠️ {t('report.button', { defaultValue: '举报' })}
+        <Flag className="h-3.5 w-3.5" aria-hidden />
+        {t('report.button', { defaultValue: '举报' })}
       </button>
 
       {open ? (

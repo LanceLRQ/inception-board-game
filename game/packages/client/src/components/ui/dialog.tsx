@@ -32,6 +32,8 @@ export interface DialogProps {
   /** 是否渲染右上角 × 关闭按钮（blocking=true 默认不显示；blocking=false 默认显示） */
   showClose?: boolean;
   'data-testid'?: string;
+  /** 无可见标题时用来给对话框命名；有 DialogTitle 时不需要 */
+  'aria-label'?: string;
   className?: string;
   children?: React.ReactNode;
 }
@@ -49,6 +51,7 @@ export function Dialog({
   size = 'md',
   showClose,
   'data-testid': testId,
+  'aria-label': ariaLabel,
   className,
   children,
 }: DialogProps) {
@@ -72,6 +75,7 @@ export function Dialog({
         />
         <BaseDialog.Popup
           data-testid={testId}
+          aria-label={ariaLabel}
           // blocking=true 时禁用 ESC 关闭：在 keydown 捕获阶段拦截
           onKeyDown={(e) => {
             if (blocking && e.key === 'Escape') {

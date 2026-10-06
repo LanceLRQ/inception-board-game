@@ -20,6 +20,7 @@ import {
   isRecoveryCodeComplete,
   recoverErrorKey,
 } from '../../lib/recoveryCode';
+import { Button } from '@/components/ui/button';
 
 /** 待展示的恢复码；只存在于本页组件状态里，确认后即丢弃 */
 interface PendingRecoveryCode {
@@ -180,27 +181,28 @@ export default function Lobby() {
             {error}
           </div>
         )}
-        <button
+        <Button
           type="button"
           onClick={handleInitIdentity}
           disabled={loading || inputNickname.trim().length < 2}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-acc-bright disabled:opacity-50"
+          className="h-10 gap-2 px-4 font-bold"
         >
           {t('lobby.continue')}
           <ArrowRight size={16} />
-        </button>
+        </Button>
 
         <div className="mt-4 border-t border-line pt-4">
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => setRestoreOpen((v) => !v)}
             aria-expanded={restoreOpen}
-            className="flex items-center gap-2 text-sm text-dim underline-offset-4 hover:underline"
+            className="h-auto gap-2 p-0 text-sm text-dim"
             data-testid="lobby-restore-toggle"
           >
             <KeyRound size={14} />
             {t('recovery.restore.entry')}
-          </button>
+          </Button>
           {restoreOpen && (
             <div className="mt-3 flex flex-col gap-2">
               <label className="text-sm text-dim" htmlFor="lobby-restore-code">
@@ -229,15 +231,16 @@ export default function Lobby() {
                   {restoreError}
                 </div>
               )}
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={handleRestore}
                 disabled={loading || !isRecoveryCodeComplete(restoreInput)}
-                className="rounded-md border border-line-strong px-4 py-2 font-bold text-foreground disabled:opacity-50"
+                className="h-10 border-line-strong px-4 font-bold"
                 data-testid="lobby-restore-submit"
               >
                 {t('recovery.restore.submit')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -256,15 +259,16 @@ export default function Lobby() {
       </div>
 
       {resumable && (
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleResume}
-          className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-3 font-bold text-foreground"
+          className="h-11 gap-2 border-primary/50 bg-primary/20 px-4 font-bold text-foreground hover:bg-primary/30"
           data-testid="resume-online-match"
         >
           <RotateCcw size={16} />
           {t('lobby.resume_match', { defaultValue: '回到对局' })}
-        </button>
+        </Button>
       )}
 
       <section className="rounded-lg border border-line bg-panel p-4">
@@ -287,15 +291,15 @@ export default function Lobby() {
             </option>
           ))}
         </select>
-        <button
+        <Button
           type="button"
           onClick={handleCreateRoom}
           disabled={loading}
-          className="w-full rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-acc-bright disabled:opacity-50"
+          className="h-10 w-full px-4 font-bold"
           data-testid="lobby-create"
         >
           {t('lobby.createRoom')}
-        </button>
+        </Button>
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-4">
@@ -315,15 +319,16 @@ export default function Lobby() {
           onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
           maxLength={6}
         />
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleJoinRoom}
           disabled={loading || joinCode.length !== 6}
-          className="w-full rounded-md border border-line-strong px-4 py-2 font-bold text-foreground disabled:opacity-50"
+          className="h-10 w-full border-line-strong px-4 font-bold"
           data-testid="lobby-join"
         >
           {t('lobby.joinRoom')}
-        </button>
+        </Button>
       </section>
 
       {error && (

@@ -3,7 +3,10 @@
 
 import { useTranslation } from 'react-i18next';
 import type { TutorialStep } from '@icgame/shared';
-import { cn } from '../../lib/utils.js';
+import { X } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Dialog, DialogTitle } from '../ui/dialog';
+import { Progress } from '../ui/progress';
 
 export interface TutorialOverlayProps {
   readonly step: TutorialStep;
@@ -27,96 +30,75 @@ export function TutorialOverlay({
   const { t } = useTranslation();
   const percent = Math.round(((currentIndex + 1) / totalSteps) * 100);
 
+  // 教学气泡不能点背景或按 Esc 关闭：只能走「跳过教学」或右上角关闭按钮
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tutorial-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
+    <Dialog
+      open
+      blocking
+      size="md"
+      aria-label={step.title ? undefined : t('tutorial.aria_label', { defaultValue: '新手教学' })}
+      className="p-6"
     >
-      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl">
-        {/* 顶部进度 */}
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {t('tutorial.step_count', {
-              defaultValue: '第 {{current}} / {{total}} 步',
-              current: currentIndex + 1,
-              total: totalSteps,
-            })}
-          </span>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('common.close', { defaultValue: '关闭' })}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        <div
-          className="mb-4 h-1 w-full overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div
-            className="h-full bg-primary transition-[width] duration-200"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-
-        {/* 标题 + 正文 */}
-        {step.title && (
-          <h2 id="tutorial-title" className="mb-2 text-lg font-bold text-foreground">
-            {step.title}
-          </h2>
-        )}
-        <p className="mb-6 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
-          {step.body}
-        </p>
-
-        {/* 操作区 */}
-        {step.kind === 'choice' && step.choices ? (
-          <div className="space-y-2">
-            {step.choices.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onChoose(c.id)}
-                className={cn(
-                  'w-full rounded-lg border border-border px-4 py-2 text-sm text-foreground transition-colors',
-                  'hover:bg-primary/10 hover:border-primary',
-                )}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="flex justify-between">
-            <button
-              type="button"
-              onClick={onSkip}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {t('tutorial.skip', { defaultValue: '跳过教学' })}
-            </button>
-            <button
-              type="button"
-              onClick={onNext}
-              className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              {currentIndex + 1 >= totalSteps
-                ? t('tutorial.finish', { defaultValue: '完成' })
-                : t('tutorial.next', { defaultValue: '继续' })}
-            </button>
-          </div>
+      {/* 顶部进度 */}
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {t('tutorial.step_count', {
+            defaultValue: '第 {{current}} / {{total}} 步',
+            current: currentIndex + 1,
+            total: totalSteps,
+          })}
+        </span>
+        {onClose && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={onClose}
+            aria-label={t('common.close', { defaultValue: '关闭' })}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </Button>
         )}
       </div>
-    </div>
+
+      <Progress value={percent} className="mb-4" />
+
+      {/* 标题 + 正文 */}
+      {step.title && (
+        <DialogTitle className="mb-2 text-lg font-bold text-foreground">{step.title}</DialogTitle>
+      )}
+      <p className="mb-6 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+        {step.body}
+      </p>
+
+      {/* 操作区 */}
+      {step.kind === 'choice' && step.choices ? (
+        <div className="space-y-2">
+          {step.choices.map((c) => (
+            <Button
+              key={c.id}
+              type="button"
+              variant="outline"
+              onClick={() => onChoose(c.id)}
+              className="h-auto w-full px-4 py-2 hover:border-primary hover:bg-primary/10"
+            >
+              {c.label}
+            </Button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <Button type="button" variant="ghost" onClick={onSkip} className="text-muted-foreground">
+            {t('tutorial.skip', { defaultValue: '跳过教学' })}
+          </Button>
+          <Button type="button" onClick={onNext} className="rounded-full px-6">
+            {currentIndex + 1 >= totalSteps
+              ? t('tutorial.finish', { defaultValue: '完成' })
+              : t('tutorial.next', { defaultValue: '继续' })}
+          </Button>
+        </div>
+      )}
+    </Dialog>
   );
 }
