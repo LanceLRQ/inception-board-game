@@ -18,6 +18,8 @@ export const RedisKeys = {
   shortLink: (code: string) => `${PREFIX}:link:${code}`,
   // 恢复码失败计数（按来源地址）
   recoverFailures: (ip: string) => `${PREFIX}:recover:fail:${ip}`,
+  // 恢复码失败计数（全站）
+  recoverFailuresGlobal: () => `${PREFIX}:recover:fail-global`,
   rateLimit: (key: string) => `${PREFIX}:ratelimit:${key}`,
   matchmakingQueue: () => `${PREFIX}:matchmaking:queue`,
 } as const;

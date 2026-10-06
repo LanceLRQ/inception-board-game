@@ -9,7 +9,12 @@ import { RedisMatchStore } from './match/MatchStore.js';
 import { isOperatorTokenTooShort, MIN_OPERATOR_TOKEN_LENGTH } from './middleware/operatorAuth.js';
 import { parseOrigins } from './middleware/cors.js';
 import { resolveRecoveryPepper } from './infra/recoveryCode.js';
-import { RedisRecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js';
+import { resolveJwtSecret } from './infra/jwt.js';
+import {
+  FallbackRecoverAttemptLimiter,
+  InMemoryRecoverAttemptLimiter,
+  RedisRecoverAttemptLimiter,
+} from './services/RecoverAttemptLimiter.js';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
@@ -18,6 +23,14 @@ try {
   resolveRecoveryPepper(process.env);
 } catch (err) {
   logger.error({ err }, 'recovery code pepper missing');
+  process.exit(1);
+}
+
+// 生产环境缺少令牌签名密钥或密钥过短时直接退出，避免用公开的开发值签发令牌
+try {
+  resolveJwtSecret(process.env);
+} catch (err) {
+  logger.error({ err }, 'jwt secret missing or too short');
   process.exit(1);
 }
 
@@ -35,7 +48,10 @@ const realtime = buildRealtime({
   lobbyRedis: redis,
   lobbyPrisma: prisma,
   heartbeatRedis: redis,
-  recoverLimiter: new RedisRecoverAttemptLimiter(redis),
+  recoverLimiter: new FallbackRecoverAttemptLimiter(
+    new RedisRecoverAttemptLimiter(redis),
+    new InMemoryRecoverAttemptLimiter(),
+  ),
   timing: timingFromEnv(process.env),
   ws: {
     corsOrigin: parseOrigins(process.env.WS_CORS_ORIGIN ?? '*'),

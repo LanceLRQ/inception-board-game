@@ -3,7 +3,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { logger } from '../infra/logger.js';
 import { prisma as defaultPrisma } from '../infra/postgres.js';
-import { signToken } from '../infra/jwt.js';
+import { signToken, tokenExpiresAt } from '../infra/jwt.js';
 import { nicknameSchema } from '../infra/nicknameSchema.js';
 import {
   generateRecoveryCode,
@@ -93,8 +93,9 @@ export function createIdentityRouter(
   // POST /identity/init - 首次访问建档
   const initSchema = z.object({
     nickname: nicknameSchema.default('旅行者'),
-    locale: z.string().default('zh-CN'),
-    fingerprint: z.string().optional(),
+    // 长度上限与数据库列宽一致，超长在入口就拒绝，不要落成 500
+    locale: z.string().max(10).default('zh-CN'),
+    fingerprint: z.string().max(128).optional(),
   });
 
   router.post('/identity/init', async (ctx) => {
@@ -127,7 +128,7 @@ export function createIdentityRouter(
       playerId: player.id,
       nickname: player.nickname,
       token,
-      expiresAt: Date.now() + 30 * 24 * 3600 * 1000,
+      expiresAt: tokenExpiresAt(token),
       recoveryCode,
       recoveryCodeWarning: '此码只显示一次，请妥善保存，可用于换设备时恢复账号',
     };
@@ -136,29 +137,27 @@ export function createIdentityRouter(
   // POST /identity/recover - 凭恢复码恢复身份
   const recoverSchema = z.object({
     code: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/i),
-    fingerprint: z.string().optional(),
+    fingerprint: z.string().max(128).optional(),
   });
 
   router.post('/identity/recover', async (ctx) => {
-    const ip = recoverLimitKey(ctx.ip);
-    // 限速组件出故障时放行：不能因为 Redis 不可用把正常用户挡在门外
-    try {
-      if (await recoverLimiter.isBlocked(ip)) {
-        throw new AppError('RATE_LIMITED', '恢复尝试过于频繁，请稍后再试');
-      }
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-      logger.warn({ err }, 'recover limiter check failed, allowing request');
-    }
-
+    // 先校验形状再占额度：格式不对的请求直接 400，不消耗额度也不查库
     const { code } = recoverSchema.parse(ctx.request.body);
 
-    const fail = async (): Promise<never> => {
-      try {
-        await recoverLimiter.recordFailure(ip);
-      } catch (err) {
-        logger.warn({ err }, 'recover limiter record failed');
-      }
+    // 先占额度再校验：并发请求各自原子占用，不会在失败计数落地之前全部越过检查
+    // 限速器（含回落的进程内计数）自身抛错时拒绝请求：宁可让恢复暂时不可用，也不放开对恢复码的穷举
+    const ip = recoverLimitKey(ctx.ip);
+    let allowed: boolean;
+    try {
+      allowed = await recoverLimiter.tryConsume(ip);
+    } catch (err) {
+      logger.error({ err }, 'recover limiter unavailable, rejecting request');
+      allowed = false;
+    }
+    if (!allowed) throw new AppError('RATE_LIMITED', '恢复尝试过于频繁，请稍后再试');
+
+    // 额度已经占了，失败路径不再调限速器
+    const fail = (): never => {
       throw new AppError('INVALID_RECOVERY_CODE', '恢复码无效或已失效');
     };
 
@@ -209,13 +208,20 @@ export function createIdentityRouter(
     });
     if (!claimed) return fail();
 
+    // 成功的恢复不计入失败次数：退还额度；退还失败不影响成功响应
+    try {
+      await recoverLimiter.refund(ip);
+    } catch (err) {
+      logger.warn({ err }, 'recover limiter refund failed');
+    }
+
     const token = signToken({ playerId: record.playerId, nickname: record.player.nickname });
 
     ctx.body = {
       playerId: record.playerId,
       nickname: record.player.nickname,
       token,
-      expiresAt: Date.now() + 30 * 24 * 3600 * 1000,
+      expiresAt: tokenExpiresAt(token),
       recoveryCode: newCode,
       recoveryCodeWarning: '此码只显示一次，请妥善保存；刚用过的恢复码已失效',
     };
@@ -239,8 +245,8 @@ export function createIdentityRouter(
   // PATCH /identity/me - 修改昵称/头像
   const updateMeSchema = z.object({
     nickname: nicknameSchema.optional(),
-    avatarSeed: z.string().optional(),
-    locale: z.string().optional(),
+    avatarSeed: z.string().max(64).optional(),
+    locale: z.string().max(10).optional(),
   });
 
   router.patch('/identity/me', authMiddleware, async (ctx) => {

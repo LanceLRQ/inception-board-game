@@ -7,7 +7,12 @@ import {
   createMemoryIdentityPrisma,
   type MemoryIdentityPrisma,
 } from '../testing/memoryIdentity.js';
-import type { RecoverAttemptLimiter } from '../services/RecoverAttemptLimiter.js';
+import {
+  FallbackRecoverAttemptLimiter,
+  InMemoryRecoverAttemptLimiter,
+  RECOVER_FAIL_LIMIT,
+  type RecoverAttemptLimiter,
+} from '../services/RecoverAttemptLimiter.js';
 
 vi.mock('../infra/logger.js', () => ({
   logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -207,6 +212,26 @@ describe('恢复码作废与新建在同一事务内', () => {
   });
 });
 
+describe('恢复失败限速：并发', () => {
+  it('同时发 100 个错误恢复码，真正进入校验的不超过额度', async () => {
+    await start();
+    // 查库加一点延时，让并发请求在任何一次失败落地之前都已越过限速检查
+    const realFind = db.recoveryCode.findUnique.bind(db.recoveryCode);
+    db.recoveryCode.findUnique = async (args) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return realFind(args);
+    };
+    const results = await Promise.all(
+      Array.from({ length: 100 }, () => post('/identity/recover', { code: '0000-0000' })),
+    );
+    const statuses = results.map((r) => r.status);
+    const invalid = statuses.filter((s) => s === 422).length;
+    const limited = statuses.filter((s) => s === 429).length;
+    expect(invalid).toBeLessThanOrEqual(RECOVER_FAIL_LIMIT);
+    expect(invalid + limited).toBe(100);
+  });
+});
+
 describe('恢复失败限速', () => {
   it('失败满 10 次后一律 429，包括正确的恢复码', async () => {
     await start();
@@ -229,18 +254,72 @@ describe('恢复失败限速', () => {
     expect((await post('/identity/recover', { code })).status).toBe(200);
   });
 
-  it('计数器故障时放行并告警', async () => {
+  it('限速器抛错时请求被拒绝并记错误日志，而不是放行', async () => {
     await start({
-      isBlocked: async () => {
+      tryConsume: async () => {
         throw new Error('redis down');
       },
-      recordFailure: async () => {
+      refund: async () => {
         throw new Error('redis down');
       },
     });
     const c = await init();
-    expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(422);
+    expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(429);
+    expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(429);
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('主限速器总是抛错、由回落的进程内计数接管：前 10 次进入校验，第 11 次被限速', async () => {
+    const broken: RecoverAttemptLimiter = {
+      tryConsume: async () => {
+        throw new Error('redis down');
+      },
+      refund: async () => {
+        throw new Error('redis down');
+      },
+    };
+    await start(new FallbackRecoverAttemptLimiter(broken, new InMemoryRecoverAttemptLimiter()));
+    const c = await init();
+    for (let i = 0; i < RECOVER_FAIL_LIMIT; i++) {
+      expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(422);
+    }
+    expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(429);
+  });
+
+  it('退还额度失败不影响成功响应，只记警告', async () => {
+    await start({
+      tryConsume: async () => true,
+      refund: async () => {
+        throw new Error('redis down');
+      },
+    });
+    const c = await init();
     expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(200);
     expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it('连续成功恢复超过额度仍然成功', async () => {
+    await start();
+    let code = (await init()).recoveryCode;
+    for (let i = 0; i < RECOVER_FAIL_LIMIT * 2; i++) {
+      const r = await post('/identity/recover', { code });
+      expect(r.status).toBe(200);
+      code = ((await r.json()) as { recoveryCode: string }).recoveryCode;
+    }
+  });
+
+  it('形状不对的恢复码不消耗额度', async () => {
+    await start();
+    for (let i = 0; i < 20; i++) {
+      expect((await post('/identity/recover', { code: 'bad' })).status).toBe(400);
+    }
+    expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(422);
+  });
+
+  it('超长的 fingerprint 返回 400', async () => {
+    await start();
+    expect(
+      (await post('/identity/recover', { code: '0000-0000', fingerprint: 'f'.repeat(129) })).status,
+    ).toBe(400);
   });
 });

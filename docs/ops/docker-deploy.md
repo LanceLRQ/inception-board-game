@@ -81,7 +81,7 @@ cd inception-board-game/game
 
 | 变量 | 必改 | 说明 |
 | --- | --- | --- |
-| `JWT_SECRET` | 必填 | JWT 签名密钥；留空由 `prod.sh init` 生成 |
+| `JWT_SECRET` | 必填 | JWT 签名密钥，至少 32 个字符，缺失或过短时服务拒绝启动；留空由 `prod.sh init` 生成 |
 | `RECOVERY_CODE_PEPPER` | 必填 | 恢复码哈希密钥；留空由 `prod.sh init` / `prod.sh secrets` 生成。生产环境缺失或短于 16 个字符时服务启动即退出。更换后已发出的恢复码全部失效，请勿随意修改 |
 | `OPERATOR_TOKEN` | 可选 | 运营接口（封禁 / 解封等）的访问令牌；留空即关闭运营接口。至少 16 个字符，更短的视为未配置（接口保持关闭，启动时打一条警告），建议用长随机串 |
 | `OPERATOR_ID` | 可选 | 运营操作员标识，写入封禁 / 解封的日志；留空用默认值 |

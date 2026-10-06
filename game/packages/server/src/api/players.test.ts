@@ -11,4 +11,8 @@ describe('PATCH /players/me 请求体', () => {
     expect(() => updateMeSchema.parse({ nickname: 'system' })).toThrow();
     expect(() => updateMeSchema.parse({ nickname: '   ' })).toThrow();
   });
+  it('头像种子长度上限与数据库列宽一致（64）', () => {
+    expect(updateMeSchema.parse({ avatarSeed: 'a'.repeat(64) }).avatarSeed).toHaveLength(64);
+    expect(() => updateMeSchema.parse({ avatarSeed: 'a'.repeat(65) })).toThrow();
+  });
 });

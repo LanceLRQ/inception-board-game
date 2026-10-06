@@ -26,7 +26,7 @@ router.get('/players/me', authMiddleware, async (ctx) => {
 
 // PATCH /players/me - 更新头像 seed / 昵称
 export const updateMeSchema = z.object({
-  avatarSeed: z.string().min(1).max(128).optional(),
+  avatarSeed: z.string().min(1).max(64).optional(),
   nickname: nicknameSchema.optional(),
 });
 

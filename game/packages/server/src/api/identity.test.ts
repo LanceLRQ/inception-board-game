@@ -95,4 +95,17 @@ describe('身份路由使用注入的数据库', () => {
     expect(good.status).toBe(200);
     expect(await good.json()).toMatchObject({ nickname: 'ZZ' });
   });
+
+  it('超长的 locale / fingerprint / avatarSeed 得到 400 而不是 500 或 200', async () => {
+    const base = await start();
+    expect((await post(base, '/identity/init', { locale: 'x'.repeat(11) })).status).toBe(400);
+    expect((await post(base, '/identity/init', { fingerprint: 'f'.repeat(129) })).status).toBe(400);
+    const created = (await (await post(base, '/identity/init', { nickname: '甲' })).json()) as {
+      token: string;
+    };
+    const patch = (body: unknown) => post(base, '/identity/me', body, created.token, 'PATCH');
+    expect((await patch({ avatarSeed: 'a'.repeat(65) })).status).toBe(400);
+    expect((await patch({ locale: 'x'.repeat(11) })).status).toBe(400);
+    expect((await patch({ avatarSeed: 'a'.repeat(64), locale: 'x'.repeat(10) })).status).toBe(200);
+  });
 });

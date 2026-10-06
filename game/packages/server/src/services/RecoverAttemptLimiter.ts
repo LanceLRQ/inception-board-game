@@ -1,6 +1,7 @@
-// 恢复码失败次数限制：按来源地址计数，防止对 8 位恢复码的在线穷举
+// 恢复码尝试次数限制：按来源地址与全站两级计数，防止对 8 位恢复码的在线穷举
 
 import { isIPv6 } from 'node:net';
+import { logger } from '../infra/logger.js';
 import { RedisKeys } from '../infra/redisKeys.js';
 
 /**
@@ -46,78 +47,163 @@ function parseIpv6(raw: string): number[] | null {
   return [...front, ...new Array<number>(8 - front.length - back.length).fill(0), ...back];
 }
 
-/** 窗口长度（秒）：自该地址第一次失败起算 */
+/** 窗口长度（秒）：自第一次计数起算 */
 export const RECOVER_FAIL_WINDOW_SECONDS = 15 * 60;
-/** 窗口内允许的失败次数，达到后一律拒绝 */
+/** 单个来源地址在窗口内允许的尝试次数，超过后一律拒绝 */
 export const RECOVER_FAIL_LIMIT = 10;
+/**
+ * 同一个窗口内全站允许的失败尝试次数。
+ * 恢复接口不需要指定账号，撞中任何一个有效码都算成功，攻击者换来源地址就能成倍放大尝试量，
+ * 所以必须有一个不随来源地址数量增长的上限。
+ * 代价是有人持续刷失败时，其他人在这个窗口内也暂时无法恢复：恢复是低频操作，被挡住只是等一会儿，
+ * 而账号被撞走不可逆。
+ */
+export const RECOVER_GLOBAL_FAIL_LIMIT = 300;
 
 export interface RecoverAttemptLimiter {
-  /** 该地址当前是否已被限制 */
-  isBlocked(ip: string): Promise<boolean>;
-  /** 记一次失败；成功不调用，也不清零 */
-  recordFailure(ip: string): Promise<void>;
+  /** 占用一次尝试额度；返回 false 表示已超限、这次尝试应被拒绝 */
+  tryConsume(ip: string): Promise<boolean>;
+  /** 这次尝试最终成功：退还刚才占用的额度（成功的恢复不计入失败次数） */
+  refund(ip: string): Promise<void>;
 }
 
-/** 进程内实现：全内存服务与测试使用 */
+interface CounterEntry {
+  count: number;
+  resetAt: number;
+}
+
+/** 进程内实现：全内存服务、测试与 Redis 不可用时的回落 */
 export class InMemoryRecoverAttemptLimiter implements RecoverAttemptLimiter {
-  private readonly entries = new Map<string, { count: number; resetAt: number }>();
+  private readonly entries = new Map<string, CounterEntry>();
+  private global: CounterEntry | null = null;
+  private nextPruneAt = 0;
 
   constructor(
     private readonly now: () => number = Date.now,
     private readonly limit = RECOVER_FAIL_LIMIT,
     private readonly windowMs = RECOVER_FAIL_WINDOW_SECONDS * 1000,
+    private readonly globalLimit = RECOVER_GLOBAL_FAIL_LIMIT,
   ) {}
 
-  private live(ip: string): { count: number; resetAt: number } | null {
-    const hit = this.entries.get(ip);
-    if (!hit) return null;
-    if (hit.resetAt <= this.now()) {
-      this.entries.delete(ip);
-      return null;
+  /** 同步完成「加 1 并返回新值」，单线程下天然原子 */
+  private bump(entry: CounterEntry | undefined): CounterEntry {
+    if (entry && entry.resetAt > this.now()) {
+      entry.count += 1;
+      return entry;
     }
-    return hit;
+    return { count: 1, resetAt: this.now() + this.windowMs };
   }
 
-  async isBlocked(ip: string): Promise<boolean> {
-    return (this.live(ip)?.count ?? 0) >= this.limit;
+  private drop(entry: CounterEntry | null | undefined): void {
+    if (entry && entry.resetAt > this.now() && entry.count > 0) entry.count -= 1;
   }
 
-  async recordFailure(ip: string): Promise<void> {
-    const hit = this.live(ip);
-    if (hit) hit.count += 1;
-    else this.entries.set(ip, { count: 1, resetAt: this.now() + this.windowMs });
+  /** 清掉已过期的地址条目；每个窗口最多扫一遍，避免地址表在大量不同来源下只增不减 */
+  private prune(): void {
+    const now = this.now();
+    if (now < this.nextPruneAt) return;
+    this.nextPruneAt = now + this.windowMs;
+    for (const [ip, entry] of this.entries) {
+      if (entry.resetAt <= now) this.entries.delete(ip);
+    }
+  }
+
+  /** 当前保留的地址条目数（供测试） */
+  size(): number {
+    return this.entries.size;
+  }
+
+  async tryConsume(ip: string): Promise<boolean> {
+    this.prune();
+    const mine = this.bump(this.entries.get(ip));
+    this.entries.set(ip, mine);
+    // 超限的地址不再碰全站计数，否则一个地址狂刷就能把全站锁住
+    if (mine.count > this.limit) return false;
+    this.global = this.bump(this.global ?? undefined);
+    return this.global.count <= this.globalLimit;
+  }
+
+  async refund(ip: string): Promise<void> {
+    this.drop(this.entries.get(ip));
+    this.drop(this.global);
   }
 }
 
 /** Redis 实现用到的命令子集 */
 export interface RecoverLimiterRedis {
-  get(key: string): Promise<string | null>;
   incr(key: string): Promise<number>;
   ttl(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<number>;
+  eval(script: string, numKeys: number, ...args: string[]): Promise<unknown>;
 }
 
-/** Redis 实现：多实例共享计数；固定窗口；键没有过期时间就补设，防止某次 expire 失败后该地址被永久限制 */
+/**
+ * 退还额度的脚本：只在计数大于 0 时减一。
+ * 用脚本而不是 DECR 后再补救：脚本在 Redis 内原子执行，既不会出现负数，也不会改动键的过期时间。
+ */
+export const REFUND_SCRIPT =
+  "local n = tonumber(redis.call('GET', KEYS[1]) or '0') if n > 0 then return redis.call('DECR', KEYS[1]) end return 0";
+
+/** Redis 实现：多实例共享计数；固定窗口；键没有过期时间就补设，防止某次 expire 失败后该键被永久限制 */
 export class RedisRecoverAttemptLimiter implements RecoverAttemptLimiter {
   constructor(
     private readonly redis: RecoverLimiterRedis,
     private readonly limit = RECOVER_FAIL_LIMIT,
     private readonly windowSeconds = RECOVER_FAIL_WINDOW_SECONDS,
+    private readonly globalLimit = RECOVER_GLOBAL_FAIL_LIMIT,
   ) {}
 
-  async isBlocked(ip: string): Promise<boolean> {
-    const key = RedisKeys.recoverFailures(ip);
-    const blocked = Number(await this.redis.get(key)) >= this.limit;
-    // 计数已满而键没有过期时间（此前 expire 连续失败）：补设，否则 recordFailure 不会再被调用，地址永久受限
-    if (blocked && (await this.redis.ttl(key)) < 0)
-      await this.redis.expire(key, this.windowSeconds);
-    return blocked;
+  /** INCR 本身原子，返回值就是占用后的计数；不依赖「第一次 incr」设过期，那次 expire 失败后键会永不过期 */
+  private async bump(key: string): Promise<number> {
+    const n = await this.redis.incr(key);
+    if ((await this.redis.ttl(key)) < 0) await this.redis.expire(key, this.windowSeconds);
+    return n;
   }
 
-  async recordFailure(ip: string): Promise<void> {
-    const key = RedisKeys.recoverFailures(ip);
-    await this.redis.incr(key);
-    // 不依赖「第一次 incr」判断：那次 expire 失败后键会永不过期
-    if ((await this.redis.ttl(key)) < 0) await this.redis.expire(key, this.windowSeconds);
+  async tryConsume(ip: string): Promise<boolean> {
+    // 超限的地址不再碰全站计数，否则一个地址狂刷就能把全站锁住
+    if ((await this.bump(RedisKeys.recoverFailures(ip))) > this.limit) return false;
+    return (await this.bump(RedisKeys.recoverFailuresGlobal())) <= this.globalLimit;
+  }
+
+  async refund(ip: string): Promise<void> {
+    await this.redis.eval(REFUND_SCRIPT, 1, RedisKeys.recoverFailures(ip));
+    await this.redis.eval(REFUND_SCRIPT, 1, RedisKeys.recoverFailuresGlobal());
+  }
+}
+
+/** 主限速器故障时回落到备用限速器：Redis 不可用时改用进程内计数，而不是完全放行 */
+export class FallbackRecoverAttemptLimiter implements RecoverAttemptLimiter {
+  private degraded = false;
+
+  constructor(
+    private readonly primary: RecoverAttemptLimiter,
+    private readonly fallback: RecoverAttemptLimiter,
+  ) {}
+
+  /** 只在状态切换时记日志，避免主限速器宕机期间每个请求都刷一条 */
+  private async run<T>(op: (limiter: RecoverAttemptLimiter) => Promise<T>): Promise<T> {
+    try {
+      const result = await op(this.primary);
+      if (this.degraded) {
+        this.degraded = false;
+        logger.warn('recover limiter recovered, back to primary');
+      }
+      return result;
+    } catch (err) {
+      if (!this.degraded) {
+        this.degraded = true;
+        logger.warn({ err }, 'recover limiter primary failed, falling back to in-process counting');
+      }
+      return op(this.fallback);
+    }
+  }
+
+  tryConsume(ip: string): Promise<boolean> {
+    return this.run((l) => l.tryConsume(ip));
+  }
+
+  refund(ip: string): Promise<void> {
+    return this.run((l) => l.refund(ip));
   }
 }
