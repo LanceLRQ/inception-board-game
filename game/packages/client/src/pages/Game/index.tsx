@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { MatchTable } from './Table/MatchTable.js';
 import { MatchTrack } from './Track/MatchTrack.js';
 import { useMockMatch } from '../../hooks/useMockMatch.js';

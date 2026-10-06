@@ -3,7 +3,7 @@
 # 产物：静态 SPA + PWA 资源；由 nginx:alpine 提供服务。
 # SPA fallback：所有未命中文件请求回落到 index.html（React Router 友好）。
 
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 

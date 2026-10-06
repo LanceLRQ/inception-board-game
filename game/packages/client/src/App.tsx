@@ -1,7 +1,7 @@
 // 根 layout - 挂主题 effect + Framer Motion 全局 reduced-motion 配置 + 跳转主内容链接
 // + 全局 Toaster（toast 事件通知）
 
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 import { MotionConfig } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useThemeEffect } from './hooks/useThemeEffect';

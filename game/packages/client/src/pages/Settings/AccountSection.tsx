@@ -3,7 +3,7 @@
 // 直接读身份 store 而不是 useAuth：useAuth 挂载时会再验一次令牌，设置页只需要展示。
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';

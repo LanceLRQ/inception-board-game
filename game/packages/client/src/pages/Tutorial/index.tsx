@@ -2,7 +2,7 @@
 // 新手教学关卡
 
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { BASICS_TUTORIAL, getCurrentStep, isCompleted } from '@icgame/shared';
 import { TutorialOverlay } from '../../components/TutorialOverlay';
 import { CopyrightNotice } from '../../components/CopyrightNotice';

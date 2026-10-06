@@ -3,7 +3,7 @@
 # 策略（MVP）：直接用 tsx 运行 TypeScript 源码；以后再切到 tsc 编译流水线。
 # 多阶段：deps（仅 workspace 元信息，最大化 Docker cache） → runtime（源码 + node_modules）。
 
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 

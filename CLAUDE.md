@@ -36,11 +36,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 层次 | 技术 | 版本 |
 |------|------|------|
-| 语言与工具链 | TypeScript · Node.js · pnpm · Turborepo | 5.9 · ≥ 20 · 10 · 2 |
+| 语言与工具链 | TypeScript · Node.js · pnpm · Turborepo | 5.9 · ≥ 22 · 10 · 2 |
 | 游戏引擎 | 自建对局运行器（`game-engine/src/runner/`） | - |
 | 引擎对照 | boardgame.io（仅开发依赖，供差分测试对照，不进运行路径） | 0.50 |
-| 前端 | React · Vite · React Router | 19 · 8 · 7 |
-| PWA | vite-plugin-pwa（Workbox） | 1.x |
+| 前端 | React · Vite · React Router | 19 · 8 · 8 |
+| PWA | vite-plugin-pwa（Workbox） | 2.x |
 | 本地 AI | Web Worker + Comlink | 4 |
 | UI 状态 | Zustand | 5 |
 | 数据请求 | TanStack Query | 5 |
@@ -109,7 +109,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用命令
 
-以下命令均在 `game/` 目录下执行（Node.js ≥ 20，pnpm ≥ 9）：
+以下命令均在 `game/` 目录下执行（Node.js ≥ 22，pnpm ≥ 9）：
 
 ```bash
 pnpm install                          # 安装依赖

@@ -2,7 +2,7 @@
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
 import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
 import { ApiRequestError } from '../../lib/api';

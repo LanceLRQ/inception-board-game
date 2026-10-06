@@ -3,7 +3,7 @@
 // 开始后：真实后端 → 全体进入同一局联机对局；本地模拟 → 本地人机对局。
 
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Bot, Copy, LogOut, Play, Users } from 'lucide-react';
 import { ApiRequestError } from '../../lib/api';
