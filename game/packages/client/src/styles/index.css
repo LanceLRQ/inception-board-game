@@ -311,17 +311,26 @@
 }
 
 /*
- * prefers-reduced-motion: 尊重用户系统级动效偏好
- * - 将所有 animation/transition 压缩到 1ms（近似瞬时但保留状态切换）
- * - framer-motion 侧通过 <MotionConfig reducedMotion="user"> 配合
+ * 减少动效：把所有 animation/transition 压缩到 1ms（近似瞬时但保留状态切换）
+ * - 生效条件：系统开了「减少动效」且用户没有在设置里选「不减少」（data-motion='full'），
+ *   或用户在设置里选了「总是减少」（data-motion='reduced'）
+ * - framer-motion 侧通过 <MotionConfig reducedMotion> 配合（App.tsx 按同一偏好取值）
  */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion='full']) *,
+  :root:not([data-motion='full']) *::before,
+  :root:not([data-motion='full']) *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+}
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
 }

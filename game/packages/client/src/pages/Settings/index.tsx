@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { ThemePicker } from '../../components/ThemePicker';
+import { EffectSettings } from '../../components/EffectSettings';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { AudioControls } from '../../components/AudioControls';
 import { AccountSection } from './AccountSection';
@@ -16,10 +17,11 @@ export default function Settings() {
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
           {t('settings.appearance')}
         </h2>
-        <div className="flex items-center justify-between">
-          <span className="text-sm">{t('settings.theme')}</span>
+        <div className="space-y-3">
+          <span className="block text-sm">{t('settings.theme')}</span>
           <ThemePicker />
         </div>
+        <EffectSettings className="mt-5 border-t border-border pt-4" />
       </section>
 
       <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">

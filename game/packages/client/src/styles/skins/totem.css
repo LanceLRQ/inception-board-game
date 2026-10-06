@@ -9,7 +9,7 @@
  *
  * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
  *   tint  层级调色    maze  迷宫底纹    totem  陀螺自旋与微晃    flow  穿层虚线流动
- * 系统「减少动效」与 data-motion='reduced' 下全部动画停掉。
+ * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下全部动画停掉。
  */
 
 /* ---------- 层级调色 ---------- */
@@ -548,10 +548,10 @@
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='totem'] .totem-top,
-  [data-theme='totem'] .totem-spin,
-  [data-theme='totem'] .totem-kick,
-  [data-theme='totem'] .ms-seat-flag {
+  [data-theme='totem']:root:not([data-motion='full']) .totem-top,
+  [data-theme='totem']:root:not([data-motion='full']) .totem-spin,
+  [data-theme='totem']:root:not([data-motion='full']) .totem-kick,
+  [data-theme='totem']:root:not([data-motion='full']) .ms-seat-flag {
     animation: none;
   }
 }

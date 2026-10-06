@@ -114,6 +114,33 @@ describe('皮肤样式', () => {
     for (const sel of list) expect(sel.startsWith(`[data-theme='${id}']`), sel).toBe(true);
   });
 
+  it("系统「减少动效」的媒体查询里，每条规则都要让位给 data-motion='full'（用户选「不减少」时盖过系统偏好）", () => {
+    const sources: Record<string, string> = { 'index.css': indexCss, ...skinCss };
+    let blocks = 0;
+    for (const [file, css] of Object.entries(sources)) {
+      const text = stripComments(css);
+      const re = /@media \(prefers-reduced-motion: reduce\)\s*\{/g;
+      while (re.exec(text)) {
+        blocks++;
+        // 取这个 @media 块的主体（大括号配平）
+        let depth = 1;
+        let i = re.lastIndex;
+        while (i < text.length && depth > 0) {
+          if (text[i] === '{') depth++;
+          else if (text[i] === '}') depth--;
+          i++;
+        }
+        const body = text.slice(re.lastIndex, i - 1);
+        const list = selectors(body);
+        expect(list.length, file).toBeGreaterThan(0);
+        for (const sel of list) {
+          expect(sel, `${file}: ${sel}`).toContain(":not([data-motion='full'])");
+        }
+      }
+    }
+    expect(blocks).toBeGreaterThanOrEqual(5);
+  });
+
   it('基础样式不限定主题（缺省外观对所有主题生效）', () => {
     for (const sel of selectors(baseCss)) {
       expect(sel, sel).not.toContain('[data-theme');

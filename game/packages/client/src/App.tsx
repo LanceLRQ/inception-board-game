@@ -5,14 +5,17 @@ import { Outlet } from 'react-router';
 import { MotionConfig } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useThemeEffect } from './hooks/useThemeEffect';
+import { motionConfigMode } from './theme/effects';
+import { useEffectsStore } from './stores/useEffectsStore';
 import { Toaster } from './components/ui/toaster';
 
 export default function App() {
   useThemeEffect();
+  const motionPref = useEffectsStore((s) => s.prefs.motion);
   const { t } = useTranslation();
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion={motionConfigMode(motionPref)}>
       {/* 键盘 Tab 首焦：跳到 #main-content（对照 WCAG 2.4.1 Bypass Blocks） */}
       <a href="#main-content" className="skip-to-main">
         {t('a11y.skip_to_main', { defaultValue: '跳到主内容' })}

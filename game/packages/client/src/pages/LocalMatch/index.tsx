@@ -38,11 +38,12 @@ export default function LocalMatch() {
               key={n}
               type="button"
               onClick={() => setPlayerCount(n)}
+              aria-pressed={playerCount === n}
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition-colors',
+                'flex h-11 w-11 items-center justify-center rounded-full border text-sm font-medium transition-colors',
                 playerCount === n
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-input bg-muted text-muted-foreground hover:bg-muted/70',
               )}
             >
               {n}

@@ -75,9 +75,20 @@ describe('slabGeometry', () => {
     expect(h('regular')).toBeGreaterThan(h('lost'));
   });
 
-  it('内容内缩比例由倾斜量推出，且为正的小比例', () => {
-    expect(SLAB_CONTENT_INSET).toBeGreaterThan(0);
-    expect(SLAB_CONTENT_INSET).toBeLessThan((SLAB_SKEW / SLAB_WIDTH) * 100);
+  it('内容内缩不小于倾斜量：板面内任意一段高度的内容，四个角都在斜切的左右边之内', () => {
+    const inset = (SLAB_CONTENT_INSET / 100) * SLAB_WIDTH;
+    for (const kind of SLAB_KINDS) {
+      const [tl, tr, br, bl] = parse(slabGeometry(kind).top);
+      const leftAt = (y: number) => bl![0] + ((y - bl![1]) / (tl![1] - bl![1])) * (tl![0] - bl![0]);
+      const rightAt = (y: number) =>
+        br![0] + ((y - br![1]) / (tr![1] - br![1])) * (tr![0] - br![0]);
+      // 顶面高度范围内的各个高度：内缩后的左右边界不越过斜切的边
+      for (let f = 0; f <= 1; f += 0.05) {
+        const y = tl![1] + f * (bl![1] - tl![1]);
+        expect(inset, `${kind} y=${y}`).toBeGreaterThanOrEqual(leftAt(y));
+        expect(SLAB_WIDTH - inset, `${kind} y=${y}`).toBeLessThanOrEqual(rightAt(y));
+      }
+    }
   });
 });
 

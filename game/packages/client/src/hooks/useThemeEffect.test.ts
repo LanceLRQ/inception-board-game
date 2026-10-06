@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyTheme, type ThemeDocument } from './useThemeEffect';
+import {
+  applyEffects,
+  applyTheme,
+  type EffectsDocument,
+  type ThemeDocument,
+} from './useThemeEffect';
 import { getTheme, type ThemeDefinition } from '../theme/themes';
 
 function makeDoc(withMeta = true) {
@@ -73,5 +78,47 @@ describe('applyTheme', () => {
       querySelector: () => null,
     };
     expect(() => applyTheme(getTheme('butterfly'), doc)).not.toThrow();
+  });
+});
+
+function makeEffectsDoc() {
+  const attrs: Record<string, string> = {};
+  const doc: EffectsDocument = {
+    documentElement: {
+      setAttribute: (k, v) => {
+        attrs[k] = v;
+      },
+      removeAttribute: (k) => {
+        delete attrs[k];
+      },
+    },
+  };
+  return { doc, attrs };
+}
+
+describe('applyEffects', () => {
+  it('缺省偏好不写任何属性', () => {
+    const { doc, attrs } = makeEffectsDoc();
+    applyEffects({ off: [], motion: 'system' }, doc);
+    expect(attrs).toEqual({});
+  });
+
+  it('关闭的开关写成空格分隔的内部名字，总是减少写 data-motion=reduced', () => {
+    const { doc, attrs } = makeEffectsDoc();
+    applyEffects({ off: ['scan', 'tint'], motion: 'reduce' }, doc);
+    expect(attrs).toEqual({ 'data-fx-off': 'scan tint', 'data-motion': 'reduced' });
+  });
+
+  it('不减少写 data-motion=full', () => {
+    const { doc, attrs } = makeEffectsDoc();
+    applyEffects({ off: [], motion: 'full' }, doc);
+    expect(attrs).toEqual({ 'data-motion': 'full' });
+  });
+
+  it('偏好恢复缺省时移除先前写下的属性', () => {
+    const { doc, attrs } = makeEffectsDoc();
+    applyEffects({ off: ['desat'], motion: 'reduce' }, doc);
+    applyEffects({ off: [], motion: 'system' }, doc);
+    expect(attrs).toEqual({});
   });
 });

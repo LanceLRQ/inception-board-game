@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildThemeBootScript } from './bootScript';
+import { EFFECTS_STORAGE_KEY, fxOffAttribute, parseEffectPrefs } from './effects';
 import { DEFAULT_THEME_ID, THEMES, THEME_STORAGE_KEY } from './themes';
 
 interface FakeDoc {
@@ -124,5 +125,74 @@ describe('buildThemeBootScript', () => {
     (doc.document as { documentElement: { style?: unknown } }).documentElement.style = undefined;
     expect(() => run(doc, { getItem: () => 'butterfly' })).not.toThrow();
     expect(doc.attrs['data-scheme']).toBe('light');
+  });
+});
+
+describe('buildThemeBootScript · 效果偏好', () => {
+  const withPrefs = (raw: string | null) => (k: string) => (k === EFFECTS_STORAGE_KEY ? raw : null);
+
+  it('没存偏好时不写 data-fx-off 与 data-motion', () => {
+    const doc = makeDoc();
+    run(doc, { getItem: withPrefs(null) });
+    expect(doc.attrs['data-fx-off']).toBeUndefined();
+    expect(doc.attrs['data-motion']).toBeUndefined();
+  });
+
+  it('关闭的开关写成空格分隔的内部名字，与运行时 fxOffAttribute 一致', () => {
+    const doc = makeDoc();
+    const raw = JSON.stringify({ off: ['tint', 'ambient', 'scan'], motion: 'system' });
+    run(doc, { getItem: withPrefs(raw) });
+    expect(doc.attrs['data-fx-off']).toBe(fxOffAttribute(parseEffectPrefs(raw)));
+    expect(doc.attrs['data-fx-off']).toBe('rain totem flow blink drift scan tint');
+    expect(doc.attrs['data-motion']).toBeUndefined();
+  });
+
+  it('总是减少写 data-motion=reduced，不减少写 data-motion=full', () => {
+    const a = makeDoc();
+    run(a, { getItem: withPrefs(JSON.stringify({ off: [], motion: 'reduce' })) });
+    expect(a.attrs['data-motion']).toBe('reduced');
+    const b = makeDoc();
+    run(b, { getItem: withPrefs(JSON.stringify({ off: [], motion: 'full' })) });
+    expect(b.attrs['data-motion']).toBe('full');
+  });
+
+  it.each([
+    'not json',
+    'null',
+    '42',
+    '[]',
+    '{"off":"scan","motion":"sideways"}',
+    '{"off":["__proto__","bogus",1]}',
+  ])('无效内容 %s 不写属性、不抛错', (raw) => {
+    const doc = makeDoc();
+    expect(() => run(doc, { getItem: withPrefs(raw) })).not.toThrow();
+    expect(doc.attrs['data-fx-off']).toBeUndefined();
+    expect(doc.attrs['data-motion']).toBeUndefined();
+    expect(doc.attrs['data-theme']).toBe(DEFAULT_THEME_ID);
+  });
+
+  it('读取偏好抛错时主题照常应用', () => {
+    const doc = makeDoc();
+    run(doc, {
+      getItem: (k: string) => {
+        if (k === EFFECTS_STORAGE_KEY) throw new Error('blocked');
+        return 'matrix';
+      },
+    });
+    expect(doc.attrs['data-theme']).toBe('matrix');
+    expect(doc.attrs['data-fx-off']).toBeUndefined();
+  });
+
+  it('偏好与解析函数对同一输入给出同样的结果', () => {
+    for (const raw of [
+      JSON.stringify({ off: ['texture'], motion: 'reduce' }),
+      JSON.stringify({ off: ['desat', 'scan', 'bogus'], motion: 'full' }),
+      '{"off":[]}',
+    ]) {
+      const doc = makeDoc();
+      run(doc, { getItem: withPrefs(raw) });
+      const prefs = parseEffectPrefs(raw);
+      expect(doc.attrs['data-fx-off'] ?? '').toBe(fxOffAttribute(prefs));
+    }
   });
 });

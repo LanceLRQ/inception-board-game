@@ -5,7 +5,7 @@
  *
  * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
  *   rain  数字雨    scan  扫描线    desat  卡图降饱和    blink  光标与状态灯的明灭
- * 系统「减少动效」与 data-motion='reduced' 下，数字雨只画静态一帧，明灭停掉。
+ * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下，数字雨只画静态一帧，明灭停掉。
  */
 
 /* ---------- 舞台与背景氛围 ---------- */
@@ -388,9 +388,9 @@
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='matrix'] .matrix-cursor,
-  [data-theme='matrix'] .ms-seat-flag,
-  [data-theme='matrix'] .matrix-marker {
+  [data-theme='matrix']:root:not([data-motion='full']) .matrix-cursor,
+  [data-theme='matrix']:root:not([data-motion='full']) .ms-seat-flag,
+  [data-theme='matrix']:root:not([data-motion='full']) .matrix-marker {
     animation: none;
   }
 }

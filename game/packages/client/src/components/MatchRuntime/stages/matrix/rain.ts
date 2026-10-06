@@ -167,6 +167,8 @@ export interface RainModeInput {
 
 export function resolveRainMode(input: RainModeInput): RainMode {
   if (input.fxOff.has('rain')) return 'off';
-  if (input.reducedMotion || input.motionAttr === 'reduced') return 'static';
+  // 根元素的 data-motion 盖过系统偏好：reduced 总是减少；full 即使系统要求减少也照常运行
+  if (input.motionAttr === 'reduced') return 'static';
+  if (input.reducedMotion && input.motionAttr !== 'full') return 'static';
   return 'running';
 }

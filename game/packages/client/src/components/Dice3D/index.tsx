@@ -5,6 +5,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../lib/utils.js';
 import { useSoundEffect } from '../../hooks/useSoundEffect.js';
+import { useEffectsStore } from '../../stores/useEffectsStore.js';
+import { resolveReducedMotion } from '../../theme/effects.js';
 import { Die, type DieKind } from '../Die';
 
 export interface Dice3DProps {
@@ -44,7 +46,10 @@ export function Dice3D({
   size = 48,
   className,
 }: Dice3DProps) {
-  const prefersReduced = useReducedMotion();
+  // 系统偏好与设置里的「减少动效」三态合起来判定
+  const systemReduced = useReducedMotion();
+  const motionPref = useEffectsStore((s) => s.prefs.motion);
+  const prefersReduced = resolveReducedMotion(motionPref, systemReduced === true);
   const playSound = useSoundEffect();
 
   // 掷骰动画：只在 rolling 时快速切换面值

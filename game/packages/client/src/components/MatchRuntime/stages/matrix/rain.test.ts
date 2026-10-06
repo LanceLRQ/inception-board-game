@@ -206,6 +206,16 @@ describe('数字雨 · 开关', () => {
     );
   });
 
+  it('data-motion=full 盖过系统的减少动效偏好：照常运行；rain 开关仍然优先', () => {
+    const none = parseFxOff(null);
+    expect(resolveRainMode({ fxOff: none, reducedMotion: true, motionAttr: 'full' })).toBe(
+      'running',
+    );
+    expect(
+      resolveRainMode({ fxOff: parseFxOff('rain'), reducedMotion: true, motionAttr: 'full' }),
+    ).toBe('off');
+  });
+
   it('其它情况下运行；别的特效开关不影响数字雨', () => {
     expect(
       resolveRainMode({ fxOff: parseFxOff('scan desat'), reducedMotion: false, motionAttr: null }),

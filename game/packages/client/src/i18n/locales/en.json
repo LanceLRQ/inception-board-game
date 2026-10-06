@@ -149,6 +149,40 @@
       "butterfly": "The Butterfly Dream"
     }
   },
+  "effects": {
+    "heading": "Visual effects",
+    "motion": {
+      "label": "Reduce motion",
+      "desc": "Fewer animations and transitions. \"Follow system\" uses your device's accessibility setting.",
+      "options": {
+        "system": "Follow system",
+        "reduce": "Always reduce",
+        "full": "Never reduce"
+      }
+    },
+    "items": {
+      "ambient": {
+        "name": "Background animation",
+        "desc": "Looping decorations such as digital rain, the spinning top, flowing dashes, blinking cursors and the drifting butterfly"
+      },
+      "texture": {
+        "name": "Background texture",
+        "desc": "Static textures such as the drafting grid, the maze and paper grain"
+      },
+      "scan": {
+        "name": "Scanlines",
+        "desc": "Monitor scanlines laid over the screen"
+      },
+      "desat": {
+        "name": "Desaturate card art",
+        "desc": "Card art in play turns monochrome; the detail view keeps the original"
+      },
+      "tint": {
+        "name": "Layer tinting",
+        "desc": "Swaps the accent colour for the focused layer's cinematic tint"
+      }
+    }
+  },
   "avatar": {
     "roll": "Roll Avatar",
     "rolls": "Rolled {{count}} times",

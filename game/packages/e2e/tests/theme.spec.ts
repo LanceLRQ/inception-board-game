@@ -566,3 +566,275 @@ test.describe('主题 Theme · 庄周梦蝶的亮色与按需字体', () => {
     expect(await mode()).toBe('horizontal-tb');
   });
 });
+
+/** 在页面里放一个声明了 3 秒过渡的元素，读出它实际生效的过渡时长（全局减少动效规则生效时是 0.001s） */
+const probeTransitionDuration = (page: Page) =>
+  page.evaluate(() => {
+    const el = document.createElement('div');
+    el.style.transition = 'opacity 3s';
+    document.body.appendChild(el);
+    const value = getComputedStyle(el).transitionDuration;
+    el.remove();
+    return value;
+  });
+
+/** 设置页「视觉效果」里的开关与减少动效三态 */
+const switchByName = (page: Page, name: RegExp) => page.getByRole('switch', { name });
+const motionOption = (page: Page, pref: 'system' | 'reduce' | 'full') =>
+  page.getByTestId(`motion-pref-${pref}`);
+
+test.describe('主题 Theme · 效果开关', () => {
+  test('梦境矩阵：关掉背景动画后数字雨停掉，刷新后仍是关，重新打开后恢复', async ({ page }) => {
+    await preselectTheme(page, 'matrix');
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    const html = page.locator('html');
+    const ambient = switchByName(page, /背景动画|Background animation/);
+    await expect(ambient).toHaveAttribute('aria-checked', 'true');
+    await expect(html).not.toHaveAttribute('data-fx-off', /./);
+
+    await ambient.click();
+    await expect(ambient).toHaveAttribute('aria-checked', 'false');
+    await expect(html).toHaveAttribute('data-fx-off', /\brain\b/);
+    // 同一类别里的别的内部名字也一起关
+    await expect(html).toHaveAttribute('data-fx-off', /\bblink\b/);
+    // 别的类别不受牵连
+    await expect(html).not.toHaveAttribute('data-fx-off', /\bscan\b/);
+
+    await page.reload();
+    await waitForAppReady(page);
+    await expect(switchByName(page, /背景动画|Background animation/)).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await expect(html).toHaveAttribute('data-fx-off', /\brain\b/);
+
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'off');
+
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    await switchByName(page, /背景动画|Background animation/).click();
+    await expect(html).not.toHaveAttribute('data-fx-off', /./);
+  });
+
+  test('开关只显示当前主题用得到的：切到没有扫描线的主题，扫描线开关消失；深眠影院没有任何装饰开关', async ({
+    page,
+  }) => {
+    await preselectTheme(page, 'matrix');
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    const scan = switchByName(page, /扫描线|Scanlines/);
+    await expect(scan).toBeVisible();
+    await expect(switchByName(page, /卡图降饱和|Desaturate card art/)).toBeVisible();
+    await expect(switchByName(page, /层级调色|Layer tinting/)).toHaveCount(0);
+
+    // preselectTheme 的初始化脚本每次加载都会写回主题，这里改用页面里的点选来切换
+    await page.getByRole('radio', { name: /筑梦蓝图|Architect's Blueprint/ }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'blueprint');
+    await expect(switchByName(page, /扫描线|Scanlines/)).toHaveCount(0);
+    await expect(switchByName(page, /背景动画|Background animation/)).toBeVisible();
+    await expect(switchByName(page, /背景底纹|Background texture/)).toBeVisible();
+
+    await page.getByRole('radio', { name: /陀螺未停|The Top Still Spins/ }).click();
+    await expect(switchByName(page, /层级调色|Layer tinting/)).toBeVisible();
+
+    await page.getByRole('radio', { name: /深眠影院|Cinematic Noir/ }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'noir');
+    await expect(page.getByRole('switch')).toHaveCount(0);
+    await expect(page.getByTestId('effect-switches')).toHaveCount(0);
+    // 减少动效对所有主题都有意义，始终在
+    await expect(page.getByTestId('motion-pref')).toBeVisible();
+  });
+
+  test('开关可用键盘操作，触控目标不小于 44×44', async ({ page }) => {
+    await preselectTheme(page, 'matrix');
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    const scan = switchByName(page, /扫描线|Scanlines/);
+    const box = await scan.boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(44);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+
+    await scan.focus();
+    await page.keyboard.press('Space');
+    await expect(scan).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('html')).toHaveAttribute('data-fx-off', /\bscan\b/);
+    await page.keyboard.press('Space');
+    await expect(scan).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('html')).not.toHaveAttribute('data-fx-off', /./);
+
+    for (const pref of ['system', 'reduce', 'full'] as const) {
+      const b = await motionOption(page, pref).boundingBox();
+      expect(b!.height, `减少动效选项 ${pref}`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('减少动效三态：总是减少写 data-motion=reduced，不减少写 full，跟随系统不写；刷新后保持', async ({
+    page,
+  }) => {
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    const html = page.locator('html');
+    await expect(motionOption(page, 'system')).toHaveAttribute('aria-checked', 'true');
+    await expect(html).not.toHaveAttribute('data-motion', /./);
+
+    await motionOption(page, 'reduce').click();
+    await expect(motionOption(page, 'reduce')).toHaveAttribute('aria-checked', 'true');
+    await expect(html).toHaveAttribute('data-motion', 'reduced');
+    await page.reload();
+    await waitForAppReady(page);
+    await expect(html).toHaveAttribute('data-motion', 'reduced');
+    await expect(motionOption(page, 'reduce')).toHaveAttribute('aria-checked', 'true');
+
+    await motionOption(page, 'full').click();
+    await expect(html).toHaveAttribute('data-motion', 'full');
+
+    await motionOption(page, 'system').click();
+    await expect(html).not.toHaveAttribute('data-motion', /./);
+  });
+
+  test('首屏内联脚本不依赖应用代码：外部脚本全被拦下时，已存的效果偏好也已写到根元素上', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem(
+          'icgame-effects',
+          JSON.stringify({ off: ['ambient', 'scan'], motion: 'reduce' }),
+        );
+      } catch {
+        /* ignore */
+      }
+    });
+    await page.route('**/*', (route) =>
+      route.request().resourceType() === 'script' ? route.abort() : route.continue(),
+    );
+    await page.goto('/settings');
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-fx-off', 'rain totem flow blink drift scan');
+    await expect(html).toHaveAttribute('data-motion', 'reduced');
+    await expect(page.locator('#root > *')).toHaveCount(0);
+  });
+
+  test('localStorage 里无效的效果偏好回落到缺省，页面照常工作', async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('icgame-effects', '{"off":"scan","motion":"sideways"');
+      } catch {
+        /* ignore */
+      }
+    });
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    const html = page.locator('html');
+    await expect(html).not.toHaveAttribute('data-fx-off', /./);
+    await expect(html).not.toHaveAttribute('data-motion', /./);
+    await expect(motionOption(page, 'system')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('梦境矩阵：系统要求减少动效时数字雨只画静态一帧；选「不减少」后盖过系统偏好照常运行', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await preselectTheme(page, 'matrix');
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'static');
+    expect(await probeTransitionDuration(page)).toBe('0.001s');
+
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    await motionOption(page, 'full').click();
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'running');
+    // 样式侧同样让位：全局的 1ms 动画压缩不再生效
+    expect(await probeTransitionDuration(page)).toBe('3s');
+  });
+});
+
+/** 筑梦蓝图：每块斜切楼板里的文字与控件都要落在该楼板的顶面平行四边形之内 */
+const SLAB_BOUNDS = () => {
+  const violations: string[] = [];
+  for (const plane of document.querySelectorAll('[data-testid^="layer-row-"]')) {
+    const svg = plane.querySelector('svg.blueprint-slab')!;
+    const poly = svg.querySelector('.blueprint-slab-top')!;
+    const vb = (svg as SVGSVGElement).viewBox.baseVal;
+    const sr = svg.getBoundingClientRect();
+    const [tl, tr, br, bl] = poly
+      .getAttribute('points')!
+      .split(' ')
+      .map((s) => s.split(',').map(Number))
+      .map(([x, y]) => [
+        sr.left + (x! / vb.width) * sr.width,
+        sr.top + (y! / vb.height) * sr.height,
+      ]);
+    const xAt = (y: number, a: number[], c: number[]) =>
+      a[0]! + ((y - a[1]!) / (c[1]! - a[1]!)) * (c[0]! - a[0]!);
+    const inside = (x: number, y: number) =>
+      y >= tl![1]! - 0.5 &&
+      y <= bl![1]! + 0.5 &&
+      x >= xAt(y, tl!, bl!) - 0.5 &&
+      x <= xAt(y, tr!, br!) + 0.5;
+    const corners = (r: DOMRect) =>
+      [
+        [r.left, r.top],
+        [r.right, r.top],
+        [r.left, r.bottom],
+        [r.right, r.bottom],
+      ] as const;
+    const walker = document.createTreeWalker(plane, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent?.trim() || n.parentElement!.closest('svg')) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      for (const r of range.getClientRects()) {
+        if (r.width === 0 || r.height === 0) continue;
+        if (!corners(r).every(([x, y]) => inside(x, y))) {
+          violations.push(`${(plane as HTMLElement).dataset['testid']}: "${n.textContent.trim()}"`);
+        }
+      }
+    }
+    for (const el of plane.querySelectorAll('button')) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (!corners(r).every(([x, y]) => inside(x, y))) {
+        violations.push(
+          `${(plane as HTMLElement).dataset['testid']}: button ${el.getAttribute('data-testid')}`,
+        );
+      }
+    }
+  }
+  return violations;
+};
+
+test.describe('主题 Theme · 筑梦蓝图的楼板', () => {
+  const CASES = [
+    { w: 1024, h: 768, players: 10 },
+    { w: 1024, h: 768, players: 4 },
+    { w: 1280, h: 800, players: 6 },
+    { w: 1920, h: 1080, players: 10 },
+  ] as const;
+  for (const c of CASES) {
+    test(`${c.w}×${c.h}、${c.players} 人：各层文字与按钮都在各自楼板的顶面之内（含逐层设为焦点层）`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(isMobileProject(testInfo.project.name), '中央舞台只在桌面视口出现');
+      await page.setViewportSize({ width: c.w, height: c.h });
+      await preselectTheme(page, 'blueprint');
+      await page.goto(`/game/debug?players=${c.players}`);
+      await waitForAppReady(page);
+      await expect(page.getByTestId('blueprint-stage')).toBeVisible({ timeout: 10_000 });
+      expect(await page.evaluate(SLAB_BOUNDS), '默认焦点层').toEqual([]);
+      for (const layer of [0, 1, 2, 3, 4]) {
+        await page.getByTestId(`layer-focus-${layer}`).click();
+        await expect(page.getByTestId(`layer-row-${layer}`)).toHaveAttribute('data-focus', 'true');
+        expect(await page.evaluate(SLAB_BOUNDS), `焦点层 ${layer}`).toEqual([]);
+      }
+    });
+  }
+});

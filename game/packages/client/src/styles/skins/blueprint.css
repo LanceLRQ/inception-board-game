@@ -2,7 +2,7 @@
  * 「筑梦蓝图」皮肤：深普鲁士蓝图纸、制图白线、网格底、轴测楼板与图签。
  * 全部限定在 [data-theme='blueprint'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
  * 动效：陀螺旋转、穿层虚线流动可由 data-fx-off 单独关闭（totem / flow），网格底可关闭（grid）；
- * 系统「减少动效」与 data-motion='reduced' 下全部停掉。
+ * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下全部停掉。
  */
 
 /* ---------- 舞台与背景氛围 ---------- */
@@ -411,9 +411,9 @@
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='blueprint'] .blueprint-totem,
-  [data-theme='blueprint'] .blueprint-kick,
-  [data-theme='blueprint'] .ms-seat-flag {
+  [data-theme='blueprint']:root:not([data-motion='full']) .blueprint-totem,
+  [data-theme='blueprint']:root:not([data-motion='full']) .blueprint-kick,
+  [data-theme='blueprint']:root:not([data-motion='full']) .ms-seat-flag {
     animation: none;
   }
 }

@@ -24,10 +24,12 @@ const FACE_HEIGHT: Readonly<Record<SlabKind, number>> = {
 };
 
 /**
- * 楼板内文字内容左右各内缩的百分比：取倾斜量的 0.8 倍。
- * 行内容垂直居中，左右边在行中线处各向内收进约半个倾斜量，再留出行高带来的余量。
+ * 楼板内容左右各内缩的百分比（相对楼板宽度）：倾斜量加一份描边余量。
+ * 斜切的楼板左边在顶部最靠右（偏移整个倾斜量）、右边在底部最靠左（同样收进整个倾斜量），
+ * 所以无论内容在板面的哪一段（单行居中、两行、换行后占满板面），只要左右各内缩这么多，
+ * 内容的四个角就都在顶面平行四边形之内；不依赖行高与内容高度，窗口怎么缩放都成立。
  */
-export const SLAB_CONTENT_INSET = Math.round((SLAB_SKEW / SLAB_WIDTH) * 100 * 0.8 * 10) / 10;
+export const SLAB_CONTENT_INSET = Math.round(((SLAB_SKEW + MARGIN) / SLAB_WIDTH) * 100 * 10) / 10;
 
 export interface SlabGeometry {
   /** SVG 视窗 */

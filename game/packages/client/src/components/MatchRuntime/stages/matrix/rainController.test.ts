@@ -228,6 +228,19 @@ describe('数字雨控制器', () => {
     expect(h.hasPending()).toBe(false);
   });
 
+  it('data-motion=full 盖过系统的减少动效偏好，运行中切换即时生效', () => {
+    const h = makeHarness();
+    h.flags.reduced = true;
+    h.attrs['data-motion'] = 'full';
+    h.controller.start();
+    expect(h.states).toEqual(['running']);
+
+    h.attrs['data-motion'] = null;
+    h.emit('attributes');
+    expect(h.states.at(-1)).toBe('static');
+    expect(h.hasPending()).toBe(false);
+  });
+
   it('静态模式下页面不可见也保持 static，不会误报 paused', () => {
     const h = makeHarness();
     h.flags.reduced = true;

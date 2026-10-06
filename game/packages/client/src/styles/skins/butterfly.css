@@ -6,7 +6,7 @@
  *
  * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
  *   paper  纸纹    drift  蝶的漂移与扇动、墨点呼吸
- * 系统「减少动效」与 data-motion='reduced' 下，所有动画停掉。
+ * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下，所有动画停掉。
  */
 
 /* 楷体只有一个字重：不合成粗体（合成的粗体笔画发糊），强调靠字号与字距 */
@@ -435,9 +435,9 @@
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='butterfly'] .butterfly-flyer,
-  [data-theme='butterfly'] .butterfly-wings,
-  [data-theme='butterfly'] .butterfly-breath {
+  [data-theme='butterfly']:root:not([data-motion='full']) .butterfly-flyer,
+  [data-theme='butterfly']:root:not([data-motion='full']) .butterfly-wings,
+  [data-theme='butterfly']:root:not([data-motion='full']) .butterfly-breath {
     animation: none;
   }
 }
