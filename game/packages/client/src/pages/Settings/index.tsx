@@ -1,25 +1,29 @@
+import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { AudioControls } from '../../components/AudioControls';
 import { AccountSection } from './AccountSection';
 
 export default function Settings() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-background p-4 text-foreground">
-      <h1 className="mb-6 text-2xl font-bold">设置</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t('settings.title')}</h1>
 
       <AccountSection />
 
       <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">外观</h2>
+        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
+          {t('settings.appearance')}
+        </h2>
         <div className="flex items-center justify-between">
-          <span className="text-sm">主题</span>
+          <span className="text-sm">{t('settings.theme')}</span>
           <ThemeToggle />
         </div>
       </section>
 
       <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">音效</h2>
+        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{t('settings.sound')}</h2>
         <AudioControls />
       </section>
 
