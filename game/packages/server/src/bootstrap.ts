@@ -20,7 +20,12 @@ import { createBanChecker, type BanChecker } from './services/BanChecker.js';
 import type { RecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js';
 import { BotManager } from './services/BotManager.js';
 import { ChatService } from './services/ChatService.js';
-import { LobbyService, type LobbyPrisma, type LobbyRedis } from './services/LobbyService.js';
+import {
+  LobbyService,
+  type LobbyPrisma,
+  type LobbyRedis,
+  type RoomState,
+} from './services/LobbyService.js';
 import { MoveGateway } from './services/MoveGateway.js';
 import { InMemoryRateGuard, type RateGuardMutable } from './services/RateGuardService.js';
 import { ConnectionRegistry } from './ws/connectionRegistry.js';
@@ -106,6 +111,8 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     onStorageHealth: (matchID, healthy) => gateway.sendStorageHealth(matchID, healthy),
     onResync: (matchID) => gateway.resyncMatch(matchID),
     onAborted: (matchID) => gateway.abortMatch(matchID),
+    // 大厅在对局服务之后才建好；恢复时才会用到，那时 lobby 已就绪
+    lookupRoom: (code): Promise<RoomState | null> => lobby.getRoom(code),
     // 对局结束的标记已在最后一条 icg:step 的视图里
     onGameOver: (matchID) => {
       logger.info({ matchID }, 'match over');

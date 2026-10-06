@@ -4,6 +4,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { InceptionCityGame, eventsFor, viewMatch } from '@icgame/game-engine';
 import { signToken } from '../infra/jwt.js';
+import { logger } from '../infra/logger.js';
 import { InMemoryMatchStore } from './MatchStore.js';
 import { InMemoryMatchArchive } from './MatchArchive.js';
 import { InMemoryRateGuard } from '../services/RateGuardService.js';
@@ -420,7 +421,7 @@ describe('重启恢复', () => {
     // 恢复节奏：连接变化不会重置已挂的计时器，所以重新从存储挂载房间，让它按新时长排程，再打完
     Object.assign(second.timing, FAST_TIMING);
     second.rt.matches.shutdown();
-    expect(await second.rt.matches.restoreAll()).toEqual({ restored: 1, failed: [] });
+    expect(await second.rt.matches.restoreAll()).toEqual({ restored: 1, discarded: 0, failed: [] });
     for (const c of again) c.startAutoPlay();
     await waitUntil(() => again.every((c) => c.isGameOver()), '重启后打完', 25_000);
     const finalID = again[0]!.latestStateID();
@@ -485,6 +486,28 @@ describe('掉线接管', () => {
     );
     await back.waitFor((c) => c.acceptedCount > 0, '重连后的真人自己行动被接受', 20_000);
   }, 30_000);
+});
+
+describe('对局撤销后的迟到断线', () => {
+  it('撤销后再断开连接：Bot 管理器不会把这一局的登记重新建出来', async () => {
+    const server = await boot({
+      timing: { turnTimeoutMs: 60_000, pendingTimeoutMs: 60_000, responseTimeoutCapMs: 60_000 },
+    });
+    const { room, accounts } = makeRoom({ humans: 2, bots: 2 });
+    await server.rt.matches.createFromRoom(room);
+    const [a] = await joinAll(server, accounts, room.id);
+    expect(server.rt.bot.snapshot(room.id)).not.toBeNull();
+
+    await server.rt.matches.discardMatch(room.id);
+    expect(server.rt.bot.snapshot(room.id)).toBeNull();
+
+    const disconnected = (): number =>
+      vi.mocked(logger.info).mock.calls.filter((c) => c[1] === 'ws disconnected').length;
+    const before = disconnected();
+    a!.close();
+    await waitUntil(() => disconnected() > before, '网关处理了断线');
+    expect(server.rt.bot.snapshot(room.id)).toBeNull();
+  });
 });
 
 describe('挂机托管', () => {

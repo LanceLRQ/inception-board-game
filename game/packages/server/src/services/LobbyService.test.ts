@@ -68,6 +68,7 @@ describe('LobbyService', () => {
   let matches: {
     createFromRoom: Mock<(room: RoomState) => Promise<string>>;
     discardMatch: Mock<(matchID: string) => Promise<void>>;
+    isRunning: Mock<(matchID: string) => boolean>;
   };
 
   beforeEach(() => {
@@ -75,6 +76,7 @@ describe('LobbyService', () => {
     matches = {
       createFromRoom: vi.fn(async (room: RoomState) => room.id),
       discardMatch: vi.fn(async () => undefined),
+      isRunning: vi.fn(() => false),
     };
     service = new LobbyService({ matches });
     vi.clearAllMocks();
@@ -353,6 +355,44 @@ describe('LobbyService', () => {
 
       await expect(service.startGame(room.code, 'P1')).resolves.toBe(room.id);
       expect((await service.getRoom(room.code))!.status).toBe('playing');
+    });
+
+    it('同 id 的对局还在运行（撤销没清干净的残留）：先撤销再建局，房间成功进入 playing', async () => {
+      const room = await roomWith(4);
+      matches.isRunning.mockReturnValue(true);
+      const order: string[] = [];
+      matches.discardMatch.mockImplementation(async () => {
+        order.push('discard');
+      });
+      matches.createFromRoom.mockImplementation(async (r: RoomState) => {
+        order.push('create');
+        return r.id;
+      });
+
+      await expect(service.startGame(room.code, 'P1')).resolves.toBe(room.id);
+      expect(matches.isRunning).toHaveBeenCalledWith(room.id);
+      expect(matches.discardMatch).toHaveBeenCalledWith(room.id);
+      expect(order).toEqual(['discard', 'create']);
+      expect((await service.getRoom(room.code))!.status).toBe('playing');
+    });
+
+    it('没有同 id 的对局在运行时不调撤销', async () => {
+      const room = await roomWith(4);
+      matches.isRunning.mockReturnValue(false);
+
+      await service.startGame(room.code, 'P1');
+      expect(matches.discardMatch).not.toHaveBeenCalled();
+    });
+
+    it('撤销残留时抛错：开始锁被释放，房间仍是 waiting', async () => {
+      const room = await roomWith(4);
+      matches.isRunning.mockReturnValue(true);
+      matches.discardMatch.mockRejectedValueOnce(new Error('discard down'));
+
+      await expect(service.startGame(room.code, 'P1')).rejects.toThrow('discard down');
+      expect(matches.createFromRoom).not.toHaveBeenCalled();
+      expect(mock.store.has(`ico:room:${room.code}:starting`)).toBe(false);
+      expect((await service.getRoom(room.code))!.status).toBe('waiting');
     });
 
     it('takes a short start lock: SET NX EX 10', async () => {

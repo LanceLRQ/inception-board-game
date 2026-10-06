@@ -49,6 +49,8 @@ export interface MatchServiceDeps {
   onResync?(matchID: string): void;
   /** 对局无法继续（重新加载失败）：通知这一局的连接并断开 */
   onAborted?(matchID: string): void;
+  /** 按房间码读房间状态，用来识别撤销没删干净的残留快照；不注入时恢复不做这项判断 */
+  lookupRoom?(roomCode: string): Promise<Pick<RoomState, 'status'> | null>;
 }
 
 export class MatchService {
@@ -153,6 +155,11 @@ export class MatchService {
     }
   }
 
+  /** 这一局当前是否有房间在本进程里运行 */
+  isRunning(matchID: string): boolean {
+    return this.rooms.has(matchID);
+  }
+
   get(matchID: string): MatchRoom | null {
     return this.rooms.get(matchID) ?? null;
   }
@@ -183,21 +190,24 @@ export class MatchService {
   }
 
   /** 进程启动时调用：把活跃集合里的对局逐个恢复；单个失败不影响其余 */
-  async restoreAll(): Promise<{ restored: number; failed: string[] }> {
+  async restoreAll(): Promise<{ restored: number; discarded: number; failed: string[] }> {
     const ids = await this.deps.store.listActive();
     let restored = 0;
+    let discarded = 0;
     const failed: string[] = [];
 
     for (const matchID of ids) {
       if (this.rooms.has(matchID) || this.creating.has(matchID)) continue;
       try {
-        if ((await this.restoreOne(matchID)) === 'mounted') restored += 1;
+        const outcome = await this.restoreOne(matchID);
+        if (outcome === 'mounted') restored += 1;
+        else if (outcome === 'discarded') discarded += 1;
       } catch (err) {
         failed.push(matchID);
         logger.error({ matchID, err }, 'match restore failed');
       }
     }
-    return { restored, failed };
+    return { restored, discarded, failed };
   }
 
   /**
@@ -205,11 +215,12 @@ export class MatchService {
    * replacing 不为空时是替换一个已在运行（但内存状态不可信）的房间：Bot 管理器里的登记与座位在线记录原样保留；
    * 等待存储和归档期间这个房间若已被撤销或服务已关停，什么都不做，返回 'superseded'。
    * 快照里已经是结束状态时只走结束流程，返回 'finished'。
+   * 非原地恢复时若快照是撤销没删干净的残留，撤销它并返回 'discarded'。
    */
   private async restoreOne(
     matchID: string,
     replacing?: MatchRoom,
-  ): Promise<'mounted' | 'finished' | 'superseded'> {
+  ): Promise<'mounted' | 'finished' | 'superseded' | 'discarded'> {
     const inPlace = replacing !== undefined;
     const stillCurrent = (): boolean => !inPlace || this.rooms.get(matchID) === replacing;
 
@@ -218,6 +229,14 @@ export class MatchService {
     if (snapshot === null) throw new Error('快照不存在');
     if (!Array.isArray(snapshot.seats) || snapshot.seats.length === 0) {
       throw new Error('快照里没有座位表');
+    }
+    if (replacing === undefined && (await this.isOrphanSnapshot(snapshot))) {
+      logger.warn(
+        { matchID, roomCode: snapshot.roomCode },
+        'active snapshot belongs to a room that never started, discarding it',
+      );
+      await this.teardown(matchID);
+      return 'discarded';
     }
     const state = matchFromSnapshot<SetupState>(snapshot.state, game);
     if (replacing === undefined) await this.checkArchiveTail(matchID, state.stateID);
@@ -237,6 +256,26 @@ export class MatchService {
       'match restored',
     );
     return 'mounted';
+  }
+
+  /**
+   * 活跃快照是否是撤销没删干净的残留：房间只有在对局建成并存盘之后才会离开 waiting，
+   * 所以 waiting 的房间名下的活跃快照只能是撤销时没删掉的。
+   * 没有注入查询、查询失败、房间已过期都按「不是残留」处理，照常恢复。
+   */
+  private async isOrphanSnapshot(snapshot: MatchSnapshot): Promise<boolean> {
+    const { lookupRoom } = this.deps;
+    if (lookupRoom === undefined) return false;
+    try {
+      const room = await lookupRoom(snapshot.roomCode);
+      return room !== null && room.status === 'waiting';
+    } catch (err) {
+      logger.warn(
+        { matchID: snapshot.matchID, roomCode: snapshot.roomCode, err },
+        'room lookup failed, restoring match as usual',
+      );
+      return false;
+    }
   }
 
   /**

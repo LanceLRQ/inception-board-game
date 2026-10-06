@@ -94,7 +94,7 @@ export class BotManager {
     }
   }
 
-  /** 注册对局（可选；首次 onDisconnect 会自动 ensure） */
+  /** 登记对局：必须先登记，未登记的对局其掉线与超时记录会被忽略（对局撤销或结束后的迟到事件不会把登记建回来） */
   registerMatch(matchID: string): void {
     this.ensureMatch(matchID);
   }
@@ -113,7 +113,8 @@ export class BotManager {
 
   /** 玩家掉线 */
   onDisconnect(matchID: string, playerID: string): void {
-    const entry = this.ensureMatch(matchID);
+    const entry = this.matches.get(matchID);
+    if (!entry) return;
     entry.disconnects.set(playerID, this.now());
   }
 
@@ -134,7 +135,8 @@ export class BotManager {
    * 已托管的座位不再累计（它的步由 Bot 走，不会再有超时代发）。
    */
   recordTimeout(matchID: string, seat: string): void {
-    const entry = this.ensureMatch(matchID);
+    const entry = this.matches.get(matchID);
+    if (!entry) return;
     if (entry.idle.isBotControlled(seat)) return;
     const streak = (entry.timeoutStreaks.get(seat) ?? 0) + 1;
     entry.timeoutStreaks.set(seat, streak);

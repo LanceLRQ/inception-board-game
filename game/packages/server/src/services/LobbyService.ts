@@ -66,13 +66,15 @@ export interface LobbyPrisma {
 export interface LobbyDeps {
   redis?: LobbyRedis;
   prisma?: LobbyPrisma;
-  matches?: Pick<MatchService, 'createFromRoom' | 'discardMatch'>;
+  matches?: Pick<MatchService, 'createFromRoom' | 'discardMatch' | 'isRunning'>;
 }
 
 export class LobbyService {
   private readonly redis: LobbyRedis;
   private readonly prisma: LobbyPrisma;
-  private readonly matches: Pick<MatchService, 'createFromRoom' | 'discardMatch'> | undefined;
+  private readonly matches:
+    | Pick<MatchService, 'createFromRoom' | 'discardMatch' | 'isRunning'>
+    | undefined;
 
   constructor(deps: LobbyDeps = {}) {
     this.redis = deps.redis ?? createRedisClient();
@@ -215,6 +217,11 @@ export class LobbyService {
     if (locked !== 'OK') throw new AppError('CONFLICT', '正在开始');
 
     try {
+      // 持有开始锁且房间确认是 waiting：同 id 还在运行的对局只能是撤销没清干净的残留，先撤销再建
+      if (this.matches.isRunning(room.id)) {
+        logger.warn({ roomId: room.id }, 'discarding leftover match before start');
+        await this.matches.discardMatch(room.id);
+      }
       const matchId = await this.matches.createFromRoom(room);
       room.status = 'playing';
       room.matchId = matchId;

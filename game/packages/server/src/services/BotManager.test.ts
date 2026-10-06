@@ -19,6 +19,7 @@ describe('BotManager', () => {
       tickIntervalMs: 5_000,
       now: () => now,
     });
+    bot.registerMatch('m1');
   });
 
   afterEach(() => {
@@ -91,6 +92,45 @@ describe('BotManager', () => {
     });
   });
 
+  describe('未登记的对局', () => {
+    it('onDisconnect 不建登记', () => {
+      bot.onDisconnect('ghost', 'p1');
+      expect(bot.snapshot('ghost')).toBeNull();
+    });
+
+    it('recordTimeout 达到阈值也不触发接管、不建登记', () => {
+      const listener = vi.fn<(matchID: string, record: TakeoverRecord) => void>();
+      bot.onTakeover(listener);
+
+      bot.recordTimeout('ghost', 's1');
+      bot.recordTimeout('ghost', 's1');
+      bot.recordTimeout('ghost', 's1');
+
+      expect(listener).not.toHaveBeenCalled();
+      expect(bot.isBotControlled('ghost', 's1')).toBe(false);
+      expect(bot.snapshot('ghost')).toBeNull();
+    });
+
+    it('对局撤销后再断开连接：不会把登记重新建出来，之后的巡检不触发任何监听器', () => {
+      const takeover = vi.fn<(matchID: string, record: TakeoverRecord) => void>();
+      const abandon = vi.fn();
+      bot.onTakeover(takeover);
+      bot.onAbandon(abandon);
+
+      bot.registerMatch('m2');
+      bot.onDisconnect('m2', 'p1');
+      bot.disposeMatch('m2');
+      bot.onDisconnect('m2', 'p1');
+
+      expect(bot.snapshot('m2')).toBeNull();
+      now += 180_000 + 1;
+      bot.tick();
+
+      expect(takeover).not.toHaveBeenCalled();
+      expect(abandon).not.toHaveBeenCalled();
+    });
+  });
+
   describe('permanent takeover (friend-room host leaving)', () => {
     it('markPermanent keeps bot control after reconnect', () => {
       bot.markPermanent('m1', 'p1');
@@ -151,6 +191,7 @@ describe('BotManager', () => {
     });
 
     it('disposeMatch clears everything for that match', () => {
+      bot.registerMatch('m2');
       bot.onDisconnect('m1', 'p1');
       bot.onDisconnect('m2', 'p2');
 
@@ -162,6 +203,7 @@ describe('BotManager', () => {
 
   describe('multi-match isolation', () => {
     it('takeover in one match does not affect another', () => {
+      bot.registerMatch('m2');
       bot.onDisconnect('m1', 'p1');
       bot.onDisconnect('m2', 'p1'); // same player, different match
       now += 60_000;
@@ -196,6 +238,7 @@ describe('BotManager', () => {
 
     it('threshold is configurable', () => {
       const b = new BotManager({ idleTakeoverThreshold: 3, now: () => now });
+      b.registerMatch('m1');
       b.recordTimeout('m1', 's1');
       b.recordTimeout('m1', 's1');
       expect(b.isBotControlled('m1', 's1')).toBe(false);

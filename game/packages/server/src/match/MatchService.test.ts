@@ -663,7 +663,7 @@ describe('MatchService 对局结束', () => {
 
     const second = makeHarness({}, { store: first.store, archive: first.archive });
     const result = await second.svc.restoreAll();
-    expect(result).toEqual({ restored: 0, failed: [] });
+    expect(result).toEqual({ restored: 0, discarded: 0, failed: [] });
     // 归档对象是共用的：第一次抛错、重启后重试一次
     expect(recordFinish).toHaveBeenCalledTimes(2);
     expect(await second.store.listActive()).toEqual([]);
@@ -950,7 +950,7 @@ describe('MatchService.restoreAll', () => {
 
     const second = makeHarness({}, { store: first.store, archive: first.archive });
     const result = await second.svc.restoreAll();
-    expect(result).toEqual({ restored: 1, failed: [] });
+    expect(result).toEqual({ restored: 1, discarded: 0, failed: [] });
     const room = second.svc.get(id)!;
     expect(room.current().stateID).toBe(stateID);
     expect(second.svc.seatOf(id, 'acct-2')).toBe('2');
@@ -992,7 +992,7 @@ describe('MatchService.restoreAll', () => {
   it('已在注册表里的对局跳过', async () => {
     const h = makeHarness();
     await h.svc.createFromRoom(makeRoom(4, [0]));
-    expect(await h.svc.restoreAll()).toEqual({ restored: 0, failed: [] });
+    expect(await h.svc.restoreAll()).toEqual({ restored: 0, discarded: 0, failed: [] });
   });
 
   it('快照里已是结束状态：走结束流程，不建房间', async () => {
@@ -1015,6 +1015,108 @@ describe('MatchService.restoreAll', () => {
     expect(finish).toHaveBeenCalledTimes(1);
     expect(dispose).toHaveBeenCalledWith(id);
     expect(second.onGameOver).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MatchService 撤销残留的快照', () => {
+  /** 建一局再停掉进程，留下一份活跃快照，模拟撤销时 store.discard 没删成功 */
+  async function leftover(): Promise<{ first: Harness; id: string }> {
+    const first = makeHarness();
+    const id = await first.svc.createFromRoom(makeRoom(4, [0]));
+    first.svc.shutdown();
+    return { first, id };
+  }
+
+  it('活跃快照对应的房间还是 waiting：重启时撤销它，不当作对局恢复', async () => {
+    const { first, id } = await leftover();
+    const lookupRoom = vi.fn(async () => ({ status: 'waiting' as const }));
+    const second = makeHarness({ lookupRoom }, { store: first.store, archive: first.archive });
+    const dispose = vi.spyOn(second.bot, 'disposeMatch');
+
+    const result = await second.svc.restoreAll();
+
+    expect(result).toEqual({ restored: 0, discarded: 1, failed: [] });
+    expect(lookupRoom).toHaveBeenCalledWith('ABCDEF');
+    expect(await second.store.load(id)).toBeNull();
+    expect(await second.store.listActive()).not.toContain(id);
+    expect(second.svc.isRunning(id)).toBe(false);
+    expect(dispose).toHaveBeenCalledWith(id);
+    expect(second.bot.snapshot(id)).toBeNull();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: id, roomCode: 'ABCDEF' }),
+      expect.any(String),
+    );
+  });
+
+  it('房间已是 playing：照常恢复', async () => {
+    const { first, id } = await leftover();
+    const second = makeHarness(
+      { lookupRoom: async () => ({ status: 'playing' }) },
+      { store: first.store, archive: first.archive },
+    );
+    expect(await second.svc.restoreAll()).toEqual({ restored: 1, discarded: 0, failed: [] });
+    expect(second.svc.isRunning(id)).toBe(true);
+    expect(await second.store.load(id)).not.toBeNull();
+  });
+
+  it('房间已不存在（过期）：照常恢复', async () => {
+    const { first, id } = await leftover();
+    const second = makeHarness(
+      { lookupRoom: async () => null },
+      { store: first.store, archive: first.archive },
+    );
+    expect(await second.svc.restoreAll()).toEqual({ restored: 1, discarded: 0, failed: [] });
+    expect(second.svc.isRunning(id)).toBe(true);
+  });
+
+  it('查询房间抛错：记警告并保守地照常恢复', async () => {
+    const { first, id } = await leftover();
+    const second = makeHarness(
+      {
+        lookupRoom: async () => {
+          throw new Error('redis down');
+        },
+      },
+      { store: first.store, archive: first.archive },
+    );
+    expect(await second.svc.restoreAll()).toEqual({ restored: 1, discarded: 0, failed: [] });
+    expect(second.svc.isRunning(id)).toBe(true);
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: id }),
+      expect.any(String),
+    );
+  });
+
+  it('没有注入 lookupRoom：照常恢复', async () => {
+    const { first, id } = await leftover();
+    const second = makeHarness({}, { store: first.store, archive: first.archive });
+    expect(await second.svc.restoreAll()).toEqual({ restored: 1, discarded: 0, failed: [] });
+    expect(second.svc.isRunning(id)).toBe(true);
+  });
+
+  it('原地替换（写快照冲突后重新加载）不做孤儿判断', async () => {
+    const lookupRoom = vi.fn(async () => ({ status: 'waiting' as const }));
+    const h = makeHarness({ lookupRoom });
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    lookupRoom.mockClear();
+    const stale = h.svc.get(id)!;
+    await (
+      h.svc as unknown as { recoverFromConflict(id: string, room: unknown): Promise<void> }
+    ).recoverFromConflict(id, stale);
+    expect(lookupRoom).not.toHaveBeenCalled();
+    expect(h.svc.isRunning(id)).toBe(true);
+    expect(h.svc.get(id)).not.toBe(stale);
+  });
+});
+
+describe('MatchService.isRunning', () => {
+  it('建局后为 true，撤销后为 false', async () => {
+    const h = makeHarness();
+    expect(h.svc.isRunning('room-1')).toBe(false);
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    expect(h.svc.isRunning(id)).toBe(true);
+    await h.svc.discardMatch(id);
+    expect(h.svc.isRunning(id)).toBe(false);
   });
 });
 
@@ -1256,7 +1358,7 @@ describe('MatchService 结尾缺步时不报完整', () => {
 
     archive.down = false;
     const second = makeHarness({}, { store: first.store, archive });
-    expect(await second.svc.restoreAll()).toEqual({ restored: 0, failed: [] });
+    expect(await second.svc.restoreAll()).toEqual({ restored: 0, discarded: 0, failed: [] });
     expect(recordFinish).toHaveBeenCalledTimes(1);
     expect(await second.store.listActive()).toEqual([]);
     const gaps = await archive.listGaps(id);

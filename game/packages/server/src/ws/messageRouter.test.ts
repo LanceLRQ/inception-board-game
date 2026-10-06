@@ -14,6 +14,7 @@ describe('WSMessageRouter', () => {
   beforeEach(() => {
     heartbeat = { recordHeartbeat: vi.fn().mockResolvedValue(undefined) };
     bot = new BotManager({ tickIntervalMs: 99_999 });
+    bot.registerMatch('m1');
     router = new WSMessageRouter({
       heartbeat: heartbeat as never,
       bot,
