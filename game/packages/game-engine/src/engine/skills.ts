@@ -8,7 +8,10 @@ import {
   drawCards,
   movePlayerToLayer,
   incrementMoveCounter,
+  discardCard,
+  discardCards,
   setLayerHeartLock,
+  setTurnPhase,
   HEART_LOCK_REDUCED_BY_SKILL_KEY,
 } from '../moves.js';
 import { killPlayer, sendToLimbo } from './death.js';
@@ -224,26 +227,26 @@ export function applyChemistRefine(
   if (!canUseSkill(player, CHEMIST_SKILL_ID, 'ownTurnLimitN', CHEMIST_LIMIT_PER_TURN)) return null;
 
   // 弃牌必须在手中
-  const handIdx = player.hand.indexOf(discardCardId);
-  if (handIdx === -1) return null;
+  if (!player.hand.includes(discardCardId)) return null;
 
   // 弃牌堆必须含 action_dream_transit
   const transitIdx = state.deck.discardPile.lastIndexOf('action_dream_transit' as CardID);
   if (transitIdx === -1) return null;
 
   let s = markSkillUsed(state, selfID, CHEMIST_SKILL_ID);
-  // 移除手牌 + 加入弃牌堆
-  const newHand = [...player.hand];
-  newHand.splice(handIdx, 1);
-  // 取出梦境穿梭剂
+  // 先付代价：从手中弃牌（弃的是时间风暴则触发效果；弃牌堆只会追加，原有下标不变）
+  s = discardCard(s, selfID, discardCardId);
+  // 取出梦境穿梭剂加入手牌
   const newDiscard = [...s.deck.discardPile];
   newDiscard.splice(transitIdx, 1);
-  // 加入手牌
-  newHand.push('action_dream_transit' as CardID);
+  const self = s.players[selfID]!;
   s = {
     ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: newHand } },
-    deck: { ...s.deck, discardPile: [...newDiscard, discardCardId] },
+    players: {
+      ...s.players,
+      [selfID]: { ...self, hand: [...self.hand, 'action_dream_transit' as CardID] },
+    },
+    deck: { ...s.deck, discardPile: newDiscard },
   };
   return s;
 }
@@ -274,20 +277,10 @@ export function applyChemistInject(
   // 穿梭剂只能移到相邻层（从 target 当前层出发）
   if (Math.abs(target.currentLayer - toLayer) !== 1) return null;
   // 手牌必须有 action_dream_transit
-  const idx = player.hand.indexOf('action_dream_transit' as CardID);
-  if (idx === -1) return null;
+  if (!player.hand.includes('action_dream_transit' as CardID)) return null;
 
   // 弃穿梭剂
-  const newHand = [...player.hand];
-  newHand.splice(idx, 1);
-  let s: SetupState = {
-    ...state,
-    players: { ...state.players, [selfID]: { ...player, hand: newHand } },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, 'action_dream_transit' as CardID],
-    },
-  };
+  let s = discardCard(state, selfID, 'action_dream_transit' as CardID);
   // target 移动
   s = movePlayerToLayer(s, targetID, toLayer);
   return s;
@@ -325,13 +318,15 @@ export function applyLordOfWarBlackMarket(
   if (pickIdx === -1) return null;
 
   let s = markSkillUsed(state, selfID, LORD_OF_WAR_SKILL_ID);
+  // 先付代价：从手中弃 2 张（弃牌堆只会追加，原有下标不变）
+  s = discardCards(s, selfID, discardIds);
   const newDiscard = [...s.deck.discardPile];
   newDiscard.splice(pickIdx, 1);
-  newHand.push(pickFromDiscard);
+  const self = s.players[selfID]!;
   s = {
     ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: newHand } },
-    deck: { ...s.deck, discardPile: [...newDiscard, ...discardIds] },
+    players: { ...s.players, [selfID]: { ...self, hand: [...self.hand, pickFromDiscard] } },
+    deck: { ...s.deck, discardPile: newDiscard },
   };
   return s;
 }
@@ -362,13 +357,11 @@ export function applyPaprikSalvation(
   if (selfID === targetID) return null;
 
   // 弃牌必须在手中
-  const handIdx = player.hand.indexOf(discardCardId);
-  if (handIdx === -1) return null;
+  if (!player.hand.includes(discardCardId)) return null;
 
   let s = markSkillUsed(state, selfID, PAPRIK_SKILL_ID);
-  // 弃手牌
-  const newHand = [...player.hand];
-  newHand.splice(handIdx, 1);
+  // 弃手牌（弃的是时间风暴则触发效果）
+  s = discardCard(s, selfID, discardCardId);
   // 复活 target：isAlive=true、deathTurn=null、迁移到 self.currentLayer
   // target 的所有手牌转给 self（先收手牌，再清 target.hand）
   const targetHand = [...target.hand];
@@ -376,7 +369,7 @@ export function applyPaprikSalvation(
     ...s,
     players: {
       ...s.players,
-      [selfID]: { ...s.players[selfID]!, hand: [...newHand, ...targetHand] },
+      [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...targetHand] },
       [targetID]: {
         ...s.players[targetID]!,
         isAlive: true,
@@ -385,7 +378,6 @@ export function applyPaprikSalvation(
         hand: [],
       },
     },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, discardCardId] },
   };
   // 移动 target 到 self 所在层
   s = movePlayerToLayer(s, targetID, player.currentLayer);
@@ -686,12 +678,7 @@ export function applyMartyrSacrifice(
   let s = markSkillUsed(state, selfID, MARTYR_SKILL_ID);
 
   // 自杀 + 弃手牌（无论骰值）：自己进迷失层，不是被击杀，没有凶手，手牌进弃牌堆
-  const handToDiscard = [...player.hand];
-  s = {
-    ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: [] } },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...handToDiscard] },
-  };
+  s = discardCards(s, selfID, [...player.hand]);
   s = sendToLimbo(s, selfID);
 
   let heartLockChanged = false;
@@ -1000,6 +987,24 @@ export function applyHlninoFlow(
   if (toLayer <= fromLayer) return state;
   // 抽 2 张（不计 skillUsed，因被动且每次移动都触发）
   return drawCards(state, playerID, 2);
+}
+
+/**
+ * 降世神通·降临的统一收口：一个 move 结算完后，对比回合主人的层数。
+ * 条件：回合主人是活着的降世神通，处于自己的出牌阶段，且这一个 move 让他到达了数字更大的梦境
+ * （迷失层按 0 算，复活自己即 0 → 1）。梦境穿梭剂、SHOOT·梦境穿梭剂、KICK 换层、复活、
+ * 各类技能与世界观造成的上移都由此触发，不必在每个 move 里各接一次；别人回合里被移动不算。
+ * 对照：docs/manual/05-dream-thieves.md 降世神通；docs/manual/08-appendix.md「移动」词条
+ */
+export function applyHlninoAscent(before: SetupState, after: SetupState): SetupState {
+  if (before.turnPhase !== 'action' || after.turnPhase !== 'action') return after;
+  const pid = before.currentPlayerID;
+  if (after.currentPlayerID !== pid) return after;
+  const prev = before.players[pid];
+  const next = after.players[pid];
+  if (!prev || !next || prev.characterId !== 'thief_hlnino') return after;
+  if (!next.isAlive) return after;
+  return applyHlninoFlow(after, pid, prev.isAlive ? prev.currentLayer : 0, next.currentLayer);
 }
 
 // === 梦境猎手 · 满载 ===
@@ -1344,16 +1349,20 @@ export function applyGeminiChoice(
 // 接入：在 applyShootVariant 前置 hook 检查（被动）
 export const PISCES_SKILL_ID = 'thief_pisces.skill_0';
 
-/** 双鱼·游离是否可发动（正面朝上 + 当前层 > 1） */
+/**
+ * 双鱼·游离是否可发动（正面朝上 + 活着在 1-4 层）。
+ * 第 1 层同样能发动：移到「数字更小的相邻层」即进入迷失层。
+ * 对照：docs/manual/05-dream-thieves.md 双鱼（详述第一层仍可启动游离）
+ */
 export function canPiscesEvade(player: PlayerSetup): boolean {
   if (!isCharacterFace(player.characterId, PISCES_FRONT_ID, 'front')) return false;
   if (!player.isAlive) return false;
-  if (player.currentLayer <= 1) return false;
+  if (player.currentLayer < 1) return false;
   if (!canUseSkill(player, PISCES_SKILL_ID, 'ownTurnOncePerTurn')) return false;
   return true;
 }
 
-/** 执行双鱼闪避：移到 currentLayer-1 + 翻面 */
+/** 执行双鱼闪避：移到 currentLayer-1（第 1 层则进入迷失层，不算被击杀）+ 翻面 */
 export function applyPiscesEvade(state: SetupState, selfID: string): SetupState | null {
   const player = state.players[selfID];
   if (!player || !canPiscesEvade(player)) return null;
@@ -1436,11 +1445,7 @@ export function applyLunaEclipse(
 
   let s = markSkillUsed(state, selfID, LUNA_SKILL_ID);
   // 弃 2 张 SHOOT 到弃牌堆
-  s = {
-    ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...shootCardIds] },
-  };
+  s = discardCards(s, selfID, shootCardIds);
   // 击杀 target
   s = killPlayer(s, targetID, selfID);
   // 翻面
@@ -1488,12 +1493,8 @@ export function applyLunaFullMoon(
   }
 
   let s = markSkillUsed(state, selfID, LUNA_FULL_MOON_SKILL_ID);
-  // 弃 2 张非 SHOOT
-  s = {
-    ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...discardCardIds] },
-  };
+  // 弃 2 张非 SHOOT（弃的是时间风暴则触发效果）
+  s = discardCards(s, selfID, discardCardIds);
   // 逐个复活到自己所在层
   for (const rid of reviveIDs) {
     const rp = s.players[rid]!;
@@ -2031,23 +2032,9 @@ export function applySaturnDecree(
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_saturn_territory') return null;
   if (!master.isAlive) return null;
-  const idx = master.hand.indexOf(discardCardId);
-  if (idx === -1) return null;
+  if (!master.hand.includes(discardCardId)) return null;
 
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, discardCardId],
-    },
-  };
+  let s = discardCard(state, masterID, discardCardId);
   s = drawCards(s, masterID, 1);
   return s;
 }
@@ -2117,20 +2104,7 @@ export function applySecretPassageTeleport(
     return null;
 
   // 弃掉穿梭剂
-  const idx = master.hand.indexOf(transitCardId);
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, transitCardId],
-    },
-  };
+  let s = discardCard(state, masterID, transitCardId);
   s = markSkillUsed(s, masterID, SECRET_PASSAGE_SKILL_ID);
   // 直接送到迷失层（跳过击杀状态，保留手牌）
   s = sendToLimbo(s, targetID);
@@ -2206,8 +2180,7 @@ export function applyPlutoBurning(
   if (!master || master.characterId !== 'dm_pluto_hell') return null;
   if (!master.isAlive) return null;
   if (!canUseSkill(master, PLUTO_BURNING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
-  const idx = master.hand.indexOf(discardCardId);
-  if (idx === -1) return null;
+  if (!master.hand.includes(discardCardId)) return null;
 
   // 前置检查：必须存在至少 1 名手牌<2 的存活盗梦者（manual §30 "不产生效果的技能不能无故启动"）
   // 对照：docs/manual/06-dream-master.md 冥王星·地狱 详述
@@ -2218,19 +2191,7 @@ export function applyPlutoBurning(
   if (preTargets.length === 0) return null;
 
   // 弃 1
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, discardCardId],
-    },
-  };
+  let s = discardCard(state, masterID, discardCardId);
   s = markSkillUsed(s, masterID, PLUTO_BURNING_SKILL_ID);
 
   // 所有手牌<2 的存活盗梦者抽 2（再次快照防止中途状态漂移）
@@ -2268,44 +2229,64 @@ export function applyMarsKillDiscardUnlock(state: SetupState, masterID: string):
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_mars_battlefield') return null;
   if (!master.isAlive) return null;
-  const idx = master.hand.indexOf('action_unlock');
-  if (idx === -1) return null;
+  if (!master.hand.includes('action_unlock')) return null;
 
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-  return {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, 'action_unlock' as CardID],
-    },
-  };
+  return discardCard(state, masterID, 'action_unlock' as CardID);
 }
 
 // === 冥王星·地狱世界观 ===
 // 盗梦者抽牌阶段抽牌数 = 1 颗骰子的掷骰结果
-// 抽牌阶段后手牌 ≥ 6 → 该盗梦者回合结束时进入迷失层
-// 对照：cards-data.json dm_pluto_hell 世界观
+// 抽牌阶段结束的那一刻手牌 ≥ 6 → 该盗梦者本回合照常行动，回合结束时进入迷失层；
+// 此后手牌再变多不追加（只在抽牌阶段检视一次）。进迷失层不是被击杀，不交手牌。
+// 对照：docs/manual/06-dream-master.md 冥王星·地狱（世界观与详述）
 
 const PLUTO_LOST_HAND_THRESHOLD = 6;
+
+/** 抽牌阶段结束时检视手牌后打下的标记；记在每回合自动清零的 skillUsedThisTurn 里 */
+export const PLUTO_HELL_MARK_KEY = 'dm_pluto_hell.world.marked';
 
 /** 冥王星地狱世界观激活 */
 export function isPlutoHellWorldActive(state: SetupState): boolean {
   return getMasterCharacterID(state) === 'dm_pluto_hell';
 }
 
-/** 冥王星世界观：本回合结束时检查盗梦者手牌≥6 → 入迷失层 */
+/**
+ * 抽牌阶段结束 → 进入行动阶段。
+ * 所有把 turnPhase 从 draw 切到 action 的路径（正常抽牌、跳过、小丑·赌博、黑天鹅·巡演、黑洞·吞噬）都走这里，
+ * 冥王星世界观在这一刻检视当前玩家的手牌数。
+ */
+export function endDrawPhase(state: SetupState): SetupState {
+  const s = setTurnPhase(state, 'action');
+  if (!isPlutoHellWorldActive(s)) return s;
+  const playerID = s.currentPlayerID;
+  const p = s.players[playerID];
+  if (!p || !p.isAlive || p.faction !== 'thief') return s;
+  if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return s;
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      [playerID]: {
+        ...p,
+        skillUsedThisTurn: { ...p.skillUsedThisTurn, [PLUTO_HELL_MARK_KEY]: 1 },
+      },
+    },
+  };
+}
+
+/** 冥王星世界观：回合结束时，抽牌阶段打过标记的盗梦者进入迷失层（不算击杀） */
 export function applyPlutoHellLostCheck(state: SetupState, playerID: string): SetupState {
-  if (!isPlutoHellWorldActive(state)) return state;
   const p = state.players[playerID];
-  if (!p || !p.isAlive || p.faction !== 'thief') return state;
-  if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return state;
-  if (p.currentLayer === 0) return state;
-  return sendToLimbo(state, playerID);
+  if (!p || (p.skillUsedThisTurn[PLUTO_HELL_MARK_KEY] ?? 0) < 1) return state;
+  const rest = { ...p.skillUsedThisTurn };
+  delete rest[PLUTO_HELL_MARK_KEY];
+  const cleared: SetupState = {
+    ...state,
+    players: { ...state.players, [playerID]: { ...p, skillUsedThisTurn: rest } },
+  };
+  if (!isPlutoHellWorldActive(cleared)) return cleared;
+  if (!p.isAlive || p.faction !== 'thief' || p.currentLayer === 0) return cleared;
+  return sendToLimbo(cleared, playerID);
 }
 
 // === 土星·领地世界观 ===
@@ -2733,6 +2714,13 @@ export function isSecretPassageWorldActive(state: SetupState): boolean {
  * 基础复活：弃 2 张手牌复活自己或他人
  * 密道世界观变体：弃 1 张【梦境穿梭剂】复活
  */
+/**
+ * 本回合自己复活过自己的标记，记在每回合自动清零的 skillUsedThisTurn 里。
+ * 带标记的玩家当回合不能用【解封】的效果①，效果②（抵消别人的解封）不受影响。
+ * 对照：docs/manual/04-action-cards.md 解封（效果①「复活后不能在当回合使用此效果」）
+ */
+export const REVIVED_SELF_THIS_TURN_KEY = 'revive.self';
+
 export function applyRevive(
   state: SetupState,
   selfID: string,
@@ -2772,34 +2760,38 @@ export function applyRevive(
     if (!self.hand.includes(cid)) return null;
   }
 
-  // 弃牌
-  const newHand = [...self.hand];
-  for (const cid of discardedCardIds) {
-    const idx = newHand.indexOf(cid);
-    if (idx < 0) return null;
-    newHand.splice(idx, 1);
-  }
+  // 弃牌：代价从复活者手里扣掉（弃的是时间风暴则触发效果）。
+  // 复活自己时必须先弃牌再改写自己的状态，否则弃牌后的手牌会被旧快照覆盖
+  let s = discardCards(state, selfID, discardedCardIds);
 
   // 复活目标：isAlive=true, deathTurn=null
   const reviveLayer = effectiveTarget === selfID ? 1 : self.currentLayer;
-  let s: SetupState = {
-    ...state,
+  s = {
+    ...s,
     players: {
-      ...state.players,
-      [selfID]: { ...self, hand: newHand },
+      ...s.players,
       [effectiveTarget]: {
-        ...state.players[effectiveTarget]!,
+        ...s.players[effectiveTarget]!,
         isAlive: true,
         deathTurn: null,
         layerBeforeLimbo: null,
       },
     },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, ...discardedCardIds],
-    },
   };
   s = movePlayerToLayer(s, effectiveTarget, reviveLayer as Layer);
+  if (isSelfRevive) {
+    const revived = s.players[selfID]!;
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [selfID]: {
+          ...revived,
+          skillUsedThisTurn: { ...revived.skillUsedThisTurn, [REVIVED_SELF_THIS_TURN_KEY]: 1 },
+        },
+      },
+    };
+  }
   return s;
 }
 
@@ -2843,26 +2835,16 @@ export function applyVenusMirrorWorld(
   if (!target || !target.isAlive) return null;
   if (selfID === targetID) return null;
 
-  // 弃牌
-  const newHand = [...self.hand];
+  // 弃牌（弃的是时间风暴则触发效果）
+  const handCopy = [...self.hand];
   for (const cid of discardedCardIds) {
-    const idx = newHand.indexOf(cid);
+    const idx = handCopy.indexOf(cid);
     if (idx < 0) return null;
-    newHand.splice(idx, 1);
+    handCopy.splice(idx, 1);
   }
 
   const lastCard = mirrorable[mirrorable.length - 1]!;
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [selfID]: { ...self, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, ...discardedCardIds],
-    },
-  };
+  let s = discardCards(state, selfID, discardedCardIds);
   s = markSkillUsed(s, selfID, VENUS_MIRROR_WORLD_SKILL_ID);
 
   if (lastCard === MIRRORABLE_KICK) {

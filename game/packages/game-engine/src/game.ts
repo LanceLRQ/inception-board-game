@@ -19,6 +19,7 @@ import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT, HAND_LIMIT } from './config.js';
 import {
   drawCards,
   discardCard,
+  discardCards,
   discardToLimit,
   beginTurn,
   setTurnPhase,
@@ -61,7 +62,6 @@ import {
   LIBRA_SKILL_ID,
   ARCHITECT_SKILL_ID,
   applyShadeFollow,
-  applyHlninoFlow,
   applyExtractorBounty,
   applyForgerExchange,
   isTerroristCrossLayerActive,
@@ -87,6 +87,8 @@ import {
   applySecretPassageTeleport,
   applyUranusPower,
   applyPlutoBurning,
+  endDrawPhase,
+  REVIVED_SELF_THIS_TURN_KEY,
   canMarsKill,
   applyMarsKillDiscardUnlock,
   isPlutoHellWorldActive,
@@ -471,11 +473,9 @@ export const InceptionCityGame = {
           if (s.pendingShootResponse) {
             s = { ...s, pendingShootResponse: null };
           }
-          // 冥王星地狱世界观：盗梦者回合结束时手牌≥6 → 入迷失层
-          // 对照：cards-data.json dm_pluto_hell 世界观
-          if (isPlutoHellWorldActive(s)) {
-            s = applyPlutoHellLostCheck(s, ctx.currentPlayer);
-          }
+          // 冥王星地狱世界观：抽牌阶段结束时手牌≥6 打下的标记，在该盗梦者回合结束时兑现 → 入迷失层
+          // 对照：docs/manual/06-dream-master.md 冥王星·地狱
+          s = applyPlutoHellLostCheck(s, ctx.currentPlayer);
           // abilities registry：触发 onTurnEnd passive
           s = dispatchPassives(s, 'onTurnEnd').state;
           return s;
@@ -519,7 +519,7 @@ export const InceptionCityGame = {
             // abilities registry：运行 onDrawPhase passive（白羊·skill_1 等）
             // 主动技能（小丑/黑天鹅）由 UI 通过 listAvailableActives 展示按钮，显式触发
             s = dispatchPassives(s, 'onDrawPhase').state;
-            s = setTurnPhase(s, 'action');
+            s = endDrawPhase(s);
             // 进入行动阶段 → 触发 onActionPhase passive
             s = dispatchPassives(s, 'onActionPhase').state;
             return s;
@@ -529,7 +529,7 @@ export const InceptionCityGame = {
         skipDraw: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
-            return setTurnPhase(G, 'action');
+            return endDrawPhase(G);
           },
           client: false,
         },
@@ -557,7 +557,7 @@ export const InceptionCityGame = {
                 },
               },
             };
-            s = setTurnPhase(s, 'action');
+            s = endDrawPhase(s);
             // 进入行动阶段 → 触发 onActionPhase passive
             s = dispatchPassives(s, 'onActionPhase').state;
             return s;
@@ -573,7 +573,7 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             const applied = applyBlackSwanTour(G, G.currentPlayerID, distribution);
             if (applied === null) return INVALID_MOVE;
-            let s = setTurnPhase(applied, 'action');
+            let s = endDrawPhase(applied);
             s = dispatchPassives(s, 'onActionPhase').state;
             return s;
           },
@@ -588,7 +588,7 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             const applied = applyBlackHoleLevy(G, G.currentPlayerID, giverPicks);
             if (applied === null) return INVALID_MOVE;
-            let s = setTurnPhase(applied, 'action');
+            let s = endDrawPhase(applied);
             s = dispatchPassives(s, 'onActionPhase').state;
             return s;
           },
@@ -817,21 +817,13 @@ export const InceptionCityGame = {
             } else if (result === 'move') {
               if (pending.extraOnMove) {
                 const tp = s.players[pending.targetPlayerID]!;
-                const keep: CardID[] = [];
-                const dropped: CardID[] = [];
-                for (const id of tp.hand) {
-                  const shouldDrop =
-                    pending.extraOnMove === 'discard_unlocks'
-                      ? id === 'action_unlock'
-                      : isShootClassCard(id);
-                  (shouldDrop ? dropped : keep).push(id);
-                }
+                const dropped = tp.hand.filter((id) =>
+                  pending.extraOnMove === 'discard_unlocks'
+                    ? id === 'action_unlock'
+                    : isShootClassCard(id),
+                );
                 if (dropped.length > 0) {
-                  s = {
-                    ...s,
-                    players: { ...s.players, [pending.targetPlayerID]: { ...tp, hand: keep } },
-                    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...dropped] },
-                  };
+                  s = discardCards(s, pending.targetPlayerID, dropped);
                 }
               }
               const target = s.players[pending.targetPlayerID]!;
@@ -1213,6 +1205,10 @@ export const InceptionCityGame = {
             if (!player || !player.isAlive) return INVALID_MOVE;
             if (player.faction !== 'thief') return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
+            // 自己复活自己的当回合不能用效果①（效果②走 respondCancelUnlock，不受限）
+            // 对照：docs/manual/04-action-cards.md 解封 效果①
+            if ((player.skillUsedThisTurn[REVIVED_SELF_THIS_TURN_KEY] ?? 0) > 0)
+              return INVALID_MOVE;
             // 摩羯·节奏 / 水瓶·同流：被动豁免解封次数限制
             // 黑洞·DM 世界观：上限提升至 2
             // 技能减少心锁也占用同一份次数（R-23）
@@ -1366,11 +1362,8 @@ export const InceptionCityGame = {
             if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
             if (!isAdjacent(player.currentLayer, targetLayer)) return INVALID_MOVE;
 
-            const fromLayer = player.currentLayer;
             let s = discardCard(G, ctx.currentPlayer, cardId);
             s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
-            // 降世神通·顺流：移到更大数字层时抽 2 张
-            s = applyHlninoFlow(s, ctx.currentPlayer, fromLayer, targetLayer);
             // 天王星·苍穹世界观：盗梦者因行动牌移动 → 牌库顶弃 1（贿赂派完弃 2）
             s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
             return recordCardPlayed(incrementMoveCounter(s), cardId);
@@ -2028,10 +2021,9 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 打出时间风暴 - 从牌库顶翻 10 张 + 本牌整体移出游戏
+        // 打出时间风暴 - 从牌库顶弃掉 10 张牌，本牌移出游戏
         // 对照：docs/manual/04-action-cards.md 时间风暴
-        // 规则：使用或弃掉时都触发效果；该牌 + 被翻的 10 张均"移出游戏"，
-        //      不入弃牌堆（防止被药剂师/火星·战场等回收）
+        // 规则：使用或弃掉时都触发效果；被弃掉的 10 张进弃牌堆，只有时间风暴自己移出游戏
         playTimeStorm: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -2040,30 +2032,8 @@ export const InceptionCityGame = {
             if (!isCardForPlayMove('playTimeStorm', cardId)) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
 
-            // 从手牌中移除该牌（注：此牌效果结算后"移出游戏"，不入弃牌堆）
-            const handIdx = player.hand.indexOf(cardId);
-            const newHand = [...player.hand];
-            newHand.splice(handIdx, 1);
-
-            // 从牌库顶翻 10 张（不足则全翻）
-            const flipCount = Math.min(10, G.deck.cards.length);
-            const flipped = G.deck.cards.slice(0, flipCount);
-            const remaining = G.deck.cards.slice(flipCount);
-
-            const s: SetupState = {
-              ...G,
-              players: {
-                ...G.players,
-                [ctx.currentPlayer]: { ...player, hand: newHand },
-              },
-              deck: {
-                cards: remaining,
-                discardPile: G.deck.discardPile,
-              },
-              // 本牌 + 被翻的 10 张均移出游戏
-              removedFromGame: [...G.removedFromGame, cardId, ...flipped],
-            };
-            return incrementMoveCounter(s);
+            // 打出与弃掉走同一个入口：牌库顶 10 张进弃牌堆，时间风暴自己移出游戏
+            return incrementMoveCounter(discardCard(G, ctx.currentPlayer, cardId));
           },
           client: false,
         },
@@ -2782,31 +2752,6 @@ export const InceptionCityGame = {
                 },
               };
             }
-            // 时间风暴：弃牌阶段弃掉同样触发效果，且该牌本身与翻的 10 张牌库顶
-            // 均"移出游戏"而非进入弃牌堆。
-            // 对照：docs/manual/04-action-cards.md 时间风暴"使用或弃掉时都触发效果"
-            const stormCount = cardIds.filter((c) => c === 'action_time_storm').length;
-            if (stormCount > 0) {
-              const dp = [...next.deck.discardPile];
-              // 1) 将 discardToLimit 误入 discardPile 的 N 张风暴抠回，改路 removedFromGame
-              const extractedStorms: CardID[] = [];
-              for (let i = 0; i < stormCount; i++) {
-                const idx = dp.lastIndexOf('action_time_storm' as CardID);
-                if (idx !== -1) {
-                  dp.splice(idx, 1);
-                  extractedStorms.push('action_time_storm' as CardID);
-                }
-              }
-              // 2) 每张风暴翻 10 张牌库顶（累积 = 10 * N，不足全翻），同样进 removedFromGame
-              const totalFlip = Math.min(10 * stormCount, next.deck.cards.length);
-              const flipped = next.deck.cards.slice(0, totalFlip);
-              const remaining = next.deck.cards.slice(totalFlip);
-              next = {
-                ...next,
-                deck: { cards: remaining, discardPile: dp },
-                removedFromGame: [...next.removedFromGame, ...extractedStorms, ...flipped],
-              };
-            }
             // 弃牌完成 → 切下一回合
             events.endTurn();
             return next;
@@ -3007,12 +2952,7 @@ function applyNightmareEffect(
       if (!p || !p.isAlive) continue;
       if (p.currentLayer === 0) continue;
       if (p.currentLayer === layer) continue;
-      const hand = p.hand;
-      s = {
-        ...s,
-        players: { ...s.players, [pid]: { ...p, hand: [] } },
-        deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...hand] },
-      };
+      s = discardCards(s, pid, p.hand);
       s = movePlayerToLayer(s, pid, layer);
     }
     return s;
@@ -3101,13 +3041,7 @@ function applyNightmareEffect(
       if (!p || !p.isAlive) continue;
       if (p.hand.length >= 3) {
         // 弃前 3 张（MVP 策略；真实应让玩家选）
-        const drop = p.hand.slice(0, 3);
-        const keep = p.hand.slice(3);
-        s = {
-          ...s,
-          players: { ...s.players, [pid]: { ...p, hand: keep } },
-          deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...drop] },
-        };
+        s = discardCards(s, pid, p.hand.slice(0, 3));
       } else {
         // 不足 3 张 → 入迷失层（保留手牌，不视为被梦主击杀）
         s = sendToLimbo(s, pid);
@@ -3378,19 +3312,11 @@ function applyShootVariant(
     // on-move 副作用：弃目标特定手牌
     if (opts.extraOnMove) {
       const tp = s.players[targetPlayerID]!;
-      const keep: CardID[] = [];
-      const dropped: CardID[] = [];
-      for (const id of tp.hand) {
-        const shouldDrop =
-          opts.extraOnMove === 'discard_unlocks' ? id === 'action_unlock' : isShootClassCard(id);
-        (shouldDrop ? dropped : keep).push(id);
-      }
+      const dropped = tp.hand.filter((id) =>
+        opts.extraOnMove === 'discard_unlocks' ? id === 'action_unlock' : isShootClassCard(id),
+      );
       if (dropped.length > 0) {
-        s = {
-          ...s,
-          players: { ...s.players, [targetPlayerID]: { ...tp, hand: keep } },
-          deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...dropped] },
-        };
+        s = discardCards(s, targetPlayerID, dropped);
       }
     }
     // 相邻层选择（1<->2, 2<->3, 3<->4；L1/L4 唯一相邻层自动移动；L2/L3 两选一 → 挂起）

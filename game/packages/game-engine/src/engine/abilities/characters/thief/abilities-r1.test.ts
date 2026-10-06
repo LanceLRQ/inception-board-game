@@ -318,7 +318,7 @@ describe('双鱼·闪避', () => {
     expect(piscesEvade.canActivate(s, ctx).ok).toBe(true);
   });
 
-  it('当前层=1 → 拒绝', () => {
+  it('当前层=1 → 允许（游离进入迷失层）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_pisces');
     s = setLayer(s, 'p1', 1 as Layer);
@@ -331,7 +331,7 @@ describe('双鱼·闪避', () => {
         modifiers: [],
       },
     });
-    expect(piscesEvade.canActivate(s, ctx).ok).toBe(false);
+    expect(piscesEvade.canActivate(s, ctx).ok).toBe(true);
   });
 
   it('非 target → 拒绝', () => {

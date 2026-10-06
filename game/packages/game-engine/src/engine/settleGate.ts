@@ -8,12 +8,14 @@
 // 这期间只有被等待的人能发结算它的那几个 move；否则玩家可以继续出牌把手牌耗尽，结算条件无法满足，对局卡死。
 // 「谁能发什么」只在行动权表里维护一份，这里不再另存 move 清单。
 // 行动权通过后，再按参数形状表（moveArgs.ts）校验参数：类型不对的参数在进入 move 之前就被拒绝。
+// 每个 move 结算后还统一处理「回合主人在自己出牌阶段移到更大数字梦境」的降世神通·降临。
 // 对照：docs/manual/04-action-cards.md 嫁接、万有引力、解封
 
 import type { SetupState } from '../setup.js';
 import { INVALID_MOVE } from './invalidMove.js';
 import { denyAction } from './actionRights.js';
 import { checkMoveArgs } from './moveArgs.js';
+import { applyHlninoAscent } from './skills.js';
 
 interface GatedMove {
   move: (...args: never[]) => unknown;
@@ -38,7 +40,13 @@ export function withSettleGate<M extends Record<string, GatedMove>>(moves: M): M
       const actor = context.playerID ?? context.ctx.currentPlayer;
       if (denyAction(context.G, actor, name) !== null) return INVALID_MOVE;
       if (!checkMoveArgs(context.G, name, rest)) return INVALID_MOVE;
-      return original({ ...context, ctx: { ...context.ctx, currentPlayer: actor } }, ...rest);
+      const result = original(
+        { ...context, ctx: { ...context.ctx, currentPlayer: actor } },
+        ...rest,
+      );
+      // 降世神通·降临：所有 move 共用的收口，见 applyHlninoAscent
+      if (result === INVALID_MOVE || typeof result !== 'object' || result === null) return result;
+      return applyHlninoAscent(context.G, result as SetupState);
     };
     Object.defineProperty(gated, 'unwrapped', { value: original });
     gatedMoves[name] = { ...def, move: gated as never };

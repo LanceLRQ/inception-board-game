@@ -35,7 +35,36 @@ export function drawCards(
   };
 }
 
-// === 弃牌阶段 ===
+// === 时间风暴 ===
+const TIME_STORM_ID = 'action_time_storm' as CardID;
+const TIME_STORM_FLIP_COUNT = 10;
+
+/**
+ * 时间风暴的效果：从牌库顶弃掉 10 张牌（进弃牌堆，不足则全弃），然后风暴自己移出游戏。
+ * 调用时风暴牌已在弃牌堆顶（刚从手中弃出）。牌库被翻空后的胜负由终局判定处理。
+ * 对照：docs/manual/04-action-cards.md 时间风暴（发动效果与解析）
+ */
+function resolveTimeStorm(state: SetupState): SetupState {
+  const pile = [...state.deck.discardPile];
+  const stormIdx = pile.lastIndexOf(TIME_STORM_ID);
+  if (stormIdx !== -1) pile.splice(stormIdx, 1);
+  const flipCount = Math.min(TIME_STORM_FLIP_COUNT, state.deck.cards.length);
+  return {
+    ...state,
+    deck: {
+      ...state.deck,
+      cards: state.deck.cards.slice(flipCount),
+      discardPile: [...pile, ...state.deck.cards.slice(0, flipCount)],
+    },
+    removedFromGame: [...state.removedFromGame, TIME_STORM_ID],
+  };
+}
+
+// === 从手中弃牌（唯一入口）===
+// 手牌 → 弃牌堆的所有路径都走这里：弃牌阶段、复活代价、技能代价、梦魇逼弃、被效果弃掉手牌，
+// 以及打出时间风暴本身。弃出的是时间风暴则触发其效果；
+// 打出别的行动牌后进弃牌堆、交给别人、被抽走、放回牌库顶都不是「弃掉」，不走这里的触发。
+// 对照：docs/manual/04-action-cards.md 时间风暴「从手中使用或弃掉，同样触发效果」
 export function discardCard(state: SetupState, playerID: string, cardId: CardID): SetupState {
   const player = state.players[playerID];
   if (!player) return state;
@@ -46,7 +75,7 @@ export function discardCard(state: SetupState, playerID: string, cardId: CardID)
   const newHand = [...player.hand];
   newHand.splice(idx, 1);
 
-  return {
+  const discarded: SetupState = {
     ...state,
     players: {
       ...state.players,
@@ -60,6 +89,18 @@ export function discardCard(state: SetupState, playerID: string, cardId: CardID)
       discardPile: [...state.deck.discardPile, cardId],
     },
   };
+  return cardId === TIME_STORM_ID ? resolveTimeStorm(discarded) : discarded;
+}
+
+/** 从手中依次弃掉多张牌，每张时间风暴各触发一次 */
+export function discardCards(
+  state: SetupState,
+  playerID: string,
+  cardIds: readonly CardID[],
+): SetupState {
+  let s = state;
+  for (const cardId of cardIds) s = discardCard(s, playerID, cardId);
+  return s;
 }
 
 // 强制弃至手牌上限
@@ -68,11 +109,7 @@ export function discardToLimit(
   playerID: string,
   cardsToDiscard: CardID[],
 ): SetupState {
-  let s = state;
-  for (const cardId of cardsToDiscard) {
-    s = discardCard(s, playerID, cardId);
-  }
-  return s;
+  return discardCards(state, playerID, cardsToDiscard);
 }
 
 // 需要弃牌的手牌数

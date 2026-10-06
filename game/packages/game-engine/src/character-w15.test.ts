@@ -120,9 +120,20 @@ describe('双鱼 · 闪避（thief_pisces）', () => {
     expect(r!.players.p1!.skillUsedThisTurn[PISCES_SKILL_ID]).toBe(1);
   });
 
-  it('拒绝：在 layer 1 无法向下', () => {
+  it('layer 1 同样可发动：进入迷失层，不算被击杀', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_pisces' as CardID);
+    expect(canPiscesEvade(s.players.p1!)).toBe(true);
+    const r = applyPiscesEvade(s, 'p1');
+    expect(r).not.toBeNull();
+    expect(r!.players.p1!.currentLayer).toBe(0);
+    expect(r!.players.p1!.isAlive).toBe(false);
+  });
+
+  it('拒绝：已在迷失层', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_pisces' as CardID);
+    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, currentLayer: 0 as Layer } } };
     expect(canPiscesEvade(s.players.p1!)).toBe(false);
     expect(applyPiscesEvade(s, 'p1')).toBeNull();
   });

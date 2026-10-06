@@ -18,6 +18,7 @@ import {
   applyLunaEclipse,
   shouldJupiterThunderKill,
   applyPlutoHellLostCheck,
+  endDrawPhase,
   isPlutoHellWorldActive,
   applyFortressDiceModifier,
   applyExtractorBounty,
@@ -466,11 +467,20 @@ describe('木星雷霆层差矩阵', () => {
 });
 
 describe('冥王星·地狱手牌边界', () => {
-  // applyPlutoHellLostCheck 返回 SetupState：hand<阈值 / 无世界观 / 已在迷失 → 返回原状态
-  // hand>=阈值 且在非迷失层 → 返回新状态（currentLayer=0）
+  // 抽牌阶段结束时（endDrawPhase）检视手牌打标记，回合结束时（applyPlutoHellLostCheck）兑现。
+  // 对照：docs/manual/06-dream-master.md 冥王星·地狱
+  /** 当前玩家 p1 抽牌阶段结束时手牌 n 张 */
+  function drawPhaseEnded(s: SetupState, n: number): SetupState {
+    const withHand = setHand(
+      { ...s, turnPhase: 'draw', currentPlayerID: 'p1' },
+      'p1',
+      Array(n).fill('action_unlock') as CardID[],
+    );
+    return endDrawPhase(withHand);
+  }
+
   it('手牌 = 5（阈值-1）→ currentLayer 不变（非迷失层）', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
-    s = setHand(s, 'p1', Array(5).fill('action_unlock') as CardID[]);
+    const s = drawPhaseEnded(setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell'), 5);
     const beforeLayer = s.players.p1!.currentLayer;
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(beforeLayer);
@@ -479,23 +489,21 @@ describe('冥王星·地狱手牌边界', () => {
   it('手牌 = 6（阈值）→ currentLayer 变为 0（迷失层）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setLayer(s, 'p1', 2 as Layer);
-    s = setHand(s, 'p1', Array(6).fill('action_unlock') as CardID[]);
-    const r = applyPlutoHellLostCheck(s, 'p1');
+    const r = applyPlutoHellLostCheck(drawPhaseEnded(s, 6), 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
   });
 
   it('手牌 = 7（阈值+1）→ currentLayer 变为 0', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setLayer(s, 'p1', 3 as Layer);
-    s = setHand(s, 'p1', Array(7).fill('action_unlock') as CardID[]);
-    const r = applyPlutoHellLostCheck(s, 'p1');
+    const r = applyPlutoHellLostCheck(drawPhaseEnded(s, 7), 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
   });
 
   it('非冥王星梦主 + 手牌 8 → currentLayer 不变', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
     s = setLayer(s, 'p1', 2 as Layer);
-    s = setHand(s, 'p1', Array(8).fill('action_unlock') as CardID[]);
+    s = drawPhaseEnded(s, 8);
     expect(isPlutoHellWorldActive(s)).toBe(false);
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(2);
@@ -508,7 +516,17 @@ describe('冥王星·地狱手牌边界', () => {
       ...s,
       players: { ...s.players, p1: { ...s.players.p1!, currentLayer: 0 as Layer } },
     };
-    s = setHand(s, 'p1', Array(6).fill('action_unlock') as CardID[]);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: Array(6).fill('action_unlock') as CardID[],
+          skillUsedThisTurn: { 'dm_pluto_hell.world.marked': 1 },
+        },
+      },
+    };
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
   });
@@ -1049,11 +1067,11 @@ describe('角色被动触发守卫', () => {
     expect(canPiscesEvade(s.players.p1!)).toBe(true);
   });
 
-  it('canPiscesEvade：双鱼 + L1 → false（无法下一层）', () => {
+  it('canPiscesEvade：双鱼 + L1 → true（从第一层游离即进入迷失层）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_pisces');
     // p1 默认在 L1
-    expect(canPiscesEvade(s.players.p1!)).toBe(false);
+    expect(canPiscesEvade(s.players.p1!)).toBe(true);
   });
 
   it('canPiscesEvade：非双鱼 → false', () => {

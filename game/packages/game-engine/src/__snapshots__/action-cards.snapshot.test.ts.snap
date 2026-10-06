@@ -1321,11 +1321,22 @@ exports[`行动牌快照回归 · 21 卡 > 14. playResonance · p1 拿 p2 全部
 }
 `;
 
-exports[`行动牌快照回归 · 21 卡 > 15. playTimeStorm · 牌库顶 10 张 + 本牌移出游戏 1`] = `
+exports[`行动牌快照回归 · 21 卡 > 15. playTimeStorm · 牌库顶 10 张进弃牌堆 + 本牌移出游戏 1`] = `
 {
   "currentPlayerID": "p1",
   "deckSize": 10,
-  "discardPile": [],
+  "discardPile": [
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+    "action_unlock",
+  ],
   "layers": {
     "1": {
       "heartLockValue": 5,
@@ -1403,16 +1414,6 @@ exports[`行动牌快照回归 · 21 卡 > 15. playTimeStorm · 牌库顶 10 张
   },
   "removedFromGame": [
     "action_time_storm",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
-    "action_unlock",
   ],
   "shiftSnapshot": null,
   "turnPhase": "action",

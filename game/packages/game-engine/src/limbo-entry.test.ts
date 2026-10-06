@@ -225,10 +225,9 @@ describe('迷失层里的人不再被当作活人', () => {
 });
 
 describe('冥王星·地狱世界观', () => {
-  it('回合结束时手牌不少于 6 张，进迷失层且视为已死亡，之后可复活', () => {
-    const hand6 = Array<CardID>(6).fill(KICK);
+  it('抽牌阶段结束手牌不少于 6 张，回合结束进迷失层且视为已死亡，之后可复活', () => {
     const base = scene({
-      p1: { layer: 1, hand: hand6 },
+      p1: { layer: 1, hand: [KICK, KICK, KICK, KICK] },
       p2: { layer: 1, hand: [KICK, KICK] },
       p3: { layer: 1, hand: [KICK] },
       p4: { layer: 3, hand: [KICK] },
@@ -237,24 +236,34 @@ describe('冥王星·地狱世界观', () => {
     const G: SetupState = {
       ...base,
       currentPlayerID: 'p1',
-      turnPhase: 'discard',
+      turnPhase: 'draw',
       players: {
         ...base.players,
         pM: { ...base.players.pM!, characterId: c('dm_pluto_hell') },
-        // 巨蟹·庇佑生效时弃牌不受上限限制，手牌才能带着 6 张结束回合
-        p3: { ...base.players.p3!, characterId: c('thief_cancer') },
       },
     };
-    const res = applyMove(game, load(G), { playerID: 'p1', move: 'doDiscard', args: [[]] });
-    expect(res.ok).toBe(true);
-    if (!res.ok) return;
-    const p = res.state.G.players.p1!;
+    // 掷骰 2：抽完 4 + 2 = 6 张
+    const step = (state: SetupState, move: string, args: unknown[] = []) => {
+      const r = applyMove(
+        game,
+        load(state),
+        { playerID: 'p1', move, args },
+        { random: fixedRandom(2) },
+      );
+      expect(r.ok).toBe(true);
+      if (!r.ok) throw new Error(`${move} 被拒绝`);
+      return r.state.G;
+    };
+    let after = step(G, 'doDraw');
+    after = step(after, 'endActionPhase');
+    after = step(after, 'doDiscard', [[KICK]]);
+    const p = after.players.p1!;
     expect(p.isAlive).toBe(false);
     expect(p.deathTurn).toBe(TURN);
     expect(p.currentLayer).toBe(0);
-    expect(p.hand).toEqual(hand6);
+    expect(p.hand).toHaveLength(5);
 
-    const revive = applyMove(game, load(asTurn(res.state.G, 'p1')), {
+    const revive = applyMove(game, load(asTurn(after, 'p1')), {
       playerID: 'p1',
       move: 'playRevive',
       args: [null, [KICK, KICK]],

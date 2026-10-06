@@ -104,33 +104,29 @@ function callTimeStorm(G: SetupState, cardId: CardID) {
 }
 
 describe('时间风暴（playTimeStorm）', () => {
-  it('从牌库顶翻 10 张 + 本牌 + 翻出的 10 张 均移出游戏（不入弃牌堆）', () => {
+  it('牌库顶 10 张进弃牌堆，只有时间风暴自己移出游戏', () => {
     const s = makeState();
     const r = callTimeStorm(s, 'action_time_storm' as CardID);
     expect(r).not.toBe('INVALID_MOVE');
     expect(r.deck.cards).toHaveLength(5);
     expect(r.deck.cards[0]).toBe('c10');
-    // 被翻的 10 张进入 removedFromGame，不入 discardPile
-    expect(r.deck.discardPile).toHaveLength(0);
-    expect(r.removedFromGame).toHaveLength(11);
-    // 时间风暴本身 + 10 张牌库顶都在 removedFromGame
-    expect(r.removedFromGame).toContain('action_time_storm');
-    expect(r.removedFromGame).toContain('c0');
-    expect(r.removedFromGame).toContain('c9');
+    // 被翻的 10 张进入 discardPile，removedFromGame 只有风暴本身
+    expect(r.deck.discardPile).toHaveLength(10);
+    expect(r.deck.discardPile).toContain('c0');
+    expect(r.deck.discardPile).toContain('c9');
+    expect(r.removedFromGame).toEqual(['action_time_storm']);
     // 手牌仅剩 action_unlock
     expect(r.players['0']!.hand).toEqual(['action_unlock']);
   });
 
-  it('牌库不足 10 张时翻全部，同样进 removedFromGame', () => {
+  it('牌库不足 10 张时翻全部，同样进弃牌堆', () => {
     const s = makeState({
       deck: { cards: ['x1', 'x2', 'x3'] as CardID[], discardPile: [] as CardID[] },
     });
     const r = callTimeStorm(s, 'action_time_storm' as CardID);
     expect(r.deck.cards).toHaveLength(0);
-    expect(r.deck.discardPile).toHaveLength(0);
-    // 3 张翻出 + 1 张本牌 = 4 张移出游戏
-    expect(r.removedFromGame).toHaveLength(4);
-    expect(r.removedFromGame).toContain('action_time_storm');
+    expect(r.deck.discardPile).toEqual(['x1', 'x2', 'x3']);
+    expect(r.removedFromGame).toEqual(['action_time_storm']);
   });
 
   it('非 action_time_storm cardId → INVALID_MOVE', () => {
@@ -206,18 +202,14 @@ describe('时间风暴（doDiscard 弃牌阶段触发）', () => {
     });
   }
 
-  it('弃掉时间风暴 → 触发效果：翻 10 张牌库顶 + 本牌 全部移出游戏', () => {
+  it('弃掉时间风暴 → 触发效果：牌库顶 10 张进弃牌堆，风暴自己移出游戏', () => {
     const s = makeDiscardState();
     const { r } = callDoDiscard(s, ['action_time_storm' as CardID]);
-    // 时间风暴未进 discardPile，而是进 removedFromGame
     expect(r.deck.discardPile).not.toContain('action_time_storm');
-    expect(r.removedFromGame).toContain('action_time_storm');
+    expect(r.removedFromGame).toEqual(['action_time_storm']);
     // 翻 10 张牌库顶（deck 起始 15 张 → 剩 5）
     expect(r.deck.cards).toHaveLength(5);
-    // 10 张翻出全部进 removedFromGame
-    expect(r.removedFromGame).toHaveLength(11); // 10 翻出 + 1 本牌
-    // discardPile 仍为空（仅弃掉时间风暴这一张）
-    expect(r.deck.discardPile).toHaveLength(0);
+    expect(r.deck.discardPile).toHaveLength(10);
   });
 
   it('弃掉非时间风暴（比如 action_unlock）→ 不触发风暴效果，正常进 discardPile', () => {
@@ -228,7 +220,7 @@ describe('时间风暴（doDiscard 弃牌阶段触发）', () => {
     expect(r.removedFromGame).toHaveLength(0);
   });
 
-  it('一次性弃 2 张时间风暴 → 各自触发一次，共翻 20 张（若牌库足量）', () => {
+  it('一次性弃 2 张时间风暴 → 各自触发一次，各翻 10 张（牌库不足则翻完）', () => {
     const s = makeState({
       turnPhase: 'discard',
       players: {
@@ -247,11 +239,10 @@ describe('时间风暴（doDiscard 弃牌阶段触发）', () => {
       },
     });
     const { r } = callDoDiscard(s, ['action_time_storm' as CardID, 'action_time_storm' as CardID]);
-    // 两张本牌 + 最多 20 张翻出；此 fixture deck 仅 15 张 → 全翻 15 张
+    // 最多翻 20 张；此 fixture deck 仅 15 张 → 全翻 15 张，进弃牌堆
     expect(r.deck.cards).toHaveLength(0);
-    expect(r.deck.discardPile).toHaveLength(0); // 两张风暴均不入弃牌堆
-    // removedFromGame = 2 本牌 + 15 张 = 17
-    expect(r.removedFromGame).toHaveLength(17);
-    expect(r.removedFromGame.filter((c: string) => c === 'action_time_storm')).toHaveLength(2);
+    expect(r.deck.discardPile).toHaveLength(15);
+    // 移出游戏的只有两张风暴自己
+    expect(r.removedFromGame).toEqual(['action_time_storm', 'action_time_storm']);
   });
 });
