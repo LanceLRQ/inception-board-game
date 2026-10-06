@@ -1,5 +1,5 @@
 // Toaster · 全局 toast 渲染容器
-// 对照：plans/2-1-3-1-2-ui-cozy-wave.md Toast 视觉规范
+// Toast 视觉规范
 //
 // 使用：在 App.tsx / main.tsx 顶层挂载一次 <Toaster />
 

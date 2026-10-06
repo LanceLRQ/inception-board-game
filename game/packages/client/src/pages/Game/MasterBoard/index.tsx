@@ -1,8 +1,8 @@
 // MasterBoard - 梦主移动端视角（Tab 切换：战场 / 世界观+梦魇）
-// 对照：docs/_internal/design/06-frontend-design.md §6.3.3 梦主视角
+// 梦主视角
 //
 // Tab A · 战场：复用 ThiefBoard 的组件，但可见贿赂池 + 金库内容 + 盗梦者身份
-// Tab B · 控制台：世界观规则 + 梦魇解封（Phase 3 接入真实效果）
+// Tab B · 控制台：世界观规则 + 梦魇解封（后续接入真实效果）
 
 import { useState } from 'react';
 import { cn } from '../../../lib/utils.js';
@@ -190,19 +190,15 @@ export function MasterBoard({ state, onDispatch }: MasterBoardProps) {
         <section className="space-y-4 p-4 md:mx-auto md:max-w-3xl">
           <div className="rounded-xl border border-border bg-card p-4">
             <h3 className="mb-2 text-sm font-semibold text-foreground">激活的世界观</h3>
-            <div className="text-xs text-muted-foreground">
-              （Phase 3 接入真实世界观卡牌效果展示）
-            </div>
+            <div className="text-xs text-muted-foreground">（后续接入真实世界观卡牌效果展示）</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
             <h3 className="mb-2 text-sm font-semibold text-foreground">梦魇解封</h3>
-            <div className="text-xs text-muted-foreground">
-              （Phase 3 接入 6 张梦魇牌的触发界面）
-            </div>
+            <div className="text-xs text-muted-foreground">（后续接入 6 张梦魇牌的触发界面）</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
             <h3 className="mb-2 text-sm font-semibold text-foreground">贿赂池</h3>
-            <div className="text-xs text-muted-foreground">（Phase 4 接入贿赂系统）</div>
+            <div className="text-xs text-muted-foreground">（后续接入贿赂系统）</div>
           </div>
         </section>
       )}

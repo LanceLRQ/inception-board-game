@@ -1,5 +1,5 @@
 // TutorialEngine - 教学状态推进（纯函数）
-// 对照：docs/_internal/TASKS.md W8.5-9 · 新手教学关卡
+// 新手教学关卡
 
 import type { TutorialEvent, TutorialProgress, TutorialScenario, TutorialStep } from './types.js';
 

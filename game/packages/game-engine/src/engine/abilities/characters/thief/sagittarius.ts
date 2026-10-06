@@ -3,7 +3,7 @@
 // 击杀 1 玩家后改 1 心锁 ±1，限 1 次/局
 //
 // abilities registry 接入：onKilled trigger + perGame 限 1 次
-// 注：skill_0（SHOOT 目标移动时不让移动）依赖 SHOOT 响应窗口，留待更深的 R4 批次
+// 注：skill_0（SHOOT 目标移动时不让移动）依赖 SHOOT 响应窗口，留待更深的后续批次
 
 import { applySagittariusHeartLock, SAGITTARIUS_HEART_LOCK_SKILL_ID } from '../../../skills.js';
 import { canUse, incrementUsage } from '../../usage-counter.js';

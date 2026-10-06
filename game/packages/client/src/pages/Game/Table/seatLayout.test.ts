@@ -1,5 +1,4 @@
 // seatLayout 纯函数测试
-// 对照：docs/_internal/design/06c-match-table-layout.md §3.4
 
 import { describe, it, expect } from 'vitest';
 import { computeSeats, pickArcRange, type Seat } from './seatLayout.js';

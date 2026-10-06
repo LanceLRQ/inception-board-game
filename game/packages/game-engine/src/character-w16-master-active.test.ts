@@ -1,5 +1,4 @@
-// W16-B 梦主主动技能 4 角色单测（皇城/密道/天王星/冥王星）
-// 对照：docs/_internal/TASKS.md Phase 3 W16
+// 梦主主动技能 4 角色单测（皇城/密道/天王星/冥王星）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -55,7 +54,7 @@ function setBribePool(
   };
 }
 
-describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
+describe('皇城（dm_imperial_city）·重金', () => {
   it('canImperialPickBribe：合法目标 + inPool 贿赂 → true', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_imperial_city');
     s = setBribePool(s, [
@@ -125,7 +124,7 @@ describe('W16-B · 皇城（dm_imperial_city）·重金', () => {
   });
 });
 
-describe('W16-B · 密道（dm_secret_passage）·传送', () => {
+describe('密道（dm_secret_passage）·传送', () => {
   it('applySecretPassageTeleport：弃穿梭剂 + 送目标到迷失层', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
     s = setHand(s, 'pM', ['action_dream_transit' as CardID, 'action_dream_transit' as CardID]);
@@ -205,7 +204,7 @@ describe('W16-B · 密道（dm_secret_passage）·传送', () => {
   });
 });
 
-describe('W16-B · 天王星·苍穹（dm_uranus_firmament）·权力', () => {
+describe('天王星·苍穹（dm_uranus_firmament）·权力', () => {
   it('applyUranusPower：移动盗梦者到指定层', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
     s = setBribePool(s, [
@@ -275,7 +274,7 @@ describe('W16-B · 天王星·苍穹（dm_uranus_firmament）·权力', () => {
   });
 });
 
-describe('W16-B · 冥王星·地狱（dm_pluto_hell）·业火', () => {
+describe('冥王星·地狱（dm_pluto_hell）·业火', () => {
   it('applyPlutoBurning：弃 1 + 触发<2 手牌的盗梦者抽 2', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setHand(s, 'pM', ['action_kick' as CardID]);
@@ -334,7 +333,7 @@ describe('W16-B · 冥王星·地狱（dm_pluto_hell）·业火', () => {
     expect(r).toBeNull();
   });
 
-  // B5 · 前置检查：无手牌<2 的盗梦者时拒绝发动（不浪费弃牌）
+  // 前置检查：无手牌<2 的盗梦者时拒绝发动（不浪费弃牌）
   // 对照：docs/manual/06-dream-master.md 冥王星·地狱 §30 "不产生效果的技能不能无故启动"
   it('无手牌<2 的盗梦者 → null（不消耗弃牌 / 不标 skillUsed）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');

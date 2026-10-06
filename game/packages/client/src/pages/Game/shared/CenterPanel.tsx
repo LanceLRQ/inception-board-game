@@ -1,5 +1,5 @@
 // CenterPanel - 桌面中央共享区域
-// 布局（对照主人提供的示意图 / 06c-match-table-layout.md §5）：
+// 布局（对照主人提供的示意图）：
 //   顶部 4 行：L4 → L1，每行一层，包含「层徽 · 金库（金库牌正/背面）· 心锁」
 //   底部一行：用过的牌（弃牌堆） · 可用牌堆（背面 + 剩余数量；当前玩家回合点击摸牌）
 //
@@ -67,7 +67,7 @@ function VaultCell({
         imageUrl={imageUrl}
         size="sm"
         orientation="portrait"
-        disableDetail // 金库牌按 06c §6 规则不触发长按/双击详情
+        disableDetail // 金库牌不触发长按/双击详情
       />
     </button>
   );

@@ -39,7 +39,7 @@ describe('migrations', () => {
     expect(state.mazeState).toBeNull();
   });
 
-  // v2 → v3：添加 pendingPeekDecision + peekReveal（W19-B F5/F8 梦境窥视三段式）
+  // v2 → v3：添加 pendingPeekDecision + peekReveal（梦境窥视三段式）
   it('v2 → v3 应补全 pendingPeekDecision 与 peekReveal 字段为 null', () => {
     const raw = {
       turnNumber: 4,

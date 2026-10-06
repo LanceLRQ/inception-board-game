@@ -1,5 +1,4 @@
 // 人机局"再来一局"流程 E2E
-// 对照：docs/_internal/TASKS.md P2 B18
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 

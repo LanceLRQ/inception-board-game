@@ -1,5 +1,5 @@
 // useChatCooldown - 预设短语发送冷却（客户端 UX 层）
-// 对照：docs/_internal/design/07-backend-network.md §7.9 / 06-frontend-design.md 预设短语面板
+// 预设短语面板
 //
 // 设计：
 //   - 纯函数 computeCooldownRemaining 可单测

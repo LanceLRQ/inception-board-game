@@ -3,7 +3,7 @@
 // 略过抽牌阶段时可掷骰 → 抽 = 骰值（1-6）；下回合 discard 必须全弃
 //
 // abilities registry 接入：onDrawPhase trigger（替代默认 doDraw 流程）
-// R2 阶段：定义 + canActivate；apply 调用 jokerDrawCount，drawCards 由 dispatcher 在 R3 落地
+// 定义 + canActivate；apply 调用 jokerDrawCount，drawCards 由 dispatcher 后续落地
 
 import { jokerDrawCount, JOKER_SKILL_ID } from '../../../skills.js';
 import { canUse, incrementUsage } from '../../usage-counter.js';

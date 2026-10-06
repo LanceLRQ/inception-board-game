@@ -1,5 +1,5 @@
 // AvatarPicker - "摇骰子"换头像 UI
-// 对照：docs/_internal/design/06-frontend-design.md §6.7 像素头像选择器 / ADR-032
+// 像素头像选择器
 //
 // 交互：
 //   - 大头像预览（当前 seed）

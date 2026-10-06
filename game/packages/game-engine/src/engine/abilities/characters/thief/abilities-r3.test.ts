@@ -1,5 +1,5 @@
-// W10-R3 · 桶 D 6 角色响应窗口类能力注册
-// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R3（黑洞·征收/空间女王×2/射手·心锁/恐怖分子·远程/格林射线）
+// 6 角色响应窗口类能力注册
+// abilities registry（黑洞·征收/空间女王×2/射手·心锁/恐怖分子·远程/格林射线）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -64,7 +64,7 @@ function setHeartLock(state: SetupState, layer: Layer, val: number): SetupState 
 // Registry 集成
 // ==========================================================================
 
-describe('R3 · registry 扩展', () => {
+describe('registry 扩展', () => {
   it('注册总数升至 14', () => {
     const reg = createDefaultRegistry();
     expect(reg.get(blackHoleLevy.id)).toBe(blackHoleLevy);
@@ -97,7 +97,7 @@ describe('R3 · registry 扩展', () => {
 // 黑洞 · 征收
 // ==========================================================================
 
-describe('R3 · 黑洞·征收', () => {
+describe('黑洞·征收', () => {
   it('canActivate ok：同层有其它玩家 + draw 阶段', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_black_hole');
@@ -144,7 +144,7 @@ describe('R3 · 黑洞·征收', () => {
 // 空间女王 · 监察
 // ==========================================================================
 
-describe('R3 · 空间女王·监察（onUnlock）', () => {
+describe('空间女王·监察（onUnlock）', () => {
   it('canActivate ok：角色匹配', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_space_queen');
@@ -166,7 +166,7 @@ describe('R3 · 空间女王·监察（onUnlock）', () => {
 // 空间女王 · 放置（onDiscardPhase）
 // ==========================================================================
 
-describe('R3 · 空间女王·放置', () => {
+describe('空间女王·放置', () => {
   it('canActivate ok：角色 + 手牌非空', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_space_queen');
@@ -199,7 +199,7 @@ describe('R3 · 空间女王·放置', () => {
 // 射手 · 心锁（onKilled + perGame 限 1）
 // ==========================================================================
 
-describe('R3 · 射手·心锁', () => {
+describe('射手·心锁', () => {
   it('canActivate ok：射手 + 未用过', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_sagittarius');
@@ -239,7 +239,7 @@ describe('R3 · 射手·心锁', () => {
 // 恐怖分子 · 远程（被动）
 // ==========================================================================
 
-describe('R3 · 恐怖分子·远程（passive）', () => {
+describe('恐怖分子·远程（passive）', () => {
   it('canActivate ok：角色匹配', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_terrorist');
@@ -260,7 +260,7 @@ describe('R3 · 恐怖分子·远程（passive）', () => {
 // 格林射线
 // ==========================================================================
 
-describe('R3 · 格林射线', () => {
+describe('格林射线', () => {
   it('canActivate ok：action 阶段 + 手牌含穿梭剂+SHOOT', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_green_ray');

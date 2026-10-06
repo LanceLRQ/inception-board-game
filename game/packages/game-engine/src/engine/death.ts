@@ -1,12 +1,12 @@
 // 死亡 + 迷失层 - MVP 简化版
-// 对照：docs/manual/03-game-flow.md 死亡规则 + docs/_internal/design/02-game-rules-spec.md §2.5
+// 对照：docs/manual/03-game-flow.md 死亡规则
 //
 // MVP 规则：
 //   - 玩家死亡（SHOOT kill / 梦魇）→ isAlive=false + deathTurn=当前回合
 //   - 死亡后移至迷失层（layer=0）
 //   - 死亡玩家跳过所有回合（beginTurn / drawPhase / actionPhase 空转）
 //   - 手牌全部上交给击杀者（SHOOT 规则）；如是梦魇致死则弃至弃牌堆
-//   - MVP 不实装复活（Phase 3 的角色技能如「殉道者」才会接入复活）
+//   - MVP 不实装复活（后续的角色技能如「殉道者」才会接入复活）
 
 import type { SetupState, PlayerSetup } from '../setup.js';
 import type { CardID, Layer } from '@icgame/shared';

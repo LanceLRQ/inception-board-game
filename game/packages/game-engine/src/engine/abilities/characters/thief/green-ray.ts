@@ -3,7 +3,7 @@
 // 弃 1 梦境穿梭剂 + 1 SHOOT → 移到任意层 + 执行 SHOOT 效果
 //
 // abilities registry 接入：onActionPhase trigger
-// R3 阶段：canActivate 校验弃牌组合；apply 的效果链（移动 + SHOOT）留待 R4 响应窗口整合
+// canActivate 校验弃牌组合；apply 的效果链（移动 + SHOOT）留待响应窗口整合
 
 import { canGreenRayActivate, GREEN_RAY_SKILL_ID } from '../../../skills.js';
 import type { AbilityContext, AbilityDefinition } from '../../types.js';
@@ -38,7 +38,7 @@ export const greenRayTransfer: AbilityDefinition = {
   },
 
   apply(state) {
-    // R3 仅注册；真实效果链（弃 2 + 移动 + SHOOT）在 R4 落地
+    // 当前仅注册；真实效果链（弃 2 + 移动 + SHOOT）后续落地
     return { state, events: [] };
   },
 };

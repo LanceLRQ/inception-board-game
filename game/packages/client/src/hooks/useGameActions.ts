@@ -1,5 +1,5 @@
 // useGameActions - 两步点击打牌状态机
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.4 两步点击流程
+// 两步点击流程
 //
 // 状态流转：
 //   idle → selectCard (hand click)

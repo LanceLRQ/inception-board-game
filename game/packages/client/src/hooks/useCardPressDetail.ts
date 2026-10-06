@@ -1,5 +1,4 @@
 // useCardPressDetail - 卡牌长按/双击/键盘统一交互 hook
-// 对照：docs/_internal/design/06c-match-table-layout.md §6.1
 //
 // 架构：核心状态机 createCardPressStateMachine 为纯工厂函数（闭包 + 外部注入 timer 调度），
 // useCardPressDetail 仅在 hook 里 useRef 持有实例并在卸载时销毁，保证测试可脱离 React 环境。

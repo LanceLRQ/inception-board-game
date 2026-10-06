@@ -1,5 +1,4 @@
 // 盗梦都市 - 卡牌类型定义
-// 对照：docs/_internal/design/03-data-model.md §3.3
 
 import type { CardID, ActionSubType, Faction, SkillUsageScope, TriggerTiming } from './enums.js';
 

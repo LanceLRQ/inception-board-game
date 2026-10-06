@@ -1,5 +1,5 @@
-// W10-R4 · 桶 E 水星/金星 未实装占位 stub
-// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R4（水星·航路/金星·镜界 世界观 stub）
+// 水星/金星 未实装占位 stub
+// abilities registry（水星·航路/金星·镜界 世界观 stub）
 
 import { describe, expect, it } from 'vitest';
 import { scenarioStartOfGame3p } from '../../../../testing/scenarios.js';
@@ -25,7 +25,7 @@ function ctxFor(state: SetupState, invokerID: string): AbilityContext {
   };
 }
 
-describe('R4 · master 注册集', () => {
+describe('master 注册集', () => {
   it('ALL_MASTER_ABILITIES 含 4 个 stub', () => {
     expect(ALL_MASTER_ABILITIES).toHaveLength(4);
     const ids = ALL_MASTER_ABILITIES.map((a) => a.id).sort();
@@ -62,7 +62,7 @@ describe('R4 · master 注册集', () => {
   });
 });
 
-describe('R4 · 水星·航路 stub', () => {
+describe('水星·航路 stub', () => {
   it('canActivate 返回 not_implemented（非梦主）', () => {
     const s = scenarioStartOfGame3p();
     const ctx = ctxFor(s, 'p1');
@@ -88,7 +88,7 @@ describe('R4 · 水星·航路 stub', () => {
   });
 });
 
-describe('R4 · 金星·镜界 stub', () => {
+describe('金星·镜界 stub', () => {
   it('canActivate 返回 not_implemented（梦主）', () => {
     const s = scenarioStartOfGame3p();
     const ctx = ctxFor(s, 'pM');
@@ -107,7 +107,7 @@ describe('R4 · 金星·镜界 stub', () => {
   });
 });
 
-describe('R4 · 总览', () => {
+describe('总览', () => {
   it('registry 总注册数 = 14 盗梦者 + 4 梦主 = 18', () => {
     const reg = createDefaultRegistry();
     const allTrigger: string[] = [

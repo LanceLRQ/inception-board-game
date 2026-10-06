@@ -2,7 +2,7 @@
 // 对照：engine/abilities/characters/ + engine/skills.ts
 //
 // 仅处理"行动阶段可点按钮触发"的主动技能；被动技能由 dispatcher 自动触发
-// R7-R9 支持：
+// 支持：
 //   - 影子·潜伏 (thief_shade → playShadeFollow, 无参)
 //   - 阿波罗·崇拜 (thief_apollo → playApolloWorship, 1 target)
 //   - 穿行者·支助 (thief_tourist → playTouristAssist, 1 target)
@@ -257,7 +257,7 @@ export const PLUTO_BURNING: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master' && ctx.hand.length > 0,
 };
 
-// R16：哈雷·冲击 —— 每成功解封 1 次可触发 1 次，掷骰击杀 / 位移目标
+// 哈雷·冲击 —— 每成功解封 1 次可触发 1 次，掷骰击杀 / 位移目标
 // 对照：docs/manual/05-dream-thieves.md 哈雷 + engine/game.ts playHaleyImpact
 export const HALEY_IMPACT: ActiveSkillDescriptor = {
   id: 'thief_haley.skill_0',
@@ -274,7 +274,7 @@ export const HALEY_IMPACT: ActiveSkillDescriptor = {
   },
 };
 
-// R16：梦主·贿赂派发（所有梦主通用）—— 从贿赂池随机派 1 张给盗梦者
+// 梦主·贿赂派发（所有梦主通用）—— 从贿赂池随机派 1 张给盗梦者
 // 对照：docs/manual/03-game-flow.md 贿赂阶段 + engine/game.ts masterDealBribe
 export const MASTER_DEAL_BRIBE: ActiveSkillDescriptor = {
   id: '__any_master__.deal_bribe',
@@ -286,7 +286,7 @@ export const MASTER_DEAL_BRIBE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master' && ctx.bribePoolAvailable === true,
 };
 
-// R17：露娜·月蚀 —— 弃 2 张 SHOOT → 击杀同层任意玩家 → 翻面
+// 露娜·月蚀 —— 弃 2 张 SHOOT → 击杀同层任意玩家 → 翻面
 // 对照：docs/manual/05-dream-thieves.md 露娜 + engine/game.ts playLunaEclipse
 export const LUNA_ECLIPSE: ActiveSkillDescriptor = {
   id: 'thief_luna.skill_0',
@@ -299,7 +299,7 @@ export const LUNA_ECLIPSE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 2,
 };
 
-// R17：雅典娜·惊叹 —— 展示 4 张手牌 + 1 牌库顶 → 5 张同名击杀同层玩家
+// 雅典娜·惊叹 —— 展示 4 张手牌 + 1 牌库顶 → 5 张同名击杀同层玩家
 // 对照：docs/manual/05-dream-thieves.md 雅典娜 + engine/game.ts playAthenaAwe
 export const ATHENA_AWE: ActiveSkillDescriptor = {
   id: 'thief_athena.skill_0',
@@ -312,7 +312,7 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length >= 4,
 };
 
-// R24：欺诈师·盗心（单机盲抽版）—— 选 target + 选 1 张手牌还回
+// 欺诈师·盗心（单机盲抽版）—— 选 target + 选 1 张手牌还回
 // 对照：docs/manual/05-dream-thieves.md 欺诈师 + engine/game.ts playForgerExchangeSingle
 // 从 target 抽取的卡由服务端 Random.Die 随机挑，保护隐藏信息；回合限 1 次。
 export const FORGER_EXCHANGE: ActiveSkillDescriptor = {
@@ -328,7 +328,7 @@ export const FORGER_EXCHANGE: ActiveSkillDescriptor = {
   },
 };
 
-// R23：天秤·平衡 step 1 —— bonder 选 target；后续 split + pick 由 worker 自动补完
+// 天秤·平衡 step 1 —— bonder 选 target；后续 split + pick 由 worker 自动补完
 // 对照：docs/manual/05-dream-thieves.md 天秤 + engine/game.ts playLibraBalance
 // 单机模式简化：engine 放宽 ctx.currentPlayer guard，worker 自动代 target 对半分
 // + 代 bonder 挑大堆（包括人类 bonder）；保证流程不卡死。
@@ -346,7 +346,7 @@ export const LIBRA_BALANCE: ActiveSkillDescriptor = {
   },
 };
 
-// R21：火星·战场世界观 —— 弃 2 张非 SHOOT 手牌 → 从弃牌堆取 1 张 SHOOT
+// 火星·战场世界观 —— 弃 2 张非 SHOOT 手牌 → 从弃牌堆取 1 张 SHOOT
 // 对照：cards-data.json dm_mars_battlefield 世界观 + engine/game.ts useMarsBattlefield
 // 世界观激活时对所有存活玩家可用，SHOOT 类筛选交由 engine 精校
 export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
@@ -362,7 +362,7 @@ export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
     (ctx.discardPile?.length ?? 0) > 0,
 };
 
-// R20：皇城·重金 —— 梦主指定池中 1 张贿赂派给盗梦者（替代随机抽）
+// 皇城·重金 —— 梦主指定池中 1 张贿赂派给盗梦者（替代随机抽）
 // 对照：cards-data.json dm_imperial_city + engine/game.ts masterDealBribeImperial
 export const IMPERIAL_DEAL_BRIBE: ActiveSkillDescriptor = {
   id: 'dm_imperial_city.skill_0',
@@ -374,7 +374,7 @@ export const IMPERIAL_DEAL_BRIBE: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master' && (ctx.bribePoolItems?.length ?? 0) > 0,
 };
 
-// R19：战争之王·黑市 —— 弃 2 张手牌 → 从弃牌堆取 1 张
+// 战争之王·黑市 —— 弃 2 张手牌 → 从弃牌堆取 1 张
 // 对照：docs/manual/05-dream-thieves.md 战争之王 + engine/game.ts playLordOfWarBlackMarket
 export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
   id: 'thief_lord_of_war.skill_0',
@@ -391,7 +391,7 @@ export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
   },
 };
 
-// R18：盖亚·大地 —— 使同层其他玩家各自 +1 / -1 层（限 2 次/回合）
+// 盖亚·大地 —— 使同层其他玩家各自 +1 / -1 层（限 2 次/回合）
 // 对照：docs/manual/05-dream-thieves.md 盖亚 + engine/game.ts playGaiaShift
 export const GAIA_SHIFT: ActiveSkillDescriptor = {
   id: 'thief_gaia.skill_0',

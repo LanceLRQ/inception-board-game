@@ -1,5 +1,4 @@
-// W16-A 梦主 6 角色单测（纯函数）
-// 对照：docs/_internal/TASKS.md Phase 3 W16
+// 梦主 6 角色单测（纯函数）
 // 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
 
 import { describe, expect, it } from 'vitest';
@@ -50,7 +49,7 @@ function setVaultOpened(state: SetupState, vaultIndex: number, openedBy: string)
   };
 }
 
-describe('W16-A · 梦主公共 helper', () => {
+describe('梦主公共 helper', () => {
   it('findMasterID 返回 master 玩家', () => {
     const s = scenarioStartOfGame3p();
     expect(findMasterID(s)).toBe('pM');
@@ -62,7 +61,7 @@ describe('W16-A · 梦主公共 helper', () => {
   });
 });
 
-describe('W16-A · 港口（dm_harbor）', () => {
+describe('港口（dm_harbor）', () => {
   describe('海啸 applyHarborTsunami', () => {
     it('1-5 点击杀盗梦者并直接进迷失层', () => {
       const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
@@ -144,7 +143,7 @@ describe('W16-A · 港口（dm_harbor）', () => {
   });
 });
 
-describe('W16-A · 盛夏（dm_midsummer）', () => {
+describe('盛夏（dm_midsummer）', () => {
   it('充盈：未派发贿赂数即额外抽牌', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_midsummer');
     s = {
@@ -180,7 +179,7 @@ describe('W16-A · 盛夏（dm_midsummer）', () => {
   });
 });
 
-describe('W16-A · 黑洞·DM（dm_black_hole）', () => {
+describe('黑洞·DM（dm_black_hole）', () => {
   describe('倒流 applyBlackHoleReverse', () => {
     it('未开金库的层 +2 心锁，受 cap 限制', () => {
       let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_black_hole');
@@ -227,7 +226,7 @@ describe('W16-A · 黑洞·DM（dm_black_hole）', () => {
   });
 });
 
-describe('W16-A · 海王星·泓洋（dm_neptune_ocean）', () => {
+describe('海王星·泓洋（dm_neptune_ocean）', () => {
   it('风暴：弃 5 张牌库顶', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_neptune_ocean');
     const cards: CardID[] = Array.from({ length: 10 }, () => 'action_unlock' as CardID);
@@ -269,7 +268,7 @@ describe('W16-A · 海王星·泓洋（dm_neptune_ocean）', () => {
   });
 });
 
-describe('W16-A · 木星·巅峰（dm_jupiter_peak）', () => {
+describe('木星·巅峰（dm_jupiter_peak）', () => {
   it('isJupiterPeakWorldActive', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_jupiter_peak');
     expect(isJupiterPeakWorldActive(s)).toBe(true);
@@ -306,8 +305,8 @@ describe('W16-A · 木星·巅峰（dm_jupiter_peak）', () => {
   });
 });
 
-// B4 · M4 卡宾枪 dice modifier（与 shouldJupiterThunderKill 组合使用）
-// 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪 + 05-dream-thieves.md §111
+// M4 卡宾枪 dice modifier（与 shouldJupiterThunderKill 组合使用）
+// 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪 + docs/manual/05-dream-thieves.md §111
 describe('M4 卡宾枪 · dice modifier', () => {
   it('梦主身份 → 骰 -1（clamp [1,6]）', () => {
     expect(applyM4CarbineModifier(true, 6)).toBe(5);
@@ -332,7 +331,7 @@ describe('M4 卡宾枪 · dice modifier', () => {
   });
 });
 
-describe('W16-A · 土星·领地（dm_saturn_territory）', () => {
+describe('土星·领地（dm_saturn_territory）', () => {
   describe('律令 applySaturnDecree', () => {
     it('弃 1 手牌 + 抽 1', () => {
       let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');

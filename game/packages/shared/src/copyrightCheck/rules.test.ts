@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { checkLine, scanText, isScanTarget, summarize, INTERNAL_TERM_RULES } from './rules.js';
+import {
+  checkLine,
+  scanText,
+  isScanTarget,
+  isSourceScanTarget,
+  summarize,
+  INTERNAL_TERM_RULES,
+  SOURCE_RULES,
+} from './rules.js';
 
 describe('checkLine · 规则命中', () => {
   it('flags ADR-001 style references', () => {
@@ -123,7 +131,7 @@ describe('isScanTarget · 白名单目标', () => {
     expect(isScanTarget('game/packages/client/src/i18n/locales/en-US.json')).toBe(true);
   });
 
-  it('excludes source code (source comments allowed to reference design docs)', () => {
+  it('excludes source code (scanned separately by isSourceScanTarget)', () => {
     expect(isScanTarget('game/packages/client/src/App.tsx')).toBe(false);
     expect(isScanTarget('game/packages/shared/src/types.ts')).toBe(false);
   });
@@ -204,5 +212,188 @@ describe('INTERNAL_TERM_RULES · 覆盖', () => {
       expect(r.name.length).toBeGreaterThan(0);
       expect(r.description.length).toBeGreaterThan(0);
     }
+  });
+});
+
+const sourceRuleNames = (line: string): string[] =>
+  checkLine(line, 'a.ts', 1, SOURCE_RULES).map((v) => v.rule);
+
+describe('SOURCE_RULES · 命中', () => {
+  it('reuses existing INTERNAL_TERM_RULES objects instead of copying them', () => {
+    for (const name of [
+      'adr_reference',
+      'phase_number',
+      'spike_reference',
+      'week_reference',
+      'user_story',
+      'internal_docs_path',
+      'plans_design_path',
+      'plans_manual_path',
+    ]) {
+      const inInternal = INTERNAL_TERM_RULES.find((r) => r.name === name);
+      expect(inInternal).toBeDefined();
+      expect(SOURCE_RULES).toContain(inInternal);
+    }
+  });
+
+  it('does not include risk_code or design_doc_number', () => {
+    const names = SOURCE_RULES.map((r) => r.name);
+    expect(names).not.toContain('risk_code');
+    expect(names).not.toContain('design_doc_number');
+  });
+
+  it('flags docs/_internal path', () => {
+    expect(sourceRuleNames('// docs/_internal/design/03-data-model.md')).toContain(
+      'internal_docs_path',
+    );
+  });
+
+  it('flags ADR / Phase / Spike / Week / US codes', () => {
+    expect(sourceRuleNames('// ADR-042 失败降级')).toContain('adr_reference');
+    expect(sourceRuleNames('// Phase 2 再做')).toContain('phase_number');
+    expect(sourceRuleNames('// Spike 验证')).toContain('spike_reference');
+    expect(sourceRuleNames('// Week 8')).toContain('week_reference');
+    expect(sourceRuleNames('// US-001')).toContain('user_story');
+  });
+
+  describe('week_abbrev', () => {
+    it.each([
+      '// W10 · 梦主 helper',
+      '// W19.5 · xxx',
+      '// W20.4 补实装',
+      "describe('W16-A · 梦主公共 helper', () => {})",
+      '// W19-B F3：由 passResponse 共享',
+      '（见 W10-R1）',
+    ])('flags %s', (line) => {
+      expect(sourceRuleNames(line)).toContain('week_abbrev');
+    });
+
+    it.each([
+      '// 参见 W3C 规范',
+      'const sw10 = 1',
+      'const hex = "0xAW10F"',
+      'const TEST_W10 = 2',
+      'const T1 = 1',
+      'const O2 = 2',
+      'const W = 1',
+      'const W100 = 1',
+    ])('does not flag %s', (line) => {
+      expect(sourceRuleNames(line)).not.toContain('week_abbrev');
+    });
+  });
+
+  describe('internal_filename', () => {
+    it('flags TASKS.md and CLAUDE.local.md', () => {
+      expect(sourceRuleNames('// 见 TASKS.md')).toContain('internal_filename');
+      expect(sourceRuleNames('// 见 CLAUDE.local.md 约定')).toContain('internal_filename');
+    });
+
+    it('does not flag unrelated names', () => {
+      expect(sourceRuleNames('// MY_TASKS.mdx')).not.toContain('internal_filename');
+      expect(sourceRuleNames('// CLAUDE.md')).not.toContain('internal_filename');
+    });
+  });
+
+  describe('design_doc_filename', () => {
+    it('flags bare design doc file names', () => {
+      expect(sourceRuleNames('// 对照 05-card-system.md')).toContain('design_doc_filename');
+      expect(sourceRuleNames('// 06c-match-table-layout.md 座位算法')).toContain(
+        'design_doc_filename',
+      );
+      expect(sourceRuleNames('// AUDIT-2026-04-22-skill-status.md')).toContain(
+        'design_doc_filename',
+      );
+    });
+
+    it('flags design doc under docs/_internal', () => {
+      expect(sourceRuleNames('docs/_internal/design/03-data-model.md')).toContain(
+        'design_doc_filename',
+      );
+    });
+
+    it('does not flag public docs/manual references', () => {
+      expect(sourceRuleNames('// 对照：docs/manual/03-game-flow.md 死亡规则')).toEqual([]);
+      expect(sourceRuleNames('// docs/manual/05-dream-thieves.md 处女')).toEqual([]);
+    });
+
+    it('does not flag ordinary words', () => {
+      expect(sourceRuleNames('// 参见 README.md 与 fully.md')).toEqual([]);
+    });
+  });
+
+  it('does not flag clean comments or identifiers', () => {
+    expect(sourceRuleNames('// L0-L3 AI 分级')).toEqual([]);
+    expect(sourceRuleNames('const T1 = 1; const O2 = 2;')).toEqual([]);
+  });
+});
+
+describe('isSourceScanTarget · 源码扫描范围', () => {
+  it.each([
+    'game/packages/client/src/App.tsx',
+    'game/packages/shared/src/types.ts',
+    'game/packages/game-engine/src/foo.test.ts',
+    'game/packages/client/src/components/Foo.test.tsx',
+    'game/packages/client/src/index.css',
+    'game/packages/server/src/infra/logger.ts',
+    'game/packages/e2e/tests/landing.spec.ts',
+    'game/packages/e2e/playwright.config.ts',
+    'game/packages/e2e/tests-online/online-match.spec.ts',
+    'game/packages/client/index.html',
+    'game/packages/client/vite.config.ts',
+    'game/packages/client/package.json',
+    'game/packages/server/tsconfig.json',
+    'game/packages/client/scripts/other-tool.ts',
+    'game/scripts/copyright-check.ts',
+    'game/scripts/dev.sh',
+    'game/deploy/prod/api/Dockerfile',
+    'game/deploy/prod/client/nginx.conf',
+    'game/deploy/prod/docker-compose.prod.yml',
+    'game/deploy/dev/docker-compose.dev.yml',
+    '.github/workflows/ci.yml',
+    '.github/dependabot.yml',
+  ])('includes %s', (p) => {
+    expect(isSourceScanTarget(p)).toBe(true);
+  });
+
+  it.each([
+    'game/packages/shared/src/generated/cards.ts',
+    'game/packages/server/src/generated/prisma/client.ts',
+    'game/packages/game-engine/src/engine/__snapshots__/x.snap',
+    'game/packages/game-engine/src/__snapshots__/x.test.ts.snap',
+    'game/packages/shared/src/copyrightCheck/rules.ts',
+    'game/packages/shared/src/copyrightCheck/rules.test.ts',
+    // 以内部素材目录为输入的脚本：代码里必须写出那个路径
+    'game/scripts/sync-card-assets.ts',
+    'game/packages/client/scripts/sync-assets.ts',
+    'game/packages/shared/scripts/codegen.ts',
+    'docs/manual/x.md',
+    'docs/_internal/design/00-overview.md',
+    'README.md',
+    'CLAUDE.md',
+    'CLAUDE.local.md',
+    'experimental_demo/foo/src/index.ts',
+    'game/packages/client/node_modules/foo/index.js',
+    'game/packages/client/dist/main.js',
+    'game/packages/client/public/cards/manifest.json',
+    'game/packages/client/public/dice/dice-red-1.svg',
+    'game/packages/client/public/sfx/README.md',
+    'game/pnpm-lock.yaml',
+    'game/packages/client/tsconfig.tsbuildinfo',
+    'game/.env.example',
+    'game/packages/e2e/playwright-report/index.html',
+    'game/packages/e2e/test-results/a/trace.json',
+    'game/packages/client/src/assets/logo.png',
+    'game/packages/client/src/assets/font.woff2',
+    'image.png',
+  ])('excludes %s', (p) => {
+    expect(isSourceScanTarget(p)).toBe(false);
+  });
+
+  it('overlaps isScanTarget only on i18n locales (copyright-check.ts prefers isScanTarget)', () => {
+    const p = 'game/packages/client/src/i18n/locales/zh-CN.json';
+    expect(isScanTarget(p) && isSourceScanTarget(p)).toBe(true);
+    expect(isScanTarget('README.md') && isSourceScanTarget('README.md')).toBe(false);
+    expect(isScanTarget('docs/manual/01-game-overview.md')).toBe(true);
+    expect(isSourceScanTarget('docs/manual/01-game-overview.md')).toBe(false);
   });
 });

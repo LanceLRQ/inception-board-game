@@ -1,6 +1,5 @@
 // 双面角色 skill_1 单测：双子·抉择 / 双鱼·洗礼 / 露娜·满月
 // 对照：docs/manual/05-dream-thieves.md 双子(83)/双鱼(55)/露娜(21)
-// 对照：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 A · A2/A3/A4
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

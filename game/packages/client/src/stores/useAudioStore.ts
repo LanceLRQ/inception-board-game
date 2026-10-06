@@ -1,5 +1,4 @@
 // 音效偏好 Zustand store（volume + muted，带 localStorage 持久化）
-// 对照：docs/_internal/design/06-frontend-design.md §6.19.5
 
 import { create } from 'zustand';
 import { clampVolume } from '../lib/audio.js';

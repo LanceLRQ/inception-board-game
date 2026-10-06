@@ -1,5 +1,4 @@
 // PixelAvatar - 8×8 像素艺术头像组件
-// 对照：docs/_internal/design/06-frontend-design.md §6.7 / ADR-032
 //
 // 设计：
 //   - 无状态渲染组件：给 seed 就出图

@@ -1,4 +1,4 @@
-// R6 · dispatcher 覆盖扩展 · 6 个 trigger 点集成冒烟测试
+// dispatcher 覆盖扩展 · 6 个 trigger 点集成冒烟测试
 // 覆盖：onTurnStart / onTurnEnd / onActionPhase / onDiscardPhase / onBeforeShoot / onAfterShoot / onKilled
 
 import { describe, expect, it } from 'vitest';
@@ -12,7 +12,7 @@ function setCharacter(state: SetupState, playerID: string, characterId: CardID):
   return { ...state, players: { ...state.players, [playerID]: { ...p, characterId } } };
 }
 
-describe('R6 · dispatcher 覆盖扩展', () => {
+describe('dispatcher 覆盖扩展', () => {
   it('doDraw 触发 onDrawPhase + onActionPhase（白羊）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_aries');

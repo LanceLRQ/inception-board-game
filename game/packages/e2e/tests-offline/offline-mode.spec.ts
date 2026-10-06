@@ -1,5 +1,5 @@
 // 离线模式 E2E（prod 构建 + vite preview + Service Worker）
-// 对照：docs/_internal/TASKS.md P0 ★ 离线模式验证（断网人机可玩）
+// 离线模式验证（断网人机可玩）
 //
 // 核心验收：
 //   1. 首次联网加载后 SW 注册成功，app shell 落入 workbox precache

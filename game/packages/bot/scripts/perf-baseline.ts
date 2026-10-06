@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 // Move P95 性能基线脚本
-// 对照：docs/_internal/TASKS.md P1 · MVP 性能基线报告（Move P95）
+// MVP 性能基线报告（Move P95）
 //
 // 做法：
 //   - 用 matchRunner 跑 N 局简化回合

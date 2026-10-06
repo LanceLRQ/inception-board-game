@@ -1,5 +1,4 @@
 // 预置场景 fixtures
-// 对照：docs/_internal/design/09-testing-quality.md §9.3.1
 //
 // 这些 scenarios 是常用对局状态的命名快照，
 // 避免在每个测试里重复大量 overrides。
@@ -103,7 +102,7 @@ export function scenarioMasterWin(): SetupState {
  * 行动阶段标准场景：3 名玩家（p1/p2 盗梦者 + pM 梦主），
  * 全员位于第 1 层，p1 当前回合，turnPhase=action。
  *
- * 用于 W10 行动牌快照测试基线：每个 move 在该 state 上跑一遍 happy path，
+ * 用于行动牌快照测试基线：每个 move 在该 state 上跑一遍 happy path，
  * 然后 snapshot 切片差异。
  */
 export function scenarioActionPhase(): SetupState {

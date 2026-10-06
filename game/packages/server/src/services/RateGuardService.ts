@@ -1,5 +1,4 @@
 // RateGuardService - WS 层 Move 频率/幂等守卫
-// 对照：docs/_internal/design/07-backend-network.md §7.4 + docs/_internal/design/08-security-ai.md §8.4
 //
 // 功能：
 //   - isDuplicate(intentId)：intentId 幂等检测（5 分钟 TTL）

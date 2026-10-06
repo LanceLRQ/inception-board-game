@@ -1,5 +1,4 @@
 // orderCandidates 纯函数测试
-// 对照：docs/_internal/design/06c-match-table-layout.md §5.3
 
 import { describe, it, expect } from 'vitest';
 import { orderCandidates } from './logic.js';

@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 // 卡图素材同步脚本
-// 源：docs/_internal/reference/assets/cards/{category}/*.webp
+// 源：内部素材目录下的 cards/{category}/*.webp
 // 目标：game/packages/client/public/cards/{category}/*.webp
 // 策略：只同步 webp（已预压缩），jpg 忽略；不在仓库保留目标目录
 

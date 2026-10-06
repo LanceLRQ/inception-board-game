@@ -1,6 +1,6 @@
-// 跨系统集成测试 · 贿赂 × 梦魇 × 世界观（W20-B）
-// 对照：docs/_internal/TASKS.md W20 · 贿赂 × 梦魇 × 世界观 交互快照测试
-// 对照：docs/manual/03-game-flow.md 贿赂&背叛者 / 06-dream-master.md 皇城 / 07-nightmare-cards.md
+// 跨系统集成测试 · 贿赂 × 梦魇 × 世界观
+// 贿赂 × 梦魇 × 世界观 交互快照测试
+// 对照：docs/manual/03-game-flow.md 贿赂&背叛者 / docs/manual/06-dream-master.md 皇城 / docs/manual/07-nightmare-cards.md
 //
 // 覆盖范围：
 //   A. 贿赂 + 阵营切换：DEAL 命中即时 faction='master'

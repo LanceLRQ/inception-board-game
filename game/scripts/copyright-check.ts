@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 // 版权合规终检 CLI
-// 对照：CLAUDE.local.md 核心纪律 1 / docs/_internal/TASKS.md W9 版权合规终检
+// 对外产物不得出现内部开发文档的引用与排期编号
+//
+// 两类扫描：文档与文案用 INTERNAL_TERM_RULES，源码与工程配置用 SOURCE_RULES
 //
 // 用法：
 //   pnpm run copyright:check          # 扫描仓库根 + docs + game/
@@ -14,7 +16,10 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  INTERNAL_TERM_RULES,
+  SOURCE_RULES,
   isScanTarget,
+  isSourceScanTarget,
   scanText,
   summarize,
   type Violation,
@@ -49,15 +54,25 @@ function walk(dir: string, onFile: (abs: string) => void): void {
 function main(): number {
   const asJson = process.argv.includes('--json');
   const violations: Violation[] = [];
-  const filesScanned: string[] = [];
+  const docFilesScanned: string[] = [];
+  const sourceFilesScanned: string[] = [];
 
   walk(REPO_ROOT, (abs) => {
     const rel = relative(REPO_ROOT, abs);
-    if (!isScanTarget(rel)) return;
-    filesScanned.push(rel);
+    // 两类目标重叠时（如 i18n 文案）以文档规则为准
+    let rules;
+    if (isScanTarget(rel)) {
+      docFilesScanned.push(rel);
+      rules = INTERNAL_TERM_RULES;
+    } else if (isSourceScanTarget(rel)) {
+      sourceFilesScanned.push(rel);
+      rules = SOURCE_RULES;
+    } else {
+      return;
+    }
     try {
       const text = readFileSync(abs, 'utf-8');
-      violations.push(...scanText(text, rel));
+      violations.push(...scanText(text, rel, rules));
     } catch {
       // 非 UTF-8 / 无权读：跳过
     }
@@ -66,12 +81,23 @@ function main(): number {
   const report = summarize(violations);
   if (asJson) {
     console.log(
-      JSON.stringify({ scanned: filesScanned.length, violations, summary: report }, null, 2),
+      JSON.stringify(
+        {
+          scanned: docFilesScanned.length + sourceFilesScanned.length,
+          scannedDocs: docFilesScanned.length,
+          scannedSources: sourceFilesScanned.length,
+          violations,
+          summary: report,
+        },
+        null,
+        2,
+      ),
     );
     return report.total > 0 ? 1 : 0;
   }
 
-  console.log(`[copyright:check] 扫描文件数: ${filesScanned.length}`);
+  console.log(`[copyright:check] 扫描文件数（文档与文案）: ${docFilesScanned.length}`);
+  console.log(`[copyright:check] 扫描文件数（源码与配置）: ${sourceFilesScanned.length}`);
   console.log(`[copyright:check] 违规总数: ${report.total}`);
   if (report.total === 0) {
     console.log('✅ 合规检查通过');

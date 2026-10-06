@@ -1,6 +1,6 @@
 // CardDetailModal - 长按/双击查看卡牌详情弹窗
 // 支持双面角色（双子/双鱼/露娜）翻面预览
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.2 卡牌详情
+// 卡牌详情
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +15,6 @@ export interface CardDetailModalProps {
   /**
    * 禁用翻面：传 true 时隐藏翻面按钮 + F 键无响应。
    * 用于金库等"正面已公开但背面是游戏机密"的卡种
-   * （对照：docs/_internal/design/06c-match-table-layout.md §6.2）
    */
   disableFlip?: boolean;
 }

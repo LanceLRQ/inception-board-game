@@ -1,5 +1,5 @@
-// W10-R1 · 桶 A+B 5 角色 AbilityDefinition 注册 + canActivate/apply 行为测试
-// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R1（处女/雅典娜急智/水瓶/意念判官/双鱼）
+// 5 角色 AbilityDefinition 注册 + canActivate/apply 行为测试
+// abilities registry（处女/雅典娜急智/水瓶/意念判官/双鱼）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -50,7 +50,7 @@ function setLayer(state: SetupState, playerID: string, layer: Layer): SetupState
 // Registry 集成
 // ==========================================================================
 
-describe('R1 · createDefaultRegistry', () => {
+describe('createDefaultRegistry', () => {
   it('注册全部 5 个 thief 能力', () => {
     const reg = createDefaultRegistry();
     expect(ALL_THIEF_ABILITIES.length).toBeGreaterThanOrEqual(5);
@@ -96,7 +96,7 @@ describe('R1 · createDefaultRegistry', () => {
 // 处女 · 完美
 // ==========================================================================
 
-describe('R1 · 处女·完美 (W20.5 实装)', () => {
+describe('处女·完美', () => {
   it('canActivate ok：角色匹配 + lastShootRoll=6', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_virgo');
@@ -162,7 +162,7 @@ describe('R1 · 处女·完美 (W20.5 实装)', () => {
 // 雅典娜 · 急智
 // ==========================================================================
 
-describe('R1 · 雅典娜·急智', () => {
+describe('雅典娜·急智', () => {
   it('canActivate ok：角色匹配 + 弃牌堆非空 + 未用过', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_athena');
@@ -207,7 +207,7 @@ describe('R1 · 雅典娜·急智', () => {
 // 水瓶 · 解封无限（被动）
 // ==========================================================================
 
-describe('R1 · 水瓶·解封无限（被动）', () => {
+describe('水瓶·解封无限（被动）', () => {
   it('角色匹配 → 被动 active', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_aquarius');
@@ -234,7 +234,7 @@ describe('R1 · 水瓶·解封无限（被动）', () => {
 // 意念判官 · 定罪
 // ==========================================================================
 
-describe('R1 · 意念判官·定罪', () => {
+describe('意念判官·定罪', () => {
   it('canActivate ok：角色匹配 + 是 shooter', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_sudger_of_mind');
@@ -304,7 +304,7 @@ describe('R1 · 意念判官·定罪', () => {
 // 双鱼 · 闪避
 // ==========================================================================
 
-describe('R1 · 双鱼·闪避', () => {
+describe('双鱼·闪避', () => {
   it('canActivate ok：双鱼 + 当前层>1 + 是 target', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_pisces');

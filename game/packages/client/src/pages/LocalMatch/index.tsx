@@ -1,5 +1,4 @@
 // LocalMatch · 人机对战页面
-// 对照：docs/_internal/design/08-security-ai.md §8.5 / docs/_internal/TASKS.md W9
 //
 // 交互流：
 //   1. 选择人数 → started=true

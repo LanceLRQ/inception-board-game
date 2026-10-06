@@ -1,5 +1,4 @@
 // TargetLayerPickerDialog · 纯逻辑层
-// 对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 2
 //
 // 对于"需选目标层"的卡（梦境穿梭剂 / 梦境窥视 / 梦魇解封 等），
 // 当前简化规则：所有 L1-L4 均为候选；具体合法性由 engine 侧校验。

@@ -1,5 +1,4 @@
 // MatchTable - PC 围坐桌面入口（≥1024px）
-// 对照：docs/_internal/design/06c-match-table-layout.md §2.1
 //
 // 组合：顶部状态条 + TableStage（围坐 + 中央桌面）+ 右侧 MasterConsole（仅梦主）+ 底部 ActionDock + 响应窗口 + CardDetailModal
 
@@ -37,7 +36,7 @@ export function MatchTable({ state, onDispatch }: MatchTableProps) {
   const [detailCard, setDetailCard] = useState<CardID | null>(null);
   const isMaster = viewer?.faction === 'master';
 
-  // 焦点层：盗梦者视角用自己所在层；梦主默认 L1，可扩展切换（Phase 4）
+  // 焦点层：盗梦者视角用自己所在层；梦主默认 L1，可扩展切换
   const [focusLayer, setFocusLayer] = useState<number>(viewer?.currentLayer ?? 1);
 
   const handCards: HandCard[] = useMemo(

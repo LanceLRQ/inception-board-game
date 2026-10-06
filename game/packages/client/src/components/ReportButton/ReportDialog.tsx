@@ -1,5 +1,5 @@
 // ReportDialog - 举报弹窗：选理由 + 选填描述
-// 对照：docs/_internal/design/06-frontend-design.md 举报入口
+// 举报入口
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';

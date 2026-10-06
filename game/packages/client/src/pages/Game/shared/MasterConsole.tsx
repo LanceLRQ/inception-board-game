@@ -1,11 +1,10 @@
 // MasterConsole - 梦主专属控制台（世界观 / 梦魇 / 贿赂池）
-// 对照：docs/_internal/design/06c-match-table-layout.md §5.5
 //
 // 两种布局：
 //   pc-sidebar：PC 右侧固定 panel（宽 280-320px）
 //   mobile-drawer：移动端顶部折叠栏 → 展开为全屏 Drawer
 //
-// Phase 3 阶段以占位为主，实际接入世界观/梦魇状态留待 Phase 4。
+// 当前以占位为主，实际接入世界观/梦魇状态留待后续。
 
 import { cn } from '../../../lib/utils.js';
 import { ScrollText, Sparkles, Coins } from 'lucide-react';
@@ -49,7 +48,7 @@ export function MasterConsole({
           激活的世界观
         </div>
         <div className="rounded border border-red-500/20 bg-slate-900/60 p-2 text-[11px] text-muted-foreground">
-          （Phase 4 接入真实世界观卡牌效果）
+          （后续接入真实世界观卡牌效果）
         </div>
       </section>
 
@@ -60,7 +59,7 @@ export function MasterConsole({
           梦魇库存 <span className="text-[10px] text-muted-foreground">0 / 6</span>
         </div>
         <div className="rounded border border-red-500/20 bg-slate-900/60 p-2 text-[11px] text-muted-foreground">
-          （Phase 3 接入 6 张梦魇牌触发界面）
+          （后续接入 6 张梦魇牌触发界面）
         </div>
       </section>
 
@@ -71,7 +70,7 @@ export function MasterConsole({
           贿赂池
         </div>
         <div className="rounded border border-red-500/20 bg-slate-900/60 p-2 text-[11px] text-muted-foreground">
-          （Phase 4 接入贿赂系统）
+          （后续接入贿赂系统）
         </div>
       </section>
     </aside>

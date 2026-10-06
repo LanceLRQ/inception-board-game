@@ -140,7 +140,7 @@ describe('resolveSudgerPick（第 2 步：选 A/B + SHOOT 结算）', () => {
 
   it('选 B（骰值 3）→ move target 到相邻层', () => {
     let s = setupSudger();
-    // 规则 04-action-cards.md：基础 SHOOT 只有 [2,3,4] 是 move，5/6 为 miss
+    // 规则 docs/manual/04-action-cards.md：基础 SHOOT 只有 [2,3,4] 是 move，5/6 为 miss
     s = callMove(s, 'playShootSudger', ['p2', 'action_shoot'], {
       currentPlayer: 'p1',
       rolls: [1, 3], // A=1(death), B=3(move)

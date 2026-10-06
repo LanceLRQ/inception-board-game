@@ -2,7 +2,7 @@
 // 对照：docs/manual/05-dream-thieves.md 处女
 // 任意玩家骰 6 时，处女可三选一：复活弃牌堆己方角色 / 抽 2 张 / 传送到任一层
 //
-// W20.5 实装：
+// 实装：
 //   - scope='passive' + triggers=['onAfterShoot']：每次 SHOOT 结算后由 dispatchPassives 自动检查
 //   - canActivate 校验：处女存活 + lastShootRoll === 6 + 当前无 pending（避免重入）
 //   - apply 不直接施加副作用，而是挂起 pendingVirgoChoice 等待玩家选择

@@ -3,7 +3,7 @@
 // 被 SHOOT 时可移到上一层并翻面，回合限 1 次
 //
 // abilities registry 接入：onBeforeShoot — target 响应窗口
-// R1 阶段：定义 + canActivate；apply 调用 applyPiscesEvade 纯函数
+// 定义 + canActivate；apply 调用 applyPiscesEvade 纯函数
 
 import { applyPiscesEvade, canPiscesEvade, PISCES_SKILL_ID } from '../../../skills.js';
 import type { AbilityContext, AbilityDefinition } from '../../types.js';

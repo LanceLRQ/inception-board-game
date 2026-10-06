@@ -1,5 +1,4 @@
 // 盗梦都市 - 核心枚举与基础类型
-// 对照：docs/_internal/design/03-data-model.md §3.1-§3.2
 
 // 层级（0=迷失层）
 export type Layer = 0 | 1 | 2 | 3 | 4;

@@ -1,5 +1,5 @@
 // ThiefBoard - 盗梦者移动端视角
-// 对照：docs/_internal/design/06-frontend-design.md §6.3 移动端布局
+// 移动端布局
 //
 // 布局（移动端竖屏）：
 //   ┌───────────────────────┐

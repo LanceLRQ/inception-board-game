@@ -1,5 +1,4 @@
 // computeRailSlots 纯函数测试
-// 对照：docs/_internal/design/06c-match-table-layout.md §4
 
 import { describe, it, expect } from 'vitest';
 import { computeRailSlots } from './turnOrder.js';

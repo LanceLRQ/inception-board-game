@@ -1,5 +1,4 @@
 // 测试 Fixtures 工厂
-// 对照：docs/_internal/design/09-testing-quality.md §9.3.2
 //
 // 用途：生成可控的 SetupState / PlayerSetup / LayerSetup，便于单测与快照。
 // 所有函数都是纯函数，返回深拷贝（不会误改模板）。
@@ -191,7 +190,7 @@ export function withHand(state: SetupState, playerId: string, hand: CardID[]): S
 export type { DeepPartial };
 
 // ---------------------------------------------------------------------------
-// Move 调用器 + 快照切片器（W10 行动牌快照测试基建）
+// Move 调用器 + 快照切片器（行动牌快照测试基建）
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,5 +1,5 @@
 // 全局 Toast store（zustand）
-// 对照：plans/2-1-3-1-2-ui-cozy-wave.md Toast 视觉规范
+// Toast 视觉规范
 //
 // 用法（推荐走 lib/toast.ts 门面 API）：
 //   import { toast } from '@/lib/toast';

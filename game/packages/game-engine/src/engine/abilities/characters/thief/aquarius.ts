@@ -2,7 +2,7 @@
 // 对照：docs/manual/05-dream-thieves.md 水瓶
 // 解封次数无限制（被动）— game.ts playUnlock guard 已接入，registry 主要承担文档化角色
 //
-// 注：水瓶另一个技能（同名重用）依赖响应窗口，留 R3 批次
+// 注：水瓶另一个技能（同名重用）依赖响应窗口，留待后续批次
 
 import { isAquariusUnlimitedActive, AQUARIUS_UNLOCK_SKILL_ID } from '../../../skills.js';
 import type { AbilityContext, AbilityDefinition } from '../../types.js';

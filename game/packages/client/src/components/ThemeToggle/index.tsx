@@ -1,5 +1,5 @@
 // ThemeToggle - 三态主题切换按钮
-// 对照：docs/_internal/design/06-frontend-design.md 明暗双主题
+// 明暗双主题
 
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../../stores/useThemeStore';

@@ -2,7 +2,7 @@
 // 展示 L1-L4 + 迷失层 L0（死亡玩家），每层内显示心锁值、金库、玩家列表
 // 人类玩家高亮，梦主徽标，死亡玩家在迷失层
 //
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.3 梦境层
+// 梦境层
 
 import { useTranslation } from 'react-i18next';
 import { Crown, Heart, Skull, User } from 'lucide-react';

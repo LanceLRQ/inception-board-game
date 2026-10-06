@@ -1,5 +1,5 @@
 // useMockMatch - 本地 mock 视角状态
-// 用于 B6 前端视角整合的过渡开发（真实 WS + PlayerView 集成在 B7）
+// 用于前端视角整合的过渡开发（真实 WS + PlayerView 集成前使用）
 // 注：返回的状态结构对齐 FilteredState，便于后续切换到真实过滤后状态
 
 import { useMemo } from 'react';

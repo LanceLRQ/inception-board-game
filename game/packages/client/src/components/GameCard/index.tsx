@@ -1,6 +1,5 @@
 // 游戏卡牌组件 - 正面/背面/高亮/不可用/多尺寸/可选方向
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.2 / §6.4.3 / §6.17.8（ADR-042 失败降级）
-//       docs/_internal/design/06c-match-table-layout.md §6.1（orientation + 长按 2000ms 统一）
+// 图片加载失败降级为占位；orientation + 长按 2000ms 统一
 
 import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -75,7 +74,7 @@ export function GameCard({
 }: GameCardProps) {
   const isBack = !cardId || cardId === '__back__';
 
-  // 图片加载失败 → 降级占位（ADR-042 §6.17.8）
+  // 图片加载失败 → 降级占位
   const [imageFailed, setImageFailed] = useState(false);
   const handleImageError = useCallback(() => setImageFailed(true), []);
   // 当 cardId 为背面但调用方传了 imageUrl（如阵营通用卡背），也应展示图片

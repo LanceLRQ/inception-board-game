@@ -1,5 +1,4 @@
 // 优先级仲裁引擎 — 黄金定律
-// 对照：docs/_internal/design/05-card-system.md §5.3
 // 规则：技能(bucket 1) > 行动牌(2) > 世界观(3) > 梦魇(4) > 规则(5)
 
 import type { EffectStackFrame } from './types.js';

@@ -1,6 +1,5 @@
-// 梦境窥视三段式回归测试 · W19-B F5~F8
+// 梦境窥视三段式回归测试
 // 对照：docs/manual/04-action-cards.md 梦境窥视 效果①
-// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-02
 //
 // 规则原文（效果①盗梦者）：
 //   "仅盗梦者使用，梦主可以先给予你 1 张贿赂牌。你查看任意一层梦境的金库，
@@ -329,7 +328,7 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
     });
   });
 
-  describe('E · endActionPhase 阻断（W19-B F4a · 防 bot 跳过窥视结算）', () => {
+  describe('E · endActionPhase 阻断（防 bot 跳过窥视结算）', () => {
     it('pendingPeekDecision 挂起时 endActionPhase → INVALID_MOVE', () => {
       const s0 = withStandardBribes(sceneBeforePeek());
       const s1 = callMove(s0, 'playPeek', [PEEK_CARD, 3], { currentPlayer: 'p1' }) as SetupState;
@@ -350,7 +349,7 @@ describe('OOT-02 · 梦境窥视三段式（F5~F8 red test）', () => {
 });
 
 // -----------------------------------------------------------------------------
-// OOT-03 · 梦境窥视 效果② · 梦主查看一名盗梦者的所有贿赂牌（W19-B F10）
+// 梦境窥视 效果② · 梦主查看一名盗梦者的所有贿赂牌
 // 对照：docs/manual/04-action-cards.md 梦境窥视 效果②
 //   "仅梦主使用，查看一名盗梦者的所有贿赂牌。"
 //   使用目标："一名已被贿赂的盗梦者"

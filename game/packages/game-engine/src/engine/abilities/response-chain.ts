@@ -1,5 +1,4 @@
 // 响应链框架 — 统一响应窗口模型（栈式）
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.4.2 / 05-card-system.md §5.4.6
 // 取消解封 / SHOOT 响应 / 链式触发的通用容器
 //
 // 栈式语义：当已有窗口时再开新窗口，新窗口挂到栈顶，旧窗口通过 parentWindow 保留；
@@ -13,7 +12,7 @@ import type { PendingResponse, ResponseWindowSourceType } from './types.js';
 export interface ResponseWindowState {
   /** 触发的来源能力 ID（如 "action_unlock"） */
   sourceAbilityID: string;
-  /** 响应窗口来源类别（W19-B F14 · 可选 metadata，便于 UI/Bot 区分） */
+  /** 响应窗口来源类别（可选 metadata，便于 UI/Bot 区分） */
   sourceType?: ResponseWindowSourceType;
   /** 等待响应的玩家列表 */
   responders: string[];
@@ -107,7 +106,7 @@ export function handleTimeout(state: SetupState): {
 }
 
 // ============================================================================
-// 栈式辅助（W19 · 响应链嵌套子系统）
+// 栈式辅助（响应链嵌套子系统）
 // ============================================================================
 
 /** 获取当前栈顶活跃窗口（与直接读 state.pendingResponseWindow 等价，语义更清晰） */
@@ -132,7 +131,7 @@ export function getWindowDepth(state: SetupState): number {
 }
 
 /**
- * W19-B F14 · 获取当前响应窗口的 sourceType（便于 UI/Bot 按类别分派）
+ * 获取当前响应窗口的 sourceType（便于 UI/Bot 按类别分派）
  *   未设置 → null（向后兼容旧窗口）
  */
 export function getWindowSourceType(state: SetupState): ResponseWindowSourceType | null {

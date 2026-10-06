@@ -1,5 +1,4 @@
 // 游戏初始化 - Setup 阶段
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.2
 
 import type { Layer, CardID, Faction } from '@icgame/shared';
 import { ACTION_CARDS } from '@icgame/shared';
@@ -22,7 +21,7 @@ const SHUFFLE_LABEL = {
 
 /**
  * 构建行动牌牌库
- * 对照：docs/_internal/design/02-game-rules-spec.md §2.2 / docs/manual/04-action-cards.md
+ * 对照：docs/manual/04-action-cards.md
  * 按每张牌 quantity 字段展开，跳过扩展牌与占位的 "action_back"（背面）
  */
 /**
@@ -105,11 +104,10 @@ export interface SetupState {
   // 对照：docs/manual/04-action-cards.md 移形换影
   shiftSnapshot: Record<string, CardID> | null;
   // 响应窗口（能力系统）
-  // 对照：docs/_internal/design/02-game-rules-spec.md §2.4.2
   pendingResponseWindow: import('./engine/abilities/response-chain.js').ResponseWindowState | null;
   // 梦境窥视 · 梦主决策等待态
   //   规则：盗梦者使用【梦境窥视】效果①时，梦主先决定是否给 1 张贿赂牌 → 然后盗梦者查看金库
-  //   对照：docs/manual/04-action-cards.md 梦境窥视 效果① / docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-02
+  //   对照：docs/manual/04-action-cards.md 梦境窥视 效果①
   //   生命周期：playPeek 挂起（若贿赂池有可派牌） → masterPeekBribeDecision 清空
   //   若贿赂池已派完 → playPeek 跳过该步，直接设置 peekReveal
   pendingPeekDecision: {
@@ -118,7 +116,7 @@ export interface SetupState {
   } | null;
   // 梦境窥视 · 私密展示态（对局视图按授权分支消费）
   //   revealKind='vault'：效果①（盗梦者使用），仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容
-  //   revealKind='bribe'：效果②（梦主使用，W19-B F10），仅对 peekerID(=梦主) 视角透传
+  //   revealKind='bribe'：效果②（梦主使用），仅对 peekerID(=梦主) 视角透传
   //                     targetThiefID 持有的贿赂牌内容（为未来梦主隐私收紧预留授权入口）
   //   生命周期：playPeek / masterPeekBribeDecision / playPeekMaster 挂起 → peekerAcknowledge 清空
   //   对照：docs/manual/04-action-cards.md 梦境窥视 效果①/效果②
@@ -169,7 +167,7 @@ export interface SetupState {
    * 白羊·星尘：盗梦者被击杀时，若白羊存活且被击杀者所在层有未翻梦魇，
    * 则挂起白羊的"发动 or 弃"选择；在 playAriesStardustActivate/Discard 或 turn.onEnd 清空。
    * 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
-   * 说明：本批次为简化 pending（非完整响应窗口栈），P4 W20.5 可被框架替换。
+   * 说明：本批次为简化 pending（非完整响应窗口栈），可被框架替换。
    */
   pendingAriesChoice: {
     ariesID: string;
@@ -191,8 +189,8 @@ export interface SetupState {
   } | null;
   /**
    * SHOOT 响应窗口（pre-roll）：当 SHOOT 发动且目标可响应时挂起，等待目标决策。
-   * 当前消费方：双鱼·闪避（W20.5-C）。后续可扩展 恐怖分子·讹诈 等。
-   * 对照：docs/manual/05-dream-thieves.md 双鱼 / docs/_internal/TASKS.md W20.5
+   * 当前消费方：双鱼·闪避。后续可扩展 恐怖分子·讹诈 等。
+   * 对照：docs/manual/05-dream-thieves.md 双鱼
    * 生命周期：
    *   - applyShootVariant 在 dispatchPassives(onBeforeShoot) 之后、随机 D6 之前检查
    *   - target 是双鱼且 canPiscesEvade → 挂起本窗口 + 提前 return（未弃 SHOOT 卡）
@@ -212,19 +210,18 @@ export interface SetupState {
     preventMove?: boolean;
     /**
      * 响应类型：
-     *   - 'pisces'：双鱼·闪避（W20.5-C 默认值，向后兼容；可省略）
-     *   - 'terrorist'：恐怖分子·狂热（W20.5-D；target 必须弃 1 张否则骰 -1）
+     *   - 'pisces'：双鱼·闪避（默认值，向后兼容；可省略）
+     *   - 'terrorist'：恐怖分子·狂热（target 必须弃 1 张否则骰 -1）
      */
     responseType?: 'pisces' | 'terrorist';
   } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
-  // 出牌追踪（Phase 3 坑③子系统基础设施）
+  // 出牌追踪（子系统基础设施）
   // 本回合内按时序记录每次成功打出的行动牌 cardId（SHOOT 变体也计入）。
   // 消费方：水星·航路 / 金星·镜界 / 格林射线 等依赖"上一张打出的牌"的能力。
   // 生命周期：turn.onBegin 清空；每个 playXxx move 成功结算后 push。
-  // 对照：docs/_internal/design/02-game-rules-spec.md §2.4 · abilities registry R4 deferred
   playedCardsThisTurn: CardID[];
   /** 最近一次打出的行动牌 cardId（便于 O(1) 查询；同 playedCardsThisTurn 末元素） */
   lastPlayedCardThisTurn: CardID | null;

@@ -1,5 +1,5 @@
 // 梦主梦魇决策提示 · 纯逻辑层
-// 对照：docs/manual/03-game-flow.md 第 94-102 行 + 07-nightmare-cards.md
+// 对照：docs/manual/03-game-flow.md 第 94-102 行 + docs/manual/07-nightmare-cards.md
 // 触发条件：盗梦者打开金币金库 → 同层有未翻开梦魇 → 梦主回合+action 阶段决策 3 选 1
 //
 // 决策三选一：

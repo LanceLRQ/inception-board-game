@@ -1,5 +1,5 @@
 // SHOOT 骰子动画浮层 —— 射击牌打出后展示骰面快速切换，落定后停留 1s 再回调
-// 对照：docs/_internal/design/06-frontend-design.md §6.6 Dice3D
+// Dice3D
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';

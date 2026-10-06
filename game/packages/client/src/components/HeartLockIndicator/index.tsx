@@ -1,8 +1,7 @@
 // HeartLockIndicator - 心锁骰视觉（蓝色骰面常亮，不掷）
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.2 HeartLockIndicator
-//        Spike: experimental_demo/dice-svg-css3d（蓝色 1-6 SVG）
+// 技术验证原型：experimental_demo/dice-svg-css3d（蓝色 1-6 SVG）
 //
-// 变更（B8.2）：
+// 变更：
 //   - 单色蓝骰面图取代 ♥ 符号
 //   - count ∈ [0, 6]：0 → 灰色空骰；1-6 → 对应点数蓝骰 SVG
 //   - 明确 "不掷"：无动画、静态展示

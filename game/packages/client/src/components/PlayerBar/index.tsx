@@ -1,5 +1,5 @@
 // PlayerBar - 玩家状态栏（头像 / 昵称 / 手牌数 / 存活 / 层）
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.5 玩家栏
+// 玩家栏
 
 import { cn } from '../../lib/utils.js';
 import type { MockPlayer } from '../../hooks/useMockMatch.js';

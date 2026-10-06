@@ -1,5 +1,4 @@
-// W16-C 梦主世界观 / 火星·杀戮 / 土星·领地世界观
-// 对照：docs/_internal/TASKS.md Phase 3 W16
+// 梦主世界观 / 火星·杀戮 / 土星·领地世界观
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -59,7 +58,7 @@ function setLayerNightmare(state: SetupState, layer: Layer, nid: CardID): SetupS
   };
 }
 
-describe('W16-C · 火星·战场（dm_mars_battlefield）·杀戮', () => {
+describe('火星·战场（dm_mars_battlefield）·杀戮', () => {
   it('canMarsKill：手牌有解封 → true', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
     s = setHand(s, 'pM', ['action_unlock' as CardID]);
@@ -130,7 +129,7 @@ describe('W16-C · 火星·战场（dm_mars_battlefield）·杀戮', () => {
   });
 });
 
-describe('W16-C · 冥王星·地狱世界观', () => {
+describe('冥王星·地狱世界观', () => {
   it('isPlutoHellWorldActive：冥王星梦主时 true', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     expect(isPlutoHellWorldActive(s)).toBe(true);
@@ -221,7 +220,7 @@ describe('W16-C · 冥王星·地狱世界观', () => {
   });
 });
 
-describe('W16-C · 土星·领地世界观', () => {
+describe('土星·领地世界观', () => {
   it('canUseSaturnFreeMoveThisTurn：持贿赂 → true', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
     s = setBribeReceived(s, 'p1', 1);

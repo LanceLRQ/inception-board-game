@@ -1,5 +1,5 @@
 // TutorialOverlay - 教学气泡 + 蒙层
-// 对照：docs/_internal/TASKS.md W8.5-9 · 新手教学关卡
+// 新手教学关卡
 
 import { useTranslation } from 'react-i18next';
 import type { TutorialStep } from '@icgame/shared';

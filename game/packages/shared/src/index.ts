@@ -103,7 +103,7 @@ export {
 } from './shortlink/base58.js';
 export type { RandomBytesFn } from './shortlink/base58.js';
 
-// 教学（B16）
+// 教学
 export {
   initialProgress,
   getCurrentStep,

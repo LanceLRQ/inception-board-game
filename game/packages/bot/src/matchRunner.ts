@@ -1,5 +1,5 @@
 // Bot 夜间回归 runner
-// 对照：docs/_internal/design/10-roadmap-risk.md W9 / docs/_internal/TASKS.md Bot 夜间 100 局回归
+// Bot 夜间 100 局回归
 //
 // 设计：
 //   - MVP 阶段 engine 的完整 Move 尚未全量就位，这里提供一个**简化回合 loop**：

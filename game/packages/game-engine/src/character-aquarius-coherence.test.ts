@@ -1,6 +1,5 @@
 // 水瓶 · 凝聚（skill_0）单测
 // 对照：docs/manual/05-dream-thieves.md 水瓶 46-50 行
-// 对照：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 B · B1
 
 import { describe, expect, it } from 'vitest';
 import type { CardID } from '@icgame/shared';
@@ -137,7 +136,7 @@ describe('水瓶 · 凝聚 · 取牌', () => {
 });
 
 // ============================================================================
-// W20.5 · BGIO move 集成测试（playAquariusCoherence）
+// BGIO move 集成测试（playAquariusCoherence）
 // 对照：game.ts:2503 playAquariusCoherence move 入口
 // ============================================================================
 

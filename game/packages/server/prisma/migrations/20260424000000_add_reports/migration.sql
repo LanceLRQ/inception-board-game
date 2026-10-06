@@ -1,5 +1,5 @@
--- W22-B Sprint 2: 举报面板持久化表
--- 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
+-- 举报面板持久化表
+-- 反作弊与信誉分
 
 -- CreateTable
 CREATE TABLE "reports" (

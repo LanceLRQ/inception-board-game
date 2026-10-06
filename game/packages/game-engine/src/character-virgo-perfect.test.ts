@@ -1,6 +1,5 @@
 // 处女 · 完美（thief_virgo.skill_0）实装单测
 // 对照：docs/manual/05-dream-thieves.md 处女
-// 对照：docs/_internal/TASKS.md W20.5 · Phase 3 遗留 · 响应窗口技能（5 项）
 //
 // 覆盖范围：
 //   A. 三选一 helper 纯函数（applyVirgoResurrect / applyVirgoDrawTwo / applyVirgoTeleport）

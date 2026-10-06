@@ -1,5 +1,4 @@
 // BGIO Game 对象 - 盗梦都市主游戏定义
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.1 + §7.5.1
 //
 // BGIO 0.50 回调签名约定：
 //   setup: (context: { ctx }, setupData?) => G
@@ -233,7 +232,7 @@ function findJustOpenedCoinVault(
 }
 
 // --- 内部 helper：解封成功完整副作用链 ---
-// W19-B F3：由 passResponse（全员 pass）与 resolveUnlock（兜底）共享。
+// 由 passResponse（全员 pass）与 resolveUnlock（兜底）共享。
 // 顺序：applyUnlockSuccess → M4-4 金币金库贿赂奖励 → 译梦师抽 2 → 梦境猎手·满载 → onUnlock passive。
 // 对照：docs/manual/04-action-cards.md 解封 + docs/manual/08-appendix.md M4-4
 function resolveUnlockFull(G: SetupState, random: BGIORandom): SetupState {
@@ -327,8 +326,8 @@ export const InceptionCityGame = {
             const masterIdx = random.Die(G.playerOrder.length) - 1;
             const masterID = G.playerOrder[masterIdx]!;
 
-            // 给玩家随机分配角色 —— 涵盖 Phase 3 所有已实装角色
-            // 梦主 13 个 · 盗梦者 37 个（对照 docs/_internal/TASKS.md W11-W16）
+            // 给玩家随机分配角色 —— 涵盖所有已实装角色
+            // 梦主 13 个 · 盗梦者 37 个
             const masterPool: CardID[] = [
               'dm_fortress',
               'dm_chess',
@@ -922,7 +921,7 @@ export const InceptionCityGame = {
           client: false,
         },
         // 梦主弃掉已翻开的梦魇（不发动效果）
-        // 梦主弃掉未翻开的梦魇（W18-A：玩家打开金币金库后，梦主选择不发动）
+        // 梦主弃掉未翻开的梦魇（玩家打开金币金库后，梦主选择不发动）
         // 对照：docs/manual/03-game-flow.md 第 96-101 行
         masterDiscardHiddenNightmare: {
           move: ({ G, ctx }: MoveCtx, layer: number) => {
@@ -1234,7 +1233,7 @@ export const InceptionCityGame = {
         },
         // 打出解封 - 盗梦者解锁同层心锁（效果①）
         // 对照：docs/manual/04-action-cards.md 解封
-        // W19-B F3：playUnlock 成功后即刻打开响应窗口（对照：§解封 使用时机②
+        // playUnlock 成功后即刻打开响应窗口（对照：§解封 使用时机②
         //   "任意玩家使用【解封】的效果①时"），允许其他玩家出效果②抵消
         playUnlock: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
@@ -1287,7 +1286,7 @@ export const InceptionCityGame = {
           client: false,
         },
         // resolveUnlock：兜底入口 - 在响应窗口未接入或 bot 直接推进时可用。
-        // W19-B F3：正常流程下由 passResponse 在"全员 pass"时自动触发 resolveUnlockFull。
+        // 正常流程下由 passResponse 在"全员 pass"时自动触发 resolveUnlockFull。
         //   该 move 仍保留：供 bot/无响应窗口场景 fallback；会强制关闭可能残留的窗口。
         resolveUnlock: {
           move: ({ G, random }: MoveCtx) => {
@@ -1360,7 +1359,7 @@ export const InceptionCityGame = {
 
         // 响应解封效果②：抵消一张正在结算的【解封】。
         // 对照：docs/manual/04-action-cards.md §解封 效果②
-        // W19-B F2：补齐 responder 校验 + 持卡校验 + 弃牌 + 关闭响应窗口。
+        // 补齐 responder 校验 + 持卡校验 + 弃牌 + 关闭响应窗口。
         //   无参数：响应者就是发起者（包装层已按行动权表校验并把 ctx.currentPlayer 设为发起者）。
         respondCancelUnlock: {
           move: ({ G, ctx }: MoveCtx) => {
@@ -1387,7 +1386,7 @@ export const InceptionCityGame = {
           client: false,
         },
         // pass 响应：表示自己不出效果②抵消。
-        // W19-B F2：校验 responder 合法 & 未重复 pass；全员 pass 时自动进入 resolveUnlockFull。
+        // 校验 responder 合法 & 未重复 pass；全员 pass 时自动进入 resolveUnlockFull。
         //   无参数：响应者就是发起者（同 respondCancelUnlock）。
         passResponse: {
           move: ({ G, ctx, random }: MoveCtx) => {
@@ -1485,7 +1484,7 @@ export const InceptionCityGame = {
         // 打出梦境窥视 · 效果①（盗梦者使用）
         // 对照：docs/manual/04-action-cards.md 梦境窥视 · 解析
         //   三段式：playPeek → [梦主决策是否派贿赂] → [盗梦者私密查看金库]
-        //   W19-B F5：改 MVP 占位为完整三段式。贿赂池有可派牌 → 挂 pendingPeekDecision；
+        //   改 MVP 占位为完整三段式。贿赂池有可派牌 → 挂 pendingPeekDecision；
         //             贿赂池已派完（无 inPool）→ 跳过决策，直接挂 peekReveal（无负担窥视）。
         playPeek: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetLayer: number) => {
@@ -1526,7 +1525,7 @@ export const InceptionCityGame = {
         // 梦主决策是否派 1 张贿赂给窥视者（回合外 move，不 guard turnPhase）
         // 对照：docs/manual/04-action-cards.md 梦境窥视 · 解析
         //   "梦主先决定是否让该盗梦者抽取 1 张贿赂牌，然后该盗梦者再查看任意一层梦境的金库"
-        //   W19-B F6：deal=true 随机派 1 张（命中 DEAL 转阵营）；deal=false 或 inPool=0 → 跳过派发。
+        //   deal=true 随机派 1 张（命中 DEAL 转阵营）；deal=false 或 inPool=0 → 跳过派发。
         //   两分支终态一致：清 pendingPeekDecision + 挂 peekReveal（由 peeker 通过 peekerAcknowledge 消费）。
         masterPeekBribeDecision: {
           move: ({ G, random }: MoveCtx, deal: boolean) => {
@@ -1589,7 +1588,7 @@ export const InceptionCityGame = {
         // 对照：docs/manual/04-action-cards.md 梦境窥视 效果②
         //   "仅梦主使用，查看一名盗梦者的所有贿赂牌。"
         //   使用目标："一名已被贿赂的盗梦者"
-        //   W19-B F10：梦主对一名已被贿赂的盗梦者打出此牌，弃牌后挂 peekReveal.bribe；
+        //   梦主对一名已被贿赂的盗梦者打出此牌，弃牌后挂 peekReveal.bribe；
         //              peeker=梦主自己；由 peekerAcknowledge 清理（复用）。
         playPeekMaster: {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetThiefID: string) => {
@@ -1621,8 +1620,8 @@ export const InceptionCityGame = {
           client: false,
         },
         // 盗梦者确认查看完毕 → 清 peekReveal + moveCounter+1
-        //   W19-B F8：必须由 peekerID 本人调用。
-        //   W19-B F10：对 revealKind='bribe' 分支同样适用（peeker=梦主）。
+        //   必须由 peekerID 本人调用。
+        //   对 revealKind='bribe' 分支同样适用（peeker=梦主）。
         peekerAcknowledge: {
           move: ({ G, ctx }: MoveCtx) => {
             if (!G.peekReveal) return INVALID_MOVE;
@@ -1685,7 +1684,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 皇城·重金（W16-B）：派发贿赂时可指定 1 张牌（替代随机抽取）
+        // 皇城·重金：派发贿赂时可指定 1 张牌（替代随机抽取）
         // 对照：cards-data.json dm_imperial_city
         masterDealBribeImperial: {
           move: ({ G, ctx }: MoveCtx, targetPlayerID: string, poolIndex: number) => {
@@ -1727,7 +1726,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 密道·传送（W16-B）：弃 1 穿梭剂送任一盗梦者到迷失层。回合限 2 次。
+        // 密道·传送：弃 1 穿梭剂送任一盗梦者到迷失层。回合限 2 次。
         // 对照：cards-data.json dm_secret_passage
         playSecretPassageTeleport: {
           move: ({ G, ctx }: MoveCtx, targetPlayerID: string, transitCardId: CardID) => {
@@ -1745,7 +1744,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 天王星·权力（W16-B）：每未派发贿赂可移动 1 个盗梦者到指定层（非迷失层）
+        // 天王星·权力：每未派发贿赂可移动 1 个盗梦者到指定层（非迷失层）
         // 对照：cards-data.json dm_uranus_firmament
         // 金星·镜界 · 重影：展示牌库顶 N（N=活盗梦者数）+ 展示手牌 → 同名入手，其余混洗回顶
         // 对照：docs/manual/06-dream-master.md 金星·镜界
@@ -1782,7 +1781,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 冥王星·业火（W16-B）：弃 1 → 所有手牌<2 的盗梦者抽 2
+        // 冥王星·业火：弃 1 → 所有手牌<2 的盗梦者抽 2
         // 对照：cards-data.json dm_pluto_hell
         usePlutoBurning: {
           move: ({ G, ctx }: MoveCtx, discardCardId: CardID) => {
@@ -1795,7 +1794,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 火星·杀戮（W16-C）：弃 1 解封 → 发动指定层的梦魇牌效果（无需翻开）
+        // 火星·杀戮：弃 1 解封 → 发动指定层的梦魇牌效果（无需翻开）
         // 对照：cards-data.json dm_mars_battlefield
         useMarsKill: {
           move: ({ G, ctx, random }: MoveCtx, layer: number, params?: Record<string, unknown>) => {
@@ -1829,7 +1828,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 土星·领地世界观（W16-C）：持贿赂的盗梦者出牌阶段免费移动 1 次到相邻层
+        // 土星·领地世界观：持贿赂的盗梦者出牌阶段免费移动 1 次到相邻层
         // 对照：cards-data.json dm_saturn_territory 世界观
         useSaturnFreeMove: {
           move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
@@ -1861,7 +1860,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 火星·战场世界观（W16-D）：弃 2 非 SHOOT → 弃牌堆取 1 SHOOT 入手
+        // 火星·战场世界观：弃 2 非 SHOOT → 弃牌堆取 1 SHOOT 入手
         // 对照：cards-data.json dm_mars_battlefield 世界观
         useMarsBattlefield: {
           move: (
@@ -2438,7 +2437,7 @@ export const InceptionCityGame = {
         },
 
         // 处女·完美（skill_0）· 三选一响应窗
-        // 对照：docs/manual/05-dream-thieves.md 处女 / docs/_internal/TASKS.md W20.5
+        // 对照：docs/manual/05-dream-thieves.md 处女
         // 触发：dispatchPassives(onAfterShoot) 在 lastShootRoll===6 时挂起 pendingVirgoChoice
         // 约束：
         //   - 仅 pendingVirgoChoice.virgoID 本人可发起（回合外 move，不 guard turnPhase）
@@ -2541,7 +2540,7 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // R24：欺诈师·盗心（单机盲抽版）—— 固定抽 1 张，用 BGIO Random 在服务端
+        // 欺诈师·盗心（单机盲抽版）—— 固定抽 1 张，用 BGIO Random 在服务端
         // 随机挑选，避免客户端能看到 target 手牌即违反隐藏信息原则。
         // 对照：docs/manual/05-dream-thieves.md 欺诈师 · applyForgerExchange
         playForgerExchangeSingle: {
@@ -3280,7 +3279,7 @@ function applyShootVariant(
   if (decreeCheck === 'INVALID') return INVALID_MOVE;
   const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
 
-  // W20.5-C · Pisces 闪避响应窗口（pre-roll）
+  // Pisces 闪避响应窗口（pre-roll）
   // 限制：dicePreModifier 路径（哈雷免费 SHOOT，函数不可序列化）跳过窗口
   // skipPiscesCheck=true 由 respondShootPass move 重入时设置
   if (
@@ -3306,7 +3305,7 @@ function applyShootVariant(
     };
   }
 
-  // W20.5-D · Terrorist 狂热响应窗口（pre-roll，Pisces 之后）
+  // Terrorist 狂热响应窗口（pre-roll，Pisces 之后）
   // 触发：shooter 是恐怖分子（被动技能 skill_1）→ target 必须弃 1 张否则骰 -1
   // 对照：docs/manual/05-dream-thieves.md 恐怖分子 狂热 247 行
   // 限制：dicePreModifier 路径同样跳过（哈雷免费 SHOOT 等特殊路径不挂窗）
@@ -3337,9 +3336,9 @@ function applyShootVariant(
   // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
   const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const rawD6 = random.D6();
-  // W20.5-D · 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1（不 floor，可能产生 0 → miss）
+  // 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1（不 floor，可能产生 0 → miss）
   const baseRoll = opts.terroristPenalty ? rawD6 - 1 : rawD6;
-  // D 批次：M4 卡宾枪全局化 —— 梦主使用 SHOOT 时目标骰 -1（基线梦主优势）
+  // M4 卡宾枪全局化 —— 梦主使用 SHOOT 时目标骰 -1（基线梦主优势）
   // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪道具；§111 印证 M4 先于效果处理
   // 仅在"未被角色技能重写骰值"的通用路径生效，不影响灵雕师 override / 天蝎毒针等特殊处理
   //   （这些路径的 shooter 都是盗梦者，M4 本来就不触发）
@@ -3351,8 +3350,8 @@ function applyShootVariant(
   const s0 = { ...preShootState, lastShootRoll: rawD6 };
 
   // === 角色 SHOOT 修饰链 ===
-  // W12 Tier B: 天蝎·毒针 / 金牛·号角
-  // W13 Tier A: 灵雕师·雕琢（最高优先级，override 不可改）
+  // 天蝎·毒针 / 金牛·号角
+  // 灵雕师·雕琢（最高优先级，override 不可改）
   // hook 注入: opts.diceModifierHint 用于哈雷·冲击的免费 SHOOT
   let result: 'kill' | 'move' | 'miss';
   let preState: SetupState = s0;
@@ -3389,7 +3388,7 @@ function applyShootVariant(
   }
 
   // 木星·雷霆：梦主使用 SHOOT 类，目标骰 < 梦主层 → 直接击杀
-  // 对照：cards-data.json dm_jupiter_peak 雷霆 + manual §50 "叠加 M4 -1"
+  // cards-data.json dm_jupiter_peak 雷霆 + manual §50 "叠加 M4 -1"
   if (result !== 'kill') {
     if (shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, postM4Roll)) {
       result = 'kill';
@@ -3420,7 +3419,7 @@ function applyShootVariant(
         },
       },
     };
-    // 白羊·星尘 onKilled 响应（简化 pending，P4 W20.5 可替换为完整响应栈）
+    // 白羊·星尘 onKilled 响应（简化 pending，可替换为完整响应栈）
     // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
     // 注：在 movePlayerToLayer(..., 0) 之前捕获原所在层 —— 但此处 target 已被 isAlive=false 前已被处理，
     // tp.currentLayer 仍在原层（isAlive 修改时未动 currentLayer，后续 movePlayerToLayer 才移走）

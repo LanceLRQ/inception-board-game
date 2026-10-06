@@ -1,5 +1,4 @@
 // 手牌抽屉 - 上滑展开/选中/两步点击打牌
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.3 HandDrawer + §6.4.4 两步点击
 
 import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';

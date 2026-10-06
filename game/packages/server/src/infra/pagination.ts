@@ -1,4 +1,4 @@
-// Cursor 分页工具（参照设计文档 §7.3.1）
+// Cursor 分页工具
 
 import { z } from 'zod';
 import { AppError } from './errors.js';

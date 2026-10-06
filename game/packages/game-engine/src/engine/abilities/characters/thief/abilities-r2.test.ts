@@ -1,5 +1,5 @@
-// W10-R2 · 桶 C 3 角色 turnPhase 抽牌阶段 hook
-// 对照：docs/_internal/TASKS.md Phase 3 abilities registry · R2（小丑/黑天鹅/白羊·skill_1）
+// 3 角色 turnPhase 抽牌阶段 hook
+// abilities registry（小丑/黑天鹅/白羊·skill_1）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID } from '@icgame/shared';
@@ -42,7 +42,7 @@ function setUsedNightmares(state: SetupState, ids: string[]): SetupState {
 // Registry 集成
 // ==========================================================================
 
-describe('R2 · registry 扩展', () => {
+describe('registry 扩展', () => {
   it('注册总数升至 8', () => {
     const reg = createDefaultRegistry();
     expect(reg.get(jokerGamble.id)).toBe(jokerGamble);
@@ -63,7 +63,7 @@ describe('R2 · registry 扩展', () => {
 // 小丑 · 赌博
 // ==========================================================================
 
-describe('R2 · 小丑·赌博', () => {
+describe('小丑·赌博', () => {
   it('canActivate ok：draw 阶段 + 角色匹配', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_joker');
@@ -111,7 +111,7 @@ describe('R2 · 小丑·赌博', () => {
 // 黑天鹅 · 巡演
 // ==========================================================================
 
-describe('R2 · 黑天鹅·巡演', () => {
+describe('黑天鹅·巡演', () => {
   it('canActivate ok：draw 阶段 + 手牌 ≥1', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_black_swan');
@@ -172,7 +172,7 @@ describe('R2 · 黑天鹅·巡演', () => {
 // 白羊 · 弃梦魇加成
 // ==========================================================================
 
-describe('R2 · 白羊·弃梦魇加成', () => {
+describe('白羊·弃梦魇加成', () => {
   it('canActivate ok：白羊 + 已弃 ≥1 张梦魇', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_aries');

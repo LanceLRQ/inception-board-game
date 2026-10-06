@@ -1,5 +1,4 @@
 // 围坐桌面座位坐标算法（纯函数，脱离 React）
-// 对照：docs/_internal/design/06c-match-table-layout.md §3
 
 export interface Seat {
   id: string;

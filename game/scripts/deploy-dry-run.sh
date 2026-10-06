@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 私有部署 Dry Run
-# 对照：docs/_internal/TASKS.md W9 · 私有部署 Dry Run（空白 VPS 3 分钟跑起首屏）
+# 私有部署 Dry Run（空白 VPS 3 分钟跑起首屏）
 #
 # 用法：
 #   bash scripts/deploy-dry-run.sh           # 默认：build + up + probe + down

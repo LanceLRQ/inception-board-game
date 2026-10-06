@@ -1,5 +1,4 @@
 // 卡牌交互统一配置
-// 对照：docs/_internal/design/06c-match-table-layout.md §6.1
 //
 // 设计取舍：长按阈值从 500 调到 2000，主要解决 PC 端鼠标按下意外触发详情弹窗的问题；
 // PC 双击作为快捷等价手势，两端统一走 useCardPressDetail hook。

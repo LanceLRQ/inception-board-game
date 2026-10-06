@@ -1,4 +1,4 @@
-// W10-R5 · dispatcher 工具层单元测试
+// dispatcher 工具层单元测试
 // 对照：engine/abilities/dispatch-helpers.ts
 
 import { describe, expect, it } from 'vitest';

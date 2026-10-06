@@ -1,5 +1,4 @@
 // 短链 API
-// 对照：docs/_internal/design/07-backend-network.md §7.11 / ADR-033
 //
 // POST /shortlinks   - 创建短链（鉴权）
 // GET  /r/:code      - 短链跳转（公开）

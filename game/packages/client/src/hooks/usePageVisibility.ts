@@ -1,5 +1,4 @@
 // usePageVisibility - 监听 document.visibilitychange
-// 对照：docs/_internal/design/07-backend-network.md §7.4.6 / 08-security-ai.md §8.5.3
 //
 // 核心需求：
 //   - hidden → visible 时计算离开时长

@@ -1,5 +1,5 @@
 // useThemeEffect - 同步主题偏好到 document.documentElement.classList + 监听系统偏好变化
-// 对照：docs/_internal/design/06-frontend-design.md 明暗双主题 follow 系统
+// 明暗双主题 follow 系统
 
 import { useEffect } from 'react';
 import { resolveTheme, type ResolvedTheme } from '../lib/theme';

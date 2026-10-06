@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 // cards-data.json → TypeScript 生成脚本
-// 输入：docs/_internal/reference/assets/cards-data.json
+// 输入：内部素材目录下的 cards-data.json
 // 输出：packages/shared/src/cards/generated/cards.ts
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -42,7 +42,7 @@ interface RawData {
 }
 
 // 图片路径规范化：cards-data.json 里的 OCR 源用的是 .jpg 扩展名，
-// 但对外产物要使用 docs/_internal/reference/scripts/convert-to-webp.sh 预压缩过的 .webp 版本，
+// 但对外产物要使用预压缩过的 .webp 版本，
 // 同时剥掉前导 "cards/" 前缀，改为相对 /public/cards/ 根的路径（由 CardImage 组件补前缀）。
 function normalizeImagePath(src: string): string {
   if (!src) return '';
@@ -184,7 +184,7 @@ function cardToAction(card: RawCard) {
   // quantity 必须从 cards-data.json 透传，不能硬编码为 1，
   // 否则 buildInitialDeck 只会造出 21 张行动牌（原版应为 ~144 张），
   // 导致 deck_exhausted 提前触发 → 游戏第 2-3 回合就被判梦主胜。
-  // 对照：docs/manual/04-action-cards.md + docs/_internal/reference/assets/cards-data.json
+  // 对照：docs/manual/04-action-cards.md
   return {
     category: 'action' as const,
     id: card.id,

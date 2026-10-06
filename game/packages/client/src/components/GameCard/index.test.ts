@@ -1,5 +1,5 @@
 // GameCard.SIZE_MAP 映射表完整性测试
-// 对照：docs/_internal/design/06c-match-table-layout.md §5.1（梦主 landscape / 盗梦者 portrait）
+// 梦主 landscape / 盗梦者 portrait
 
 import { describe, it, expect } from 'vitest';
 import { SIZE_MAP, type GameCardSize, type GameCardOrientation } from './index.js';

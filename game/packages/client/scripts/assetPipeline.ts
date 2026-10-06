@@ -1,5 +1,4 @@
-// 资产管线纯逻辑（ADR-042）
-// 对照：docs/_internal/design/06-frontend-design.md §6.17
+// 资产管线纯逻辑
 //
 // 拆出来的纯函数模块——便于单测，不做任何 IO。
 // IO 相关（读/写/sha256/扫描目录）放在 sync-assets.ts 入口里。
@@ -75,7 +74,7 @@ export function assignTier(id: string, category: CardCategory): AssetTier {
 }
 
 /**
- * 把 cards-data.json 的 image 字段（jpg 路径）转为相对于 docs/_internal/reference/assets/ 的 webp 路径。
+ * 把 cards-data.json 的 image 字段（jpg 路径）转为相对于内部素材目录的 webp 路径。
  * 例：'cards/thief/foo.jpg' → 'cards/thief/foo.webp'
  */
 export function toWebpSourcePath(imagePathInJson: string): string {

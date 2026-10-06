@@ -1,5 +1,4 @@
 // TargetLayerPickerDialog · 选目标层对话框
-// 对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 2
 
 import { Layers } from 'lucide-react';
 import {

@@ -1,5 +1,4 @@
 // ShortLinkService - 短链业务（生成/查询/碰撞/过期）
-// 对照：docs/_internal/design/07-backend-network.md §7.11 / ADR-033
 //
 // 设计：
 //   - 抽象 ShortLinkStore 接口（Prisma 实现 + 内存实现便于测试）

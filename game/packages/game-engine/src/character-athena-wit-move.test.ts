@@ -1,6 +1,5 @@
 // 雅典娜 · 急智（thief_athena.skill_0）BGIO move 集成单测
 // 对照：docs/manual/05-dream-thieves.md 雅典娜
-// 对照：docs/_internal/TASKS.md W20.5 · Phase 3 遗留 · 响应窗口技能（5 项）批次 E
 //
 // 规则："当其他盗梦者对你使用行动牌时，你可以先从弃牌堆顶部摸 1 张牌"
 //

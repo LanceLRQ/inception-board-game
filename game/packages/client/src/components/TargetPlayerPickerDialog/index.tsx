@@ -1,5 +1,4 @@
 // TargetPlayerPickerDialog · 选目标玩家对话框（从 LocalMatchRuntime 提炼）
-// 对照：plans/2-1-3-1-2-ui-cozy-wave.md 阶段 2
 //
 // 适用于所有"需选目标玩家"场景：SHOOT / KICK / 念力牵引 / 共鸣 / shift 等
 // 同层/跨层约束由卡牌 id 决定（参考 logic.isSameLayerRequired）

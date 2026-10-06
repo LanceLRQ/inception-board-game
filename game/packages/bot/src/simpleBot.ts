@@ -1,5 +1,5 @@
 // 傻 AI L0 - "有啥打啥"策略
-// 对照：docs/_internal/design/08-security-ai.md §8.5 L0-L3 AI 分级
+// L0-L3 AI 分级
 //
 // L0 设计原则：
 //   - 合法即可行，不考虑胜率
@@ -43,7 +43,7 @@ const MOVE_PRIORITY: Record<string, number> = {
   doDraw: 10, // 抽牌基本总是选
   doDiscard: 50,
   skipDiscard: 51,
-  // W19-B Bug fix（2026-04-21）：响应类 move 不能在 SimpleBot.play 里主动选
+  // Bug fix（2026-04-21）：响应类 move 不能在 SimpleBot.play 里主动选
   //   原因：play() 看到 legalMoves 含 respondCancelUnlock 就会因高优先级选中 →
   //         无 pendingResponseWindow / 不在 responders 时 engine 返回 INVALID_MOVE，
   //         污染日志且浪费循环。
@@ -52,25 +52,25 @@ const MOVE_PRIORITY: Record<string, number> = {
   respondCancelUnlock: 999,
   passResponse: 999,
   resolveUnlock: 999,
-  // W19-B F12 · 梦境窥视三段式 move 注册（同上原则：响应类 999 不主动选）
+  // 梦境窥视三段式 move 注册（同上原则：响应类 999 不主动选）
   peekerAcknowledge: 999,
   masterPeekBribeDecision: 999,
   playPeek: 80,
   playPeekMaster: 85,
-  // W20.5 · 处女·完美 三选一响应窗（回合外 move，由自动行动判定以处女本人的名义发；此处 999 不主动选）
+  // 处女·完美 三选一响应窗（回合外 move，由自动行动判定以处女本人的名义发；此处 999 不主动选）
   respondVirgoPerfect: 999,
-  // W20.5-C · 双鱼·闪避 SHOOT 响应窗（同上：响应类 999 不主动选；由自动行动判定以目标本人的名义发）
+  // 双鱼·闪避 SHOOT 响应窗（同上：响应类 999 不主动选；由自动行动判定以目标本人的名义发）
   respondShootEvade: 999,
   respondShootPass: 999,
-  // W20.5-D · 恐怖分子·狂热 SHOOT 响应窗（同上）
+  // 恐怖分子·狂热 SHOOT 响应窗（同上）
   respondTerroristDiscard: 999,
   respondTerroristAccept: 999,
-  // W20.5 · 水瓶·凝聚（playAquariusCoherence）
+  // 水瓶·凝聚（playAquariusCoherence）
   //   主动技能：本回合每打 2 张同名牌产生 1 次触发额度，从弃牌堆收 1 张未用过的牌
   //   优先级 7：高于 doDraw(10) 但低于 SHOOT/Unlock 类（让 bot 优先打出 SHOOT 凑同名 pair 再回收）
   //   实际可用性由 engine availableAquariusCoherence(state, playerID) 守卫，bot 看到合法即触发
   playAquariusCoherence: 7,
-  // W20.5-E · 雅典娜·急智（useAthenaWit）回合外主动 move
+  // 雅典娜·急智（useAthenaWit）回合外主动 move
   //   优先级 999：bot 自己回合 engine 会拒（已 guard "非 currentPlayerID 才能用"）
   //   目前没有调度方替他发这个 move；此处 999 防 SimpleBot 主动选
   useAthenaWit: 999,

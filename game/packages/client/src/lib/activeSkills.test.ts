@@ -1,4 +1,4 @@
-// R7 · activeSkills 纯函数推导测试
+// activeSkills 纯函数推导测试
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -411,7 +411,7 @@ describe('getAvailableActiveSkills · 双子·协同（弃牌阶段）', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R16 哈雷·冲击', () => {
+describe('getAvailableActiveSkills · 哈雷·冲击', () => {
   it('哈雷 + 本回合成功解封 1 次 + 未触发 → 含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
@@ -485,7 +485,7 @@ describe('getAvailableActiveSkills · 梦主·贿赂派发（已从常驻主动�
   });
 });
 
-describe('getAvailableActiveSkills · R17 露娜·月蚀', () => {
+describe('getAvailableActiveSkills · 露娜·月蚀', () => {
   it('露娜 + 手牌 ≥2 → 含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({ characterId: 'thief_luna', hand: ['action_shoot', 'action_shoot'] }),
@@ -512,7 +512,7 @@ describe('getAvailableActiveSkills · R17 露娜·月蚀', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R17 雅典娜·惊叹', () => {
+describe('getAvailableActiveSkills · 雅典娜·惊叹', () => {
   it('雅典娜 + 手牌 ≥4 → 含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({ characterId: 'thief_athena', hand: ['a', 'b', 'c', 'd'] }),
@@ -539,7 +539,7 @@ describe('getAvailableActiveSkills · R17 雅典娜·惊叹', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R18 盖亚·大地', () => {
+describe('getAvailableActiveSkills · 盖亚·大地', () => {
   it('盖亚 + 同层有其他玩家 + 未用完 → 含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
@@ -592,7 +592,7 @@ describe('getAvailableActiveSkills · R18 盖亚·大地', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R19 战争之王·黑市', () => {
+describe('getAvailableActiveSkills · 战争之王·黑市', () => {
   it('战争之王 + 手牌≥2 + 弃牌堆非空 + 未用 → 含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
@@ -676,7 +676,7 @@ describe('getAvailableActiveSkills · 皇城·重金（已从常驻主动技能�
   });
 });
 
-describe('getAvailableActiveSkills · R21 火星·战场世界观', () => {
+describe('getAvailableActiveSkills · 火星·战场世界观', () => {
   it('世界观激活 + 手牌≥2 + 弃牌堆非空 → 含（任意阵营）', () => {
     const list1 = getAvailableActiveSkills(
       baseCtx({
@@ -741,7 +741,7 @@ describe('getAvailableActiveSkills · R21 火星·战场世界观', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R23 天秤·平衡', () => {
+describe('getAvailableActiveSkills · 天秤·平衡', () => {
   it('天秤 + 手牌>0 + 未用 → 含', () => {
     const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_libra', hand: ['a'] }));
     expect(list).toContain(LIBRA_BALANCE);
@@ -773,7 +773,7 @@ describe('getAvailableActiveSkills · R23 天秤·平衡', () => {
   });
 });
 
-describe('getAvailableActiveSkills · R24 欺诈师·盗心（盲抽）', () => {
+describe('getAvailableActiveSkills · 欺诈师·盗心（盲抽）', () => {
   it('欺诈师 + 手牌>0 + 未用 → 含', () => {
     const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_forger', hand: ['a'] }));
     expect(list).toContain(FORGER_EXCHANGE);

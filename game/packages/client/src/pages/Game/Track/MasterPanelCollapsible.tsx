@@ -1,5 +1,4 @@
 // MasterPanelCollapsible - 移动端 viewer=盗梦者 时顶部梦主专区折叠栏
-// 对照：docs/_internal/design/06c-match-table-layout.md §2.2 / §5.5
 //
 // 收起：56px 高，显示激活世界观徽记 + 梦魇计数
 // 展开：全屏 Drawer，内部挂 MasterConsole（mobile-drawer layout）

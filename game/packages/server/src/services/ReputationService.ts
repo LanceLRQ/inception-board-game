@@ -1,5 +1,5 @@
 // ReputationService - 信誉分规则与 upsert
-// 对照：docs/_internal/design/08-security-ai.md §8.4b 反作弊与信誉分
+// 反作弊与信誉分
 //
 // 规则（MVP 简化）：
 //   - 初始 1000 分

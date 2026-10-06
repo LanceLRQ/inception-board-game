@@ -1,5 +1,5 @@
 // 优先级仲裁引擎测试
-// 对照：docs/_internal/design/05-card-system.md §5.3 黄金定律
+// 黄金定律
 
 import { describe, it, expect } from 'vitest';
 import { arbitrate, resolveDiceModifiers } from './priority.js';
@@ -149,7 +149,6 @@ describe('resolveDiceModifiers', () => {
   });
 
   it('典型场景：灵雕师 vs 要塞世界观', () => {
-    // 对照 05-card-system.md §5.3.2
     // 灵雕师 override = target.hand.length = 4；要塞 delta = -1
     // override 优先，返回 4
     const ctx = makeCtx(3, [
@@ -177,10 +176,9 @@ describe('resolveDiceModifiers', () => {
 });
 
 // ============================================================================
-// R25 · 黄金定律优先级仲裁测试矩阵（Phase 3 W19）
-// 对照：docs/_internal/design/05-card-system.md §5.3 + docs/_internal/TASKS.md W19
+// 黄金定律优先级仲裁测试矩阵
 // ============================================================================
-describe('arbitrate · 矩阵（R25 · W19 黄金定律）', () => {
+describe('arbitrate · 矩阵（黄金定律）', () => {
   it('5 个 bucket 全部齐全：返回严格升序', () => {
     const frames = [
       makeFrame('r1', 5, 0),
@@ -232,7 +230,7 @@ describe('arbitrate · 矩阵（R25 · W19 黄金定律）', () => {
   });
 });
 
-describe('resolveDiceModifiers · 矩阵（R25 · W19 SHOOT 修饰链）', () => {
+describe('resolveDiceModifiers · 矩阵（SHOOT 修饰链）', () => {
   function makeCtx(baseRoll: number, modifiers: DiceModifierEntry[]): PendingShootContext {
     return {
       shooterID: 'p0',
@@ -311,7 +309,7 @@ describe('resolveDiceModifiers · 矩阵（R25 · W19 SHOOT 修饰链）', () =>
   });
 
   it('典型交互：灵雕师 + 要塞 + M4 + 恐怖分子 → override 优先', () => {
-    // 05-card-system.md §5.3.2 核心场景
+    // 核心场景
     // 灵雕师·雕琢 override = target.hand.length = 3
     // 要塞世界观 delta -1 / M4 delta -1 / 恐怖分子 delta -1
     // override 优先 → 3（忽略所有 delta）

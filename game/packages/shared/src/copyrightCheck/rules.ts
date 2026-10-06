@@ -1,9 +1,13 @@
 // 版权合规终检 · 纯规则模块
-// 对照：CLAUDE.local.md 核心纪律 1、CLAUDE.md
+// 对照：CLAUDE.md
 //
 // 对外产物（README/LICENSE/NOTICE/docs/源代码注释）严禁出现：
 //   - 内部设计文档编号、ADR、Phase、Week、Spike、User Story、风险代号
 //   - docs/_internal 内部文档路径引用（含历史路径 plans/design、plans/manual）
+//
+// 两套扫描：
+//   - 文档与文案：isScanTarget + INTERNAL_TERM_RULES
+//   - 源码与工程配置：isSourceScanTarget + SOURCE_RULES（不含 risk_code，源码里 T1、O2 是正常标识）
 //
 // 本模块仅导出纯函数，IO 由 copyright-check.ts 入口实现。
 
@@ -87,6 +91,51 @@ export const INTERNAL_TERM_RULES: readonly Rule[] = [
   },
 ];
 
+function pickRules(...names: string[]): Rule[] {
+  return names.map((name) => {
+    const rule = INTERNAL_TERM_RULES.find((r) => r.name === name);
+    if (!rule) throw new Error(`INTERNAL_TERM_RULES 中不存在规则 ${name}`);
+    return rule;
+  });
+}
+
+/**
+ * 源码与工程配置的扫描规则。
+ *
+ * 复用 INTERNAL_TERM_RULES 中的同名规则对象；不含 risk_code（T1 / O2 在源码里是普通标识）
+ * 和 design_doc_number（会误报 docs/manual/ 的公开引用，改用 design_doc_filename）。
+ */
+export const SOURCE_RULES: readonly Rule[] = [
+  ...pickRules(
+    'adr_reference',
+    'phase_number',
+    'spike_reference',
+    'week_reference',
+    'user_story',
+    'internal_docs_path',
+    'plans_design_path',
+    'plans_manual_path',
+  ),
+  {
+    name: 'week_abbrev',
+    pattern: /(?<![A-Za-z0-9_])W\d{1,2}(?:\.\d+)?(?![A-Za-z0-9_])/,
+    description: '周次缩写（W10 / W19.5 等内部排期）',
+    suggestion: '去掉周次前缀，只保留说明文字',
+  },
+  {
+    name: 'internal_filename',
+    pattern: /\b(?:TASKS|CLAUDE\.local)\.md\b/,
+    description: '内部文件名（TASKS.md / CLAUDE.local.md）',
+    suggestion: '改为描述性说法，不引用内部文件',
+  },
+  {
+    name: 'design_doc_filename',
+    pattern: /(?<!docs\/manual\/)\b\d{2}[a-z]?-[a-z]+(?:-[a-z]+)*\.md\b/,
+    description: '内部设计文档文件名（如 05-card-system.md），docs/manual/ 下的公开规则原文除外',
+    suggestion: '去掉文档引用；规则出处改引 docs/manual/',
+  },
+];
+
 /** 每行判定：命中规则时返回违规详情 */
 export function checkLine(
   line: string,
@@ -127,7 +176,8 @@ export function scanText(
 /**
  * 判断路径是否为本次扫描目标。
  *
- * 白名单策略：只扫描真正对外产物，避免源代码注释 / 测试 / 原型误报。
+ * 白名单策略：只扫描文档与用户可见文案。源码与工程配置由 isSourceScanTarget
+ * 配合 SOURCE_RULES 另行扫描，两者互斥。
  * 允许：
  *   - 仓库根：README.md / NOTICE / LICENSE / CLAUDE.md
  *   - docs/** 对外文档（含 docs/manual/ 规则原文、docs/ops/ 运维指南、docs/superpowers/specs/ 定稿规格）
@@ -135,8 +185,7 @@ export function scanText(
  * 排除：
  *   - docs/_internal/**（内部开发文档，需先于 docs/** 白名单排除）
  *   - experimental_demo/**（原型）
- *   - 源代码 .ts/.tsx/.js（注释引用设计文档是合理的）
- *   - 测试、node_modules、dist 等
+ *   - 源代码与测试（见 isSourceScanTarget）、node_modules、dist 等
  */
 export function isScanTarget(relPath: string): boolean {
   // 明确排除
@@ -177,6 +226,52 @@ export function isScanTarget(relPath: string): boolean {
   if (/\/i18n\/locales\/[^/]+\.(json|ya?ml)$/i.test(relPath)) return true;
 
   return false;
+}
+
+const SOURCE_FILE_EXT = /\.(?:ts|tsx|js|mjs|cjs|css|html|json|ya?ml|sh|conf|sql|prisma|toml)$/i;
+const SOURCE_BASENAME = /(?:^|\/)(?:Dockerfile(?:\.[\w.-]+)?|[\w.-]+\.Dockerfile)$/;
+
+/**
+ * 判断路径是否为源码扫描目标（配合 SOURCE_RULES，路径相对仓库根）。
+ *
+ * 范围：各包 src/ 与 scripts/ 与 prisma/、e2e 包、各包根目录的配置文件、game/scripts、game/deploy、.github。
+ * 测试文件要扫。排除：文档与素材目录、generated、__snapshots__、规则模块自身（copyrightCheck/）、
+ * 以内部素材目录为输入的三个脚本、锁文件、构建与测试产物、.env*。
+ */
+export function isSourceScanTarget(relPath: string): boolean {
+  const excludePatterns = [
+    /^docs\//,
+    /^experimental_demo\//,
+    /(?:^|\/)node_modules\//,
+    /(?:^|\/)\.turbo\//,
+    /(?:^|\/)dist\//,
+    /\/generated\//,
+    /\/__snapshots__\//,
+    /\/public\//,
+    /^game\/packages\/shared\/src\/copyrightCheck\//,
+    // 素材同步与卡牌数据生成脚本：输入就是不入库的内部素材目录，代码里必须写出它的路径
+    /^game\/scripts\/sync-card-assets\.ts$/,
+    /^game\/packages\/client\/scripts\/sync-assets\.ts$/,
+    /^game\/packages\/shared\/scripts\/codegen\.ts$/,
+    /(?:^|\/)(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$/,
+    /\.tsbuildinfo$/,
+    /(?:^|\/)\.env(?:\.|$)/,
+    /(?:^|\/)playwright-report\//,
+    /(?:^|\/)test-results\//,
+  ];
+  if (excludePatterns.some((re) => re.test(relPath))) return false;
+
+  if (!SOURCE_FILE_EXT.test(relPath) && !SOURCE_BASENAME.test(relPath)) return false;
+
+  const inScope = [
+    /^game\/packages\/[^/]+\/(?:src|scripts|prisma)\//,
+    /^game\/packages\/e2e\//,
+    /^game\/packages\/[^/]+\/[^/]+$/,
+    /^game\/scripts\//,
+    /^game\/deploy\//,
+    /^\.github\//,
+  ];
+  return inScope.some((re) => re.test(relPath));
 }
 
 /** 汇总：按 rule 聚合违规计数 */

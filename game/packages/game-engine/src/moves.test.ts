@@ -227,7 +227,7 @@ describe('moves', () => {
       expect(movePlayerToLayer(s, 'UNKNOWN', 3)).toBe(s);
     });
 
-    // W19-B Bug fix · 同层移动不应造成 playersInLayer 重复
+    // Bug fix · 同层移动不应造成 playersInLayer 重复
     it('targetLayer === currentLayer 时 no-op，不重复 playerID', () => {
       const s = makeState();
       const result = movePlayerToLayer(s, 'P1', 1); // P1 已在 layer 1

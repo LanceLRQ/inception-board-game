@@ -5,7 +5,7 @@
 // abilities registry 接入：onDrawPhase passive 修饰器
 // scope=passive：不限次数，作为额外抽牌数提供
 //
-// 注：白羊·skill_0（盗梦者被杀时翻当层梦魇）依赖 onKilled 响应窗口，留 R3 批次
+// 注：白羊·skill_0（盗梦者被杀时翻当层梦魇）依赖 onKilled 响应窗口，留待后续批次
 
 import { ariesExtraDrawCount, ARIES_DRAW_SKILL_ID } from '../../../skills.js';
 import { drawCards } from '../../../../moves.js';

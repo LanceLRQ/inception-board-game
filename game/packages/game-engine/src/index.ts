@@ -72,7 +72,7 @@ export type {
   RateGuard,
 } from './engine/validator.js';
 
-// 健壮性 · 死亡/迷失层/超时（Phase 2 B7）
+// 健壮性 · 死亡/迷失层/超时
 export {
   LOST_LAYER,
   canAct,
@@ -93,7 +93,7 @@ export {
 } from './engine/timeout.js';
 export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
 
-// 规则不变量（B12）
+// 规则不变量
 export { checkInvariants, assertInvariants } from './invariants.js';
 export type { InvariantViolation } from './invariants.js';
 
@@ -187,7 +187,7 @@ export {
   applyDiscardHiddenNightmare,
 } from './engine/skills.js';
 
-// 测试 fixtures（B12）
+// 测试 fixtures
 export {
   createTestState,
   makePlayer,

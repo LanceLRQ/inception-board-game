@@ -1,5 +1,5 @@
 // BGIO 集成测试 - 验证 InceptionCityGame 在 BGIO 客户端下的回合 / Stage / CurrentPlayer 对齐
-// 对照：docs/_internal/TASKS.md P2 B18 人机本地模式完整走完一局
+// 人机本地模式完整走完一局
 //
 // 这里通过 boardgame.io/client 的 Local 多人模式模拟 Worker 侧的行为，
 // 确保：

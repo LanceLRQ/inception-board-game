@@ -1,6 +1,6 @@
 // ChatService - 预设短语冷却 + 白名单 + 广播
-// 对照：docs/_internal/design/07-backend-network.md §7.9 聊天协议
-//        docs/_internal/design/08-security-ai.md §8.6 聊天反刷屏
+// 聊天协议
+//        聊天反刷屏
 //
 // 职责：
 //   - 3s 冷却（按 playerID）

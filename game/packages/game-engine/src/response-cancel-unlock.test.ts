@@ -1,5 +1,4 @@
-// 响应窗口（解封抵消）回归测试 · W19-B F1
-// 对照：docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-01
+// 响应窗口（解封抵消）回归测试
 // 对照：docs/manual/04-action-cards.md 解封（效果①/效果②）
 //
 // 本测试覆盖"盗梦者打出【解封】效果① → 其他玩家可出【解封】效果② 抵消"完整链路。
@@ -14,11 +13,10 @@
 //   8. 死亡玩家不在 responders 中
 //   9. 梦主持有 action_unlock 也能抵消（规则"任何玩家"均可）
 //
-// 当前实现（W19 前）的已知缺陷（本测试初版会 red）：
+// 当前实现（修复前）的已知缺陷（本测试初版会 red）：
 //   - playUnlock 未开启响应窗口
 //   - respondCancelUnlock 无任何校验，任意玩家可调用且不弃牌
 //   - passResponse 是 noop，未记录响应状态
-//   详见 docs/_internal/audit/AUDIT-2026-04-21-out-of-turn-interaction-review.md OOT-01
 
 import { describe, it, expect } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -299,7 +297,7 @@ describe('OOT-01 · 解封响应窗口（F1 red test）', () => {
     });
   });
 
-  describe('endActionPhase 阻断（W19-B F4a · 防 bot 跳过响应）', () => {
+  describe('endActionPhase 阻断（防 bot 跳过响应）', () => {
     it('pendingUnlock 挂起时 endActionPhase → INVALID_MOVE', () => {
       const s0 = sceneBeforeUnlock();
       const s1 = doPlayUnlock(s0);

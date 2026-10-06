@@ -3,7 +3,7 @@
 // SHOOT 时 target 改掷 2 颗骰，由 self 选 1 颗作为结果
 //
 // abilities registry 接入：onBeforeShoot — 修饰链 override 模式
-// R1 阶段：定义 + canActivate 检查；apply 计算最终骰值留待 R3 SHOOT 修饰链整合
+// 定义 + canActivate 检查；apply 计算最终骰值留待 SHOOT 修饰链整合
 
 import { applySudgerVerdict, SUDGER_SKILL_ID } from '../../../skills.js';
 import type { AbilityContext, AbilityDefinition } from '../../types.js';

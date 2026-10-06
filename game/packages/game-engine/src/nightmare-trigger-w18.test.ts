@@ -1,5 +1,5 @@
-// W18-A 梦魇自动触发检测 + 未翻开梦魇直接弃掉
-// 对照：docs/_internal/TASKS.md Phase 3 W18 梦魇触发时机集成
+// 梦魇自动触发检测 + 未翻开梦魇直接弃掉
+// 梦魇触发时机集成
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -47,7 +47,7 @@ function setActionPhasePM(state: SetupState): SetupState {
   return { ...state, turnPhase: 'action', currentPlayerID: 'pM' };
 }
 
-describe('W18-A · findCoinVaultsWithHiddenNightmare', () => {
+describe('findCoinVaultsWithHiddenNightmare', () => {
   it('金币金库已开 + 同层有未翻开梦魇 → 命中', () => {
     let s = scenarioStartOfGame3p();
     s = setLayerNightmare(s, 2 as Layer, 'nightmare_despair_storm');
@@ -99,7 +99,7 @@ describe('W18-A · findCoinVaultsWithHiddenNightmare', () => {
   });
 });
 
-describe('W18-A · applyDiscardHiddenNightmare', () => {
+describe('applyDiscardHiddenNightmare', () => {
   it('弃掉未翻开梦魇 + 标记已触发', () => {
     let s = scenarioStartOfGame3p();
     s = setLayerNightmare(s, 1 as Layer, 'nightmare_despair_storm');
@@ -132,7 +132,7 @@ describe('W18-A · applyDiscardHiddenNightmare', () => {
   });
 });
 
-describe('W18-A · move masterDiscardHiddenNightmare', () => {
+describe('move masterDiscardHiddenNightmare', () => {
   it('梦主弃未翻开梦魇 → 成功', () => {
     let s = scenarioStartOfGame3p();
     s = setActionPhasePM(s);
@@ -174,7 +174,7 @@ describe('W18-A · move masterDiscardHiddenNightmare', () => {
   });
 });
 
-describe('W18-A · 端到端：开金币金库 → 检测 → 弃梦魇', () => {
+describe('端到端：开金币金库 → 检测 → 弃梦魇', () => {
   it('盗梦者打开金币金库后，梦主能检测并弃掉同层未翻开梦魇', () => {
     let s = scenarioStartOfGame3p();
     s = setLayerNightmare(s, 2 as Layer, 'nightmare_despair_storm');

@@ -3,7 +3,7 @@
 // 技能「逆流」：另一拥有贿赂的盗梦者使用牌时，若你与他同层则你先将该牌收入手牌，然后结算该牌效果。回合限 2 次
 // 世界观：当梦主角色牌翻开时，额外增加 1 张失败的贿赂牌。
 //
-// 当前状态：registry 存档占位；完整实施依赖"牌使用追踪 + 响应窗口"子系统（预留 Phase 3 后续批次）
+// 当前状态：registry 存档占位；完整实施依赖"牌使用追踪 + 响应窗口"子系统（预留后续批次）
 
 import type { AbilityContext, AbilityDefinition } from '../../types.js';
 import type { SetupState } from '../../../../setup.js';

@@ -19,7 +19,7 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       mazeState: state.mazeState ?? null,
     }),
   ],
-  // v2 → v3：添加 pendingPeekDecision / peekReveal（梦境窥视三段式 W19-B F5/F8）
+  // v2 → v3：添加 pendingPeekDecision / peekReveal（梦境窥视三段式）
   [
     3,
     (state) => ({
@@ -47,7 +47,7 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     }),
   ],
   // v5 → v6：添加 pendingVirgoChoice（处女·完美 onAfterShoot roll=6 三选一响应窗口）
-  //   对照：docs/manual/05-dream-thieves.md 处女 / docs/_internal/TASKS.md W20.5
+  //   对照：docs/manual/05-dream-thieves.md 处女
   [
     6,
     (state) => ({
@@ -55,8 +55,8 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       pendingVirgoChoice: state.pendingVirgoChoice ?? null,
     }),
   ],
-  // v6 → v7：添加 pendingShootResponse（SHOOT pre-roll 响应窗口；当前消费方双鱼·闪避 W20.5-C）
-  //   对照：docs/manual/05-dream-thieves.md 双鱼 / docs/_internal/TASKS.md W20.5
+  // v6 → v7：添加 pendingShootResponse（SHOOT pre-roll 响应窗口；当前消费方双鱼·闪避）
+  //   对照：docs/manual/05-dream-thieves.md 双鱼
   [
     7,
     (state) => ({

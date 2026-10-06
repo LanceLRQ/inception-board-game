@@ -1,6 +1,6 @@
 // Base58 短链编码（跨端：浏览器 + Node）
-// 对照：docs/_internal/design/07-backend-network.md §7.11 短链 / ADR-033
-// Spike 验证：experimental_demo/base58-shortlink（6/6 通过）
+// 短链
+// 技术验证：experimental_demo/base58-shortlink（6/6 通过）
 //
 // 设计：
 //   - Base58 字符集排除歧义字符 0 / O / I / l

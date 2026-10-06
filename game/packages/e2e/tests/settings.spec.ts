@@ -1,5 +1,5 @@
 // Settings 页 E2E
-// 对照：docs/_internal/TASKS.md P2 B8.4 / B11 · 主题 + 音效
+// 主题 + 音效
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 

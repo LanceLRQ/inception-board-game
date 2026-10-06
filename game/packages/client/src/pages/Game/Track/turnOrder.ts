@@ -1,5 +1,4 @@
 // 移动端行动轴的 slot 顺序计算（纯函数）
-// 对照：docs/_internal/design/06c-match-table-layout.md §4
 
 import type { MockPlayer } from '../../../hooks/useMockMatch.js';
 

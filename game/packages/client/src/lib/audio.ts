@@ -1,5 +1,5 @@
 // AudioManager - MVP 音效管理
-// 对照：docs/_internal/design/06-frontend-design.md §6.19.5（音效约定）
+// （音效约定）
 //
 // 设计要点：
 //   - 纯函数（clampVolume / computeEffectiveVolume）便于单测

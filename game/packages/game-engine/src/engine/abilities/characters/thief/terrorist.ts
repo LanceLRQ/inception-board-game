@@ -5,7 +5,7 @@
 // abilities registry 接入：passive trigger（skills.ts isTerroristCrossLayerActive 已被
 // applyShootVariant 吃掉，这里只是 registry 存档）
 //
-// 注：skill_1（target 弃牌否则骰-1）依赖 SHOOT 响应窗口 + 新纯函数，留 R4 批次
+// 注：skill_1（target 弃牌否则骰-1）依赖 SHOOT 响应窗口 + 新纯函数，留待后续批次
 
 import { isTerroristCrossLayerActive, TERRORIST_SKILL_ID } from '../../../skills.js';
 import type { AbilityContext, AbilityDefinition } from '../../types.js';

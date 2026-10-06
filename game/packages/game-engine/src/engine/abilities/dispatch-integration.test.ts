@@ -1,4 +1,4 @@
-// W10-R5 · dispatcher → game.ts 接入冒烟测试
+// dispatcher → game.ts 接入冒烟测试
 // 验证 doDraw / resolveUnlock 调用 dispatchPassives 后主流程保持正常
 
 import { describe, expect, it } from 'vitest';
@@ -41,7 +41,7 @@ describe('dispatcher 接入 · doDraw', () => {
     expect(r.players['p1']!.hand.length).toBeGreaterThan(0);
   });
 
-  // R28 · 白羊实际多抽（接入响应/触发批次 · ariesExtraDraw.apply 调用 drawCards）
+  // 白羊实际多抽（接入响应/触发批次 · ariesExtraDraw.apply 调用 drawCards）
   it('白羊 · 1 张已弃梦魇 → 比标准多抽 1 张', () => {
     let base = scenarioStartOfGame3p();
     base = { ...base, deck: { ...base.deck, cards: Array(20).fill('action_unlock') as CardID[] } };

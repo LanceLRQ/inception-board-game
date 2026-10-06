@@ -1,5 +1,4 @@
-// W16-D 梦主世界观补充：天王星·苍穹（行动牌移动弃牌 hook）+ 火星·战场（弃 2 非SHOOT 换 SHOOT）
-// 对照：docs/_internal/TASKS.md Phase 3 W16
+// 梦主世界观补充：天王星·苍穹（行动牌移动弃牌 hook）+ 火星·战场（弃 2 非SHOOT 换 SHOOT）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
@@ -66,7 +65,7 @@ function withDeck(state: SetupState, cards: CardID[]): SetupState {
   return { ...state, deck: { cards, discardPile: [] } };
 }
 
-describe('W16-D · 天王星·苍穹世界观（行动牌移动弃牌）', () => {
+describe('天王星·苍穹世界观（行动牌移动弃牌）', () => {
   it('isUranusFirmamentWorldActive', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
     expect(isUranusFirmamentWorldActive(s)).toBe(true);
@@ -190,7 +189,7 @@ describe('W16-D · 天王星·苍穹世界观（行动牌移动弃牌）', () =>
   });
 });
 
-describe('W16-D · 火星·战场世界观（弃 2 非SHOOT 换 SHOOT）', () => {
+describe('火星·战场世界观（弃 2 非SHOOT 换 SHOOT）', () => {
   it('isMarsBattlefieldWorldActive', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_mars_battlefield');
     expect(isMarsBattlefieldWorldActive(s)).toBe(true);

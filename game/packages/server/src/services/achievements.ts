@@ -1,5 +1,5 @@
 // 成就系统 · 数据定义 + 计算触发点
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.13.5（成就示例 Phase 4 设计）
+// 成就示例
 //
 // 设计要点：
 //   - 注册表模式（ACHIEVEMENTS 数组），便于后续新增成就而不改算法

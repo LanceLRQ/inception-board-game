@@ -1,5 +1,5 @@
-// MVP 评选算法 · W21 成就系统前置
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.13.5 MVP 评选
+// MVP 评选算法 · 成就系统前置
+// MVP 评选
 //
 // 设计要点：
 //   - 纯函数，便于单测与后续回放重算

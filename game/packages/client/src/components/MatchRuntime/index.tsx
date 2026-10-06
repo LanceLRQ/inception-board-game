@@ -822,7 +822,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
         </div>
       )}
 
-      {/* 角色主动技能面板（R7：影子·潜伏 / 阿波罗·崇拜） */}
+      {/* 角色主动技能面板（影子·潜伏 / 阿波罗·崇拜） */}
       {(() => {
         if (!isMyTurn || winner) return null;
         const masterPlayer = players?.[dreamMasterID];
@@ -997,9 +997,9 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
 
       {/* 贿赂派发：遵循桌游规则（仅在梦境窥视/金币金库触发的响应窗口中进行），
           常驻主动派发 UI 已移除；决策入口走 MasterPeekBribeBanner 等响应式组件。
-          对照：docs/manual/03-game-flow.md §贿赂&背叛者 / 04-action-cards.md 梦境窥视 */}
+          对照：docs/manual/03-game-flow.md §贿赂&背叛者 / docs/manual/04-action-cards.md 梦境窥视 */}
 
-      {/* P2 内联 picker 面板（棋局·易位 / 梦境穿梭剂 mode / 万有引力 / 嫁接）
+      {/* 内联 picker 面板（棋局·易位 / 梦境穿梭剂 mode / 万有引力 / 嫁接）
           均已迁至 Dialog（ChessTransposeDialog / DreamTransitModeDialog /
           GravityTargetPickerDialog / GravityPoolPickerDialog / GraftResolverDialog），
           挂载在本组件末尾的 Dialog 集群区。

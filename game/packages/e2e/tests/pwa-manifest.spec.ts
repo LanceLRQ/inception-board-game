@@ -1,5 +1,5 @@
 // PWA manifest / meta E2E
-// 对照：docs/_internal/TASKS.md P0 ★ Vite PWA Plugin + SW
+// Vite PWA Plugin + SW
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 

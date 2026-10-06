@@ -1,5 +1,5 @@
 // Dialog 统一外壳 · 基于 @base-ui/react Dialog primitive + Tailwind 过渡动画
-// 对照：plans/2-1-3-1-2-ui-cozy-wave.md Dialog 视觉规范
+// Dialog 视觉规范
 //
 // 用法：
 //   <Dialog open={open} onOpenChange={setOpen} blocking={false} size="md">

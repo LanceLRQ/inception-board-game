@@ -1,5 +1,5 @@
 // 版权声明四重展示 E2E
-// 对照：docs/_internal/TASKS.md P2 B8.4 · 首屏/关于/教学前/结算 四处版权
+// 首屏/关于/教学前/结算 四处版权
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 

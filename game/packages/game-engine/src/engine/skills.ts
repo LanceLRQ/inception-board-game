@@ -1,6 +1,6 @@
 // 角色技能运行时执行器
 // MVP 4 角色：先锋（突袭）/ 译梦师（伏笔）/ 要塞（冷酷）/ 棋局（易位）
-// 对照：docs/manual/05-dream-thieves.md / 06-dream-master.md
+// 对照：docs/manual/05-dream-thieves.md / docs/manual/06-dream-master.md
 
 import type { SetupState, PlayerSetup } from '../setup.js';
 import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
@@ -191,7 +191,7 @@ export function isCapricornusRhythmActive(player: PlayerSetup): boolean {
 }
 
 // ============================================================================
-// W12 中复杂度角色（7 个）
+// 中复杂度角色（7 个）
 // ============================================================================
 // Tier A（弃牌取牌类）：药剂师 / 战争之王 / 灵魂牧师 → 完整 skills + move 接入
 // Tier B（SHOOT 修饰类）：意念判官 / 天蝎 / 金牛 → skills 纯函数（move 接入待批次）
@@ -481,7 +481,7 @@ export function applyInterpreterForeshadow(state: SetupState, playerID: string):
 }
 
 // === 要塞 · 冷酷 ===
-// 对照：docs/_internal/design/05-card-system.md 要塞 + docs/manual/06-dream-master.md
+// 对照：docs/manual/06-dream-master.md 要塞
 // 梦主出牌阶段移动到另一层时，可视为对任一盗梦者使用 1 张 SHOOT
 // 世界观：梦主掷骰结果 -1
 
@@ -496,7 +496,7 @@ export function applyFortressDiceModifier(roll: number): number {
  * M4 卡宾枪：梦主对盗梦者使用 SHOOT 类牌时，目标玩家掷骰结果 -1。
  * 对照：docs/manual/03-game-flow.md §80-81 "M4卡宾枪是1个特殊效果道具..."
  * 对照：docs/manual/05-dream-thieves.md §111 "梦主SHOOT盗梦者不会触发处女·完美"（印证 M4 必须先于 processing）
- * 本批次（B4）只用于 shouldJupiterThunderKill 对齐 manual §50 示例；其余 master SHOOT 行为待后续统一接入。
+ * 本批次只用于 shouldJupiterThunderKill 对齐 manual §50 示例；其余 master SHOOT 行为待后续统一接入。
  */
 export function applyM4CarbineModifier(shooterIsMaster: boolean, roll: number): number {
   if (!shooterIsMaster) return roll;
@@ -559,7 +559,7 @@ export function applyFortressColdness(
 }
 
 // === 棋局 · 易位 ===
-// 对照：docs/_internal/design/05-card-system.md 棋局 + docs/manual/06-dream-master.md
+// 对照：docs/manual/06-dream-master.md 棋局
 // 金库被打开前，交换两个金库。限 2 次
 // 世界观：使用梦境窥视时，从牌库顶抽 2 张
 
@@ -617,7 +617,7 @@ export function getChessUsesLeft(player: PlayerSetup): number {
 }
 
 // ============================================================================
-// W13 高复杂度角色（7 个 / 9 技能）
+// 高复杂度角色（7 个 / 9 技能）
 // ============================================================================
 // Tier A 完整接入：阿波罗·崇拜 / 殉道者·牺牲 / 灵雕师·雕琢 / 雅典娜·惊叹 / 哈雷·冲击
 // Tier B 纯函数：处女·完美 / 筑梦师·迷宫 / 雅典娜·急智（接入待 pending state 批次）
@@ -862,7 +862,7 @@ export function applyAthenaAwe(
 }
 
 // ============================================================================
-// W13 Tier B 纯函数（接入待 pending state 批次）
+// 纯函数（接入待 pending state 批次）
 // ============================================================================
 
 // === 处女 · 完美 ===
@@ -1005,7 +1005,7 @@ export function applyAthenaWit(state: SetupState, selfID: string): SetupState | 
 }
 
 // ============================================================================
-// W14 混合 9 角色
+// 混合 9 角色
 // ============================================================================
 // 完整接入：影子 / 降世神通 / 梦境猎手 / 欺诈师 / 恐怖分子（SHOOT 跨层被动）
 // 纯函数：小丑 / 黑洞 / 黑天鹅 / 空间女王（接入待 pending state / 响应窗口）
@@ -1308,7 +1308,7 @@ export function applySpaceQueenStashTop(
 }
 
 // ============================================================================
-// W15 双面 / 扩展 9 角色
+// 双面 / 扩展 9 角色
 // ============================================================================
 // 完整接入：双子 / 双鱼 / 露娜（含翻面）/ 盖亚 / 达尔文
 // 纯函数：白羊 / 射手 / 水瓶 / 格林射线（接入待响应窗口/扩展批次）
@@ -1636,7 +1636,7 @@ export function applyDarwinEvolution(
 }
 
 // ============================================================================
-// W15 纯函数（接入待响应窗口 / 扩展批次）
+// 纯函数（接入待响应窗口 / 扩展批次）
 // ============================================================================
 
 // === 白羊 · 解封者（纯函数） ===
@@ -1760,10 +1760,10 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
 }
 
 // ============================================================================
-// W16-A 梦主 6 角色（纯函数 + 简单接入）
+// 梦主 6 角色（纯函数 + 简单接入）
 // ============================================================================
 // 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
-// 对照：docs/_internal/design/05-card-system.md + docs/manual/06-dream-master.md
+// 对照：docs/manual/06-dream-master.md
 
 /** 找当前梦主玩家 ID（faction === 'master'，alive 优先） */
 export function findMasterID(state: SetupState): string | null {
@@ -1864,7 +1864,6 @@ export function getMidsummerWorldThiefBonus(state: SetupState): number {
 // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
 // 规则：只能二选一，不能保留；白羊自己被击杀时同样可触发（victim=self 时白羊已死，由规则自动跳过）
 // 本批次实装：纯函数 + pendingAriesChoice 简化 pending；SHOOT 击杀路径同步接入挂起
-// 对照 plan：docs/_internal/audit/AUDIT-2026-04-22-skill-development-status.md 批次 A · A5
 
 export const ARIES_STARDUST_SKILL_ID = 'thief_aries.skill_0';
 
@@ -2078,7 +2077,7 @@ export function shouldJupiterThunderKill(
 // === 土星·领地 · 律令（纯函数） ===
 // 技能 律令：弃 1 手牌抵消 1 张同名牌效果，并从牌库顶抽 1
 // 世界观 领地：拥有贿赂的盗梦者，自己回合出牌阶段可不用行动牌移动 1 次到相邻层
-// 集成留 W16-B（需 pending state + UI）；本批仅纯函数
+// 集成留后续（需 pending state + UI）；本批仅纯函数
 // 对照：cards-data.json dm_saturn_territory
 
 export const SATURN_DECREE_SKILL_ID = 'dm_saturn_territory.skill_0';
@@ -2122,7 +2121,7 @@ export function canSaturnFreeMove(state: SetupState, playerID: string): boolean 
 }
 
 // ============================================================================
-// W16-B 梦主主动技能（4 角色 · engine 接入）
+// 梦主主动技能（4 角色 · engine 接入）
 // ============================================================================
 // 皇城·重金 / 密道·传送 / 天王星·权力 / 冥王星·业火
 // 对照：cards-data.json + docs/manual/06-dream-master.md
@@ -2306,7 +2305,7 @@ export function applyPlutoBurning(
 }
 
 // ============================================================================
-// W16-C 梦主世界观 / 部分主动技能（火星·杀戮 / 冥王星地狱世界观 / 土星领地世界观）
+// 梦主世界观 / 部分主动技能（火星·杀戮 / 冥王星地狱世界观 / 土星领地世界观）
 // ============================================================================
 // 对照：cards-data.json + docs/manual/06-dream-master.md
 
@@ -2446,9 +2445,9 @@ export function isMarsBattlefieldWorldActive(state: SetupState): boolean {
 }
 
 // ============================================================================
-// W18-A 梦魇触发时机辅助（auto-detect + un-revealed discard）
+// 梦魇触发时机辅助（auto-detect + un-revealed discard）
 // ============================================================================
-// 对照：docs/manual/03-game-flow.md 第 94-102 行 / 07-nightmare-cards.md
+// 对照：docs/manual/03-game-flow.md 第 94-102 行 / docs/manual/07-nightmare-cards.md
 // 触发：盗梦者打开放有金币的金库 → 同层有未翻开梦魇 → 梦主 3 选 1
 //   1. 派发贿赂牌然后弃掉梦魇（masterDealBribe + masterDiscardHiddenNightmare）
 //   2. 翻开梦魇并发动效果（masterRevealNightmare + masterActivateNightmare）
@@ -2733,7 +2732,7 @@ export function applyImperialCityWorldShoot(
   if (shooterID === targetID) return null;
   if (target.faction !== 'thief') return null;
   if (target.bribeReceived > 0) return null;
-  // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4]（规则 04-action-cards.md SHOOT 章）
+  // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4]（规则 docs/manual/04-action-cards.md SHOOT 章）
   const modifiedRoll = Math.max(1, roll - 3);
   const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
   if (result === 'kill') {

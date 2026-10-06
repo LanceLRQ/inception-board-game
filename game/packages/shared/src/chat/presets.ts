@@ -1,5 +1,5 @@
 // 预设短语清单（MVP 固定 20 条，分 4 类）
-// 对照：docs/_internal/design/07-backend-network.md §7.9 聊天协议 / docs/_internal/design/06-frontend-design.md 预设短语面板
+// 聊天协议、预设短语面板
 //
 // 设计：
 //   - 仅广播 presetId，客户端按 i18n 渲染（避免 UGC 风险）
@@ -19,7 +19,7 @@ export interface ChatPresetPhrase {
   readonly displayOrder: number;
 }
 
-/** MVP 固定 20 条预设短语。Phase 4+ 可迁移到 DB 表运营维护。 */
+/** MVP 固定 20 条预设短语。后续可迁移到 DB 表运营维护。 */
 export const CHAT_PRESETS: readonly ChatPresetPhrase[] = [
   // --- 问候 ---
   {

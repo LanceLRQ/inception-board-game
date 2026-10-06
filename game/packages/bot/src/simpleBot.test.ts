@@ -38,7 +38,7 @@ describe('SimpleBot L0', () => {
     expect(choice).toBe('playShoot:action_shoot');
   });
 
-  describe('W19-B Bug fix · 响应类 move 不被 play() 主动选', () => {
+  describe('Bug fix · 响应类 move 不被 play() 主动选', () => {
     // 修复前：respondCancelUnlock=1 最高优 → bot 自己回合主动选 → engine INVALID_MOVE
     // 修复后：响应类全部 999，由 worker 顶部分支专用代发；play 永不主动选
     it('endActionPhase 优先于 respondCancelUnlock', () => {
@@ -61,12 +61,12 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['playShoot', 'playPeekMaster']);
       expect(choice).toBe('playShoot');
     });
-    // W20.5 · 处女·完美 三选一响应窗
+    // 处女·完美 三选一响应窗
     it('endActionPhase 优先于 respondVirgoPerfect', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondVirgoPerfect']);
       expect(choice).toBe('endActionPhase');
     });
-    // W20.5-C · 双鱼·闪避 SHOOT 响应窗
+    // 双鱼·闪避 SHOOT 响应窗
     it('endActionPhase 优先于 respondShootEvade', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondShootEvade']);
       expect(choice).toBe('endActionPhase');
@@ -75,7 +75,7 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondShootPass']);
       expect(choice).toBe('endActionPhase');
     });
-    // W20.5-D · 恐怖分子·狂热
+    // 恐怖分子·狂热
     it('endActionPhase 优先于 respondTerroristDiscard', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondTerroristDiscard']);
       expect(choice).toBe('endActionPhase');
@@ -84,14 +84,14 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondTerroristAccept']);
       expect(choice).toBe('endActionPhase');
     });
-    // W20.5-E · 雅典娜·急智
+    // 雅典娜·急智
     it('endActionPhase 优先于 useAthenaWit', () => {
       const choice = bot.play(null, ['endActionPhase', 'useAthenaWit']);
       expect(choice).toBe('endActionPhase');
     });
   });
 
-  describe('W20.5 · 水瓶·凝聚优先级', () => {
+  describe('水瓶·凝聚优先级', () => {
     it('playAquariusCoherence(7) 优先于 doDraw(10)', () => {
       const choice = bot.play(null, ['doDraw', 'playAquariusCoherence']);
       expect(choice).toBe('playAquariusCoherence');

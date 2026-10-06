@@ -3,7 +3,7 @@
 // 同层盗梦者对你用行动牌时，可先抽弃牌堆 1 张。回合限 1 次（每个对手回合）
 //
 // abilities registry 接入：onActionPhase trigger（dispatcher 在他人出牌前调用）
-// R1 阶段：apply 直接调用 applyAthenaWit 纯函数
+// apply 直接调用 applyAthenaWit 纯函数
 
 import { applyAthenaWit, ATHENA_WIT_SKILL_ID } from '../../../skills.js';
 import { canUse, incrementUsage } from '../../usage-counter.js';

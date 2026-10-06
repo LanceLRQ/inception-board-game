@@ -1,5 +1,5 @@
 // Admin API · 单元测试
-// W22-B Sprint 2：parseListFilter 纯函数 + 路由行为（注入 InMemoryReportArchive 绕过 DB）
+// parseListFilter 纯函数 + 路由行为（注入 InMemoryReportArchive 绕过 DB）
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import Koa from 'koa';

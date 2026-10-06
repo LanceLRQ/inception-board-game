@@ -1,5 +1,5 @@
 // AI 接管管理器 - 真人 → Bot 切换的生命周期
-// 对照：docs/_internal/design/08-security-ai.md §8.5 AI 接管
+// AI 接管
 //
 // 策略：
 //   1. 记录每个玩家的最后活动时间（heartbeat / move）

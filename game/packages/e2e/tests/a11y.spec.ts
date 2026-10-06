@@ -1,5 +1,5 @@
 // 基础无障碍 E2E
-// 对照：docs/_internal/TASKS.md P1 · 基础无障碍（键盘导航 + prefers-reduced-motion）
+// 基础无障碍（键盘导航 + prefers-reduced-motion）
 // WCAG 2.1 / 2.2 基础要求：
 //   - 2.1.1 Keyboard - 所有交互可键盘达成
 //   - 2.4.1 Bypass Blocks - 跳过导航到主内容

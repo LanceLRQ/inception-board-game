@@ -1,5 +1,4 @@
 // TurnOrderRail - 移动端星穹铁道式竖直行动轴
-// 对照：docs/_internal/design/06c-match-table-layout.md §4
 //
 // 规则：
 //   - 宽度 64px（<375px）/ 72px（≥375px）

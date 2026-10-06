@@ -1,6 +1,6 @@
-// 出牌追踪基础设施测试（Phase 3 坑③子系统）
+// 出牌追踪基础设施测试
 // 验证 recordCardPlayed + turn.onBegin 重置 + 代表性 play moves 接入
-// 对照：docs/_internal/design/02-game-rules-spec.md §2.4 · setup.ts playedCardsThisTurn
+// 对照：setup.ts playedCardsThisTurn
 
 import { describe, it, expect } from 'vitest';
 import { recordCardPlayed, beginTurn } from './moves.js';

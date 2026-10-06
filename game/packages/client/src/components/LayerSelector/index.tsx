@@ -1,5 +1,4 @@
 // LayerSelector - 梦境层选择器（第二步选层用）
-// 对照：docs/_internal/design/06-frontend-design.md §6.4.4
 
 import { cn } from '../../lib/utils.js';
 

@@ -1,5 +1,4 @@
 // createCardPressStateMachine 行为测试（纯函数工厂，脱离 React 环境）
-// 对照：docs/_internal/design/06c-match-table-layout.md §6.1
 
 import { describe, it, expect, vi } from 'vitest';
 import {

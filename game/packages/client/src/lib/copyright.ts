@@ -1,5 +1,5 @@
 // 版权元信息常量 - 四重展示点共享
-// 对照：NOTICE 根文件 / docs/_internal/design/06-frontend-design.md 版权展示
+// 对照：NOTICE 根文件（版权展示）
 
 export const COPYRIGHT_ACK_KEY = 'icgame-copyright-ack';
 

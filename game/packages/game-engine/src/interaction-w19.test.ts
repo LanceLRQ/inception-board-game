@@ -1,5 +1,4 @@
-// W19-A 高风险交互组合压测（聚焦子集）
-// 对照：docs/_internal/TASKS.md Phase 3 W19
+// 高风险交互组合压测（聚焦子集）
 // 覆盖：
 //   1. SHOOT 修饰链优先级（灵雕师 > 天蝎 > 金牛 > 哈雷 > 木星雷霆 > 默认）
 //   2. 翻面 × 移形换影 还原一致性（双子/双鱼/露娜 × shift snapshot）
@@ -127,7 +126,7 @@ function setVaultOpened(state: SetupState, vaultIndex: number, openedBy: string)
   };
 }
 
-describe('W19-A · 胜利条件优先级仲裁', () => {
+describe('胜利条件优先级仲裁', () => {
   it('秘密金库已开 → thief 胜（优先于梦主胜利）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const secretIdx = s.vaults.findIndex((v) => v.contentType === 'secret');
@@ -193,7 +192,7 @@ describe('W19-A · 胜利条件优先级仲裁', () => {
   });
 });
 
-describe('W19-A · 翻面 × 移形换影 交叉一致性', () => {
+describe('翻面 × 移形换影 交叉一致性', () => {
   it('双子翻面后被移形换影 → shiftSnapshot 记录翻面后的角色', () => {
     let s = scenarioStartOfGame3p();
     s = setActionPhase(s, 'p1');
@@ -234,7 +233,7 @@ describe('W19-A · 翻面 × 移形换影 交叉一致性', () => {
   });
 });
 
-describe('W19-A · SHOOT 修饰链优先级（多角色叠加）', () => {
+describe('SHOOT 修饰链优先级（多角色叠加）', () => {
   it('木星·巅峰梦主使用 SHOOT 同层 → 默认结算 + 雷霆 override（roll<层）', () => {
     // 设置：梦主在 L4，target 在 L4，roll=1 → 即使 base 是 move 也变 kill
     let s = scenarioStartOfGame3p();
@@ -289,7 +288,7 @@ describe('W19-A · SHOOT 修饰链优先级（多角色叠加）', () => {
   });
 });
 
-describe('W19-A · 港口·海啸 联动', () => {
+describe('港口·海啸 联动', () => {
   it('海啸杀了 p1 + 检查胜利条件（≥2 金库胜）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const coinIdxs = s.vaults
@@ -318,7 +317,7 @@ describe('W19-A · 港口·海啸 联动', () => {
   });
 });
 
-describe('W19-A · 冥王星·地狱世界观（doDraw + onEnd 联动）', () => {
+describe('冥王星·地狱世界观（doDraw + onEnd 联动）', () => {
   it('完整链路：doDraw 抽=D6=6 → 手牌≥6 → 触发 onEnd 入迷失', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = { ...s, turnPhase: 'draw', currentPlayerID: 'p1' };
@@ -366,11 +365,10 @@ describe('W19-A · 冥王星·地狱世界观（doDraw + onEnd 联动）', () =>
 });
 
 // ============================================================================
-// R29 · W19-A 交互矩阵扩充（第二批）
-// 对照：docs/_internal/TASKS.md Phase 3 W19
+// 交互矩阵扩充（第二批）
 // 聚焦子集：胜利条件更多边界 / 雷霆层差闭包 / 冥王星手牌边界 / 多梦主联动
 // ============================================================================
-describe('W19-A · 胜利优先级更多边界（R29）', () => {
+describe('胜利优先级更多边界', () => {
   it('秘密金库已开 + all_thieves_dead → thief 仍胜（秘密优先级最高）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const secretIdx = s.vaults.findIndex((v) => v.contentType === 'secret');
@@ -440,7 +438,7 @@ describe('W19-A · 胜利优先级更多边界（R29）', () => {
   });
 });
 
-describe('W19-A · 木星雷霆层差矩阵（R29）', () => {
+describe('木星雷霆层差矩阵', () => {
   // 签名：shouldJupiterThunderKill(shooterCharacter, shooterLayer, finalRoll)
   it('roll=层数 → 不杀（严格小于）', () => {
     expect(shouldJupiterThunderKill('dm_jupiter_peak', 3, 3)).toBe(false);
@@ -467,7 +465,7 @@ describe('W19-A · 木星雷霆层差矩阵（R29）', () => {
   });
 });
 
-describe('W19-A · 冥王星·地狱手牌边界（R29）', () => {
+describe('冥王星·地狱手牌边界', () => {
   // applyPlutoHellLostCheck 返回 SetupState：hand<阈值 / 无世界观 / 已在迷失 → 返回原状态
   // hand>=阈值 且在非迷失层 → 返回新状态（currentLayer=0）
   it('手牌 = 5（阈值-1）→ currentLayer 不变（非迷失层）', () => {
@@ -516,7 +514,7 @@ describe('W19-A · 冥王星·地狱手牌边界（R29）', () => {
   });
 });
 
-describe('W19-A · 港口·海啸与胜利判定（R29）', () => {
+describe('港口·海啸与胜利判定', () => {
   it('海啸后所有盗梦者仍存活 + 2 金库已开 → master 胜（港口）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const coinIdxs = s.vaults
@@ -532,7 +530,7 @@ describe('W19-A · 港口·海啸与胜利判定（R29）', () => {
   });
 });
 
-describe('W19-A · 达尔文·进化 + 木星 SHOOT', () => {
+describe('达尔文·进化 + 木星 SHOOT', () => {
   it('达尔文进化展示 4 张 + 木星梦主 SHOOT 雷霆击杀', () => {
     let s = scenarioStartOfGame3p();
     s = setMasterCharacter(s, 'dm_jupiter_peak');
@@ -565,10 +563,10 @@ describe('W19-A · 达尔文·进化 + 木星 SHOOT', () => {
 });
 
 // ============================================================================
-// R30 · W19-A 交互矩阵扩充（第三批）
+// 交互矩阵扩充（第三批）
 // 聚焦子集：世界观激活守卫 / 骰子修饰器 / 解封后被动抽牌 / 港口海啸边界
 // ============================================================================
-describe('W19-A · 世界观激活守卫（R30）', () => {
+describe('世界观激活守卫', () => {
   it('isHarborWorldActive：dm_harbor → true / 其他 → false', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     expect(isHarborWorldActive(s)).toBe(true);
@@ -591,7 +589,7 @@ describe('W19-A · 世界观激活守卫（R30）', () => {
   });
 });
 
-describe('W19-A · 要塞骰子修饰器 clamp（R30）', () => {
+describe('要塞骰子修饰器 clamp', () => {
   it('applyFortressDiceModifier：roll=6 → 5（-1）', () => {
     expect(applyFortressDiceModifier(6)).toBe(5);
   });
@@ -605,7 +603,7 @@ describe('W19-A · 要塞骰子修饰器 clamp（R30）', () => {
   });
 });
 
-describe('W19-A · 港口·海啸骰值矩阵（R30）', () => {
+describe('港口·海啸骰值矩阵', () => {
   it('roll=6 → 盗梦者幸免（不杀）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     // 2 名盗梦者 p1 / p2
@@ -639,7 +637,7 @@ describe('W19-A · 港口·海啸骰值矩阵（R30）', () => {
   });
 });
 
-describe('W19-A · 解封后被动抽牌（R30）', () => {
+describe('解封后被动抽牌', () => {
   it('译梦师·先知：applyInterpreterForeshadow 抽 2', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_dream_interpreter');
@@ -684,10 +682,10 @@ describe('W19-A · 解封后被动抽牌（R30）', () => {
 });
 
 // ============================================================================
-// R31 · W19-A 交互矩阵扩充（第四批）
+// 交互矩阵扩充（第四批）
 // 聚焦子集：天秤分堆仲裁 / 土星领地免费移动守卫 / 火星杀戮守卫
 // ============================================================================
-describe('W19-A · 天秤·平衡分堆仲裁（R31）', () => {
+describe('天秤·平衡分堆仲裁', () => {
   it('libraValidateSplit：合法分堆（multiset 一致）', () => {
     const hand = ['action_unlock', 'action_shoot', 'action_shift'] as CardID[];
     const p1 = ['action_unlock'] as CardID[];
@@ -734,7 +732,7 @@ describe('W19-A · 天秤·平衡分堆仲裁（R31）', () => {
   });
 });
 
-describe('W19-A · 土星领地免费移动守卫（R31）', () => {
+describe('土星领地免费移动守卫', () => {
   it('非 dm_saturn_territory 梦主 → false', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     expect(canSaturnFreeMove(s, 'p1')).toBe(false);
@@ -771,7 +769,7 @@ describe('W19-A · 土星领地免费移动守卫（R31）', () => {
   });
 });
 
-describe('W19-A · 火星·战场杀戮守卫（R31）', () => {
+describe('火星·战场杀戮守卫', () => {
   it('非 dm_mars_battlefield 梦主 → false', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     expect(canMarsKill(s, findMasterID(s)!)).toBe(false);
@@ -801,7 +799,7 @@ describe('W19-A · 火星·战场杀戮守卫（R31）', () => {
 });
 
 // ============================================================================
-// R32 · W19-A 交互矩阵扩充（第五批）
+// 交互矩阵扩充（第五批）
 // 聚焦子集：皇城·重金 守卫 / 密道·传送 happy path + 守卫 + 次数计量
 // ============================================================================
 // 辅助：填入一个 inPool 贿赂，用于皇城测试（scenarioStartOfGame3p 默认 bribePool=[]）
@@ -820,7 +818,7 @@ function withInPoolBribe(state: SetupState): SetupState {
   };
 }
 
-describe('W19-A · 皇城·重金派发贿赂守卫（R32）', () => {
+describe('皇城·重金派发贿赂守卫', () => {
   it('非 dm_imperial_city 梦主 → false', () => {
     const s = withInPoolBribe(setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor'));
     expect(canImperialPickBribe(s, findMasterID(s)!, 'p1', 0)).toBe(false);
@@ -863,7 +861,7 @@ describe('W19-A · 皇城·重金派发贿赂守卫（R32）', () => {
   });
 });
 
-describe('W19-A · 密道·传送 happy path + 守卫（R32）', () => {
+describe('密道·传送 happy path + 守卫', () => {
   it('非 dm_secret_passage 梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const mid = findMasterID(s)!;
@@ -920,7 +918,7 @@ describe('W19-A · 密道·传送 happy path + 守卫（R32）', () => {
   });
 });
 
-describe('W19-A · 密道·传送次数计量（R32）', () => {
+describe('密道·传送次数计量', () => {
   it('getSecretPassageUsesLeft：非密道梦主 → 0', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const mid = findMasterID(s)!;
@@ -967,10 +965,10 @@ describe('W19-A · 密道·传送次数计量（R32）', () => {
 });
 
 // ============================================================================
-// R33 · W19-A 交互矩阵扩充（第六批 · 纯函数批量）
+// 交互矩阵扩充（第六批 · 纯函数批量）
 // 聚焦子集：SHOOT 修饰链纯函数 / 角色触发纯判定 / 骰值 clamp / 牌型分类
 // ============================================================================
-describe('W19-A · SHOOT 修饰链纯函数（R33）', () => {
+describe('SHOOT 修饰链纯函数', () => {
   it('applySudgerVerdict：pick=A → rollA', () => {
     expect(applySudgerVerdict(3, 5, 'A')).toBe(3);
   });
@@ -1011,7 +1009,7 @@ describe('W19-A · SHOOT 修饰链纯函数（R33）', () => {
   });
 });
 
-describe('W19-A · 角色被动触发守卫（R33）', () => {
+describe('角色被动触发守卫', () => {
   it('isVirgoPerfectTriggered：骰 6 → true / 非 6 → false', () => {
     expect(isVirgoPerfectTriggered(6)).toBe(true);
     expect(isVirgoPerfectTriggered(5)).toBe(false);
@@ -1085,7 +1083,7 @@ describe('W19-A · 角色被动触发守卫（R33）', () => {
   });
 });
 
-describe('W19-A · 牌型分类 + 骰值 clamp（R33）', () => {
+describe('牌型分类 + 骰值 clamp', () => {
   it('isShootClassCard：所有 shoot 变体 → true', () => {
     expect(isShootClassCard('action_shoot' as CardID)).toBe(true);
     expect(isShootClassCard('action_shoot_king' as CardID)).toBe(true);
@@ -1150,9 +1148,9 @@ describe('W19-A · 牌型分类 + 骰值 clamp（R33）', () => {
 });
 
 // ============================================================================
-// R34 · W19-A 交互矩阵扩充（第七批 · 穿行者 / 摩羯 / 药剂师）
+// 交互矩阵扩充（第七批 · 穿行者 / 摩羯 / 药剂师）
 // ============================================================================
-describe('W19-A · 穿行者·支助守卫（R34）', () => {
+describe('穿行者·支助守卫', () => {
   it('非穿行者角色 → false', () => {
     const s = scenarioStartOfGame3p();
     expect(canUseTouristAssist(s, 'p1', 'p2')).toBe(false);
@@ -1188,7 +1186,7 @@ describe('W19-A · 穿行者·支助守卫（R34）', () => {
   });
 });
 
-describe('W19-A · 摩羯·节奏守卫（R34）', () => {
+describe('摩羯·节奏守卫', () => {
   it('非摩羯 → false', () => {
     const s = scenarioStartOfGame3p();
     expect(isCapricornusRhythmActive(s.players.p1!)).toBe(false);
@@ -1240,7 +1238,7 @@ describe('W19-A · 摩羯·节奏守卫（R34）', () => {
   });
 });
 
-describe('W19-A · 药剂师·调剂守卫（R34）', () => {
+describe('药剂师·调剂守卫', () => {
   it('非药剂师 → null', () => {
     let s = scenarioStartOfGame3p();
     s = setHand(s, 'p1', ['action_unlock' as CardID]);
@@ -1293,9 +1291,9 @@ describe('W19-A · 药剂师·调剂守卫（R34）', () => {
 });
 
 // ============================================================================
-// R35 · W19-A 交互矩阵扩充（第八批 · apply* 状态变更分支）
+// 交互矩阵扩充（第八批 · apply* 状态变更分支）
 // ============================================================================
-describe('W19-A · 穿行者·支助 happy path（R35）', () => {
+describe('穿行者·支助 happy path', () => {
   it('手牌全转 target + self 移到 target 层', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_tourist');
@@ -1330,7 +1328,7 @@ describe('W19-A · 穿行者·支助 happy path（R35）', () => {
   });
 });
 
-describe('W19-A · 狮子·王道触发分支（R35）', () => {
+describe('狮子·王道触发分支', () => {
   it('非狮子角色 → 原状态返回', () => {
     let s = scenarioStartOfGame3p();
     s = setHand(s, 'p1', []);
@@ -1401,7 +1399,7 @@ describe('W19-A · 狮子·王道触发分支（R35）', () => {
   });
 });
 
-describe('W19-A · 黑洞·征收 apply 分支（R35）', () => {
+describe('黑洞·征收 apply 分支', () => {
   it('非黑洞角色 → null', () => {
     const s = scenarioStartOfGame3p();
     const picks: Record<string, CardID> = { p2: 'action_unlock' as CardID };
@@ -1440,9 +1438,9 @@ describe('W19-A · 黑洞·征收 apply 分支（R35）', () => {
 });
 
 // ============================================================================
-// R36 · W19-A 交互矩阵扩充（第九批 · 天王星/冥王星业火梦主技能）
+// 交互矩阵扩充（第九批 · 天王星/冥王星业火梦主技能）
 // ============================================================================
-describe('W19-A · 天王星·权力 apply 分支（R36）', () => {
+describe('天王星·权力 apply 分支', () => {
   it('非天王星梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     s = withInPoolBribe(s);
@@ -1490,7 +1488,7 @@ describe('W19-A · 天王星·权力 apply 分支（R36）', () => {
   });
 });
 
-describe('W19-A · 天王星·权力剩余次数 + 世界观（R36）', () => {
+describe('天王星·权力剩余次数 + 世界观', () => {
   it('getUranusPowerUsesLeft：非天王星梦主 → 0', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     expect(getUranusPowerUsesLeft(s, s.players[findMasterID(s)!]!)).toBe(0);
@@ -1527,7 +1525,7 @@ describe('W19-A · 天王星·权力剩余次数 + 世界观（R36）', () => {
   });
 });
 
-describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
+describe('冥王星·业火 apply 分支', () => {
   it('非冥王星梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const mid = findMasterID(s)!;
@@ -1553,7 +1551,7 @@ describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
     expect(r!.players[mid]!.hand.length).toBe(0);
   });
 
-  it('冥王星梦主 + 盗梦者手牌≥2 → null（B5 前置检查：不产生效果的技能不能无故启动）', () => {
+  it('冥王星梦主 + 盗梦者手牌≥2 → null（前置检查：不产生效果的技能不能无故启动）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     const mid = findMasterID(s)!;
     s = setHand(s, mid, ['action_unlock' as CardID]);
@@ -1594,9 +1592,9 @@ describe('W19-A · 冥王星·业火 apply 分支（R36）', () => {
 });
 
 // ============================================================================
-// R37 · W19-A 交互矩阵扩充（第十批 · 雅典娜/影子/土星世界观）
+// 交互矩阵扩充（第十批 · 雅典娜/影子/土星世界观）
 // ============================================================================
-describe('W19-A · 雅典娜·急智 apply 分支（R37）', () => {
+describe('雅典娜·急智 apply 分支', () => {
   it('非雅典娜 → null', () => {
     let s = scenarioStartOfGame3p();
     s = { ...s, deck: { ...s.deck, discardPile: ['action_unlock' as CardID] } };
@@ -1642,7 +1640,7 @@ describe('W19-A · 雅典娜·急智 apply 分支（R37）', () => {
   });
 });
 
-describe('W19-A · 影子·潜伏 apply 分支（R37）', () => {
+describe('影子·潜伏 apply 分支', () => {
   it('非影子 → null', () => {
     const s = scenarioStartOfGame3p();
     const r = applyShadeFollow(s, 'p1');
@@ -1667,7 +1665,7 @@ describe('W19-A · 影子·潜伏 apply 分支（R37）', () => {
   });
 });
 
-describe('W19-A · 土星世界观免费移动 apply 分支（R37）', () => {
+describe('土星世界观免费移动 apply 分支', () => {
   it('非土星梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
@@ -1744,9 +1742,9 @@ describe('W19-A · 土星世界观免费移动 apply 分支（R37）', () => {
 });
 
 // ============================================================================
-// R38 · W19-A 交互矩阵扩充（第十一批 · 天王星世界观 / 火星战场 / 土星律令）
+// 交互矩阵扩充（第十一批 · 天王星世界观 / 火星战场 / 土星律令）
 // ============================================================================
-describe('W19-A · 天王星·苍穹世界观弃牌堆顶（R38）', () => {
+describe('天王星·苍穹世界观弃牌堆顶', () => {
   it('非天王星梦主 → state 不变', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const before = s.deck.cards.length;
@@ -1806,7 +1804,7 @@ describe('W19-A · 天王星·苍穹世界观弃牌堆顶（R38）', () => {
   });
 });
 
-describe('W19-A · 火星·战场世界观交换（R38）', () => {
+describe('火星·战场世界观交换', () => {
   it('非火星梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     s = setHand(s, 'p1', ['action_unlock' as CardID, 'action_shift' as CardID]);
@@ -1903,7 +1901,7 @@ describe('W19-A · 火星·战场世界观交换（R38）', () => {
   });
 });
 
-describe('W19-A · 土星·领地律令（R38）', () => {
+describe('土星·领地律令', () => {
   it('非土星梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const mid = findMasterID(s)!;
@@ -1943,7 +1941,7 @@ describe('W19-A · 土星·领地律令（R38）', () => {
   });
 });
 
-describe('W19-A · 火星·杀戮弃解封（R38）', () => {
+describe('火星·杀戮弃解封', () => {
   it('非火星梦主 → null', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const mid = findMasterID(s)!;
@@ -1971,11 +1969,11 @@ describe('W19-A · 火星·杀戮弃解封（R38）', () => {
 });
 
 // ============================================================================
-// R39 · W19-A 交互矩阵收官批（181 → 200）
+// 交互矩阵收官批（181 → 200）
 // 聚焦：空间女王 / 黑天鹅 / 战争之王 / 灵魂牧师 / 阿波罗 / 欺诈师 / 降世神通 / 棋局世界观
 // ============================================================================
 
-describe('W19-A · 空间女王 监察 / 置顶（R39）', () => {
+describe('空间女王 监察 / 置顶', () => {
   it('非空间女王 → observe 返回 null', () => {
     const s = scenarioStartOfGame3p();
     expect(applySpaceQueenObserve(s, 'p1')).toBeNull();
@@ -2007,7 +2005,7 @@ describe('W19-A · 空间女王 监察 / 置顶（R39）', () => {
   });
 });
 
-describe('W19-A · 黑天鹅 巡演（R39）', () => {
+describe('黑天鹅 巡演', () => {
   it('非黑天鹅 → null', () => {
     const s = scenarioStartOfGame3p();
     const r = applyBlackSwanTour(s, 'p1', {});
@@ -2047,7 +2045,7 @@ describe('W19-A · 黑天鹅 巡演（R39）', () => {
   });
 });
 
-describe('W19-A · 战争之王 黑市（R39）', () => {
+describe('战争之王 黑市', () => {
   it('非战争之王 → null', () => {
     const s = scenarioStartOfGame3p();
     const r = applyLordOfWarBlackMarket(
@@ -2087,7 +2085,7 @@ describe('W19-A · 战争之王 黑市（R39）', () => {
   });
 });
 
-describe('W19-A · 灵魂牧师 拯救（R39）', () => {
+describe('灵魂牧师 拯救', () => {
   it('非灵魂牧师 → null', () => {
     const s = scenarioStartOfGame3p();
     const r = applyPaprikSalvation(s, 'p1', 'action_shoot' as CardID, 'p2');
@@ -2127,7 +2125,7 @@ describe('W19-A · 灵魂牧师 拯救（R39）', () => {
   });
 });
 
-describe('W19-A · 阿波罗 崇拜（R39）', () => {
+describe('阿波罗 崇拜', () => {
   it('target 无贿赂 → null', () => {
     const s = setCharacter(scenarioStartOfGame3p(), 'p1', 'thief_apollo');
     const r = applyApolloWorship(s, 'p1', 'p2', 0);
@@ -2154,7 +2152,7 @@ describe('W19-A · 阿波罗 崇拜（R39）', () => {
   });
 });
 
-describe('W19-A · 欺诈师 盗心（R39）', () => {
+describe('欺诈师 盗心', () => {
   it('非欺诈师 → null', () => {
     const s = scenarioStartOfGame3p();
     const r = applyForgerExchange(s, 'p1', {
@@ -2192,7 +2190,7 @@ describe('W19-A · 欺诈师 盗心（R39）', () => {
   });
 });
 
-describe('W19-A · 降世神通 顺流 / 棋局世界观窥视（R39）', () => {
+describe('降世神通 顺流 / 棋局世界观窥视', () => {
   it('非降世神通 → 状态不变', () => {
     const s = scenarioStartOfGame3p();
     const r = applyHlninoFlow(s, 'p1', 1, 2);
