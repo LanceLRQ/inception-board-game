@@ -1,0 +1,406 @@
+/*
+ * 「梦境矩阵」皮肤：磷光绿单色终端——数字雨、扫描线、进程表，卡图降饱和。
+ * 全部限定在 [data-theme='matrix'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
+ * 全场只有一种颜色（磷光绿）；红色只用于警示（梦魇、战斗骰）。
+ *
+ * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
+ *   rain  数字雨    scan  扫描线    desat  卡图降饱和    blink  光标与状态灯的明灭
+ * 系统「减少动效」与 data-motion='reduced' 下，数字雨只画静态一帧，明灭停掉。
+ */
+
+/* ---------- 舞台与背景氛围 ---------- */
+[data-theme='matrix'] .ms-stage {
+  background: var(--ms-bg);
+}
+/* CRT 暗角：画面四周压暗 */
+[data-theme='matrix'] .matrix-vignette {
+  background: radial-gradient(
+    ellipse 120% 95% at 50% 42%,
+    transparent 55%,
+    color-mix(in srgb, var(--ms-bg) 70%, transparent) 100%
+  );
+}
+[data-theme='matrix']:root[data-fx-off~='rain'] .matrix-rain {
+  display: none;
+}
+/* 扫描线：盖在整个对局布局上，低于弹窗（弹窗里的卡图要看清原图），不拦截指针 */
+[data-theme='matrix']:root:not([data-fx-off~='scan']) [data-layout]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--ms-bg) 24%, transparent) 0 1px,
+    transparent 1px 3px
+  );
+}
+[data-theme='matrix'] .ms-topbar {
+  letter-spacing: 0.18em;
+  background: color-mix(in srgb, var(--ms-bg) 92%, transparent);
+}
+
+/* ---------- HUD 角括号：座位牌与中央终端窗口 ---------- */
+[data-theme='matrix'] .ms-seat::before,
+[data-theme='matrix'] .matrix-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.85;
+  background:
+    linear-gradient(var(--ms-acc), var(--ms-acc)) top left / 12px 1.5px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) top left / 1.5px 12px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) top right / 12px 1.5px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) top right / 1.5px 12px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) bottom left / 12px 1.5px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) bottom left / 1.5px 12px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) bottom right / 12px 1.5px no-repeat,
+    linear-gradient(var(--ms-acc), var(--ms-acc)) bottom right / 1.5px 12px no-repeat;
+}
+
+/* ---------- 座位牌：节点 ---------- */
+[data-theme='matrix'] .ms-seat {
+  border-radius: 0;
+  border-color: var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-panel) 94%, transparent);
+}
+[data-theme='matrix'] .ms-seat[data-current] {
+  border-color: var(--ms-acc);
+  box-shadow:
+    0 0 0 1px var(--ms-accsoft),
+    0 0 30px color-mix(in srgb, var(--ms-acc) 20%, transparent);
+}
+[data-theme='matrix'] .ms-seat[data-lost] {
+  border-style: dashed;
+}
+[data-theme='matrix'] .ms-seat-name {
+  color: var(--ms-accb);
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 35%, transparent);
+}
+[data-theme='matrix'] .ms-seat[data-lost] .ms-seat-name {
+  color: var(--ms-faint);
+  text-shadow: none;
+}
+[data-theme='matrix'] .ms-seat-flag {
+  letter-spacing: 0.3em;
+}
+[data-theme='matrix'] .ms-seat[data-current] .ms-seat-flag {
+  animation: ms-blink 1.2s steps(1) infinite;
+}
+[data-theme='matrix'] .ms-seat-revtag {
+  z-index: 1;
+  border-radius: 0;
+}
+
+/* ---------- 卡面画框：降饱和、偏单色 ---------- */
+[data-theme='matrix'] .ms-card {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 90%, var(--ms-panel));
+}
+/* 一层磷光色薄罩，下沿压暗，卡面上的小字更清楚 */
+[data-theme='matrix'] .ms-card::after,
+[data-theme='matrix'] .ms-handcard-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ms-acc) 7%, transparent),
+    transparent 42%,
+    color-mix(in srgb, var(--ms-bg) 32%, transparent)
+  );
+}
+/* 只降本界面里的卡图；卡牌详情弹窗在布局之外，不受影响 */
+[data-theme='matrix']:root:not([data-fx-off~='desat']) .ms-card img,
+[data-theme='matrix']:root:not([data-fx-off~='desat']) .ms-handcard-art img,
+[data-theme='matrix']:root:not([data-fx-off~='desat']) [data-layout='mobile'] img {
+  filter: saturate(0.4) contrast(1.05);
+}
+
+/* ---------- 层徽 / 骰子 ---------- */
+[data-theme='matrix'] .ms-layerbadge {
+  border-radius: 0;
+  letter-spacing: 0.12em;
+}
+[data-theme='matrix'] .ms-layerbadge[data-layer='0'] {
+  border-style: dashed;
+}
+[data-theme='matrix'] .ms-die {
+  --die-fill: color-mix(in srgb, var(--die-color) 10%, var(--ms-bg));
+  --die-pip: var(--die-color);
+  border-radius: 0;
+  border: 1px solid color-mix(in srgb, var(--die-color) 55%, transparent);
+}
+[data-theme='matrix'] .ms-die-pip {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--die-color) 80%, transparent);
+}
+[data-theme='matrix'] .ms-die[data-empty] {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
+[data-theme='matrix'] .ms-handcard {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 94%, var(--ms-panel));
+}
+[data-theme='matrix'] .ms-handcard:hover {
+  box-shadow: 0 0 24px color-mix(in srgb, var(--ms-acc) 18%, transparent);
+}
+[data-theme='matrix'] .ms-handcard[data-selected],
+[data-theme='matrix'] .ms-handcard[data-reading] {
+  box-shadow:
+    0 0 0 1px var(--ms-acc),
+    0 0 26px color-mix(in srgb, var(--ms-acc) 25%, transparent);
+}
+[data-theme='matrix'] .ms-handcard-art {
+  position: relative;
+}
+[data-theme='matrix'] .ms-handcard-badge {
+  border-radius: 0;
+}
+[data-theme='matrix'] .ms-dock {
+  background: color-mix(in srgb, var(--ms-bg) 96%, var(--ms-panel));
+}
+[data-theme='matrix'] .ms-btn {
+  border-radius: 0;
+  border-color: var(--ms-line2);
+  color: var(--ms-accb);
+  letter-spacing: 0.2em;
+}
+[data-theme='matrix'] .ms-btn:not(:disabled):hover {
+  border-color: var(--ms-acc);
+  color: var(--ms-accb);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--ms-acc) 20%, transparent);
+}
+[data-theme='matrix'] .ms-btn[data-variant='primary'] {
+  color: var(--ms-bg);
+}
+[data-theme='matrix'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+  color: var(--ms-bg);
+  box-shadow: 0 6px 26px color-mix(in srgb, var(--ms-acc) 35%, transparent);
+}
+[data-theme='matrix'] .ms-response {
+  border-radius: 0;
+  border-color: var(--ms-dim);
+  background: color-mix(in srgb, var(--ms-bg) 97%, var(--ms-panel));
+}
+
+/* ---------- 中央舞台：终端窗口里的进程表 ---------- */
+[data-theme='matrix'] .matrix-stage {
+  position: relative;
+  border: 1px solid var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-panel) 96%, transparent);
+  box-shadow: inset 0 0 46px -18px color-mix(in srgb, var(--ms-acc) 22%, transparent);
+  color: var(--ms-ink);
+}
+[data-theme='matrix'] .matrix-menubar {
+  border-bottom: 1px solid var(--ms-line);
+  color: var(--ms-faint);
+}
+[data-theme='matrix'] .matrix-dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--ms-dim);
+}
+[data-theme='matrix'] .matrix-dot:first-child {
+  background: var(--ms-dim);
+}
+[data-theme='matrix'] .matrix-turn {
+  color: var(--ms-accb);
+  border-bottom: 1px solid var(--ms-line);
+}
+[data-theme='matrix'] .matrix-cursor {
+  display: block;
+  flex-shrink: 0;
+  width: 8px;
+  height: 14px;
+  background: var(--ms-acc);
+  animation: ms-blink 1s steps(1) infinite;
+}
+
+/* 进程表：表头与各行共用同一套列宽 */
+[data-theme='matrix'] .matrix-table {
+  --matrix-cols: 98px minmax(0, 1.05fr) 42px minmax(0, 1fr) minmax(116px, 0.9fr);
+}
+[data-theme='matrix'] .matrix-colhead,
+[data-theme='matrix'] .matrix-row {
+  grid-template-columns: var(--matrix-cols);
+  column-gap: 6px;
+  padding-inline: 12px;
+}
+[data-theme='matrix'] .matrix-colhead {
+  padding-block: 4px;
+  font-family: var(--ms-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  color: var(--ms-faint);
+  border-bottom: 1px solid var(--ms-line);
+}
+[data-theme='matrix'] .matrix-row {
+  min-height: 24px;
+  max-height: clamp(30px, 11cqh, 64px);
+  color: var(--ms-ink);
+  border-bottom: 1px solid color-mix(in srgb, var(--ms-acc) 8%, transparent);
+  transition: background-color 0.2s;
+}
+[data-theme='matrix'] .matrix-row:hover {
+  background: color-mix(in srgb, var(--ms-acc) 5%, transparent);
+}
+[data-theme='matrix'] .matrix-row[data-focus] {
+  background: color-mix(in srgb, var(--ms-acc) 9%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--ms-acc) 28%, transparent);
+  box-shadow: inset 2px 0 0 var(--ms-acc);
+}
+[data-theme='matrix'] .matrix-row[data-lost] {
+  border-bottom-style: dashed;
+}
+[data-theme='matrix'] .matrix-layername {
+  color: var(--ms-dim);
+}
+[data-theme='matrix'] .matrix-layername > span:nth-of-type(1) {
+  color: var(--ms-acc);
+}
+[data-theme='matrix'] .matrix-layername:focus-visible {
+  outline-offset: -2px;
+}
+[data-theme='matrix'] .matrix-pointer {
+  opacity: 0;
+  color: var(--ms-acc);
+}
+[data-theme='matrix'] .matrix-row[data-focus] .matrix-pointer {
+  opacity: 1;
+}
+[data-theme='matrix'] .matrix-row[data-focus] .matrix-layername {
+  color: var(--ms-accb);
+}
+[data-theme='matrix'] .matrix-row[data-viewer-layer]:not([data-focus]) .matrix-layername {
+  color: var(--ms-ink);
+}
+[data-theme='matrix'] .matrix-row[data-lost]:not([data-focus]) .matrix-layername,
+[data-theme='matrix']
+  .matrix-row[data-lost]:not([data-focus])
+  .matrix-layername
+  > span:nth-of-type(1) {
+  color: var(--ms-faint);
+}
+[data-theme='matrix'] .matrix-dim {
+  color: var(--ms-faint);
+}
+[data-theme='matrix'] .matrix-vault-text {
+  font-family: var(--ms-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ms-dim);
+}
+[data-theme='matrix'] .matrix-vault-text[data-opened] {
+  color: var(--ms-accb);
+}
+[data-theme='matrix'] .matrix-vault[data-opened] {
+  border-color: color-mix(in srgb, var(--ms-acc) 60%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 25%, transparent);
+}
+[data-theme='matrix'] .matrix-nodes {
+  color: var(--ms-ink);
+}
+[data-theme='matrix'] .matrix-marker {
+  padding: 1px 5px;
+  color: var(--ms-accb);
+  border: 1px solid color-mix(in srgb, var(--ms-acc) 55%, transparent);
+}
+[data-theme='matrix'] .matrix-row[data-marker='unlocking'] .matrix-marker {
+  animation: ms-blink 1.2s steps(1) infinite;
+}
+[data-theme='matrix'] .matrix-nightmare {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 5px;
+  font-family: var(--ms-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--ms-blood);
+  border: 1px dashed color-mix(in srgb, var(--ms-blood) 60%, transparent);
+  background: transparent;
+}
+[data-theme='matrix'] .matrix-nightmare[data-revealed] {
+  border-style: solid;
+}
+
+/* 焦点层详情 */
+[data-theme='matrix'] .matrix-detail {
+  border-top: 1px solid var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-acc) 4%, transparent);
+}
+[data-theme='matrix'] .matrix-occ {
+  padding: 2px 8px;
+  color: var(--ms-dim);
+  background: var(--ms-panel2);
+  border: 1px solid var(--ms-line2);
+}
+[data-theme='matrix'] .matrix-occ[data-self] {
+  color: var(--ms-accb);
+  border-color: var(--ms-acc);
+}
+[data-theme='matrix'] .matrix-activity {
+  color: var(--ms-faint);
+  border-top: 1px solid var(--ms-line);
+}
+[data-theme='matrix'] .matrix-activity svg {
+  color: var(--ms-dim);
+}
+[data-theme='matrix'] .matrix-deck {
+  color: var(--ms-dim);
+  border-top: 1px solid var(--ms-line);
+}
+[data-theme='matrix'] .matrix-seg {
+  background: color-mix(in srgb, var(--ms-acc) 12%, transparent);
+}
+[data-theme='matrix'] .matrix-seg[data-on] {
+  background: var(--ms-acc);
+}
+/* 中央区高度不够时收起焦点层说明，保证五行都放得下 */
+@container (max-height: 400px) {
+  [data-theme='matrix'] .matrix-detail-note {
+    display: none;
+  }
+}
+
+/* ---------- 移动端：只换令牌与皮肤样式，没有专属舞台 ---------- */
+[data-theme='matrix'] [data-layout='mobile'] [data-testid^='layer-row-'] {
+  border-radius: 0;
+}
+
+/* ---------- 动效开关 ---------- */
+[data-theme='matrix']:root[data-fx-off~='blink'] .matrix-cursor,
+[data-theme='matrix']:root[data-fx-off~='blink'] .ms-seat-flag,
+[data-theme='matrix']:root[data-fx-off~='blink'] .matrix-marker {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='matrix'] .matrix-cursor,
+  [data-theme='matrix'] .ms-seat-flag,
+  [data-theme='matrix'] .matrix-marker {
+    animation: none;
+  }
+}
+[data-theme='matrix']:root[data-motion='reduced'] .matrix-cursor,
+[data-theme='matrix']:root[data-motion='reduced'] .ms-seat-flag,
+[data-theme='matrix']:root[data-motion='reduced'] .matrix-marker {
+  animation: none;
+}
+[data-theme='matrix']:root[data-motion='reduced'] .ms-handcard,
+[data-theme='matrix']:root[data-motion='reduced'] .ms-btn,
+[data-theme='matrix']:root[data-motion='reduced'] .matrix-row {
+  transition: none;
+}

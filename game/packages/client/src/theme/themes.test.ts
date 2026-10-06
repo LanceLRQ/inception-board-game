@@ -91,6 +91,23 @@ describe('主题表', () => {
     expect(totem.tokens.line2).toBe('rgba(200,215,235,.24)');
   });
 
+  it('matrix 是暗色主题，取值与约定一致：近黑的绿底、磷光绿强调色、等宽字体为主', () => {
+    const matrix = getTheme('matrix');
+    expect(matrix.scheme).toBe('dark');
+    expect(matrix.themeColor).toBe('#040805');
+    expect(matrix.tokens.bg).toBe('#040805');
+    expect(matrix.tokens.panel).toBe('#081009');
+    expect(matrix.tokens.ink).toBe('#C6E3CF');
+    expect(matrix.tokens.acc).toBe('#45E07E');
+    expect(matrix.tokens.accb).toBe('#9FFFB9');
+    expect(matrix.tokens.line2).toBe('rgba(69,224,126,.4)');
+    // 正文与标题都以等宽字体打头，中文回落到已有的黑体栈；不引入新的字体依赖
+    for (const k of ['serif', 'sans', 'mono'] as const) {
+      expect(matrix.tokens[k].startsWith("'IBM Plex Mono'"), k).toBe(true);
+    }
+    expect(matrix.tokens.sans).toContain("'Noto Sans SC Variable'");
+  });
+
   it('各主题的令牌取值互不相同（换主题必须看得出来）', () => {
     const all = THEME_IDS.map((id) => getTheme(id).tokens);
     for (const k of ['bg', 'panel', 'ink', 'line2'] as const) {
@@ -110,6 +127,7 @@ describe('isThemeId / resolveThemeId', () => {
     expect(isThemeId('noir')).toBe(true);
     expect(isThemeId('blueprint')).toBe(true);
     expect(isThemeId('totem')).toBe(true);
+    expect(isThemeId('matrix')).toBe(true);
   });
 
   it('不认旧值、空值与原型链上的名字', () => {
@@ -122,6 +140,7 @@ describe('isThemeId / resolveThemeId', () => {
     expect(resolveThemeId('noir')).toBe('noir');
     expect(resolveThemeId('blueprint')).toBe('blueprint');
     expect(resolveThemeId('totem')).toBe('totem');
+    expect(resolveThemeId('matrix')).toBe('matrix');
     for (const v of ['light', 'dark', 'system', null, undefined, 42]) {
       expect(resolveThemeId(v)).toBe(DEFAULT_THEME_ID);
     }

@@ -12,6 +12,7 @@
 @import './skins/noir.css';
 @import './skins/blueprint.css';
 @import './skins/totem.css';
+@import './skins/matrix.css';
 /*
  ---break---
  */
@@ -164,6 +165,28 @@
   --ms-totem-l2: #E0BC7E;
   --ms-totem-l3: #BFD4E6;
   --ms-totem-l4: #9AA098;
+}
+
+/* prettier-ignore */
+[data-theme='matrix'] {
+  --ms-bg: #040805;
+  --ms-panel: #081009;
+  --ms-panel2: #0C150E;
+  --ms-ink: #C6E3CF;
+  --ms-dim: #5FB67F;
+  --ms-faint: #5A8769;
+  --ms-line: rgba(69,224,126,.14);
+  --ms-line2: rgba(69,224,126,.4);
+  --ms-acc: #45E07E;
+  --ms-accb: #9FFFB9;
+  --ms-accsoft: rgba(69,224,126,.1);
+  --ms-lock: #3CC47F;
+  --ms-blood: #C4685A;
+  --ms-ok: #8BD9A5;
+  --ms-grade: #45E07E;
+  --ms-serif: 'IBM Plex Mono','Noto Sans SC Variable','Noto Sans SC','PingFang SC',monospace;
+  --ms-sans: 'IBM Plex Mono','Noto Sans SC Variable','Noto Sans SC','PingFang SC',monospace;
+  --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
 }
 
 /* shadcn 变量统一从语义令牌映射，换主题只需换令牌 */

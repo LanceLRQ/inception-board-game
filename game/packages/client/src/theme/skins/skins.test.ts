@@ -206,3 +206,58 @@ describe('「陀螺未停」皮肤样式', () => {
     for (const name of ['ms-flow', 'ms-dash', 'ms-wobble']) expect(css).toContain(name);
   });
 });
+
+describe('「梦境矩阵」皮肤样式', () => {
+  const css = stripComments(skinCss['../../styles/skins/matrix.css']!);
+
+  it('专属类名都带 matrix- 前缀，不借用别的主题的类名', () => {
+    const classes = new Set(
+      selectors(css).flatMap((s) => [...s.matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]!)),
+    );
+    expect(classes.size).toBeGreaterThan(0);
+    for (const name of classes) {
+      expect(name.startsWith('ms-') || name.startsWith('matrix-'), name).toBe(true);
+    }
+    for (const other of ['noir-', 'blueprint-', 'totem-']) expect(css).not.toContain(other);
+  });
+
+  it('动效在系统「减少动效」与 data-motion=reduced 下都会停掉', () => {
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain(":root[data-motion='reduced']");
+  });
+
+  it('装饰效果各有独立的 data-fx-off 开关：rain / scan / desat / blink', () => {
+    for (const fx of ['rain', 'scan', 'desat', 'blink']) {
+      expect(css, fx).toContain(`[data-fx-off~='${fx}']`);
+    }
+  });
+
+  it('扫描线是不拦截指针的纯 CSS 叠层，低于弹窗的层级，且可被 scan 开关关闭', () => {
+    const rule = css.match(/\[data-layout\]::after\s*\{[^}]*\}/);
+    expect(rule).not.toBeNull();
+    expect(rule![0]).toContain('pointer-events: none');
+    expect(rule![0]).toContain('repeating-linear-gradient');
+    expect(Number(rule![0].match(/z-index:\s*(\d+)/)![1])).toBeLessThan(50);
+    expect(css).toContain(":root:not([data-fx-off~='scan']) [data-layout]::after");
+  });
+
+  it('卡图降饱和可被 desat 开关关闭，只作用于对局里的卡图（不碰弹窗）', () => {
+    const filterRules = selectors(css).filter((s) => /\bimg\b/.test(s));
+    expect(filterRules.length).toBeGreaterThan(0);
+    for (const sel of filterRules) {
+      expect(sel, sel).toContain(":not([data-fx-off~='desat'])");
+      expect(sel, sel).toMatch(/\.ms-card|\.ms-handcard-art|\[data-layout='mobile'\]/);
+    }
+    expect(css).toMatch(/filter:\s*saturate\(/);
+  });
+
+  it('不使用层级调色：没有任何 data-tint-layer 规则', () => {
+    expect(css).not.toContain('data-tint-layer');
+  });
+
+  it('关键帧由基础样式提供，皮肤只引用', () => {
+    expect(css).not.toContain('@keyframes');
+    expect(baseCss).toContain('@keyframes ms-blink');
+    expect(css).toContain('ms-blink');
+  });
+});

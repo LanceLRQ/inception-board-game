@@ -186,9 +186,9 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | 皮肤件 | 少量按主题切换的样式：卡牌画框、骰子、层徽、座位框、背景氛围 | 共用组件只带稳定的钩子类名，基础样式在 `styles/skins/base.css`，每个主题的差异在 `styles/skins/<id>.css`，全部限定在 `[data-theme='<id>']` 之下（关键帧放 `base.css`）；皮肤样式里**不许有颜色字面量**（装饰性取值用 `color-mix()` 基于令牌推导），由 `theme/skins/skins.test.ts` 保证 |
 | 中央舞台 | 桌面端中央区，每个主题一个结构不同的组件，吃同一份盘面数据 | `components/MatchRuntime/stages/<id>/`，经 `React.lazy` 加载成独立 chunk，不进首屏包 |
 
-移动端布局所有主题共用一套结构、只靠令牌换肤，没有按主题分叉的中央舞台。
+移动端布局所有主题共用一套结构、只靠令牌换肤，没有按主题分叉的中央舞台（背景可以有：皮肤的 `MobileAmbient` 由 `MobileLayout` 铺在最底层）。
 
-**皮肤注册表**在 `theme/skins/`：`ThemeSkin`（`types.ts`）含 `CenterStage`（懒加载的中央舞台）、可选的 `Ambient`（铺在桌面舞台最底层的背景氛围）、`center`（中央舞台在舞台上占的宽度比例与最小高度，座位规划按它让位）；`index.ts` 的 `SKINS` 登记每个主题；`useThemeSkin()` 按当前主题取皮肤。中央舞台的接口是 `stages/types.ts` 的 `CenterStageProps`：`board`（`BoardModel`，与主题无关的盘面数据）+ `onFocusLayer` + `onOpenCard`。中央舞台只展示，不处理出牌与选目标；金库缩略图可点开详情（详情禁止翻面），梦境层牌不触发详情。
+**皮肤注册表**在 `theme/skins/`：`ThemeSkin`（`types.ts`）含 `CenterStage`（懒加载的中央舞台）、可选的 `Ambient`（铺在桌面舞台最底层的背景氛围）与 `MobileAmbient`（移动布局的最底层背景）、`center`（中央舞台在舞台上占的宽度比例与最小高度，座位规划按它让位）；`index.ts` 的 `SKINS` 登记每个主题；`useThemeSkin()` 按当前主题取皮肤。中央舞台的接口是 `stages/types.ts` 的 `CenterStageProps`：`board`（`BoardModel`，与主题无关的盘面数据）+ `onFocusLayer` + `onOpenCard`。中央舞台只展示，不处理出牌与选目标；金库缩略图可点开详情（详情禁止翻面），梦境层牌不触发详情。
 
 **样式钩子类名**（统一前缀 `ms-`，状态用数据属性表达）：
 
@@ -205,13 +205,13 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | `ms-btn` | 坞与响应窗口里的按钮 | `data-variant="primary"` |
 | `ms-response` | 响应窗口 / 提示卡 | - |
 
-**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`flow`、`maze`（迷宫底纹）、`tint`（层级调色）。
+**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`flow`、`maze`（迷宫底纹）、`tint`（层级调色）、`rain`（梦境矩阵的数字雨）、`scan`（扫描线）、`desat`（卡图降饱和）、`blink`（光标与状态灯明灭）。运行中会变化的开关（`data-fx-off`、`data-motion`，以及系统「减少动效」）要靠监听即时响应，数字雨的控制器（`stages/matrix/rainController.ts`）就是这么做的：监听根元素属性变化与媒体查询变化，页面不可见时暂停。
 
 **新增一个主题要动的地方：**
 
 1. `theme/themes.ts` 的 `THEMES` 加主题（18 个令牌）+ `styles/index.css` 加同样的 `[data-theme='<id>']` 块 + 两份 i18n 的 `theme.names.<id>`（`themeCss.test.ts`、`themes.test.ts` 会检查一致性）
 2. `styles/skins/<id>.css`：该主题对钩子类名的差异样式，并在 `styles/index.css` 里 `@import`
-3. `components/MatchRuntime/stages/<id>/`：中央舞台组件（吃 `CenterStageProps`），需要背景氛围就再放一个 `Ambient` 组件
+3. `components/MatchRuntime/stages/<id>/`：中央舞台组件（吃 `CenterStageProps`），需要背景氛围就再放一个 `Ambient` 组件（移动布局也要时再提供 `MobileAmbient`）
 4. `theme/skins/<id>.ts`：登记 `ThemeSkin`（`React.lazy` 加载中央舞台、`center` 占位参数），并在 `theme/skins/index.ts` 的 `SKINS` 里加一项
 5. 跑 `pnpm --filter @icgame/client test`：注册表、样式限定、颜色字面量等检查会替你兜底；然后按下面的清单走查
 

@@ -3,6 +3,7 @@
 
 import type { ThemeId } from '../themes';
 import { blueprintSkin } from './blueprint';
+import { matrixSkin } from './matrix';
 import { noirSkin } from './noir';
 import { totemSkin } from './totem';
 import type { ThemeSkin } from './types';
@@ -11,6 +12,7 @@ export const SKINS: Readonly<Record<ThemeId, ThemeSkin>> = {
   noir: noirSkin,
   blueprint: blueprintSkin,
   totem: totemSkin,
+  matrix: matrixSkin,
 };
 
 export function getSkin(id: ThemeId): ThemeSkin {

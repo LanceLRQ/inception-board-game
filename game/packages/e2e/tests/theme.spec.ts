@@ -36,6 +36,13 @@ const SWITCHABLE_THEMES = [
     stage: 'totem-stage',
     desc: '陀螺仪加梦层塔',
   },
+  {
+    id: 'matrix',
+    label: '梦境矩阵',
+    name: /梦境矩阵|DreamMatrix/,
+    stage: 'matrix-stage',
+    desc: '终端进程表',
+  },
 ] as const;
 
 /** 所有带专属舞台的主题的舞台 testid（含默认主题），用来断言别的主题的舞台没有渲染 */
@@ -275,5 +282,132 @@ test.describe('主题 Theme · 陀螺未停的层级调色', () => {
         ),
       )
       .toBe('#C9A35F');
+  });
+});
+
+/** 梦境矩阵的数字雨画布：状态由控制器写在 data-rain-state 上 */
+const RAIN = 'canvas.matrix-rain';
+
+/** 画布内容的指纹：像素有变化它就变 */
+const rainFrame = (page: Page) =>
+  page.evaluate((sel) => (document.querySelector(sel) as HTMLCanvasElement).toDataURL(), RAIN);
+
+async function openMatrixMatch(page: Page): Promise<void> {
+  await preselectTheme(page, 'matrix');
+  await page.goto('/game/debug');
+  await waitForAppReady(page);
+  await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'running');
+}
+
+test.describe('主题 Theme · 梦境矩阵的特效', () => {
+  test('数字雨在桌面与移动布局里都有，并且在持续推进', async ({ page }) => {
+    await openMatrixMatch(page);
+    const before = await rainFrame(page);
+    await expect.poll(() => rainFrame(page), { timeout: 5_000 }).not.toBe(before);
+  });
+
+  test('data-fx-off="rain"：画布停止推进并清空，去掉后恢复', async ({ page }) => {
+    await openMatrixMatch(page);
+    const html = page.locator('html');
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-fx-off', 'rain'));
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'off');
+    const a = await rainFrame(page);
+    await page.waitForTimeout(700);
+    expect(await rainFrame(page), '关掉之后画面不再变化').toBe(a);
+
+    await page.evaluate(() => document.documentElement.removeAttribute('data-fx-off'));
+    await expect(html).not.toHaveAttribute('data-fx-off', /./);
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'running');
+    await expect.poll(() => rainFrame(page), { timeout: 5_000 }).not.toBe(a);
+  });
+
+  test('页面不可见时暂停，重新可见时恢复', async ({ page }) => {
+    await openMatrixMatch(page);
+    const setVisibility = (state: 'hidden' | 'visible') =>
+      page.evaluate((v) => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+
+    await setVisibility('hidden');
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'paused');
+    const a = await rainFrame(page);
+    await page.waitForTimeout(700);
+    expect(await rainFrame(page), '暂停期间画面不变').toBe(a);
+
+    await setVisibility('visible');
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'running');
+  });
+
+  test('减少动效：系统偏好与 data-motion=reduced 都只留静态一帧，且运行中切换即时生效', async ({
+    page,
+  }) => {
+    await openMatrixMatch(page);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'static');
+    const a = await rainFrame(page);
+    await page.waitForTimeout(700);
+    expect(await rainFrame(page), '静态一帧不再推进').toBe(a);
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'running');
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-motion', 'reduced'));
+    await expect(page.locator(RAIN)).toHaveAttribute('data-rain-state', 'static');
+  });
+
+  test('扫描线：纯 CSS 叠层、不拦截指针，data-fx-off="scan" 关闭', async ({ page }) => {
+    await openMatrixMatch(page);
+    const layer = page.getByTestId('local-runtime');
+    const overlay = () =>
+      layer.evaluate((el) => {
+        const s = getComputedStyle(el, '::after');
+        return { content: s.content, events: s.pointerEvents, image: s.backgroundImage };
+      });
+
+    const on = await overlay();
+    expect(on.content).toBe('""');
+    expect(on.events).toBe('none');
+    expect(on.image).toContain('repeating-linear-gradient');
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-fx-off', 'scan'));
+    await expect.poll(async () => (await overlay()).content).not.toBe('""');
+  });
+
+  test('卡图降饱和：对局里的卡图有滤镜，data-fx-off="desat" 关闭，详情弹窗里的大图始终原色', async ({
+    page,
+  }) => {
+    await openMatrixMatch(page);
+    const mobile =
+      (await page.getByTestId('local-runtime').getAttribute('data-layout')) === 'mobile';
+    // 桌面取座位角色卡的卡图，移动取手牌卡图
+    const art = mobile
+      ? page.locator('[data-layout="mobile"] [data-testid^="card-"] img').first()
+      : page.locator('.ms-card img').first();
+    await expect(art).toBeVisible();
+    const filterOf = () => art.evaluate((el) => getComputedStyle(el).filter);
+
+    expect(await filterOf()).toContain('saturate');
+
+    // 打开一张详情：弹窗里的大图不降饱和
+    await page
+      .locator('[data-testid^="vault-thumb-"], [data-testid="human-character-preview"]')
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const modalFilter = await dialog
+      .locator('img')
+      .first()
+      .evaluate((el) => getComputedStyle(el).filter);
+    expect(modalFilter).toBe('none');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-fx-off', 'desat'));
+    await expect.poll(filterOf).toBe('none');
   });
 });

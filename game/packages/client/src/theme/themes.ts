@@ -123,6 +123,32 @@ export const THEMES = {
       mono: "'IBM Plex Mono','SF Mono',monospace",
     },
   },
+  matrix: {
+    id: 'matrix',
+    nameKey: 'theme.names.matrix',
+    scheme: 'dark',
+    themeColor: '#040805',
+    tokens: {
+      bg: '#040805',
+      panel: '#081009',
+      panel2: '#0C150E',
+      ink: '#C6E3CF',
+      dim: '#5FB67F',
+      faint: '#5A8769',
+      line: 'rgba(69,224,126,.14)',
+      line2: 'rgba(69,224,126,.4)',
+      acc: '#45E07E',
+      accb: '#9FFFB9',
+      accsoft: 'rgba(69,224,126,.1)',
+      lock: '#3CC47F',
+      blood: '#C4685A',
+      ok: '#8BD9A5',
+      grade: '#45E07E',
+      serif: "'IBM Plex Mono','Noto Sans SC Variable','Noto Sans SC','PingFang SC',monospace",
+      sans: "'IBM Plex Mono','Noto Sans SC Variable','Noto Sans SC','PingFang SC',monospace",
+      mono: "'IBM Plex Mono','SF Mono',monospace",
+    },
+  },
 } as const satisfies Record<string, ThemeDefinition>;
 
 export type ThemeId = keyof typeof THEMES;

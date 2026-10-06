@@ -5,6 +5,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { tintLayerAttr } from '../../../theme/layerTints';
+import { useThemeSkin } from '../../../theme/skins/useThemeSkin';
 import { useBoardModel } from '../model/useBoardModel';
 import { buildSeatViews } from '../model/seatModel';
 import { markersBySeat } from '../seatMarkers';
@@ -31,6 +32,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
   const { t } = useTranslation();
   const { stage, winner } = controller;
   const [dockOpen, setDockOpen] = useState(false);
+  const MobileAmbient = useThemeSkin().MobileAmbient;
 
   const { state, board, focusLayer, focusOn } = useBoardModel(controller);
   const seatMarkers = useMemo(() => (stage ? markersBySeat(stage.seats) : undefined), [stage]);
@@ -41,11 +43,12 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
 
   return (
     <div
-      className="flex h-dvh touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground"
+      className="relative isolate flex h-dvh touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground"
       data-testid="local-runtime"
       data-layout="mobile"
       data-tint-layer={tintLayerAttr(focusLayer)}
     >
+      {MobileAmbient && <MobileAmbient />}
       <MobileTopBar controller={controller} topRight={topRight} />
       <PreloadLine preload={controller.preload} />
 

@@ -24,5 +24,7 @@ export interface ThemeSkin {
   readonly CenterStage: LazyExoticComponent<ComponentType<CenterStageProps>>;
   /** 铺在桌面舞台最底层的背景氛围；没有就是纯底色 */
   readonly Ambient?: ComponentType;
+  /** 铺在移动布局最底层的背景氛围；没有就是纯底色（移动端不分叉中央舞台，背景可以有） */
+  readonly MobileAmbient?: ComponentType;
   readonly center: CenterFootprint;
 }

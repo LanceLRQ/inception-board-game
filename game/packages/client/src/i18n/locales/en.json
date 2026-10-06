@@ -144,7 +144,8 @@
     "names": {
       "noir": "Cinematic Noir",
       "blueprint": "Architect's Blueprint",
-      "totem": "The Top Still Spins"
+      "totem": "The Top Still Spins",
+      "matrix": "DreamMatrix"
     }
   },
   "avatar": {
@@ -645,6 +646,29 @@
         "tower": "DREAM TOWER",
         "focus": "FOCUS L{{layer}}",
         "left": "{{percent}}% LEFT"
+      },
+      "matrix": {
+        "window": "dreammon · dream process table",
+        "tableAria": "Dream process table",
+        "cols": {
+          "layer": "LAYER",
+          "vault": "VAULT",
+          "lock": "LOCK",
+          "nodes": "NODES",
+          "state": "STATE"
+        },
+        "vault": {
+          "sealed": "SEALED",
+          "sealedKnown": "SEALED · {{content}}",
+          "opened": "OPEN · {{content}}"
+        },
+        "nightmare": {
+          "ready": "ARMED",
+          "revealed": "REVEALED"
+        },
+        "marker": {
+          "focus": "FOCUS"
+        }
       }
     }
   },

@@ -144,7 +144,8 @@
     "names": {
       "noir": "深眠影院",
       "blueprint": "筑梦蓝图",
-      "totem": "陀螺未停"
+      "totem": "陀螺未停",
+      "matrix": "梦境矩阵"
     }
   },
   "avatar": {
@@ -645,6 +646,29 @@
         "tower": "梦 层 塔",
         "focus": "焦点 L{{layer}}",
         "left": "剩余 {{percent}}%"
+      },
+      "matrix": {
+        "window": "dreammon · 梦境进程表",
+        "tableAria": "梦境进程表",
+        "cols": {
+          "layer": "层",
+          "vault": "金库",
+          "lock": "心锁",
+          "nodes": "占位",
+          "state": "状态"
+        },
+        "vault": {
+          "sealed": "封存",
+          "sealedKnown": "封存 · {{content}}",
+          "opened": "已开 · {{content}}"
+        },
+        "nightmare": {
+          "ready": "待命",
+          "revealed": "已揭示"
+        },
+        "marker": {
+          "focus": "焦点"
+        }
       }
     }
   },

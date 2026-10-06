@@ -258,3 +258,9 @@ button.ms-card:not(:disabled):hover {
     transform: rotate(2.4deg);
   }
 }
+/* 光标 / 状态灯式的整体明灭，配 steps(1) 使用（梦境矩阵） */
+@keyframes ms-blink {
+  50% {
+    opacity: 0;
+  }
+}
