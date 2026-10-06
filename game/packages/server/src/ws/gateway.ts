@@ -196,6 +196,8 @@ export class SocketGateway {
       // 重新加载后的版本号可能比客户端手里的低，带上 reset 让客户端无条件接受
       this.emitTo(conn.socketId, { ...stateMessage(room, conn.seat, seats), reset: true });
     }
+    // 连接手里可能还留着旧房间的「存储不可用」提示：按新房间的状态补发一条，让它能消失
+    this.sendStorageHealth(matchID, room.isStorageHealthy());
   }
 
   /** 对局无法继续：通知这局的所有连接并断开 */

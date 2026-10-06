@@ -142,6 +142,13 @@ export class MatchService {
     this.archiver.discard(matchID);
     if (room) this.safely(matchID, 'room close', () => room.close());
     this.safely(matchID, 'bot dispose', () => this.deps.bot.disposeMatch(matchID));
+    // 队列已丢弃，之后不会再有这局的新写入；把已经落库的旧步骤与座位清掉，
+    // 免得同一个 id 再建局时旧时间线混进新的归档
+    try {
+      await this.deps.archive.resetMatch(matchID);
+    } catch (err) {
+      logger.error({ matchID, err }, 'archive reset failed');
+    }
     try {
       await this.deps.store.discard(matchID);
     } catch (err) {
@@ -190,17 +197,27 @@ export class MatchService {
 
   /**
    * 从存储恢复单局：读快照 → 还原状态 → 挂房间。
-   * inPlace 为真时是替换一个已在运行（但内存状态不可信）的房间：Bot 管理器里的登记与座位在线记录原样保留。
+   * replacing 不为空时是替换一个已在运行（但内存状态不可信）的房间：Bot 管理器里的登记与座位在线记录原样保留；
+   * 等待存储和归档期间这个房间若已被撤销或服务已关停，什么都不做，返回 'superseded'。
    * 快照里已经是结束状态时只走结束流程，返回 'finished'。
    */
-  private async restoreOne(matchID: string, inPlace = false): Promise<'mounted' | 'finished'> {
+  private async restoreOne(
+    matchID: string,
+    replacing?: MatchRoom,
+  ): Promise<'mounted' | 'finished' | 'superseded'> {
+    const inPlace = replacing !== undefined;
+    const stillCurrent = (): boolean => !inPlace || this.rooms.get(matchID) === replacing;
+
     const snapshot = await this.deps.store.load(matchID);
+    if (!stillCurrent()) return 'superseded';
     if (snapshot === null) throw new Error('快照不存在');
     if (!Array.isArray(snapshot.seats) || snapshot.seats.length === 0) {
       throw new Error('快照里没有座位表');
     }
     const state = matchFromSnapshot<SetupState>(snapshot.state, game);
-    if (!inPlace) await this.checkArchiveTail(matchID, state.stateID);
+    if (replacing === undefined) await this.checkArchiveTail(matchID, state.stateID);
+    else await this.reconcileArchive(matchID, replacing.current().stateID, state.stateID);
+    if (!stillCurrent()) return 'superseded';
 
     if (state.ctx.gameover !== undefined) {
       logger.info({ matchID, stateID: state.stateID }, 'restored match already over');
@@ -234,6 +251,30 @@ export class MatchService {
     }
   }
 
+  /**
+   * 原地重新加载时核对归档与库里版本的关系（旧房间的版本号是 previous，库里载入的是 loaded）：
+   * - 库里比内存旧：归档里新于库的步骤属于另一条时间线，丢掉队列并删掉这些行；
+   * - 库里比内存新：中间那几步没有进过归档，记一条缺口。
+   * 清理失败只记日志，不挡住重新加载。
+   */
+  private async reconcileArchive(matchID: string, previous: number, loaded: number): Promise<void> {
+    if (loaded < previous) {
+      logger.error(
+        { matchID, loaded, previous },
+        'stored snapshot is older than the room, dropping archived steps beyond it',
+      );
+      this.archiver.discard(matchID);
+      try {
+        await this.deps.archive.truncateAfter(matchID, loaded);
+      } catch (err) {
+        logger.error({ matchID, loaded, err }, 'archive truncateAfter failed');
+      }
+    } else if (loaded > previous) {
+      logger.warn({ matchID, loaded, previous }, 'stored snapshot is ahead of the room');
+      this.archiver.enqueueGap(matchID, previous + 1, loaded);
+    }
+  }
+
   /** 进程关停时调用：等归档队列写完（最多 timeoutMs），然后停掉重试；返回没写完的条数 */
   async flushArchive(timeoutMs: number): Promise<number> {
     const remaining = await this.archiver.flush(timeoutMs);
@@ -247,14 +288,19 @@ export class MatchService {
    */
   private async recoverFromConflict(matchID: string, stale: MatchRoom): Promise<void> {
     try {
-      const result = await this.restoreOne(matchID, true);
+      const result = await this.restoreOne(matchID, stale);
+      if (result === 'superseded') return;
       if (result === 'finished') {
+        // 库里的这一局已经结束，内存里的房间没有可继续的对局；让还连着的客户端知道
         this.removeRoom(matchID, stale);
+        this.safely(matchID, 'abort notify', () => this.deps.onAborted?.(matchID));
         return;
       }
       this.deps.onResync?.(matchID);
     } catch (err) {
       logger.error({ matchID, err }, 'reload after persist conflict failed, aborting room');
+      // 期间对局已被撤销或服务已关停：善后已由撤销方做完，不能再动同 id 的新登记
+      if (this.rooms.get(matchID) !== stale) return;
       this.removeRoom(matchID, stale);
       this.safely(matchID, 'bot dispose', () => this.deps.bot.disposeMatch(matchID));
       this.safely(matchID, 'abort notify', () => this.deps.onAborted?.(matchID));
@@ -331,14 +377,21 @@ export class MatchService {
     room?: MatchRoom,
   ): Promise<void> {
     const { deps } = this;
-    let archived = true;
-    // 先等这一局的步骤全部落库，再写结束信息，避免出现「已结束但缺步」的归档
-    await this.archiver.drain(matchID);
-    try {
-      await deps.archive.recordFinish(matchID, final, seats);
-    } catch (err) {
-      archived = false;
-      logger.error({ matchID, err }, 'archive recordFinish failed, keeping match active for retry');
+    // 先等这一局的步骤全部落库，再写结束信息，避免出现「已结束但缺步」的归档；
+    // 等不到（超时）与写结束信息失败同样处理
+    let archived = await this.archiver.drain(matchID);
+    if (!archived) {
+      logger.error({ matchID }, 'archive steps not fully written, keeping match active for retry');
+    } else {
+      try {
+        await deps.archive.recordFinish(matchID, final, seats);
+      } catch (err) {
+        archived = false;
+        logger.error(
+          { matchID, err },
+          'archive recordFinish failed, keeping match active for retry',
+        );
+      }
     }
     // 归档失败时对局留在活跃集合里，下次进程启动恢复到「已结束的快照」时会再走一遍结束流程
     if (archived) {

@@ -27,12 +27,15 @@ class FlakyArchive extends InMemoryMatchArchive {
   failGaps = 0;
   /** 为真时 appendStep 不返回，直到 release 被调用 */
   hold = false;
+  /** 为真时 recordGap 不返回，直到 release 被调用 */
+  holdGaps = false;
   written: number[] = [];
   attempts: number[] = [];
   private waiting: Array<() => void> = [];
 
   release(): void {
     this.hold = false;
+    this.holdGaps = false;
     for (const w of this.waiting.splice(0)) w();
   }
 
@@ -52,6 +55,7 @@ class FlakyArchive extends InMemoryMatchArchive {
       this.failGaps -= 1;
       throw new Error('pg down');
     }
+    if (this.holdGaps) await new Promise<void>((resolve) => this.waiting.push(resolve));
     await super.recordGap(matchID, from, to);
   }
 }
@@ -189,11 +193,14 @@ describe('StepArchiver', () => {
       a.enqueue(row(1));
       a.enqueue(row(2));
       let done = false;
-      const p = a.drain('m1').then(() => (done = true));
+      const p = a.drain('m1').then((ok) => {
+        done = true;
+        return ok;
+      });
       await pump();
       expect(done).toBe(false);
       archive.release();
-      await p;
+      expect(await p).toBe(true);
       expect(archive.written).toEqual([1, 2]);
     });
 
@@ -202,13 +209,13 @@ describe('StepArchiver', () => {
       archive.failAppends = 1;
       a.enqueue(row(1));
       await pump();
-      await a.drain('m1');
+      expect(await a.drain('m1')).toBe(true);
       expect(archive.written).toEqual([1]);
     });
 
     it('没有队列直接返回；超时也返回并记 ERROR，写入仍留在队列里', async () => {
       const a = new StepArchiver(archive, timers);
-      await a.drain('none');
+      expect(await a.drain('none')).toBe(true);
 
       archive.failAppends = 1_000;
       a.enqueue(row(1));
@@ -219,13 +226,63 @@ describe('StepArchiver', () => {
         // 只推进到超时点：重试被 drain 的 kick 即时触发，超时计时器最终触发
         if (!timers.fireNext()) break;
       }
-      await p;
+      expect(await p).toBe(false);
       expect(log.error).toHaveBeenCalledWith(
         expect.objectContaining({ matchID: 'm1' }),
         'archive drain timed out',
       );
       expect(a.pendingOf('m1')).toBe(1);
     });
+  });
+
+  it('写入在途时 discard：在途那一条照常落库，队列里其余的不再写，之后同一局重新入队走新队列', async () => {
+    const a = new StepArchiver(archive, timers);
+    archive.hold = true;
+    a.enqueue(row(1));
+    a.enqueue(row(2));
+    await pump();
+    a.discard('m1');
+    expect(a.pendingOf('m1')).toBe(0);
+
+    // 撤销之后同一个 id 重新建局：新的一步进新队列
+    a.enqueue(row(1));
+    archive.release();
+    await pump();
+    expect(archive.written).toEqual([1, 1]);
+    expect((await archive.listSteps('m1')).map((r) => r.stateID)).toEqual([1]);
+    expect(a.pendingOf('m1')).toBe(0);
+    expect(await a.drain('m1')).toBe(true);
+  });
+
+  it('stop 之后 enqueue / enqueueGap 直接丢弃：不建队列、不挂计时器、不写归档，并记 warn', async () => {
+    const a = new StepArchiver(archive, timers);
+    a.stop();
+    a.enqueue(row(1));
+    a.enqueueGap('m1', 2, 3);
+    await pump();
+    expect(a.pendingOf('m1')).toBe(0);
+    expect(timers.pending()).toHaveLength(0);
+    expect(archive.attempts).toEqual([]);
+    expect(await archive.listGaps('m1')).toEqual([]);
+    expect(log.warn).toHaveBeenCalledTimes(2);
+  });
+
+  it('缺口正在写入时又有相邻的丢弃：另起一段，不改在途那段', async () => {
+    const a = new StepArchiver(archive, timers, 2);
+    archive.holdGaps = true;
+    a.enqueueGap('m1', 4, 6);
+    await pump();
+    // 队列上限 2，写入在途时溢出丢的是队首后面最旧的一条（7），它与在途缺口 4..6 相邻
+    a.enqueue(row(5));
+    a.enqueue(row(7));
+    a.enqueue(row(8));
+    archive.release();
+    await pump();
+    expect(await archive.listGaps('m1')).toEqual([
+      { from: 4, to: 6 },
+      { from: 7, to: 7 },
+    ]);
+    expect(archive.written).toEqual([5, 8]);
   });
 
   describe('flush', () => {

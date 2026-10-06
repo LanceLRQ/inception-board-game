@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { InceptionCityGame } from '@icgame/game-engine';
 import { createMatch } from '@icgame/game-engine/runner';
 import { MatchRoom } from '../match/MatchRoom.js';
@@ -166,7 +166,7 @@ describe('SocketGateway 存储与中断通知', () => {
     expect(disconnected).toEqual(['s1', 's2']);
   });
 
-  it('重发完整视图：每条连接按自己的座位收到 icg:state，其他局不收', () => {
+  function makeRoom(): MatchRoom {
     const state = createMatch(InceptionCityGame, {
       numPlayers: 4,
       setupData: { rngSeed: 'g' },
@@ -178,7 +178,7 @@ describe('SocketGateway 存储与中断通知', () => {
       nickname: `P${seat}`,
       isBot: false,
     }));
-    const room = new MatchRoom('m1', seats, state, {
+    return new MatchRoom('m1', seats, state, {
       game: InceptionCityGame,
       persist: async () => 'ok',
       onStep: () => undefined,
@@ -187,14 +187,43 @@ describe('SocketGateway 存储与中断通知', () => {
       timing: { botStepDelayMs: 1, pendingTimeoutMs: 1, turnTimeoutMs: 1 },
       timers: { setTimeout: () => 0, clearTimeout: () => undefined, now: () => 0 },
     });
-    const { gateway, emitted } = setup({ room });
+  }
+
+  it('重发完整视图：每条连接按自己的座位收到 icg:state，其他局不收', () => {
+    const { gateway, emitted } = setup({ room: makeRoom() });
+    gateway.resyncMatch('m1');
+    const states = emitted.filter((e) => e.event === 'icg:state');
+    expect(states.map((e) => e.sid)).toEqual(['s1', 's2']);
+    expect(states.map((e) => (e.payload as { seat: string }).seat)).toEqual(['0', '1']);
+    // 重新加载后的版本号可能比客户端手里的低，带上 reset 让客户端无条件接受
+    expect(states.every((e) => (e.payload as { reset?: boolean }).reset === true)).toBe(true);
+    expect(emitted.every((e) => e.sid !== 's3')).toBe(true);
+  });
+
+  it('重发视图之后按新房间的存储状态再发一条 icg:storage：正常时让旧的提示消失', () => {
+    const { gateway, emitted } = setup({ room: makeRoom() });
     gateway.resyncMatch('m1');
     expect(emitted.map((e) => [e.sid, e.event])).toEqual([
       ['s1', 'icg:state'],
       ['s2', 'icg:state'],
+      ['s1', 'icg:storage'],
+      ['s2', 'icg:storage'],
     ]);
-    expect(emitted.map((e) => (e.payload as { seat: string }).seat)).toEqual(['0', '1']);
-    // 重新加载后的版本号可能比客户端手里的低，带上 reset 让客户端无条件接受
-    expect(emitted.every((e) => (e.payload as { reset?: boolean }).reset === true)).toBe(true);
+    expect(emitted.slice(2).map((e) => e.payload)).toEqual([
+      { type: 'icg:storage', matchID: 'm1', healthy: true },
+      { type: 'icg:storage', matchID: 'm1', healthy: true },
+    ]);
+  });
+
+  it('新房间的存储仍不可用时，icg:storage 带 healthy: false', () => {
+    const room = makeRoom();
+    vi.spyOn(room, 'isStorageHealthy').mockReturnValue(false);
+    const { gateway, emitted } = setup({ room });
+    gateway.resyncMatch('m1');
+    const storage = emitted.filter((e) => e.event === 'icg:storage');
+    expect(storage.map((e) => e.payload)).toEqual([
+      { type: 'icg:storage', matchID: 'm1', healthy: false },
+      { type: 'icg:storage', matchID: 'm1', healthy: false },
+    ]);
   });
 });

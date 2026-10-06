@@ -97,6 +97,8 @@ export class MatchRoom {
   /** 快照存储当前是否不可用；不可用期间自动步不计入失败上限，改按退避重试 */
   private storageUnhealthy = false;
   private storageBackoffMs = STORAGE_BACKOFF_START_MS;
+  /** 当前挂着的计时器是存储退避计时器；普通的截止 / 自动步计时器不置位 */
+  private storageRetryPending = false;
 
   /** `${座位}:${intentId}` → 结果，按插入顺序先进先出 */
   private readonly intents = new Map<string, SubmitResult>();
@@ -224,6 +226,7 @@ export class MatchRoom {
 
   private clearTimer(): void {
     this.generation += 1;
+    this.storageRetryPending = false;
     if (this.timer !== null) {
       this.deps.timers.clearTimeout(this.timer);
       this.timer = null;
@@ -259,8 +262,9 @@ export class MatchRoom {
       return;
     }
 
-    // 存储不可用时已挂着退避计时器：座位状态变化不能把它换成短延迟，否则会绕过退避
-    if (keepExisting && this.storageUnhealthy && this.timer !== null) return;
+    // 已挂着存储退避计时器：座位状态变化不能把它换成短延迟，否则会绕过退避。
+    // 只认退避计时器；存储不可用期间挂着的普通截止计时器照常允许被提前
+    if (keepExisting && this.storageRetryPending && this.timer !== null) return;
 
     const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
     if (
@@ -368,8 +372,10 @@ export class MatchRoom {
     this.storageBackoffMs = Math.min(this.storageBackoffMs * 2, STORAGE_BACKOFF_MAX_MS);
     const gen = this.generation;
     logger.warn({ matchID: this.matchID, kind, delayMs }, 'storage unavailable, retry scheduled');
+    this.storageRetryPending = true;
     this.timer = this.deps.timers.setTimeout(() => {
       this.timer = null;
+      this.storageRetryPending = false;
       void this.enqueue(() => (kind === 'auto' ? this.runAuto(gen) : this.runTimeout(gen)));
     }, delayMs);
   }
@@ -458,6 +464,15 @@ export class MatchRoom {
     }
 
     const persisted = await this.persistWithRetry(outcome.state, before.stateID);
+    // 等写快照期间房间可能已被关闭（撤销、关停、被新房间替换）：这一步不能再生效，
+    // 否则旧房间会推进状态、向连接下发，并触发已不属于它的回调
+    if (this.closed) {
+      logger.warn(
+        { matchID: this.matchID, stateID: before.stateID },
+        'room closed while persisting, step discarded',
+      );
+      return { ok: false, code: 'match_over' };
+    }
     if (persisted === 'error') {
       // 存储暂时不可用：这一步不生效，房间保持开着，等存储恢复
       logger.error(

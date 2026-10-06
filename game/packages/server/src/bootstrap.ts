@@ -154,17 +154,23 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
       bot.stop();
       matches.shutdown();
       gateway.detach();
-      if (httpServer.listening) {
-        await new Promise<void>((resolve, reject) => {
-          httpServer.close((err) => (err ? reject(err) : resolve()));
-          httpServer.closeAllConnections();
-        });
+      try {
+        if (httpServer.listening) {
+          await new Promise<void>((resolve, reject) => {
+            httpServer.close((err) => (err ? reject(err) : resolve()));
+            httpServer.closeAllConnections();
+          });
+        }
+      } finally {
+        // 房间都已关闭，进行中的步骤即使还在等快照写入也不会再生效、不会再入队（归档队列停止后会拒收）；
+        // 趁数据库连接还在，把队列里没写完的写掉。HTTP 关闭失败也不能跳过这一步
+        const unwritten = await matches.flushArchive(
+          deps.archiveFlushTimeoutMs ?? DEFAULT_ARCHIVE_FLUSH_TIMEOUT_MS,
+        );
+        if (unwritten > 0) {
+          logger.warn({ unwritten }, 'archive queue not fully written at shutdown');
+        }
       }
-      // 房间都关了之后不会再有新的步；趁数据库连接还在，把队列里没写完的写掉
-      const unwritten = await matches.flushArchive(
-        deps.archiveFlushTimeoutMs ?? DEFAULT_ARCHIVE_FLUSH_TIMEOUT_MS,
-      );
-      if (unwritten > 0) logger.warn({ unwritten }, 'archive queue not fully written at shutdown');
     },
   };
 }

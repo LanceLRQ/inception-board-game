@@ -101,6 +101,29 @@ describe('buildRealtime', () => {
     expect(rows.map((r) => r.stateID)).toEqual(Array.from({ length: version }, (_, i) => i + 1));
   });
 
+  it('关闭 HTTP 服务报错时 stop 仍会把归档队列写完，错误照常抛出', async () => {
+    const rt = buildRealtime({
+      store: new InMemoryMatchStore(),
+      archive: new InMemoryMatchArchive(),
+      lobbyRedis: { get: vi.fn(), setex: vi.fn(), set: vi.fn(), del: vi.fn(), exists: vi.fn() },
+      heartbeatRedis: { get: vi.fn(), setex: vi.fn(), del: vi.fn() } as never,
+      bot: new BotManager({ tickIntervalMs: 99_999 }),
+      httpRateLimit: passThrough,
+    });
+    await rt.start(0);
+    const flush = vi.spyOn(rt.matches, 'flushArchive');
+    // 真实的 close 在连接没断干净等情形下会把错误交给回调
+    const realClose = rt.httpServer.close.bind(rt.httpServer);
+    vi.spyOn(rt.httpServer, 'close').mockImplementation(((cb?: (err?: Error) => void) => {
+      realClose();
+      cb?.(new Error('close failed'));
+      return rt.httpServer;
+    }) as never);
+
+    await expect(rt.stop()).rejects.toThrow('close failed');
+    expect(flush).toHaveBeenCalledTimes(1);
+  });
+
   it('exposes a matches service bound to the gateway', () => {
     const rt = buildRealtime({
       store: new InMemoryMatchStore(),

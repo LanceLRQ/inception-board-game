@@ -30,6 +30,8 @@ interface MatchQueue {
   gaps: GapRange[];
   /** 正在等待 await 归档写入返回 */
   writing: boolean;
+  /** 正在写入的缺口：写入循环在等它的 recordGap，不能再改它的范围 */
+  writingGap: GapRange | null;
   retryTimer: unknown;
   backoffMs: number;
 }
@@ -37,6 +39,8 @@ interface MatchQueue {
 export class StepArchiver {
   private readonly queues = new Map<string, MatchQueue>();
   private readonly waiters = new Set<() => void>();
+  /** stop 之后不再收新内容：进程在关停，没有计时器去驱动重试，收下也只会泄漏 */
+  private stopped = false;
 
   constructor(
     private readonly archive: MatchArchive,
@@ -46,6 +50,10 @@ export class StepArchiver {
 
   /** 入队并立即返回；写入在后台进行 */
   enqueue(row: StepRow): void {
+    if (this.stopped) {
+      logger.warn({ matchID: row.matchID, stateID: row.stateID }, 'archive stopped, step dropped');
+      return;
+    }
     const q = this.queueOf(row.matchID);
     q.rows.push(row);
     if (q.rows.length > this.limit) {
@@ -65,19 +73,24 @@ export class StepArchiver {
 
   /** 记一段缺口（写入同样走队列重试）；起止版本号都包含在内 */
   enqueueGap(matchID: string, from: number, to: number): void {
+    if (this.stopped) {
+      logger.warn({ matchID, from, to }, 'archive stopped, gap dropped');
+      return;
+    }
     const q = this.queueOf(matchID);
     this.addGap(q, from, to);
     this.kick(matchID, q, false);
   }
 
-  /** 等这一局队列写完；超时只记 ERROR 并返回，写入仍会在后台继续重试 */
-  async drain(matchID: string, timeoutMs = ARCHIVE_DRAIN_TIMEOUT_MS): Promise<void> {
+  /** 等这一局队列写完，写完返回 true；超时只记 ERROR 并返回 false，写入仍会在后台继续重试 */
+  async drain(matchID: string, timeoutMs = ARCHIVE_DRAIN_TIMEOUT_MS): Promise<boolean> {
     const q = this.queues.get(matchID);
     if (q) this.kick(matchID, q, true);
     const done = await this.waitUntil(() => !this.queues.has(matchID), timeoutMs);
     if (!done) {
       logger.error({ matchID, pending: this.pendingOf(matchID) }, 'archive drain timed out');
     }
+    return done;
   }
 
   /** 等所有队列写完或超时，返回未写完的条数（步骤加缺口） */
@@ -100,6 +113,7 @@ export class StepArchiver {
 
   /** 停掉所有重试计时器；队列里没写完的内容丢弃 */
   stop(): void {
+    this.stopped = true;
     for (const q of this.queues.values()) {
       if (q.retryTimer !== null) this.timers.clearTimeout(q.retryTimer);
     }
@@ -121,6 +135,7 @@ export class StepArchiver {
         rows: [],
         gaps: [],
         writing: false,
+        writingGap: null,
         retryTimer: null,
         backoffMs: ARCHIVE_RETRY_BASE_MS,
       };
@@ -129,10 +144,10 @@ export class StepArchiver {
     return q;
   }
 
-  /** 相邻的缺口合并成一段，少写几行 */
+  /** 相邻的缺口合并成一段，少写几行；正在写入的那段不动，否则写完被整段移除时会带走新并入的部分 */
   private addGap(q: MatchQueue, from: number, to: number): void {
     const last = q.gaps[q.gaps.length - 1];
-    if (last && last.to + 1 === from) last.to = to;
+    if (last && last !== q.writingGap && last.to + 1 === from) last.to = to;
     else q.gaps.push({ from, to });
   }
 
@@ -156,14 +171,19 @@ export class StepArchiver {
         const row = q.rows[0];
         if (!gap && !row) break;
         try {
-          if (gap) await this.archive.recordGap(matchID, gap.from, gap.to);
-          else await this.archive.appendStep(row!);
+          if (gap) {
+            q.writingGap = gap;
+            await this.archive.recordGap(matchID, gap.from, gap.to);
+          } else await this.archive.appendStep(row!);
         } catch (err) {
+          q.writingGap = null;
           this.scheduleRetry(matchID, q, err, gap ? { gapTo: gap.to } : { stateID: row!.stateID });
           return;
         }
-        if (gap) q.gaps.shift();
-        else q.rows.shift();
+        if (gap) {
+          q.gaps.shift();
+          q.writingGap = null;
+        } else q.rows.shift();
         q.backoffMs = ARCHIVE_RETRY_BASE_MS;
       }
       if (this.queues.get(matchID) === q) this.queues.delete(matchID);

@@ -166,6 +166,21 @@ describe.skipIf(!redisUrl)('RedisMatchStore · 真实 Redis（需要 TEST_REDIS_
     return new RedisMatchStore(open({ keyPrefix: p }));
   });
 
+  it('finish 之后（快照带过期时间）再 create：快照键不再有过期时间', async () => {
+    const p = `${prefix}${Math.random().toString(36).slice(2)}:`;
+    const client = open({ keyPrefix: p });
+    const store = new RedisMatchStore(client);
+    await store.create(makeTestSnapshot('m-redo'));
+    expect(await client.ttl(RedisKeys.matchSnapshot('m-redo'))).toBe(-1);
+    await store.finish('m-redo');
+    expect(await client.ttl(RedisKeys.matchSnapshot('m-redo'))).toBeGreaterThan(0);
+
+    expect(await store.create(makeTestSnapshot('m-redo'))).toBe('replaced');
+    // -1 表示键存在且没有过期时间
+    expect(await client.ttl(RedisKeys.matchSnapshot('m-redo'))).toBe(-1);
+    expect(await store.listActive()).toContain('m-redo');
+  });
+
   afterAll(async () => {
     const cleaner = open();
     const keys = await cleaner.keys(`${prefix}*`);

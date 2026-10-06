@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InceptionCityGame } from '@icgame/game-engine';
-import { applyMove, type GameDef } from '@icgame/game-engine/runner';
+import { nextAutoAction } from '@icgame/bot';
+import { applyMove, type GameDef, type MatchState } from '@icgame/game-engine/runner';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { AppError } from '../infra/errors.js';
 import { BotManager } from '../services/BotManager.js';
@@ -20,6 +21,17 @@ vi.mock('../infra/logger.js', () => ({ logger: log }));
 const timing: TimingConfig = { botStepDelayMs: 10, pendingTimeoutMs: 5_000, turnTimeoutMs: 20_000 };
 const SEED = 'ab'.repeat(32);
 const game: GameDef<SetupState> = InceptionCityGame;
+
+/** 房间当前状态下一个合法的下一步（取 Bot 会走的那一步） */
+function legalNext(room: { current(): MatchState<SetupState> }): {
+  seat: string;
+  move: string;
+  args: unknown[];
+} {
+  const action = nextAutoAction(room.current(), { humanPlayerIDs: [] });
+  if (action === null) throw new Error('no legal next action');
+  return { seat: action.playerID, move: action.move, args: action.args };
+}
 
 /** 让出一个宏任务，使已就绪的异步续体全部跑完 */
 const pump = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -53,9 +65,13 @@ class FlakyStore extends InMemoryMatchStore {
   failDiscard = false;
   failLoad = false;
   failSave = false;
+  /** 不为空时 load 先读到快照，再等它结束才返回（模拟存储应答很慢） */
+  loadGate: Promise<void> | null = null;
   override async load(matchID: string): Promise<MatchSnapshot | null> {
     if (this.failLoad) throw new Error('load down');
-    return super.load(matchID);
+    const snap = await super.load(matchID);
+    if (this.loadGate !== null) await this.loadGate;
+    return snap;
   }
   override async save(
     ...args: Parameters<InMemoryMatchStore['save']>
@@ -562,12 +578,174 @@ describe('MatchService 快照写入失败', () => {
     expect(onAborted).not.toHaveBeenCalled();
     expect(await h.store.listActive()).toEqual([id]);
     // 新房间可以继续接收提交
-    const next = await fresh.submit(fresh.current().ctx.currentPlayer, {
-      move: 'endActionPhase',
-      args: [],
+    const step = legalNext(fresh);
+    const next = await fresh.submit(step.seat, {
+      move: step.move,
+      args: step.args,
       intentId: 'y',
     });
-    expect(next.ok === false && next.code === 'match_over').toBe(false);
+    expect(next.ok).toBe(true);
+  });
+
+  /** 真人房间里连走两步：第一步之后抓一份库里的快照，返回房间与那份快照 */
+  async function playTwoSteps(h: Harness, id: string) {
+    const room = h.svc.get(id)!;
+    const r1 = await room.submit(room.current().ctx.currentPlayer, {
+      move: 'completeSetup',
+      args: [],
+      intentId: 'a',
+    });
+    expect(r1.ok).toBe(true);
+    const afterFirst = (await h.store.load(id))!;
+    const second = legalNext(room);
+    const r2 = await room.submit(second.seat, {
+      move: second.move,
+      args: second.args,
+      intentId: 'b',
+    });
+    expect(r2.ok).toBe(true);
+    await pump();
+    return { room, afterFirst };
+  }
+
+  it('库里的版本比内存旧：丢掉归档里新于库的步骤，记 error，新房间停在库里的版本', async () => {
+    const onResync = vi.fn();
+    const h = makeHarness({ onResync });
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const { room: oldRoom, afterFirst } = await playTwoSteps(h, id);
+    expect(oldRoom.current().stateID).toBe(2);
+    expect((await h.archive.listSteps(id)).map((r) => r.stateID)).toEqual([1, 2]);
+
+    // 库回到第 1 步的版本（例如存储从旧备份恢复）：内存里的第 2 步在库里并不存在
+    await h.store.create(afterFirst);
+
+    const third = legalNext(oldRoom);
+    const stale = await oldRoom.submit(third.seat, {
+      move: third.move,
+      args: third.args,
+      intentId: 'c',
+    });
+    expect(stale).toEqual({ ok: false, code: 'internal_error' });
+    await vi.waitFor(() => expect(onResync).toHaveBeenCalledWith(id));
+
+    expect(h.svc.get(id)!.current().stateID).toBe(1);
+    expect((await h.archive.listSteps(id)).map((r) => r.stateID)).toEqual([1]);
+    expect(await h.archive.listGaps(id)).toEqual([]);
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: id, loaded: 1, previous: 2 }),
+      expect.stringContaining('older than'),
+    );
+  });
+
+  it('库里的版本比内存旧时清理归档失败：只记 error，仍换上新房间', async () => {
+    const onResync = vi.fn();
+    const h = makeHarness({ onResync });
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const { room: oldRoom, afterFirst } = await playTwoSteps(h, id);
+    await h.store.create(afterFirst);
+    vi.spyOn(h.archive, 'truncateAfter').mockRejectedValue(new Error('pg down'));
+
+    const third = legalNext(oldRoom);
+    await oldRoom.submit(third.seat, { move: third.move, args: third.args, intentId: 'c' });
+    await vi.waitFor(() => expect(onResync).toHaveBeenCalledWith(id));
+    expect(h.svc.get(id)!.current().stateID).toBe(1);
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: id }),
+      expect.stringContaining('truncate'),
+    );
+  });
+
+  it('库里的版本比内存新：中间没归档的几步记成缺口', async () => {
+    const onResync = vi.fn();
+    const h = makeHarness({ onResync });
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const oldRoom = h.svc.get(id)!;
+    const { stored, firstMover } = await advanceStoreBehindRoomsBack(h, id);
+
+    await oldRoom.submit(firstMover, { move: 'completeSetup', args: [], intentId: 'x' });
+    await vi.waitFor(() => expect(onResync).toHaveBeenCalledWith(id));
+    await pump();
+    expect(await h.archive.listGaps(id)).toEqual([{ from: 1, to: stored.stateID }]);
+  });
+
+  it('等待重新加载期间对局被撤销：不再挂新房间，也不通知重发', async () => {
+    const onResync = vi.fn();
+    const onAborted = vi.fn();
+    const store = new FlakyStore();
+    const h = makeHarness({ onResync, onAborted }, { store });
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const oldRoom = h.svc.get(id)!;
+    const { firstMover } = await advanceStoreBehindRoomsBack(h, id);
+
+    let release: () => void = () => {};
+    store.loadGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await oldRoom.submit(firstMover, { move: 'completeSetup', args: [], intentId: 'x' });
+    await pump();
+    await h.svc.discardMatch(id);
+    release();
+    await pump();
+    await pump();
+
+    expect(h.svc.get(id)).toBeNull();
+    expect(onResync).not.toHaveBeenCalled();
+    expect(onAborted).not.toHaveBeenCalled();
+    expect(await h.archive.listGaps(id)).toEqual([]);
+  });
+
+  it('等待重新加载期间服务关停：不再挂新房间', async () => {
+    const onResync = vi.fn();
+    const store = new FlakyStore();
+    const h = makeHarness({ onResync }, { store });
+    const id = await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4]));
+    const oldRoom = h.svc.get(id)!;
+    const { firstMover } = await advanceStoreBehindRoomsBack(h, id);
+
+    let release: () => void = () => {};
+    store.loadGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await oldRoom.submit(firstMover, { move: 'completeSetup', args: [], intentId: 'x' });
+    await pump();
+    h.svc.shutdown();
+    release();
+    await pump();
+    await pump();
+
+    expect(h.svc.get(id)).toBeNull();
+    expect(onResync).not.toHaveBeenCalled();
+  });
+
+  it('载入的快照已是结束状态：走完结束流程后通知中断，连接不会一直挂着', async () => {
+    // 先在另一套服务里把同一个 id 的对局打完，取它的终局快照
+    const done = makeHarness();
+    const stubbed = vi.spyOn(done.store, 'finish').mockResolvedValue(undefined);
+    const id = await done.svc.createFromRoom(makeRoom(4));
+    await drain(done, id, () => done.onGameOver.mock.calls.length > 0);
+    stubbed.mockRestore();
+    const finalSnapshot = (await done.store.load(id))!;
+    expect(finalSnapshot.state.ctx.gameover).toBeDefined();
+
+    const onResync = vi.fn();
+    const onAborted = vi.fn();
+    const h = makeHarness({ onResync, onAborted });
+    const recordFinish = vi.spyOn(h.archive, 'recordFinish');
+    await h.svc.createFromRoom(makeRoom(5, [0, 1, 2, 3, 4], id));
+    const oldRoom = h.svc.get(id)!;
+    // 库里的对局比内存先一步打完
+    await h.store.create(finalSnapshot);
+
+    await oldRoom.submit(oldRoom.current().ctx.currentPlayer, {
+      move: 'completeSetup',
+      args: [],
+      intentId: 'x',
+    });
+    await vi.waitFor(() => expect(onAborted).toHaveBeenCalledWith(id));
+    expect(recordFinish).toHaveBeenCalledTimes(1);
+    expect(onResync).not.toHaveBeenCalled();
+    expect(h.svc.get(id)).toBeNull();
+    expect(await h.store.listActive()).toEqual([]);
   });
 
   it('重新加载失败：房间移除、Bot 登记释放、通知中断，对局留在活跃集合里', async () => {
@@ -854,5 +1032,107 @@ describe('MatchService 归档完整性', () => {
     const rows = await archive.listSteps(id);
     expect(rows.length).toBeGreaterThanOrEqual(2);
     expect(rows.map((r) => r.stateID)).toEqual(rows.map((_, i) => i + 1));
+  });
+});
+
+describe('MatchService 撤销对局时清归档', () => {
+  it('撤销后归档里没有这局的步骤与座位，同一个 id 再建一局不带旧内容', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await fireSteps(h, id, 3);
+    await pump();
+    expect((await h.archive.listSteps(id)).length).toBeGreaterThan(0);
+
+    await h.svc.discardMatch(id);
+    expect(await h.archive.listSteps(id)).toEqual([]);
+    expect(await h.archive.matchInfo(id)).toBeNull();
+
+    await h.svc.createFromRoom(makeRoom(4, [0], id));
+    expect(await h.archive.listSteps(id)).toEqual([]);
+    expect((await h.archive.matchInfo(id))?.seats[0]).toEqual({ seat: '0', playerId: 'acct-0' });
+  });
+
+  it('队列里还没写进去的步骤在撤销后不会再被补写', async () => {
+    class DownArchive extends InMemoryMatchArchive {
+      down = true;
+      override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {
+        if (this.down) throw new Error('pg down');
+        await super.appendStep(row);
+      }
+    }
+    const archive = new DownArchive();
+    const h = makeHarness({}, { archive });
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await fireSteps(h, id, 2);
+    await pump();
+
+    await h.svc.discardMatch(id);
+    archive.down = false;
+    for (let i = 0; i < 5; i++) {
+      h.timers.fireNext();
+      await pump();
+    }
+    expect(await archive.listSteps(id)).toEqual([]);
+  });
+
+  it('清归档失败只记 error，撤销的其余步骤照常完成', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    vi.spyOn(h.archive, 'resetMatch').mockRejectedValue(new Error('pg down'));
+    const dispose = vi.spyOn(h.bot, 'disposeMatch');
+    await expect(h.svc.discardMatch(id)).resolves.toBeUndefined();
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: id }),
+      expect.stringContaining('archive reset'),
+    );
+    expect(dispose).toHaveBeenCalledWith(id);
+    expect(await h.store.load(id)).toBeNull();
+  });
+});
+
+describe('MatchService 结尾缺步时不报完整', () => {
+  it('归档一直写不进去：drain 超时后不写结束信息、不调 store.finish，重启恢复时补缺口并完成', async () => {
+    class DownArchive extends InMemoryMatchArchive {
+      down = true;
+      override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {
+        if (this.down) throw new Error('pg down');
+        await super.appendStep(row);
+      }
+    }
+    const archive = new DownArchive();
+    const first = makeHarness({}, { archive });
+    const recordFinish = vi.spyOn(archive, 'recordFinish');
+    const finish = vi.spyOn(first.store, 'finish');
+    const id = await first.svc.createFromRoom(makeRoom(4));
+    // 对局结束时房间的任务队列卡在等归档上，不能用 idle() 等它：只让出事件循环、推进计时器
+    for (let i = 0; i < 20_000 && first.onGameOver.mock.calls.length === 0; i++) {
+      await pump();
+      first.timers.fireNext();
+    }
+
+    expect(recordFinish).not.toHaveBeenCalled();
+    expect(finish).not.toHaveBeenCalled();
+    expect(await first.store.listActive()).toEqual([id]);
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: id }),
+      'archive drain timed out',
+    );
+    // 其余收尾照常；归档队列还在退避重试，所以推进到房间被移除为止
+    expect(first.onGameOver).toHaveBeenCalledTimes(1);
+    for (let i = 0; i < 100 && first.svc.get(id) !== null; i++) {
+      await pump();
+      first.timers.fireNext();
+    }
+    expect(first.svc.get(id)).toBeNull();
+    first.svc.shutdown();
+
+    archive.down = false;
+    const second = makeHarness({}, { store: first.store, archive });
+    expect(await second.svc.restoreAll()).toEqual({ restored: 0, failed: [] });
+    expect(recordFinish).toHaveBeenCalledTimes(1);
+    expect(await second.store.listActive()).toEqual([]);
+    const gaps = await archive.listGaps(id);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]!.from).toBe(1);
   });
 });

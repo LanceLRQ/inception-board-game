@@ -912,3 +912,118 @@ describe('MatchRoom 存储暂时不可用', () => {
     expect(onFatal).toHaveBeenCalledWith('persist_conflict');
   });
 });
+
+describe('MatchRoom 等待写快照期间被关闭', () => {
+  const humans = ['0', '1', '2', '3', '4'];
+
+  for (const result of ['ok', 'conflict', 'error'] as const) {
+    it(`写快照返回 ${result} 时房间已关闭：这一步不生效，不触发任何回调`, async () => {
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const onStorageHealth = vi.fn();
+      const onFatal = vi.fn();
+      const h = makeHarness(
+        5,
+        humans,
+        {
+          persist: async () => {
+            await gate;
+            if (result === 'error') throw new Error('redis down');
+            return result;
+          },
+          loadStoredVersion: async () => null,
+          onStorageHealth,
+          onFatal,
+        },
+        stateAfterSetup(5),
+      );
+      h.room.start();
+      const before = h.room.current();
+      const action = nextAutoAction(before, { humanPlayerIDs: [] })!;
+      const pending = h.room.submit(action.playerID, {
+        move: action.move,
+        args: action.args,
+        intentId: 'a',
+      });
+      await pump();
+      h.room.close();
+      release();
+      // 写 error 时还要走快速重试的间隔，推进计时器让它跑完
+      let outcome: SubmitResult | null = null;
+      void pending.then((r) => (outcome = r));
+      for (let i = 0; i < 20 && outcome === null; i++) {
+        await pump();
+        h.timers.fireNext();
+      }
+      expect(outcome).toEqual({ ok: false, code: 'match_over' });
+      expect(h.room.current()).toBe(before);
+      expect(h.steps).toHaveLength(0);
+      expect(h.gameOver).not.toHaveBeenCalled();
+      expect(onStorageHealth).not.toHaveBeenCalled();
+      expect(onFatal).not.toHaveBeenCalled();
+    });
+  }
+});
+
+describe('MatchRoom 存储不可用时的排程', () => {
+  const humans = ['0', '1', '2', '3', '4'];
+
+  it('挂着的只是普通截止计时器时，座位接管后照常提前改成自动步', async () => {
+    let failing = false;
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        persist: async () => {
+          if (failing) throw new Error('redis down');
+          return 'ok';
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    expect(h.room.deadlineAt()).not.toBeNull();
+
+    // 真人提交遇到存储故障：房间标记为存储不可用，但不会挂退避计时器
+    failing = true;
+    const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    await submitAndSettle(h, action.playerID, {
+      move: action.move,
+      args: action.args,
+      intentId: 'a',
+    });
+    expect(h.room.isStorageHealthy()).toBe(false);
+    expect(h.room.deadlineAt()).not.toBeNull();
+
+    for (const s of humans) h.takenOver.add(s);
+    h.room.reschedule();
+    expect(h.room.deadlineAt()).toBeNull();
+    expect(h.timers.pending().map((p) => p.at)).toEqual([h.timers.now() + timing.botStepDelayMs]);
+  });
+
+  it('挂着的是存储退避计时器时，座位变化不会把它换成短延迟', async () => {
+    const h = makeHarness(
+      5,
+      [],
+      {
+        persist: async () => {
+          throw new Error('redis down');
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    for (let i = 0; i < 3; i++) {
+      h.timers.fireNext(); // 自动步到点，再各一次快速重试
+      await pump();
+    }
+    expect(h.room.isStorageHealthy()).toBe(false);
+    const before = h.timers.pending().map((p) => p.at);
+    expect(before).toHaveLength(1);
+
+    h.room.reschedule();
+    expect(h.timers.pending().map((p) => p.at)).toEqual(before);
+  });
+});

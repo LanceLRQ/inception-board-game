@@ -33,8 +33,16 @@ export interface StepGap {
 }
 
 export interface MatchArchive {
-  /** 建局时：写对局元信息与各座位 */
+  /**
+   * 建局时：写对局元信息与各座位。
+   * 同一个 id 已有记录时（上一次建局被撤销、或覆盖了残留快照）先清掉旧的步骤与座位，
+   * 不让另一条时间线的内容混进来。
+   */
   recordStart(snapshot: MatchSnapshot): Promise<void>;
+  /** 删掉这局全部逐步记录（含缺口行）与座位行；对局行本身保留 */
+  resetMatch(matchID: string): Promise<void>;
+  /** 删掉步号大于 stateID 的步骤行与缺口行（缺口按结束版本号判断） */
+  truncateAfter(matchID: string, stateID: number): Promise<void>;
   appendStep(row: StepRow): Promise<void>;
   recordFinish(
     matchID: string,
@@ -60,7 +68,23 @@ export class InMemoryMatchArchive implements MatchArchive {
   private readonly gaps = new Map<string, Map<number, StepGap>>();
 
   async recordStart(snapshot: MatchSnapshot): Promise<void> {
+    await this.resetMatch(snapshot.matchID);
     this.started.set(snapshot.matchID, structuredClone(snapshot));
+  }
+
+  async resetMatch(matchID: string): Promise<void> {
+    this.started.delete(matchID);
+    this.finished.delete(matchID);
+    this.steps.delete(matchID);
+    this.endedAt.delete(matchID);
+    this.gaps.delete(matchID);
+  }
+
+  async truncateAfter(matchID: string, stateID: number): Promise<void> {
+    const rows = this.steps.get(matchID);
+    if (rows) for (const id of [...rows.keys()]) if (id > stateID) rows.delete(id);
+    const gaps = this.gaps.get(matchID);
+    if (gaps) for (const to of [...gaps.keys()]) if (to > stateID) gaps.delete(to);
   }
 
   async appendStep(row: StepRow): Promise<void> {
@@ -114,8 +138,11 @@ export class InMemoryMatchArchive implements MatchArchive {
 /** PrismaMatchArchive 实际用到的最小接口，便于测试打桩 */
 export interface PrismaArchiveClient {
   match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique'>;
-  matchPlayer: Pick<PrismaClient['matchPlayer'], 'createMany' | 'update' | 'findMany'>;
-  matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany' | 'findFirst'>;
+  matchPlayer: Pick<
+    PrismaClient['matchPlayer'],
+    'createMany' | 'update' | 'findMany' | 'deleteMany'
+  >;
+  matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany' | 'findFirst' | 'deleteMany'>;
 }
 
 const PRISMA_UNIQUE_VIOLATION = 'P2002';
@@ -149,7 +176,20 @@ function isStepPayload(p: unknown): p is { request: MoveRequest; events: MatchEv
 export class PrismaMatchArchive implements MatchArchive {
   constructor(private readonly prisma: PrismaArchiveClient) {}
 
+  /** 步骤行与座位行都只通过 matchId 挂在对局行上，彼此没有外键，删除顺序无所谓 */
+  async resetMatch(matchID: string): Promise<void> {
+    await this.prisma.matchEvent.deleteMany({ where: { matchId: matchID } });
+    await this.prisma.matchPlayer.deleteMany({ where: { matchId: matchID } });
+  }
+
+  async truncateAfter(matchID: string, stateID: number): Promise<void> {
+    await this.prisma.matchEvent.deleteMany({
+      where: { matchId: matchID, moveCounter: { gt: stateID } },
+    });
+  }
+
   async recordStart(snapshot: MatchSnapshot): Promise<void> {
+    await this.resetMatch(snapshot.matchID);
     const g = snapshot.state.G;
     // 元数据只挑字段：setupData 里有种子，不能整体写入
     const metadata = {
@@ -170,6 +210,10 @@ export class PrismaMatchArchive implements MatchArchive {
       playerCount: snapshot.setup.numPlayers,
       rngSeed: seedDigest(snapshot.setup.seed),
       metadata,
+      // 覆盖上一次留下的对局行时，结束信息也要一并清掉
+      endedAt: null,
+      winner: null,
+      winReason: null,
     };
     await this.prisma.match.upsert({
       where: { id: snapshot.matchID },

@@ -97,11 +97,13 @@ function makeStub() {
       findMany: vi.fn(
         async (_arg: unknown) => [] as Array<{ seat: number; playerId: string | null }>,
       ),
+      deleteMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
     },
     matchEvent: {
       create: vi.fn(async (_arg: unknown) => ({})),
       findMany: vi.fn(async (_arg: unknown) => [] as unknown[]),
       findFirst: vi.fn(async (_arg: unknown) => null as { moveCounter: number } | null),
+      deleteMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
     },
   };
   return stub;
@@ -361,6 +363,105 @@ describe('PrismaMatchArchive', () => {
     });
     stub.matchEvent.findFirst.mockResolvedValueOnce({ moveCounter: 17 });
     expect(await archive.lastStepID('m1')).toBe(17);
+  });
+});
+
+describe('PrismaMatchArchive 清理', () => {
+  it('resetMatch：删掉这局的全部逐步记录（含缺口行）与座位行，不动对局行', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    await archive.resetMatch('m1');
+    expect(stub.matchEvent.deleteMany).toHaveBeenCalledWith({ where: { matchId: 'm1' } });
+    expect(stub.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: 'm1' } });
+  });
+
+  it('recordStart：先清掉旧步骤与旧座位，再写对局行与座位', async () => {
+    const stub = makeStub();
+    const order: string[] = [];
+    stub.matchEvent.deleteMany.mockImplementation(async () => {
+      order.push('events.delete');
+      return { count: 0 };
+    });
+    stub.matchPlayer.deleteMany.mockImplementation(async () => {
+      order.push('players.delete');
+      return { count: 0 };
+    });
+    stub.match.upsert.mockImplementation(async () => {
+      order.push('match.upsert');
+      return {};
+    });
+    stub.matchPlayer.createMany.mockImplementation(async () => {
+      order.push('players.create');
+      return { count: 0 };
+    });
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    await archive.recordStart(makeTestSnapshot('m1'));
+    expect(order.indexOf('events.delete')).toBeLessThan(order.indexOf('match.upsert'));
+    expect(order.indexOf('players.delete')).toBeLessThan(order.indexOf('players.create'));
+    expect(order).toContain('match.upsert');
+  });
+
+  it('recordStart：重建时清掉上一次的结束信息', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    await archive.recordStart(makeTestSnapshot('m1'));
+    const arg = stub.match.upsert.mock.calls[0]![0] as { update: Record<string, unknown> };
+    expect(arg.update).toMatchObject({ endedAt: null, winner: null, winReason: null });
+  });
+
+  it('truncateAfter：删掉步号大于给定版本号的步骤行与缺口行', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    await archive.truncateAfter('m1', 4);
+    expect(stub.matchEvent.deleteMany).toHaveBeenCalledWith({
+      where: { matchId: 'm1', moveCounter: { gt: 4 } },
+    });
+  });
+});
+
+describe('InMemoryMatchArchive 清理', () => {
+  it('resetMatch：清掉步骤、缺口、座位与结束信息，其他对局不受影响', async () => {
+    const a = new InMemoryMatchArchive();
+    const snap = makeTestSnapshot('m1');
+    await a.recordStart(snap);
+    await a.recordStart(makeTestSnapshot('other'));
+    await a.appendStep(step(1));
+    await a.recordGap('m1', 5, 6);
+    await a.recordFinish('m1', snap.state, snap.seats);
+    await a.appendStep({ ...step(1), matchID: 'other' });
+
+    await a.resetMatch('m1');
+    expect(await a.listSteps('m1')).toEqual([]);
+    expect(await a.listGaps('m1')).toEqual([]);
+    expect(await a.matchInfo('m1')).toBeNull();
+    expect(a.finished.has('m1')).toBe(false);
+    expect(await a.listSteps('other')).toHaveLength(1);
+    expect(await a.matchInfo('other')).not.toBeNull();
+  });
+
+  it('recordStart 对同一个 id 再次调用：旧步骤、旧缺口、旧座位身份都不保留', async () => {
+    const a = new InMemoryMatchArchive();
+    const first = makeTestSnapshot('m1');
+    await a.recordStart(first);
+    await a.appendStep(step(1));
+    await a.recordGap('m1', 5, 6);
+    const second = makeTestSnapshot('m1');
+    second.seats = second.seats.map((s, i) => (i === 0 ? { ...s, playerId: 'someone-else' } : s));
+    await a.recordStart(second);
+    expect(await a.listSteps('m1')).toEqual([]);
+    expect(await a.listGaps('m1')).toEqual([]);
+    expect((await a.matchInfo('m1'))?.seats[0]).toEqual({ seat: '0', playerId: 'someone-else' });
+  });
+
+  it('truncateAfter：删掉步号大于给定版本号的步骤与缺口（缺口按结束版本号判断）', async () => {
+    const a = new InMemoryMatchArchive();
+    for (const n of [1, 2, 3, 4]) await a.appendStep(step(n));
+    await a.recordGap('m1', 5, 6);
+    await a.recordGap('m1', 2, 2);
+    await a.truncateAfter('m1', 2);
+    expect((await a.listSteps('m1')).map((r) => r.stateID)).toEqual([1, 2]);
+    expect(await a.listGaps('m1')).toEqual([{ from: 2, to: 2 }]);
+    expect(await a.lastStepID('m1')).toBe(2);
   });
 });
 
