@@ -261,3 +261,78 @@ describe('「梦境矩阵」皮肤样式', () => {
     expect(css).toContain('ms-blink');
   });
 });
+
+describe('「庄周梦蝶」皮肤样式', () => {
+  const css = stripComments(skinCss['../../styles/skins/butterfly.css']!);
+
+  it('专属类名都带 butterfly- 前缀，不借用别的主题的类名', () => {
+    const classes = new Set(
+      selectors(css).flatMap((s) => [...s.matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]!)),
+    );
+    expect(classes.size).toBeGreaterThan(0);
+    for (const name of classes) {
+      expect(name.startsWith('ms-') || name.startsWith('butterfly-'), name).toBe(true);
+    }
+    for (const other of ['noir-', 'blueprint-', 'totem-', 'matrix-']) {
+      expect(css).not.toContain(other);
+    }
+  });
+
+  it('动效在系统「减少动效」与 data-motion=reduced 下都会停掉', () => {
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain(":root[data-motion='reduced']");
+  });
+
+  it('装饰效果各有独立的 data-fx-off 开关：paper / drift', () => {
+    for (const fx of ['paper', 'drift']) {
+      expect(css, fx).toContain(`:root[data-fx-off~='${fx}']`);
+    }
+  });
+
+  it('骰子是圆的', () => {
+    const rule = css.match(/\.ms-die\s*\{[^}]*\}/);
+    expect(rule).not.toBeNull();
+    expect(rule![0]).toContain('border-radius: 50%');
+  });
+
+  it('不使用层级调色，也不借用别的主题的特效开关', () => {
+    expect(css).not.toContain('data-tint-layer');
+    for (const fx of ['rain', 'scan', 'desat', 'grid', 'maze']) {
+      expect(css, fx).not.toContain(`data-fx-off~='${fx}'`);
+    }
+  });
+
+  it('竖排只在中文界面用：唯一的 writing-mode 规则带 :lang(zh)，英文下层签保持横排', () => {
+    expect(css.match(/writing-mode/g)).toHaveLength(1);
+    expect(css).toMatch(/:lang\(zh\)[^{]*\{[^}]*writing-mode:\s*vertical-rl/);
+  });
+
+  it('关键帧由基础样式提供，皮肤只引用', () => {
+    expect(css).not.toContain('@keyframes');
+    for (const name of ['ms-breath', 'ms-drift', 'ms-flutter']) {
+      expect(baseCss).toContain(`@keyframes ${name}`);
+      expect(css).toContain(name);
+    }
+  });
+
+  it('楷体只有一个字重：不合成粗体', () => {
+    expect(css).toContain('font-synthesis-weight: none');
+  });
+});
+
+describe('主题自带字体', () => {
+  it('只有「庄周梦蝶」带按需加载字体的函数，别的主题没有', () => {
+    for (const id of THEME_IDS) {
+      const loadFonts = getSkin(id).loadFonts;
+      if (id === 'butterfly') expect(typeof loadFonts, id).toBe('function');
+      else expect(loadFonts, id).toBeUndefined();
+    }
+  });
+
+  it('字体样式不在任何静态样式表里：index.css 不 @import 楷体，皮肤样式不声明字体', () => {
+    expect(indexCss).not.toMatch(/@import[^;]*lxgw/i);
+    for (const [file, css] of Object.entries(skinCss)) {
+      expect(css, file).not.toMatch(/@import|@font-face|lxgw/i);
+    }
+  });
+});

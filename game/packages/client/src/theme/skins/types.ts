@@ -27,4 +27,9 @@ export interface ThemeSkin {
   /** 铺在移动布局最底层的背景氛围；没有就是纯底色（移动端不分叉中央舞台，背景可以有） */
   readonly MobileAmbient?: ComponentType;
   readonly center: CenterFootprint;
+  /**
+   * 主题自带字体的按需加载函数（动态 import 字体样式）：应用这个主题时才触发，见 theme/fonts.ts。
+   * 没有自带字体的主题不提供。
+   */
+  readonly loadFonts?: () => Promise<unknown>;
 }

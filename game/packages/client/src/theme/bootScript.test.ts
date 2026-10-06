@@ -4,15 +4,22 @@ import { DEFAULT_THEME_ID, THEMES, THEME_STORAGE_KEY } from './themes';
 
 interface FakeDoc {
   attrs: Record<string, string>;
+  style: { backgroundColor: string; colorScheme: string };
   metaContent: string | null;
   document: unknown;
 }
 
 /** 伪造最小 document：根元素属性 + theme-color meta */
 function makeDoc(withMeta = true): FakeDoc {
-  const state: FakeDoc = { attrs: {}, metaContent: withMeta ? '#000000' : null, document: null };
+  const state: FakeDoc = {
+    attrs: {},
+    style: { backgroundColor: '', colorScheme: '' },
+    metaContent: withMeta ? '#000000' : null,
+    document: null,
+  };
   state.document = {
     documentElement: {
+      style: state.style,
       setAttribute: (k: string, v: string) => {
         state.attrs[k] = v;
       },
@@ -93,5 +100,29 @@ describe('buildThemeBootScript', () => {
     run(doc, { getItem: () => 'noir' });
     expect(doc.attrs['data-theme']).toBe('noir');
     expect(doc.metaContent).toBeNull();
+  });
+
+  it('亮色主题：data-scheme=light，底色与控件配色在首屏就写到根元素上（样式表到位之前不闪深色）', () => {
+    const doc = makeDoc();
+    run(doc, { getItem: (k: string) => (k === THEME_STORAGE_KEY ? 'butterfly' : null) });
+    expect(doc.attrs['data-theme']).toBe('butterfly');
+    expect(doc.attrs['data-scheme']).toBe('light');
+    expect(doc.style.backgroundColor).toBe(THEMES.butterfly.tokens.bg);
+    expect(doc.style.colorScheme).toBe('light');
+    expect(doc.metaContent).toBe(THEMES.butterfly.themeColor);
+  });
+
+  it('暗色主题的底色取自各自的 bg 令牌', () => {
+    const doc = makeDoc();
+    run(doc, { getItem: () => 'matrix' });
+    expect(doc.style.backgroundColor).toBe(THEMES.matrix.tokens.bg);
+    expect(doc.style.colorScheme).toBe('dark');
+  });
+
+  it('根元素没有 style 时只设属性，不报错', () => {
+    const doc = makeDoc();
+    (doc.document as { documentElement: { style?: unknown } }).documentElement.style = undefined;
+    expect(() => run(doc, { getItem: () => 'butterfly' })).not.toThrow();
+    expect(doc.attrs['data-scheme']).toBe('light');
   });
 });

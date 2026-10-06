@@ -79,7 +79,9 @@ export function CopyrightNotice({ variant, className }: CopyrightNoticeProps) {
           })}
         </p>
         <p>{COPYRIGHT.usageNote}</p>
-        <p className="text-xs opacity-75">{COPYRIGHT.takedownHint}</p>
+        <p className="text-xs opacity-75 in-data-[scheme=light]:opacity-100">
+          {COPYRIGHT.takedownHint}
+        </p>
       </div>
     </section>
   );

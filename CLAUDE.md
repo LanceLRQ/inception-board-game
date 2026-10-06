@@ -205,7 +205,9 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | `ms-btn` | 坞与响应窗口里的按钮 | `data-variant="primary"` |
 | `ms-response` | 响应窗口 / 提示卡 | - |
 
-**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`flow`、`maze`（迷宫底纹）、`tint`（层级调色）、`rain`（梦境矩阵的数字雨）、`scan`（扫描线）、`desat`（卡图降饱和）、`blink`（光标与状态灯明灭）。运行中会变化的开关（`data-fx-off`、`data-motion`，以及系统「减少动效」）要靠监听即时响应，数字雨的控制器（`stages/matrix/rainController.ts`）就是这么做的：监听根元素属性变化与媒体查询变化，页面不可见时暂停。
+**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`flow`、`maze`（迷宫底纹）、`tint`（层级调色）、`rain`（梦境矩阵的数字雨）、`scan`（扫描线）、`desat`（卡图降饱和）、`blink`（光标与状态灯明灭）、`paper`（庄周梦蝶的纸纹）、`drift`（庄周梦蝶的蝶漂移扇动与墨点呼吸）。运行中会变化的开关（`data-fx-off`、`data-motion`，以及系统「减少动效」）要靠监听即时响应，数字雨的控制器（`stages/matrix/rainController.ts`）就是这么做的：监听根元素属性变化与媒体查询变化，页面不可见时暂停。
+
+**亮色主题与按需字体：**主题表里 `scheme` 为 `'light'` 的主题（目前只有「庄周梦蝶」）整站都是亮色：`dark:` 变体绑定在 `data-scheme=dark` 上，亮色下自然不生效；首屏脚本除 `data-theme` / `data-scheme` 外还把 `bg` 令牌与 `color-scheme` 写到根元素行内样式，样式表到位前不闪深色。压在 blood 底上的文字用 `text-destructive-foreground`（暗色取墨色、亮色取纸色），不要写 `text-foreground`。主题自带的字体（「庄周梦蝶」的霞鹜文楷，SIL OFL）写成皮肤上可选的 `loadFonts`（动态 `import()` 字体样式），由 `theme/fonts.ts` 的 `loadThemeFonts` 在应用该主题时触发：只有切到这个主题才请求，字体样式声明 `font-display: swap`，字体文件与样式表都不进 PWA 预缓存（`vite.config.ts` 的 `globIgnores` 与运行时缓存）。竖排文字（`writing-mode`）只用在 `:lang(zh)` 下，英文界面改横排。
 
 **新增一个主题要动的地方：**
 

@@ -149,6 +149,33 @@ export const THEMES = {
       mono: "'IBM Plex Mono','SF Mono',monospace",
     },
   },
+  butterfly: {
+    id: 'butterfly',
+    nameKey: 'theme.names.butterfly',
+    scheme: 'light',
+    themeColor: '#F0EBDF',
+    tokens: {
+      bg: '#F0EBDF',
+      panel: '#FAF7EF',
+      panel2: '#E6DFCE',
+      ink: '#26221B',
+      dim: '#5A5448',
+      faint: '#675F50',
+      line: 'rgba(38,34,27,.14)',
+      line2: 'rgba(38,34,27,.5)',
+      acc: '#98322A',
+      accb: '#7E2A20',
+      accsoft: 'rgba(152,50,42,.08)',
+      lock: '#3D6570',
+      blood: '#98322A',
+      ok: '#2F5A3D',
+      grade: '#98322A',
+      serif:
+        "'LXGW WenKai Screen','Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif",
+      sans: "'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif",
+      mono: "'IBM Plex Mono','SF Mono',monospace",
+    },
+  },
 } as const satisfies Record<string, ThemeDefinition>;
 
 export type ThemeId = keyof typeof THEMES;

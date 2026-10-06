@@ -73,7 +73,7 @@ export function MasterBribeInspectDialog({
         <button
           type="button"
           onClick={() => void makeMove('peekerAcknowledge', [])}
-          className="rounded-md border border-blood bg-blood px-3 py-1.5 text-xs font-medium text-foreground hover:bg-blood/90"
+          className="rounded-md border border-blood bg-blood px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-blood/90"
           data-testid="master-bribe-inspect-ack"
         >
           已确认

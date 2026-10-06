@@ -4,9 +4,11 @@ import { getTheme, type ThemeDefinition } from '../theme/themes';
 
 function makeDoc(withMeta = true) {
   const rootAttrs: Record<string, string> = {};
+  const style = { backgroundColor: '', colorScheme: '' };
   const metaAttrs: Record<string, string> = {};
   const doc: ThemeDocument = {
     documentElement: {
+      style,
       setAttribute: (k, v) => {
         rootAttrs[k] = v;
       },
@@ -20,7 +22,7 @@ function makeDoc(withMeta = true) {
           }
         : null,
   };
-  return { doc, rootAttrs, metaAttrs };
+  return { doc, rootAttrs, metaAttrs, style };
 }
 
 describe('applyTheme', () => {
@@ -55,5 +57,21 @@ describe('applyTheme', () => {
     const { doc } = makeDoc();
     expect('classList' in doc.documentElement).toBe(false);
     expect(() => applyTheme(getTheme('noir'), doc)).not.toThrow();
+  });
+
+  it('同步写入底色与控件配色：亮色主题落 light，暗色主题落 dark', () => {
+    const { doc, style } = makeDoc();
+    applyTheme(getTheme('butterfly'), doc);
+    expect(style).toEqual({ backgroundColor: '#F0EBDF', colorScheme: 'light' });
+    applyTheme(getTheme('noir'), doc);
+    expect(style).toEqual({ backgroundColor: '#0A0D13', colorScheme: 'dark' });
+  });
+
+  it('根元素没有 style 的替身也能用', () => {
+    const doc: ThemeDocument = {
+      documentElement: { setAttribute: () => undefined },
+      querySelector: () => null,
+    };
+    expect(() => applyTheme(getTheme('butterfly'), doc)).not.toThrow();
   });
 });

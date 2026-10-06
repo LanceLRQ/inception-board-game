@@ -27,7 +27,7 @@ export function ReconnectBanner({ state, onExit }: ReconnectBannerProps) {
   const classes: Record<Exclude<ReconnectState['status'], 'healthy'>, string> = {
     reconnecting: 'bg-primary/90 text-primary-foreground',
     stale: 'bg-primary text-primary-foreground',
-    dead: 'bg-blood text-foreground',
+    dead: 'bg-blood text-destructive-foreground',
   };
 
   const labelKey: Record<Exclude<ReconnectState['status'], 'healthy'>, string> = {
@@ -50,7 +50,7 @@ export function ReconnectBanner({ state, onExit }: ReconnectBannerProps) {
         <button
           type="button"
           onClick={onExit}
-          className="ml-2 rounded bg-foreground/20 px-3 py-1 text-foreground hover:bg-foreground/30"
+          className="ml-2 rounded bg-destructive-foreground/20 px-3 py-1 text-destructive-foreground hover:bg-destructive-foreground/30"
         >
           {t('network.back_to_lobby', { defaultValue: '返回大厅' })}
         </button>

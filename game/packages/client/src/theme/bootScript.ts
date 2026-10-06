@@ -6,9 +6,13 @@
 import { DEFAULT_THEME_ID, THEMES, THEME_IDS, THEME_STORAGE_KEY } from './themes';
 
 export function buildThemeBootScript(): string {
-  const table: Record<string, { scheme: string; color: string }> = {};
+  const table: Record<string, { scheme: string; color: string; bg: string }> = {};
   for (const id of THEME_IDS) {
-    table[id] = { scheme: THEMES[id].scheme, color: THEMES[id].themeColor };
+    table[id] = {
+      scheme: THEMES[id].scheme,
+      color: THEMES[id].themeColor,
+      bg: THEMES[id].tokens.bg,
+    };
   }
   // 防止主题表里出现 </script> 之类的字符把内联脚本截断
   const tableJson = JSON.stringify(table).replace(/</g, '\\u003c');
@@ -21,6 +25,9 @@ export function buildThemeBootScript(): string {
     'var t=T[id];var r=document.documentElement;' +
     "r.setAttribute('data-theme',id);" +
     "r.setAttribute('data-scheme',t.scheme);" +
+    // 样式表到位之前（开发服务器按模块注入样式、样式被拦截时）也先把底色与控件配色定下来，
+    // 亮色主题刷新时不闪一下深色（或默认的白底）
+    'if(r.style){r.style.backgroundColor=t.bg;r.style.colorScheme=t.scheme;}' +
     'var m=document.querySelector(\'meta[name="theme-color"]\');' +
     "if(m)m.setAttribute('content',t.color);" +
     '})();'

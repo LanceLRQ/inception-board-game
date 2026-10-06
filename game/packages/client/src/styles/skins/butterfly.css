@@ -1,0 +1,452 @@
+/*
+ * 「庄周梦蝶」皮肤：宣纸亮色、松烟墨、黛青，全案唯一的红是朱砂印。
+ * 梦层是四重山（越深的梦越远越淡），迷失层在山外，是一只蝶。
+ * 全部限定在 [data-theme='butterfly'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
+ * 这是唯一的亮色主题：阴影与叠层都用墨色（--ms-ink）按比例混合，不用黑。
+ *
+ * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
+ *   paper  纸纹    drift  蝶的漂移与扇动、墨点呼吸
+ * 系统「减少动效」与 data-motion='reduced' 下，所有动画停掉。
+ */
+
+/* 楷体只有一个字重：不合成粗体（合成的粗体笔画发糊），强调靠字号与字距 */
+[data-theme='butterfly'] {
+  font-synthesis-weight: none;
+}
+
+/* 页面标题用楷体（楷体加载之前先用宋体回落） */
+[data-theme='butterfly'] h1,
+[data-theme='butterfly'] h2,
+[data-theme='butterfly'] h3 {
+  font-family: var(--ms-serif);
+}
+
+/* ---------- 舞台与背景氛围 ---------- */
+[data-theme='butterfly'] .ms-stage {
+  background: linear-gradient(180deg, var(--ms-panel) 0%, var(--ms-bg) 36%, var(--ms-panel2) 100%);
+}
+[data-theme='butterfly'] .butterfly-mountain {
+  fill: color-mix(in srgb, var(--ms-lock) 7%, transparent);
+}
+[data-theme='butterfly'] .butterfly-mountain[data-depth='2'] {
+  fill: color-mix(in srgb, var(--ms-lock) 11%, transparent);
+}
+[data-theme='butterfly'] .butterfly-mountain[data-depth='3'] {
+  fill: color-mix(in srgb, var(--ms-ink) 8%, transparent);
+}
+[data-theme='butterfly'] .butterfly-mountain[data-depth='4'] {
+  fill: color-mix(in srgb, var(--ms-ink) 13%, transparent);
+}
+/* 纸纹：一层极淡的墨色噪点（只取噪点的透明度当遮罩，颜色来自令牌） */
+[data-theme='butterfly'] .butterfly-paper {
+  background: var(--ms-ink);
+  opacity: 0.07;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.2 -0.1'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.2 -0.1'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+[data-theme='butterfly']:root[data-fx-off~='paper'] .butterfly-paper {
+  display: none;
+}
+[data-theme='butterfly'] .ms-topbar {
+  letter-spacing: 0.18em;
+  background: color-mix(in srgb, var(--ms-panel) 88%, transparent);
+}
+
+/* ---------- 座位牌：册页装裱（青苔灰的内边 + 一道墨线的硬阴影） ---------- */
+[data-theme='butterfly'] .ms-seat {
+  border-radius: 2px;
+  border-color: color-mix(in srgb, var(--ms-ink) 22%, transparent);
+  background: var(--ms-panel);
+  box-shadow:
+    2px 3px 0 color-mix(in srgb, var(--ms-ink) 7%, transparent),
+    0 14px 30px -18px color-mix(in srgb, var(--ms-ink) 30%, transparent);
+}
+[data-theme='butterfly'] .ms-seat::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ms-lock) 32%, transparent);
+}
+[data-theme='butterfly'] .ms-seat[data-current] {
+  border-color: var(--ms-acc);
+  box-shadow:
+    2px 3px 0 var(--ms-accsoft),
+    0 16px 34px -16px color-mix(in srgb, var(--ms-acc) 28%, transparent);
+}
+[data-theme='butterfly'] .ms-seat[data-lost] {
+  opacity: 0.6;
+  filter: grayscale(0.9);
+}
+[data-theme='butterfly'] .ms-seat-name {
+  color: var(--ms-ink);
+  letter-spacing: 0.14em;
+}
+[data-theme='butterfly'] .ms-seat[data-current] .ms-seat-name {
+  color: var(--ms-accb);
+}
+/* 当前行动者的标记写成一枚朱砂小印 */
+[data-theme='butterfly'] .ms-seat[data-current] .ms-seat-flag {
+  animation: none;
+  align-self: center;
+  width: fit-content;
+  padding: 0 5px;
+  color: var(--ms-acc);
+  border: 1px solid var(--ms-acc);
+  border-radius: 2px;
+  letter-spacing: 0.2em;
+}
+[data-theme='butterfly'] .ms-seat-flag {
+  letter-spacing: 0.24em;
+}
+[data-theme='butterfly'] .ms-seat-revtag {
+  z-index: 1;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-panel) 92%, transparent);
+}
+
+/* ---------- 卡面画框 / 层徽 / 骰子 ---------- */
+[data-theme='butterfly'] .ms-card {
+  position: relative;
+  z-index: 1;
+  border-radius: 0;
+  border-color: color-mix(in srgb, var(--ms-ink) 55%, transparent);
+  background: var(--ms-panel2);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ms-ink) 9%, transparent);
+}
+[data-theme='butterfly'] .ms-layerbadge {
+  border-radius: 0;
+  letter-spacing: 0.12em;
+  background: var(--ms-panel);
+}
+[data-theme='butterfly'] .ms-layerbadge[data-layer='0'] {
+  border-style: dashed;
+}
+/* 圆骰：月白的底，黛青（心锁）或朱砂（战斗）的描边与点 */
+[data-theme='butterfly'] .ms-die {
+  --die-fill: var(--ms-panel);
+  --die-pip: var(--die-color);
+  border-radius: 50%;
+  border: 1.5px solid var(--die-color);
+  box-shadow: 1px 1px 0 color-mix(in srgb, var(--ms-ink) 10%, transparent);
+}
+[data-theme='butterfly'] .ms-die[data-empty] {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+
+/* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
+[data-theme='butterfly'] .ms-handcard {
+  border-radius: 0;
+  border-color: color-mix(in srgb, var(--ms-ink) 70%, transparent);
+  background: var(--ms-panel);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--ms-ink) 10%, transparent);
+}
+[data-theme='butterfly'] .ms-handcard:hover {
+  box-shadow: 3px 10px 18px -8px color-mix(in srgb, var(--ms-ink) 30%, transparent);
+}
+[data-theme='butterfly'] .ms-handcard[data-selected],
+[data-theme='butterfly'] .ms-handcard[data-reading] {
+  border-color: var(--ms-acc);
+  box-shadow:
+    0 0 0 1px var(--ms-acc),
+    3px 4px 0 var(--ms-accsoft);
+}
+[data-theme='butterfly'] .ms-handcard-art {
+  background: var(--ms-panel2);
+}
+[data-theme='butterfly'] .ms-handcard-badge {
+  background: var(--ms-acc);
+  color: var(--ms-panel);
+}
+[data-theme='butterfly'] .ms-handcard[data-blocked] .ms-handcard-badge {
+  background: var(--ms-panel);
+  color: var(--ms-dim);
+  box-shadow: 0 0 0 1px var(--ms-line2);
+}
+[data-theme='butterfly'] .ms-dock {
+  border-top-color: color-mix(in srgb, var(--ms-ink) 70%, transparent);
+  background: color-mix(in srgb, var(--ms-panel) 94%, transparent);
+}
+[data-theme='butterfly'] .ms-btn {
+  border-radius: 0;
+  border: 1.5px solid var(--ms-ink);
+  color: var(--ms-ink);
+  font-family: var(--ms-serif);
+  letter-spacing: 0.24em;
+}
+[data-theme='butterfly'] .ms-btn:not(:disabled):hover {
+  background: var(--ms-ink);
+  border-color: var(--ms-ink);
+  color: var(--ms-panel);
+}
+[data-theme='butterfly'] .ms-btn[data-variant='primary'] {
+  background: var(--ms-acc);
+  border-color: var(--ms-acc);
+  color: var(--ms-panel);
+}
+[data-theme='butterfly'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+  background: var(--ms-accb);
+  border-color: var(--ms-accb);
+  color: var(--ms-panel);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--ms-ink) 20%, transparent);
+}
+/* 急函：月白纸、墨线外框、一道硬阴影 */
+[data-theme='butterfly'] .ms-response {
+  border-radius: 0;
+  border: 1px solid var(--ms-ink);
+  background: var(--ms-panel);
+  box-shadow: 3px 4px 0 color-mix(in srgb, var(--ms-ink) 12%, transparent);
+}
+
+/* ---------- 中央舞台：山水长卷 ---------- */
+[data-theme='butterfly'] .butterfly-stage {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--ms-ink) 30%, transparent);
+  background: color-mix(in srgb, var(--ms-panel) 94%, transparent);
+  box-shadow:
+    2px 3px 0 color-mix(in srgb, var(--ms-ink) 6%, transparent),
+    0 30px 60px -40px color-mix(in srgb, var(--ms-ink) 32%, transparent);
+  color: var(--ms-ink);
+}
+/* 装裱的内边 */
+[data-theme='butterfly'] .butterfly-stage::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 3;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ms-lock) 30%, transparent);
+}
+[data-theme='butterfly'] .butterfly-dim {
+  color: var(--ms-dim);
+}
+[data-theme='butterfly'] .butterfly-head {
+  border-bottom: 2px solid var(--ms-ink);
+}
+[data-theme='butterfly'] .butterfly-title-dot {
+  color: var(--ms-acc);
+}
+[data-theme='butterfly'] .butterfly-title-focus {
+  color: var(--ms-accb);
+}
+[data-theme='butterfly'] .butterfly-turn {
+  border-bottom: 1px dashed var(--ms-line2);
+}
+[data-theme='butterfly'] .butterfly-breath {
+  display: block;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ms-acc);
+  animation: ms-breath 2.4s ease-in-out infinite;
+}
+
+/* 山：每一层一重，越近越深；焦点层的山脊描成朱砂色 */
+[data-theme='butterfly'] .butterfly-range {
+  position: relative;
+}
+/* 山只占一层的下沿一段：焦点层加高时山不跟着拉高，起伏保持舒缓 */
+[data-theme='butterfly'] .butterfly-ridge {
+  height: min(100%, 52px);
+  pointer-events: none;
+}
+[data-theme='butterfly'] .butterfly-ridge-fill {
+  fill: color-mix(in srgb, var(--ms-lock) 9%, transparent);
+}
+[data-theme='butterfly'] .butterfly-row[data-layer='3'] .butterfly-ridge-fill {
+  fill: color-mix(in srgb, var(--ms-lock) 13%, transparent);
+}
+[data-theme='butterfly'] .butterfly-row[data-layer='2'] .butterfly-ridge-fill {
+  fill: color-mix(in srgb, var(--ms-ink) 8%, transparent);
+}
+[data-theme='butterfly'] .butterfly-row[data-layer='1'] .butterfly-ridge-fill {
+  fill: color-mix(in srgb, var(--ms-ink) 14%, transparent);
+}
+[data-theme='butterfly'] .butterfly-ridge-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-ink) 32%, transparent);
+  stroke-width: 1px;
+}
+[data-theme='butterfly'] .butterfly-row[data-focus] .butterfly-ridge-line {
+  stroke: var(--ms-acc);
+  stroke-width: 1.5px;
+}
+[data-theme='butterfly'] .butterfly-row[data-focus] {
+  background: color-mix(in srgb, var(--ms-acc) 5%, transparent);
+  box-shadow: inset 3px 0 0 var(--ms-acc);
+}
+[data-theme='butterfly'] .butterfly-row[data-lost] {
+  border-top: 1px dashed var(--ms-line2);
+}
+
+/* 竖排层签（中文）；英文与放不下竖排的矮舞台改横排 */
+[data-theme='butterfly'] .butterfly-tag {
+  display: block;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-family: var(--ms-serif);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: var(--ms-ink);
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line2);
+  box-shadow: 1.5px 2px 0 color-mix(in srgb, var(--ms-ink) 6%, transparent);
+}
+[data-theme='butterfly'] .butterfly-tag:focus-visible {
+  outline-offset: 1px;
+}
+[data-theme='butterfly'] .butterfly-row[data-focus] .butterfly-tag {
+  color: var(--ms-acc);
+  border-color: var(--ms-acc);
+}
+@container (min-height: 380px) {
+  [data-theme='butterfly'] .butterfly-stage:lang(zh) .butterfly-tag {
+    writing-mode: vertical-rl;
+    padding: 3px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+}
+
+/* 金库 / 心锁 / 梦魇 / 占位者 */
+[data-theme='butterfly'] .butterfly-vault[data-opened] {
+  border-color: var(--ms-acc);
+}
+[data-theme='butterfly'] .butterfly-vault-text {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ms-dim);
+}
+[data-theme='butterfly'] .butterfly-vault-text[data-opened] {
+  color: var(--ms-accb);
+}
+[data-theme='butterfly'] .butterfly-nightmare {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  font-family: var(--ms-serif);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--ms-blood);
+  border: 1px dashed var(--ms-blood);
+  background: transparent;
+}
+[data-theme='butterfly'] .butterfly-nightmare[data-revealed] {
+  border-style: solid;
+}
+[data-theme='butterfly'] .butterfly-names {
+  color: var(--ms-dim);
+}
+[data-theme='butterfly'] .butterfly-occ {
+  padding: 2px 8px;
+  color: var(--ms-dim);
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line2);
+}
+[data-theme='butterfly'] .butterfly-occ[data-self] {
+  color: var(--ms-lock);
+  border-color: var(--ms-lock);
+}
+/* 层上的小印：朱砂（焦点 / 解封）与黛青（本人所在） */
+[data-theme='butterfly'] .butterfly-seal {
+  padding: 0 6px;
+  font-family: var(--ms-serif);
+  font-size: 11px;
+  line-height: 1.55;
+  letter-spacing: 0.14em;
+  color: var(--ms-acc);
+  border: 1.5px solid var(--ms-acc);
+  border-radius: 2px;
+  transform: rotate(-2deg);
+}
+[data-theme='butterfly'] .butterfly-seal[data-tag='here'] {
+  color: var(--ms-lock);
+  border-color: var(--ms-lock);
+}
+/* 焦点层的说明一行只在中央区够高时出现 */
+[data-theme='butterfly'] .butterfly-note {
+  display: none;
+}
+@container (min-height: 460px) {
+  [data-theme='butterfly'] .butterfly-note {
+    display: block;
+  }
+}
+
+/* 蝶 */
+[data-theme='butterfly'] .butterfly-wing {
+  fill: color-mix(in srgb, var(--ms-lock) 12%, transparent);
+  stroke: var(--ms-ink);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+[data-theme='butterfly'] .butterfly-feeler {
+  stroke: var(--ms-ink);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+[data-theme='butterfly'] .butterfly-body {
+  stroke: var(--ms-ink);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+[data-theme='butterfly'] .butterfly-flyer {
+  animation: ms-drift 7s ease-in-out infinite alternate;
+}
+[data-theme='butterfly'] .butterfly-wings {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ms-flutter 1.8s ease-in-out infinite;
+}
+
+/* 最新动态 / 牌库：落款式的两行 */
+[data-theme='butterfly'] .butterfly-activity {
+  color: var(--ms-dim);
+  border-top: 1px dashed var(--ms-line2);
+}
+[data-theme='butterfly'] .butterfly-deck {
+  color: var(--ms-dim);
+  border-top: 1px solid var(--ms-line);
+}
+[data-theme='butterfly'] .butterfly-deckbar {
+  background: var(--ms-line);
+}
+[data-theme='butterfly'] .butterfly-deckfill {
+  background: var(--ms-ink);
+}
+
+/* ---------- 移动端：只换令牌与皮肤样式，没有专属舞台 ---------- */
+[data-theme='butterfly'] [data-layout='mobile'] [data-testid^='layer-row-'] {
+  border-radius: 0;
+}
+
+/* ---------- 动效开关 ---------- */
+[data-theme='butterfly']:root[data-fx-off~='drift'] .butterfly-flyer,
+[data-theme='butterfly']:root[data-fx-off~='drift'] .butterfly-wings,
+[data-theme='butterfly']:root[data-fx-off~='drift'] .butterfly-breath {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='butterfly'] .butterfly-flyer,
+  [data-theme='butterfly'] .butterfly-wings,
+  [data-theme='butterfly'] .butterfly-breath {
+    animation: none;
+  }
+}
+[data-theme='butterfly']:root[data-motion='reduced'] .butterfly-flyer,
+[data-theme='butterfly']:root[data-motion='reduced'] .butterfly-wings,
+[data-theme='butterfly']:root[data-motion='reduced'] .butterfly-breath {
+  animation: none;
+}
+[data-theme='butterfly']:root[data-motion='reduced'] .ms-handcard,
+[data-theme='butterfly']:root[data-motion='reduced'] .ms-btn {
+  transition: none;
+}

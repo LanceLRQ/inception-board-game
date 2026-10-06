@@ -13,6 +13,7 @@
 @import './skins/blueprint.css';
 @import './skins/totem.css';
 @import './skins/matrix.css';
+@import './skins/butterfly.css';
 /*
  ---break---
  */
@@ -69,6 +70,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -189,6 +191,28 @@
   --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
 }
 
+/* prettier-ignore */
+[data-theme='butterfly'] {
+  --ms-bg: #F0EBDF;
+  --ms-panel: #FAF7EF;
+  --ms-panel2: #E6DFCE;
+  --ms-ink: #26221B;
+  --ms-dim: #5A5448;
+  --ms-faint: #675F50;
+  --ms-line: rgba(38,34,27,.14);
+  --ms-line2: rgba(38,34,27,.5);
+  --ms-acc: #98322A;
+  --ms-accb: #7E2A20;
+  --ms-accsoft: rgba(152,50,42,.08);
+  --ms-lock: #3D6570;
+  --ms-blood: #98322A;
+  --ms-ok: #2F5A3D;
+  --ms-grade: #98322A;
+  --ms-serif: 'LXGW WenKai Screen','Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif;
+  --ms-sans: 'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif;
+  --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
+}
+
 /* shadcn 变量统一从语义令牌映射，换主题只需换令牌 */
 :root {
   color-scheme: dark;
@@ -207,6 +231,8 @@
   --accent: var(--ms-accsoft);
   --accent-foreground: var(--ms-accb);
   --destructive: var(--ms-blood);
+  /* 压在 destructive（blood）底色上的文字：暗色主题取墨色，亮色主题取纸色（见下方 data-scheme=light） */
+  --destructive-foreground: var(--ms-ink);
   --border: var(--ms-line);
   --input: var(--ms-line2);
   --ring: var(--ms-acc);
@@ -228,6 +254,7 @@
 
 [data-scheme='light'] {
   color-scheme: light;
+  --destructive-foreground: var(--ms-panel);
 }
 /*
  ---break---

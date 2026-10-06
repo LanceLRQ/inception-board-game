@@ -28,6 +28,7 @@ const SWITCHABLE_THEMES = [
     name: /筑梦蓝图|Architect's Blueprint/,
     stage: 'blueprint-stage',
     desc: '轴测楼板剖面',
+    scheme: 'dark',
   },
   {
     id: 'totem',
@@ -35,6 +36,7 @@ const SWITCHABLE_THEMES = [
     name: /陀螺未停|The Top Still Spins/,
     stage: 'totem-stage',
     desc: '陀螺仪加梦层塔',
+    scheme: 'dark',
   },
   {
     id: 'matrix',
@@ -42,6 +44,15 @@ const SWITCHABLE_THEMES = [
     name: /梦境矩阵|DreamMatrix/,
     stage: 'matrix-stage',
     desc: '终端进程表',
+    scheme: 'dark',
+  },
+  {
+    id: 'butterfly',
+    label: '庄周梦蝶',
+    name: /庄周梦蝶|The Butterfly Dream/,
+    stage: 'butterfly-stage',
+    desc: '山水长卷',
+    scheme: 'light',
   },
 ] as const;
 
@@ -94,7 +105,7 @@ test.describe('主题 Theme', () => {
 
       const html = page.locator('html');
       await expect(html).toHaveAttribute('data-theme', theme.id);
-      await expect(html).toHaveAttribute('data-scheme', 'dark');
+      await expect(html).toHaveAttribute('data-scheme', theme.scheme);
 
       await page.reload();
       await waitForAppReady(page);
@@ -118,7 +129,7 @@ test.describe('主题 Theme', () => {
       await page.goto('/settings');
       const html = page.locator('html');
       await expect(html).toHaveAttribute('data-theme', theme.id);
-      await expect(html).toHaveAttribute('data-scheme', 'dark');
+      await expect(html).toHaveAttribute('data-scheme', theme.scheme);
       await expect(page.locator('#root > *')).toHaveCount(0);
     });
   }
@@ -409,5 +420,149 @@ test.describe('主题 Theme · 梦境矩阵的特效', () => {
 
     await page.evaluate(() => document.documentElement.setAttribute('data-fx-off', 'desat'));
     await expect.poll(filterOf).toBe('none');
+  });
+});
+
+/** 楷体字体样式与字体文件的请求：只有应用了「庄周梦蝶」才会出现 */
+const FONT_REQUEST = /lxgw/i;
+
+function trackFontRequests(page: Page): string[] {
+  const urls: string[] = [];
+  page.on('request', (req) => {
+    if (FONT_REQUEST.test(req.url())) urls.push(req.url());
+  });
+  return urls;
+}
+
+test.describe('主题 Theme · 庄周梦蝶的亮色与按需字体', () => {
+  test('根元素是亮色：data-scheme=light，控件配色与背景都是亮的', async ({ page }) => {
+    await preselectTheme(page, 'butterfly');
+    await page.goto('/settings');
+    await waitForAppReady(page);
+
+    await expect(page.locator('html')).toHaveAttribute('data-scheme', 'light');
+    const m = await page.evaluate(() => ({
+      colorScheme: getComputedStyle(document.documentElement).colorScheme,
+      body: getComputedStyle(document.body).backgroundColor,
+    }));
+    expect(m.colorScheme).toBe('light');
+    // 宣纸底 #F0EBDF
+    expect(m.body).toBe('rgb(240, 235, 223)');
+  });
+
+  test('刷新后首帧就是亮色：外部脚本与样式全被拦下时，根元素也已带亮色的底色与控件配色', async ({
+    page,
+  }) => {
+    await preselectTheme(page, 'butterfly');
+    // 拦掉外部脚本与样式：底色与明暗只可能来自 <head> 里的内联脚本
+    await page.route('**/*', (route) =>
+      ['script', 'stylesheet'].includes(route.request().resourceType())
+        ? route.abort()
+        : route.continue(),
+    );
+    await page.goto('/settings');
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-scheme', 'light');
+    const m = await html.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { bg: cs.backgroundColor, colorScheme: cs.colorScheme };
+    });
+    expect(m.bg).toBe('rgb(240, 235, 223)');
+    expect(m.colorScheme).toBe('light');
+  });
+
+  test('别的主题（含暗色的默认主题）没有请求楷体的样式与字体文件', async ({ page }) => {
+    const urls = trackFontRequests(page);
+    for (const id of ['noir', 'blueprint', 'totem', 'matrix']) {
+      await preselectTheme(page, id);
+      await page.goto('/settings');
+      await waitForAppReady(page);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', id);
+    }
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    expect(urls, '其他主题不该请求楷体').toEqual([]);
+  });
+
+  test('在设置页从默认主题切到庄周梦蝶之后才请求楷体样式，之后字体按用到的分片下载', async ({
+    page,
+  }) => {
+    const urls = trackFontRequests(page);
+    await page.goto('/settings');
+    await waitForAppReady(page);
+    await page.waitForTimeout(500);
+    expect(urls, '切换之前没有楷体请求').toEqual([]);
+
+    await page.getByRole('radio', { name: /庄周梦蝶|The Butterfly Dream/ }).click();
+    await expect
+      .poll(() => urls.some((u) => /\.css(\?|$)/.test(u)), { timeout: 10_000 })
+      .toBe(true);
+    // 字体文件按用到的字才下载：设置页没有楷体的字，进对局界面（标题、名牌用楷体）后才会下到分片
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(() => urls.some((u) => /\.woff2(\?|$)/.test(u)), { timeout: 10_000 })
+      .toBe(true);
+    // 字体按字符集分片，只下用到的分片：不会把全部 97 片都请求一遍
+    expect(urls.filter((u) => /\.woff2(\?|$)/.test(u)).length).toBeLessThan(40);
+  });
+
+  test('装饰效果可单独关闭：paper 关纸纹，drift 停掉蝶的漂移与扇动', async ({ page }, testInfo) => {
+    test.skip(
+      isMobileProject(testInfo.project.name) || isNarrowViewport(page),
+      '蝶在桌面的中央舞台里',
+    );
+    await preselectTheme(page, 'butterfly');
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('butterfly-stage')).toBeVisible({ timeout: 10_000 });
+
+    const paper = page.locator('.butterfly-paper').first();
+    const flyer = page.locator('.butterfly-flyer').first();
+    const wings = page.locator('.butterfly-wings').first();
+    await expect(paper).toBeVisible();
+    expect(await flyer.evaluate((el) => getComputedStyle(el).animationName)).toBe('ms-drift');
+    expect(await wings.evaluate((el) => getComputedStyle(el).animationName)).toBe('ms-flutter');
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-fx-off', 'paper drift'));
+    await expect(paper).toBeHidden();
+    expect(await flyer.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+    expect(await wings.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+  });
+
+  test('减少动效（系统偏好）下蝶不再动', async ({ page }, testInfo) => {
+    test.skip(
+      isMobileProject(testInfo.project.name) || isNarrowViewport(page),
+      '蝶在桌面的中央舞台里',
+    );
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await preselectTheme(page, 'butterfly');
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('butterfly-stage')).toBeVisible({ timeout: 10_000 });
+    const flyer = page.locator('.butterfly-flyer').first();
+    expect(await flyer.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+  });
+
+  test('中文界面的层签竖排，放不下竖排的矮舞台与英文界面改横排', async ({ page }, testInfo) => {
+    test.skip(
+      isMobileProject(testInfo.project.name) || isNarrowViewport(page),
+      '中央舞台只在桌面视口出现',
+    );
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await preselectTheme(page, 'butterfly');
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    const tag = page.getByTestId('layer-focus-2');
+    await expect(tag).toBeVisible({ timeout: 10_000 });
+    const mode = () => tag.evaluate((el) => getComputedStyle(el).writingMode);
+    expect(await mode()).toBe('vertical-rl');
+
+    // 英文界面：舞台根元素的 lang 不是 zh，层签保持横排
+    await page.getByTestId('butterfly-stage').evaluate((el) => el.setAttribute('lang', 'en'));
+    expect(await mode()).toBe('horizontal-tb');
   });
 });

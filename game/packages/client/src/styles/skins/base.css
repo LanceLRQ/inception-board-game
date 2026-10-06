@@ -264,3 +264,37 @@ button.ms-card:not(:disabled):hover {
     opacity: 0;
   }
 }
+/* 墨点 / 状态点的缓慢呼吸（庄周梦蝶） */
+@keyframes ms-breath {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+/* 小件在原位附近的缓慢漂移（庄周梦蝶的蝶） */
+@keyframes ms-drift {
+  0% {
+    transform: translate(0, 0) rotate(-6deg);
+  }
+  50% {
+    transform: translate(5px, -4px) rotate(4deg);
+  }
+  100% {
+    transform: translate(-4px, -6px) rotate(-3deg);
+  }
+}
+/* 翅膀扇动：沿中轴收窄再张开（庄周梦蝶） */
+@keyframes ms-flutter {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.78);
+  }
+}

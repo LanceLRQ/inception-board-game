@@ -60,6 +60,15 @@ export default defineConfig({
             },
           },
           {
+            // 楷体样式表：用过一次之后离线也能用
+            urlPattern: /lxgwwenkai[^/]*\.css$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'font-css-cache',
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
             urlPattern: /\.(?:png|jpg|jpeg|svg|webp|ico)$/i,
             handler: 'CacheFirst',
             options: {
@@ -69,6 +78,8 @@ export default defineConfig({
           },
         ],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
+        // 「庄周梦蝶」的楷体样式（按字符集分片的 @font-face 声明）只在用到这个主题时才取，不进预缓存
+        globIgnores: ['**/lxgwwenkai*.css'],
       },
       devOptions: { enabled: false },
     }),
