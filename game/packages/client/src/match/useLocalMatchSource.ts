@@ -1,12 +1,16 @@
 // 本地人机对局来源：Worker 的创建、定时取状态与发 move 都收在这里
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Comlink from 'comlink';
 import type { MatchViewState, SeatInfo } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
 import type { LocalMatchWorker } from '../workers/localMatch.worker';
 import { LOCAL_HUMAN_SEAT } from '../workers/localSeat';
 import { logger } from '../lib/logger';
+import { withSelfAvatar } from '../lib/avatarSeed';
+import { effectiveAvatarSeed } from '../hooks/useAvatar';
+import { useIdentityStore } from '../stores/useIdentityStore';
+import { NO_CHAT } from './chat';
 import type { ConnectionState, MatchSource, MoveOutcome } from './matchSource';
 
 /** 取状态的间隔（毫秒） */
@@ -93,6 +97,8 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       storageDegraded: false,
       error,
       selfTakenOver: false,
+      chat: NO_CHAT,
+      report: null,
       makeMove,
       resume: () => {},
     };
@@ -174,7 +180,15 @@ export function useLocalMatchSource({
     };
   }, [playerCount, matchId, restartKey, persist, resume]);
 
-  return source ?? IDLE_SOURCE;
+  // 本地来源的座位表没有账号信息：本人座位用身份里的头像，其余座位由界面按座位推导
+  const identityAvatar = useIdentityStore((s) =>
+    effectiveAvatarSeed(s.avatarSeed, s.playerId, s.nickname),
+  );
+  const current = source ?? IDLE_SOURCE;
+  return useMemo(() => {
+    const seats = withSelfAvatar(current.seats, current.seat, identityAvatar);
+    return seats === current.seats ? current : { ...current, seats };
+  }, [current, identityAvatar]);
 }
 
 /** 首次渲染、Worker 还没建好时的占位来源 */
@@ -188,6 +202,8 @@ const IDLE_SOURCE: MatchSource = {
   storageDegraded: false,
   error: null,
   selfTakenOver: false,
+  chat: NO_CHAT,
+  report: null,
   makeMove: async () => ({ ok: false, code: 'not_ready' }),
   resume: () => {},
 };

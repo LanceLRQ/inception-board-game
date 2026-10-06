@@ -13,9 +13,10 @@ import { isMockMode, roomApi } from '../../lib/roomApi';
 import { joinOrAttach, requestErrorMessage, roomKeys } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
-import { useIdentityStore } from '../../stores/useIdentityStore';
+import { useAvatar } from '../../hooks/useAvatar';
+import { PixelAvatar } from '../../components/PixelAvatar';
 import { RoomCodeShare } from '../../components/RoomCodeShare';
-import { isRoomMember, resolveGameRedirect, startGate } from './roomLogic';
+import { isRoomMember, resolveGameRedirect, roomPlayerAvatarSeed, startGate } from './roomLogic';
 import { useRoomSync } from './useRoomSync';
 import { Button } from '@/components/ui/button';
 
@@ -26,7 +27,7 @@ export default function Room() {
   const { code: rawCode } = useParams<{ code: string }>();
   const code = (rawCode ?? '').toUpperCase();
   const { isAuthenticated, isInitialized, playerId, nickname } = useAuth();
-  const avatarSeed = useIdentityStore((s) => s.avatarSeed);
+  const { seed: avatarSeed } = useAvatar();
 
   // 进入页面时加入一次房间（已在房间里的人刷新页面时按已加入处理）；加入成功后房间数据写进查询缓存
   const join = useMutation({
@@ -35,7 +36,7 @@ export default function Room() {
       joinOrAttach(code, {
         playerId: playerId ?? '',
         nickname,
-        avatarSeed: String(avatarSeed),
+        avatarSeed,
       }),
     onSuccess: (next) => {
       logger.flow('room', 'joined', { code, players: next.players.length });
@@ -182,9 +183,12 @@ export default function Room() {
             key={p.playerId}
             className="flex items-center justify-between rounded-md border border-line bg-panel px-3 py-2"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <PixelAvatar seed={roomPlayerAvatarSeed(p)} size={28} />
               {p.isBot && <Bot size={14} className="text-primary" />}
-              <span>{p.nickname}</span>
+              <span className="truncate" data-testid={`room-player-${p.seat}`}>
+                {p.nickname}
+              </span>
               {p.playerId === playerId && (
                 <span className="rounded bg-panel-2 px-1.5 py-0.5 text-xs text-foreground">
                   {t('room.you')}

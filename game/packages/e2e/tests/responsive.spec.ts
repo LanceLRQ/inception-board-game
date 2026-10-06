@@ -4,7 +4,7 @@
 // 视口由用例自己指定，只在 desktop-chrome 项目里跑一遍（移动项目的设备视口会被覆盖，重复无意义）。
 
 import type { Page } from '@playwright/test';
-import { test, expect, waitForAppReady } from './fixtures/index.js';
+import { test, expect, waitForAppReady, waitForAssetsReady } from './fixtures/index.js';
 import {
   boxesOverlap,
   expectNoPageScroll,
@@ -64,6 +64,7 @@ async function openScene(page: Page, url: string, layout: 'desktop' | 'mobile'):
   await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('hand-dock')).toBeVisible();
   await expect(page.getByTestId('local-runtime')).toHaveAttribute('data-layout', layout);
+  await waitForAssetsReady(page);
   if (layout === 'desktop') {
     // 中央舞台是按需加载的独立 chunk，等它出现再量版面
     await expect(page.getByTestId('center-stage').getByTestId('layer-tower')).toBeVisible({

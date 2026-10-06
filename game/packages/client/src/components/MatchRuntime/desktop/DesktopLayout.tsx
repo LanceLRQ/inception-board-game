@@ -50,6 +50,7 @@ export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayout
         className="flex origin-top-left flex-col overflow-hidden bg-background text-foreground"
         style={innerStyle}
         data-testid="local-runtime"
+        data-assets-ready={controller.assetsReady}
         data-layout="desktop"
         data-scale={scale}
         data-tint-layer={tintLayerAttr(focusLayer)}
@@ -86,6 +87,7 @@ export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayout
             winReason={controller.winReason}
             isRemote={controller.isRemote}
             onRestart={onRestart}
+            report={controller.report}
           />
         )}
       </div>

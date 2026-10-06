@@ -5,6 +5,7 @@
 //   两个布局都用内联的响应窗口 / 响应条承载解封响应，不再弹窗
 
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { MatchAssetGate } from '../AssetLoadingScreen';
 import type { MatchSource } from '../../match/matchSource';
 import { DesktopLayout } from './desktop/DesktopLayout';
 import { MatchDialogs } from './MatchDialogs';
@@ -30,6 +31,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
         <MobileLayout controller={controller} topRight={topRight} onRestart={onRestart} />
       )}
       <MatchDialogs controller={controller} />
+      <MatchAssetGate entry={controller.entryAssets} />
     </>
   );
 }

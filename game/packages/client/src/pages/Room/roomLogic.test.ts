@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RoomState } from '../../lib/roomApi';
 import { MATCH_MIN_PLAYERS } from '@icgame/shared';
-import { isRoomMember, resolveGameRedirect, startGate } from './roomLogic';
+import { isRoomMember, resolveGameRedirect, roomPlayerAvatarSeed, startGate } from './roomLogic';
 
 function makeRoom(overrides: Partial<RoomState> = {}): RoomState {
   return {
@@ -82,5 +82,12 @@ describe('startGate', () => {
 
   it('房间还没加载时不能开始', () => {
     expect(startGate(null)).toEqual({ canStart: false, missing: 0 });
+  });
+});
+
+describe('roomPlayerAvatarSeed', () => {
+  it('用服务端给的种子；没有就按座位与昵称推导', () => {
+    expect(roomPlayerAvatarSeed({ seat: 1, nickname: 'B', avatarSeed: '42' })).toBe('42');
+    expect(roomPlayerAvatarSeed({ seat: 1, nickname: 'B', avatarSeed: '' })).toBe('seat-1-B');
   });
 });

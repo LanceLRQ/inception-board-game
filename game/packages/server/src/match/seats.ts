@@ -4,6 +4,7 @@ import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
 import type { RoomSeat } from './MatchRoom.js';
 
 const NICKNAME_MAX_LENGTH = 50;
+const AVATAR_SEED_MAX_LENGTH = 64;
 
 /** 按房间座位号升序，依次编为 '0'..'n-1'；Bot 座位没有账号 id */
 export function buildSeats(players: readonly RoomPlayer[]): RoomSeat[] {
@@ -16,6 +17,7 @@ export function buildSeats(players: readonly RoomPlayer[]): RoomSeat[] {
         playerId: p.isBot ? null : p.playerId,
         nickname: nickname.length > 0 ? nickname : `Player ${i + 1}`,
         isBot: p.isBot,
+        ...(p.avatarSeed ? { avatarSeed: p.avatarSeed.slice(0, AVATAR_SEED_MAX_LENGTH) } : {}),
       };
     });
 }

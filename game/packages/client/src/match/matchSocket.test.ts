@@ -408,6 +408,79 @@ describe('MatchSocket', () => {
     expect(ms.getSnapshot().seats[0]!.takenOver).toBe(false);
   });
 
+  describe('预设短语', () => {
+    const chatMsg = (sender: string, phraseId: string) => ({
+      type: 'icg:chatMessage',
+      matchID: 'm1',
+      message: { sender, text: '服务端附带的文案', phraseId, sentAt: 1_700_000_000_000 },
+    });
+
+    it('收到的短语进入快照，带发送座位与本机单调时钟的收到时刻', () => {
+      let t = 500;
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => t,
+      });
+      m.connect();
+      sock.connected = true;
+      sock.fire('icg:state', snapshotMsg('icg:state', 1));
+      sock.fire('icg:chatMessage', chatMsg('1', 'greet_hi'));
+      t = 900;
+      sock.fire('icg:chatMessage', chatMsg('0', 'emotion_gg'));
+      expect(m.getSnapshot().chat).toEqual([
+        { id: 1, seat: '1', presetId: 'greet_hi', at: 500 },
+        { id: 2, seat: '0', presetId: 'emotion_gg', at: 900 },
+      ]);
+      m.close();
+    });
+
+    it('不在预设里的短语、畸形消息一律忽略（界面不会出现任意文本）', () => {
+      ready();
+      socket.fire('icg:chatMessage', chatMsg('1', '大家好，加我'));
+      socket.fire('icg:chatMessage', { message: null });
+      socket.fire('icg:chatMessage', 'x');
+      expect(ms.getSnapshot().chat).toEqual([]);
+    });
+
+    it('历史只留最近 30 条', () => {
+      ready();
+      for (let i = 0; i < 35; i++) socket.fire('icg:chatMessage', chatMsg('1', 'greet_hi'));
+      const chat = ms.getSnapshot().chat;
+      expect(chat).toHaveLength(30);
+      expect(chat[0]!.id).toBe(6);
+    });
+
+    it('sendChat 发出只带短语 id 的 icg:chatBroadcast', () => {
+      ready();
+      expect(ms.sendChat('greet_hi')).toBe(true);
+      expect(socket.sent('icg:chatBroadcast')).toEqual([
+        { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' },
+      ]);
+    });
+
+    it('sendChat 拒发：不在预设里的 id、没连上、已关闭', () => {
+      ms.connect();
+      expect(ms.sendChat('greet_hi')).toBe(false);
+      socket.connected = true;
+      socket.fire('icg:state', snapshotMsg('icg:state', 1));
+      expect(ms.sendChat('随便写点什么')).toBe(false);
+      ms.close();
+      expect(ms.sendChat('greet_hi')).toBe(false);
+      expect(socket.sent('icg:chatBroadcast')).toEqual([]);
+    });
+
+    it('close 之后不再收短语', () => {
+      ready();
+      ms.close();
+      socket.fire('icg:chatMessage', chatMsg('1', 'greet_hi'));
+      expect(ms.getSnapshot().chat).toEqual([]);
+    });
+  });
+
   it('requestSync 只发一次 icg:sync', () => {
     ready(1);
     ms.requestSync();

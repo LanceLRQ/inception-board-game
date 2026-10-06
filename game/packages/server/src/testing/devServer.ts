@@ -13,6 +13,9 @@ import { InMemoryMatchStore } from '../match/MatchStore.js';
 import type { TimingConfig } from '../match/scheduling.js';
 import type { LobbyRedis } from '../services/LobbyService.js';
 import { InMemoryRateGuard } from '../services/RateGuardService.js';
+import type { ReportsPrisma } from '../api/reports.js';
+import { InMemoryReportArchive, ReportService } from '../services/ReportService.js';
+import { InMemoryReputationStore, ReputationService } from '../services/ReputationService.js';
 import { createMemoryIdentityPrisma } from './memoryIdentity.js';
 
 /** 进程内的 Redis 子集：键值与过期时间，足够大厅与心跳使用 */
@@ -72,8 +75,37 @@ export interface DevServer {
   stop(): Promise<void>;
 }
 
+/**
+ * 内存版的举报依赖：对局成员表直接读运行中的对局座位（举报只会发生在刚打完的对局上，
+ * 对局在结束后还会保留一小段时间），举报与信誉分都存在进程内。
+ */
+function memoryReports(getRealtime: () => Realtime | null) {
+  const prisma: ReportsPrisma = {
+    match: {
+      async findUnique({ where }) {
+        const room = getRealtime()?.matches.get(where.id) ?? null;
+        if (room === null) return null;
+        return {
+          id: where.id,
+          matchPlayers: room.seats().map((s) => ({
+            seat: Number(s.seat),
+            playerId: s.playerId,
+            isBot: s.isBot,
+          })),
+        };
+      },
+    },
+  };
+  const reputation = new ReputationService(new InMemoryReputationStore());
+  return {
+    prisma,
+    reportService: new ReportService(reputation, { archive: new InMemoryReportArchive() }),
+  };
+}
+
 export async function startDevServer(opts: DevServerOptions = {}): Promise<DevServer> {
   const redis = new MemoryRedis();
+  let started: Realtime | null = null;
   const identity = createMemoryIdentityPrisma();
   const origin = opts.corsOrigin ?? '*';
   const rt = buildRealtime({
@@ -82,8 +114,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     lobbyRedis: redis,
     lobbyPrisma: identity,
     identityPrisma: identity,
-    // 内存服务没有对局成员表，不挂举报接口
-    reports: null,
+    reports: memoryReports(() => started),
     heartbeatRedis: redis,
     rateGuard: new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
     timing: opts.timing ?? devTimingFromEnv(process.env),
@@ -93,6 +124,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     },
     ws: { corsOrigin: origin, path: '/ws' },
   });
+  started = rt;
   const port = await rt.start(opts.port ?? 0);
   logger.info({ port }, 'in-memory dev server started');
   return { rt, url: `http://127.0.0.1:${port}`, stop: () => rt.stop() };

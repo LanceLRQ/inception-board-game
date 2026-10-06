@@ -1,6 +1,8 @@
 // 对局来源：对局界面只依赖这个接口，不关心状态来自本机 Worker 还是服务端
 
 import type { MatchViewState, MoveRejectCode, SeatInfo } from '@icgame/game-engine';
+import type { ReportChannel } from '../lib/reportApi';
+import type { ChatChannel } from './chat';
 
 export type ConnectionState =
   | 'idle'
@@ -35,6 +37,10 @@ export interface MatchSource {
   readonly error: string | null;
   /** 本人座位是否被 Bot 托管（挂机或掉线）；本地来源恒为 false */
   readonly selfTakenOver: boolean;
+  /** 预设短语通道；只有联机来源可用（固定场景按地址参数注入示例） */
+  readonly chat: ChatChannel;
+  /** 局后举报通道；只有联机来源有（本地人机局没有真人对手），固定场景按地址参数注入 */
+  readonly report: ReportChannel | null;
   makeMove(move: string, args?: unknown[]): Promise<MoveOutcome>;
   /** 取消本人座位的托管；本地来源是无操作 */
   resume(): void;

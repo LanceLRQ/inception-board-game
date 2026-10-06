@@ -31,6 +31,8 @@ export interface BoardNightmare {
 export interface BoardOccupant {
   readonly id: string;
   readonly name: string;
+  /** 像素头像种子（公开信息） */
+  readonly avatarSeed: string;
   readonly isSelf: boolean;
   readonly isMaster: boolean;
   readonly isCurrent: boolean;
@@ -143,6 +145,7 @@ export function buildBoardLayers(
         {
           id,
           name: p.nickname,
+          avatarSeed: p.avatarSeed,
           isSelf,
           isMaster,
           isCurrent: id === state.currentPlayerID,

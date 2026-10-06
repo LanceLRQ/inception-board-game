@@ -2,6 +2,8 @@
 
 import { useTranslation } from 'react-i18next';
 import { RotateCcw, Trophy } from 'lucide-react';
+import type { ReportModel } from '../controllerTypes';
+import { OutcomeReport } from './OutcomeReport';
 
 interface MatchOutcomeProps {
   readonly winner: string;
@@ -9,9 +11,17 @@ interface MatchOutcomeProps {
   /** 联机对局回大厅，本地对局再来一局 */
   readonly isRemote: boolean;
   readonly onRestart?: () => void;
+  /** 局后举报；本地人机对局与没有真人对手时为 null */
+  readonly report?: ReportModel | null;
 }
 
-export function MatchOutcome({ winner, winReason, isRemote, onRestart }: MatchOutcomeProps) {
+export function MatchOutcome({
+  winner,
+  winReason,
+  isRemote,
+  onRestart,
+  report = null,
+}: MatchOutcomeProps) {
   const { t } = useTranslation();
   return (
     <div
@@ -21,7 +31,7 @@ export function MatchOutcome({ winner, winReason, isRemote, onRestart }: MatchOu
       aria-label={t('outcome.aria')}
     >
       <div
-        className="w-full max-w-sm border border-line-strong bg-panel p-6 text-center"
+        className="max-h-full w-full max-w-sm overflow-y-auto border border-line-strong bg-panel p-6 text-center"
         data-testid="winner-banner"
       >
         <Trophy className="mx-auto mb-2 size-8 text-acc-bright" aria-hidden />
@@ -44,6 +54,7 @@ export function MatchOutcome({ winner, winReason, isRemote, onRestart }: MatchOu
             ? t('match.back_to_lobby', { defaultValue: '返回大厅' })
             : t('localMatch.restart')}
         </button>
+        {report && <OutcomeReport report={report} />}
       </div>
     </div>
   );

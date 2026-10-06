@@ -5,6 +5,8 @@ import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import { buildFixtureScenario } from '../../match/fixtures/buildScenario';
 import {
   HAND_LIMIT,
+  adaptPlayForCharacter,
+  SUDGER_CHARACTER_ID,
   activeSkillTargetIds,
   buildActiveSkillContext,
   buildPlayArgs,
@@ -456,6 +458,72 @@ describe('buildPlayArgs', () => {
       'action_shoot',
       'action_death_decree_a',
     ]);
+  });
+});
+
+describe('意念判官：打出 SHOOT 类牌改走【定罪】', () => {
+  const SUDGER = SUDGER_CHARACTER_ID;
+
+  it('角色 id 与引擎一致', () => {
+    expect(SUDGER).toBe('thief_sudger_of_mind');
+  });
+
+  it.each([
+    ['action_shoot', 'playShoot'],
+    ['action_shoot_burst', 'playShootBurst'],
+  ])('%s：move 由 %s 换成 playShootSudger，参数顺序与宣言不变', (card, move) => {
+    const base = pendingPlayFor(card)!;
+    expect(base.move).toBe(move);
+    const adapted = adaptPlayForCharacter(base, SUDGER)!;
+    expect(adapted.move).toBe('playShootSudger');
+    expect(adapted.card).toBe(card);
+    expect(buildPlayArgs(adapted, '3', 'action_death_decree_a')).toEqual([
+      '3',
+      card,
+      'action_death_decree_a',
+    ]);
+    expect(buildPlayArgs(adapted, '3', null)).toEqual(['3', card]);
+  });
+
+  it('梦境穿梭剂的 SHOOT 模式：同样走定罪，目标在前、牌在后；transit 模式不受影响', () => {
+    const shoot = adaptPlayForCharacter(
+      dreamTransitPending('action_shoot_dream_transit', 'shoot'),
+      SUDGER,
+    )!;
+    expect(shoot.move).toBe('playShootSudger');
+    expect(shoot.dreamMode).toBeUndefined();
+    expect(shoot.needsTarget).toBe('player');
+    expect(buildPlayArgs(shoot, '2', 'action_death_decree_a')).toEqual([
+      '2',
+      'action_shoot_dream_transit',
+      'action_death_decree_a',
+    ]);
+    const transit = dreamTransitPending('action_shoot_dream_transit', 'transit');
+    expect(adaptPlayForCharacter(transit, SUDGER)).toBe(transit);
+  });
+
+  it('引擎的定罪结算不覆盖的牌保持原来的 move', () => {
+    const assassin = pendingPlayFor('action_shoot_assassin');
+    if (assassin) expect(adaptPlayForCharacter(assassin, SUDGER)).toBe(assassin);
+  });
+
+  it('不是 SHOOT 类的牌不受影响', () => {
+    const kick = pendingPlayFor('action_kick')!;
+    expect(adaptPlayForCharacter(kick, SUDGER)).toBe(kick);
+  });
+
+  it('别的角色、没有出牌意图：原样返回', () => {
+    const shoot = pendingPlayFor('action_shoot')!;
+    expect(adaptPlayForCharacter(shoot, 'thief_pisces')).toBe(shoot);
+    expect(adaptPlayForCharacter(shoot, '')).toBe(shoot);
+    expect(adaptPlayForCharacter(null, SUDGER)).toBeNull();
+  });
+
+  it('改走定罪后仍算 SHOOT 出牌：死亡宣言可选项照常出现', () => {
+    const adapted = adaptPlayForCharacter(pendingPlayFor('action_shoot')!, SUDGER)!;
+    expect(isShootMove(adapted.move)).toBe(true);
+    expect(isShootPlay(adapted)).toBe(true);
+    expect(decreeApplicable(adapted, ['action_death_decree_a'])).toBe(true);
   });
 });
 

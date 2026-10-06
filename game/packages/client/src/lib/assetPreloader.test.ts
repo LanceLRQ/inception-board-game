@@ -6,8 +6,8 @@ import {
   advanceProgress,
   filterByIds,
   filterByTier,
+  isConstrainedConnection,
   makeInitialProgress,
-  shouldSkipMatchEntry,
 } from './assetPreloader.js';
 
 function mkEntry(id: string, tier: AssetManifestEntry['tier'], bytes = 1000): AssetManifestEntry {
@@ -82,38 +82,25 @@ describe('advanceProgress', () => {
   });
 });
 
-describe('shouldSkipMatchEntry', () => {
-  it('returns false when saveData is undefined', () => {
-    expect(shouldSkipMatchEntry()).toBe(false);
+describe('isConstrainedConnection', () => {
+  it('读不到网络信息时不受限', () => {
+    expect(isConstrainedConnection(undefined)).toBe(false);
+    expect(isConstrainedConnection({})).toBe(false);
   });
 
-  it('returns true when saveData() is true', () => {
-    expect(shouldSkipMatchEntry(() => true)).toBe(true);
-  });
-
-  it('returns false when saveData() throws', () => {
-    expect(
-      shouldSkipMatchEntry(() => {
-        throw new Error();
-      }),
-    ).toBe(false);
+  it('数据节省模式或 2g 视为受限，4g / wifi 不受限', () => {
+    expect(isConstrainedConnection({ saveData: true })).toBe(true);
+    expect(isConstrainedConnection({ effectiveType: '2g' })).toBe(true);
+    expect(isConstrainedConnection({ effectiveType: 'slow-2g' })).toBe(true);
+    expect(isConstrainedConnection({ effectiveType: '4g', saveData: false })).toBe(false);
+    expect(isConstrainedConnection({ effectiveType: '3g' })).toBe(false);
   });
 });
 
 // --- AssetPreloader ---
 
-function makeFetchMock(opts: {
-  okIds?: readonly string[];
-  failIds?: readonly string[];
-  manifestBody?: AssetManifest | null;
-}) {
+function makeFetchMock(opts: { okIds?: readonly string[]; failIds?: readonly string[] }) {
   return vi.fn(async (url: string) => {
-    if (url.endsWith('/manifest.json')) {
-      if (opts.manifestBody === null) {
-        return new Response('', { status: 404 });
-      }
-      return new Response(JSON.stringify(opts.manifestBody ?? SAMPLE_MANIFEST), { status: 200 });
-    }
     const m = url.match(/\/([a-z0-9_]+)\.webp$/);
     const id = m?.[1] ?? '';
     if (opts.failIds?.includes(id)) return new Response('', { status: 500 });
@@ -121,23 +108,6 @@ function makeFetchMock(opts: {
     return new Response('', { status: 500 });
   });
 }
-
-describe('AssetPreloader.loadManifest', () => {
-  it('fetches manifest and caches it internally', async () => {
-    const fetchMock = makeFetchMock({});
-    const p = new AssetPreloader({ fetch: fetchMock as unknown as typeof fetch });
-    const m = await p.loadManifest();
-    expect(m).toEqual(SAMPLE_MANIFEST);
-    expect(fetchMock).toHaveBeenCalledWith('/cards/manifest.json', { cache: 'force-cache' });
-  });
-
-  it('returns null when manifest fetch fails', async () => {
-    const fetchMock = makeFetchMock({ manifestBody: null });
-    const p = new AssetPreloader({ fetch: fetchMock as unknown as typeof fetch });
-    const m = await p.loadManifest();
-    expect(m).toBeNull();
-  });
-});
 
 describe('AssetPreloader.preloadCritical', () => {
   it('loads all critical-tier entries and reports progress', async () => {
@@ -153,7 +123,7 @@ describe('AssetPreloader.preloadCritical', () => {
     expect(progressLog).toContain(1);
   });
 
-  it('returns zero progress when no manifest loaded', async () => {
+  it('returns zero progress when no catalog is set', async () => {
     const fetchMock = makeFetchMock({});
     const p = new AssetPreloader({ fetch: fetchMock as unknown as typeof fetch });
     const r = await p.preloadCritical();
@@ -167,53 +137,181 @@ describe('AssetPreloader.preloadCritical', () => {
     await p.preloadCritical();
     const before = fetchMock.mock.calls.length;
     await p.preloadCritical();
-    // 第二次应该全是命中 loaded cache，不再新增 fetch 调用（除 manifest）
-    // 但 preloadCritical 内部会再次 preloadOne，preloadOne 早退——验证方式：
     expect(p.loadedIds.has('thief_back')).toBe(true);
-    // 新增的 fetch 调用应该为 0
+    // 已经加载过的不再请求
     expect(fetchMock.mock.calls.length).toBe(before);
   });
 });
 
 describe('AssetPreloader.preloadMatchEntry', () => {
-  it('loads only entries whose id is in the request list', async () => {
-    const fetchMock = makeFetchMock({});
-    const p = new AssetPreloader({ fetch: fetchMock as unknown as typeof fetch });
-    p.setManifest(SAMPLE_MANIFEST);
+  const ok = (): AssetPreloader =>
+    new AssetPreloader({
+      fetch: makeFetchMock({}) as unknown as typeof fetch,
+      constrained: () => false,
+    });
 
+  it('取 match-entry 档的全集，再加上调用方给的 id', async () => {
+    const p = ok();
+    p.setManifest(SAMPLE_MANIFEST);
+    const r = await p.preloadMatchEntry(['other_config_table']);
+    // 全集 2 张（thief_space_queen、thief_joker）+ 视图里点名的 1 张
+    expect(r.total).toBe(3);
+    expect(r.loaded).toBe(3);
+    expect(p.loadedIds.has('other_config_table')).toBe(true);
+    expect(p.loadedIds.has('thief_back')).toBe(false);
+  });
+
+  it('受限网络下只取调用方给的 id，不取全集', async () => {
+    const fetchMock = makeFetchMock({});
+    const p = new AssetPreloader({
+      fetch: fetchMock as unknown as typeof fetch,
+      constrained: () => true,
+    });
+    p.setManifest(SAMPLE_MANIFEST);
     const r = await p.preloadMatchEntry(['thief_joker']);
     expect(r.total).toBe(1);
-    expect(r.loaded).toBe(1);
     expect(p.loadedIds.has('thief_joker')).toBe(true);
     expect(p.loadedIds.has('thief_space_queen')).toBe(false);
   });
 
-  it('skips all when saveData is enabled', async () => {
+  it('已经加载过的不再请求，进度只算新增的', async () => {
     const fetchMock = makeFetchMock({});
     const p = new AssetPreloader({
       fetch: fetchMock as unknown as typeof fetch,
-      saveData: () => true,
+      constrained: () => false,
     });
     p.setManifest(SAMPLE_MANIFEST);
-
-    const r = await p.preloadMatchEntry(['thief_joker', 'thief_space_queen']);
-    expect(r.total).toBe(0);
-    expect(p.loadedIds.size).toBe(0);
+    await p.preloadMatchEntry([]);
+    const calls = fetchMock.mock.calls.length;
+    const again = await p.preloadMatchEntry([]);
+    expect(again.total).toBe(0);
+    expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
-  it('records failed ids without marking them as loaded', async () => {
+  it('失败的素材记入 failed，不算已加载，也不影响其余', async () => {
     const fetchMock = makeFetchMock({ failIds: ['thief_joker'] });
-    const p = new AssetPreloader({ fetch: fetchMock as unknown as typeof fetch });
+    const p = new AssetPreloader({
+      fetch: fetchMock as unknown as typeof fetch,
+      constrained: () => false,
+    });
     p.setManifest(SAMPLE_MANIFEST);
-
-    const r = await p.preloadMatchEntry(['thief_joker', 'thief_space_queen']);
+    const r = await p.preloadMatchEntry([]);
     expect(r.failed).toEqual(['thief_joker']);
+    expect(r.loaded).toBe(r.total);
     expect(p.loadedIds.has('thief_joker')).toBe(false);
     expect(p.loadedIds.has('thief_space_queen')).toBe(true);
+  });
+
+  it('超时的素材同样算失败，进度照常走完', async () => {
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    const p = new AssetPreloader({
+      fetch: fetchMock as unknown as typeof fetch,
+      constrained: () => false,
+    });
+    p.setManifest(SAMPLE_MANIFEST);
+    const r = await p.preloadBatch(
+      SAMPLE_MANIFEST.entries.filter((e) => e.tier === 'match-entry'),
+      'match-entry',
+      { concurrency: 2, timeoutMs: 20 },
+    );
+    expect(r.loaded).toBe(2);
+    expect(r.failed).toHaveLength(2);
+  });
+
+  it('取消后不再开始新的请求', async () => {
+    const fetchMock = makeFetchMock({});
+    const p = new AssetPreloader({
+      fetch: fetchMock as unknown as typeof fetch,
+      constrained: () => false,
+    });
+    p.setManifest(SAMPLE_MANIFEST);
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const r = await p.preloadMatchEntry([], undefined, ctrl.signal);
+    expect(r.loaded).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('AssetPreloader.preloadIdle', () => {
+  it('受限网络下直接跳过，一张都不取', async () => {
+    const fetchMock = makeFetchMock({});
+    const p = new AssetPreloader({
+      fetch: fetchMock as unknown as typeof fetch,
+      constrained: () => true,
+    });
+    p.setManifest(SAMPLE_MANIFEST);
+    expect(await p.preloadIdle()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('不受限时取 idle 档的图，并发不超过 2', async () => {
+    let active = 0;
+    let peak = 0;
+    const fetchMock = vi.fn(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      active -= 1;
+      return new Response('ok', { status: 200 });
+    });
+    const many: AssetManifest = {
+      ...SAMPLE_MANIFEST,
+      entries: Array.from({ length: 8 }, (_, i) => mkEntry(`idle_${i}`, 'idle')),
+    };
+    const p = new AssetPreloader({
+      fetch: fetchMock as unknown as typeof fetch,
+      constrained: () => false,
+    });
+    p.setManifest(many);
+    const r = await p.preloadIdle();
+    expect(r?.loaded).toBe(8);
+    expect(peak).toBeLessThanOrEqual(2);
+  });
+
+  it('没有待取的图时返回 null', async () => {
+    const p = new AssetPreloader({
+      fetch: makeFetchMock({}) as unknown as typeof fetch,
+      constrained: () => false,
+    });
+    p.setManifest({ ...SAMPLE_MANIFEST, entries: [mkEntry('a', 'critical')] });
+    expect(await p.preloadIdle()).toBeNull();
+  });
+});
+
+describe('AssetPreloader 默认使用全局 fetch', () => {
+  it('以全局对象为 this 调用 fetch（像浏览器那样，this 不对就抛 Illegal invocation）', async () => {
+    const strictFetch = vi.fn(function (this: unknown): Promise<Response> {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError('Illegal invocation');
+      }
+      return Promise.resolve(new Response('ok', { status: 200 }));
+    });
+    vi.stubGlobal('fetch', strictFetch);
+    try {
+      const p = new AssetPreloader();
+      expect(await p.preloadOne(mkEntry('thief_g', 'critical'))).toBe(true);
+      expect(strictFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
 describe('AssetPreloader.preloadOne', () => {
+  it('响应体读完才算加载成功', async () => {
+    const body = vi.fn(async () => new ArrayBuffer(4));
+    const fetchMock = vi.fn(async () => ({ ok: true, arrayBuffer: body }) as unknown as Response);
+    const p = new AssetPreloader({ fetch: fetchMock as unknown as typeof fetch });
+    expect(await p.preloadOne(mkEntry('thief_z', 'critical'))).toBe(true);
+    expect(body).toHaveBeenCalledTimes(1);
+  });
+
   it('deduplicates concurrent calls for the same id (inflight map)', async () => {
     let calls = 0;
     const fetchMock = vi.fn(async (_url: string) => {

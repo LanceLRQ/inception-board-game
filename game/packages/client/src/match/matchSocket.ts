@@ -8,8 +8,10 @@ import {
   type SeatInfo,
   type ServerMatchMessage,
 } from '@icgame/game-engine';
+import { isValidChatPresetId } from '@icgame/shared';
 import { logger } from '@/lib/logger';
 import { toLocalDeadline } from '@/lib/deadlineClock';
+import { appendChatEntry, parseIncomingChat, type ChatEntry } from './chat';
 import type { ConnectionState, MoveOutcome } from './matchSource';
 
 /** 连接所需的最小 socket 接口；socket.io-client 的 Socket 可直接赋给它 */
@@ -56,6 +58,8 @@ export interface MatchSocketSnapshot {
   storageDegraded: boolean;
   /** 无法继续的原因：握手被拒、协议版本不符、连接被同座位的新连接替换，或服务端判定对局中断 */
   fatal: string | null;
+  /** 本连接收到的预设短语，旧的在前，只留最近一批 */
+  chat: readonly ChatEntry[];
 }
 
 const HANDSHAKE_REJECTIONS = ['AUTH_REQUIRED', 'AUTH_INVALID', 'NOT_IN_MATCH'];
@@ -69,6 +73,7 @@ const INITIAL: MatchSocketSnapshot = {
   connection: 'idle',
   storageDegraded: false,
   fatal: null,
+  chat: [],
 };
 
 interface Pending {
@@ -87,6 +92,7 @@ export class MatchSocket {
   private readonly pending = new Map<string, Pending>();
   /** 已交给事件监听的最大版本号 */
   private deliveredStateID = -1;
+  private chatSeq = 0;
   private readonly moveTimeoutMs: number;
   private readonly newIntentId: () => string;
 
@@ -112,6 +118,7 @@ export class MatchSocket {
     socket.on('icg:seats', (msg: ServerMatchMessage) => this.onSeats(msg));
     socket.on('icg:moveResult', (msg: ServerMatchMessage) => this.onMoveResult(msg));
     socket.on('icg:storage', (msg: ServerMatchMessage) => this.onStorage(msg));
+    socket.on('icg:chatMessage', (msg: unknown) => this.onChat(msg));
     socket.on('icg:error', (msg: { code?: string }) => this.onServerError(msg));
     this.update({ connection: 'connecting' });
     socket.connect();
@@ -134,6 +141,7 @@ export class MatchSocket {
       socket.off?.('icg:seats');
       socket.off?.('icg:moveResult');
       socket.off?.('icg:storage');
+      socket.off?.('icg:chatMessage');
       socket.off?.('icg:error');
       socket.disconnect();
     }
@@ -189,6 +197,23 @@ export class MatchSocket {
     if (this.closed || this.socket === null || this.snapshot.connection !== 'connected') return;
     logger.flow('net/ws', 'resume requested', { matchID: this.options.matchID });
     this.socket.emit('icg:resume', { type: 'icg:resume' });
+  }
+
+  /**
+   * 发一条预设短语。只发短语 id，座位由服务端按连接判定；冷却与限流以服务端为准。
+   * 返回是否发出：没连上、已关闭、id 不在预设里都不发。
+   */
+  sendChat(presetId: string): boolean {
+    const socket = this.socket;
+    if (this.closed || socket === null || this.snapshot.connection !== 'connected') return false;
+    if (!isValidChatPresetId(presetId)) return false;
+    socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: presetId,
+    });
+    logger.flow('game/chat', 'chat sent', { presetId });
+    return true;
   }
 
   /** 向服务端要一份最新状态；只发一次，服务端限流时不重试 */
@@ -301,6 +326,22 @@ export class MatchSocket {
   private onSeats(msg: ServerMatchMessage): void {
     if (this.closed || msg.type !== 'icg:seats') return;
     this.update({ seats: msg.seats });
+  }
+
+  private onChat(msg: unknown): void {
+    if (this.closed) return;
+    const parsed = parseIncomingChat(msg);
+    if (parsed === null) return;
+    const now = this.options.now ?? (() => performance.now());
+    this.chatSeq += 1;
+    this.update({
+      chat: appendChatEntry(this.snapshot.chat, {
+        id: this.chatSeq,
+        seat: parsed.seat,
+        presetId: parsed.presetId,
+        at: now(),
+      }),
+    });
   }
 
   private onStorage(msg: ServerMatchMessage): void {

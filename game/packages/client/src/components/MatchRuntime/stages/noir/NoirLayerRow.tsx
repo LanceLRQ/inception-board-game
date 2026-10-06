@@ -9,6 +9,7 @@ import { getCardName } from '../../../../lib/cards';
 import { CardArt } from '../../../CardArt';
 import { Die } from '../../../Die';
 import type { BoardLayer, BoardNightmare, BoardVault } from '../../model/boardModel';
+import { PixelAvatar } from '../../../PixelAvatar';
 
 interface NoirLayerRowProps {
   readonly row: BoardLayer;
@@ -178,6 +179,7 @@ export function NoirLayerRow({ row, focus, onFocus, onOpenCard }: NoirLayerRowPr
                 data-self={o.isSelf || undefined}
                 className="noir-occ flex max-w-44 items-center gap-1 text-[11px]"
               >
+                <PixelAvatar seed={o.avatarSeed} size={14} rounded={false} />
                 {o.isMaster && <Crown className="size-3 shrink-0 text-acc-bright" aria-hidden />}
                 <span className="truncate">
                   {o.isSelf ? t('seat.me') : o.name}

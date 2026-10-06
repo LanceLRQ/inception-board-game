@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const get = vi.fn();
 const post = vi.fn();
+const patch = vi.fn();
 
 vi.mock('./api', () => {
   class ApiRequestError extends Error {
@@ -13,7 +14,7 @@ vi.mock('./api', () => {
       super(message);
     }
   }
-  return { api: { get, post }, ApiRequestError };
+  return { api: { get, post, patch }, ApiRequestError };
 });
 vi.mock('./logger', () => ({
   logger: { flow: vi.fn(), warn: vi.fn(), error: vi.fn(), ai: vi.fn() },
@@ -42,6 +43,7 @@ describe('identityApi', () => {
     vi.resetModules();
     get.mockReset();
     post.mockReset();
+    patch.mockReset();
     stubLocalStorage();
   });
 
@@ -109,5 +111,27 @@ describe('identityApi', () => {
       createdAt: '2026-10-01T00:00:00.000Z',
     });
     expect(get).toHaveBeenCalledWith('/identity/recovery-code');
+  });
+
+  it('updateAvatar 走 PATCH /identity/me，返回服务端保存后的种子', async () => {
+    patch.mockResolvedValue({ playerId: 'p1', avatarSeed: 'new-seed' });
+    const { identityApi } = await import('./identityApi');
+    await expect(identityApi.updateAvatar('new-seed')).resolves.toBe('new-seed');
+    expect(patch).toHaveBeenCalledWith('/identity/me', { avatarSeed: 'new-seed' });
+  });
+
+  it('updateAvatar：服务端报错直接抛出，不写本地', async () => {
+    patch.mockRejectedValue(new Error('boom'));
+    const { identityApi } = await import('./identityApi');
+    await expect(identityApi.updateAvatar('x')).rejects.toThrow('boom');
+  });
+
+  it('updateAvatar：离线模拟身份只改本机保存的资料，不请求服务端', async () => {
+    post.mockRejectedValue(new TypeError('Failed to fetch'));
+    const { identityApi } = await import('./identityApi');
+    await identityApi.init('A');
+    await expect(identityApi.updateAvatar('local-seed')).resolves.toBe('local-seed');
+    expect(patch).not.toHaveBeenCalled();
+    await expect(identityApi.me()).resolves.toMatchObject({ avatarSeed: 'local-seed' });
   });
 });

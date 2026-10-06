@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Crown, Play } from 'lucide-react';
 import { Die } from '../../../Die';
 import type { BoardLayer } from '../../model/boardModel';
+import { PixelAvatar } from '../../../PixelAvatar';
 
 interface MatrixDetailProps {
   readonly row: BoardLayer;
@@ -39,6 +40,7 @@ export function MatrixDetail({ row }: MatrixDetailProps) {
             data-self={o.isSelf || undefined}
             className="matrix-occ flex max-w-44 items-center gap-1 text-[11px]"
           >
+            <PixelAvatar seed={o.avatarSeed} size={14} rounded={false} />
             {o.isMaster && <Crown className="size-3 shrink-0 text-acc-bright" aria-hidden />}
             <span className="truncate">
               {o.isSelf ? t('seat.me') : o.name}

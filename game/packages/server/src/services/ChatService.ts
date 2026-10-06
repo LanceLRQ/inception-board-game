@@ -10,6 +10,7 @@
 //   - 不直接依赖 SocketGateway（解耦 + 可测）
 
 import {
+  CHAT_COOLDOWN_MS,
   findChatPreset,
   isPresetAvailableForFaction,
   type ChatPresetFaction,
@@ -50,6 +51,9 @@ export interface ChatServiceOptions {
   readonly now?: () => number;
 }
 
+/** 冷却记录超过这个条数就顺手清理过期项，不依赖对局结束时的回收 */
+const PRUNE_THRESHOLD = 1_000;
+
 export type ChatBroadcaster = (matchID: string, msg: BroadcastableMessage) => void;
 
 export class ChatService {
@@ -62,7 +66,7 @@ export class ChatService {
     private readonly broadcaster: ChatBroadcaster,
     opts: ChatServiceOptions = {},
   ) {
-    this.cooldownMs = opts.cooldownMs ?? 3_000;
+    this.cooldownMs = opts.cooldownMs ?? CHAT_COOLDOWN_MS;
     this.now = opts.now ?? (() => Date.now());
   }
 
@@ -89,6 +93,7 @@ export class ChatService {
     }
 
     this.lastSentAt.set(key, nowTs);
+    this.pruneIfLarge(nowTs);
 
     const payload: ChatMessagePayload = {
       senderID: input.senderID,
@@ -128,6 +133,14 @@ export class ChatService {
     const prefix = `${matchID}:`;
     for (const k of this.lastSentAt.keys()) {
       if (k.startsWith(prefix)) this.lastSentAt.delete(k);
+    }
+  }
+
+  /** 记录条数过多时清掉已过冷却期的：它们再也不会限制任何发送，留着只占内存 */
+  private pruneIfLarge(nowTs: number): void {
+    if (this.lastSentAt.size <= PRUNE_THRESHOLD) return;
+    for (const [key, at] of this.lastSentAt) {
+      if (nowTs - at >= this.cooldownMs) this.lastSentAt.delete(key);
     }
   }
 

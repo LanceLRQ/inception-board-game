@@ -22,6 +22,8 @@ export interface RoomSeat {
   playerId: string | null;
   nickname: string;
   isBot: boolean;
+  /** 像素头像种子：建局时取自房间成员，公开信息 */
+  avatarSeed?: string;
 }
 
 export interface StepOutput {

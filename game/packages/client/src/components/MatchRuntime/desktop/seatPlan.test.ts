@@ -3,6 +3,7 @@ import type { CenterFootprint } from '../../../theme/skins/types';
 import {
   EDGE_PAD,
   NOTICE_WIDTH,
+  bubbleSpot,
   PLATE_SIZES,
   centerWidth,
   planSeats,
@@ -135,5 +136,47 @@ describe('centerWidth', () => {
     expect(centerWidth(1000, FOOTPRINT, PLATE_SIZES.full.master.w + 100)).toBe(
       PLATE_SIZES.full.master.w + 100,
     );
+  });
+});
+
+describe('bubbleSpot', () => {
+  const seat = (
+    role: PlannedSeat['role'],
+    x: number,
+    over: Partial<PlannedSeat> = {},
+  ): PlannedSeat => ({
+    id: 'a',
+    x,
+    y: 300,
+    w: 132,
+    h: 224,
+    role,
+    ...over,
+  });
+
+  it('左列座位的气泡在座位牌右侧，右列的在左侧，都与座位牌留出间隙', () => {
+    const l = bubbleSpot(seat('left', 100), 1280);
+    expect(l.side).toBe('left');
+    expect(l.x).toBe(100 + 66 + 8);
+    const r = bubbleSpot(seat('right', 1180), 1280);
+    expect(r.side).toBe('right');
+    expect(r.x).toBe(1180 - 66 - 8);
+  });
+
+  it('气泡与座位牌顶部对齐（略低一点），不超出座位牌的上沿', () => {
+    const spot = bubbleSpot(seat('left', 100), 1280);
+    expect(spot.y).toBeGreaterThanOrEqual(300 - 112);
+    expect(spot.y).toBeLessThan(300);
+  });
+
+  it('梦主优先放右侧；右侧放不下时放左侧', () => {
+    expect(bubbleSpot(seat('master', 640, { w: 340, h: 136 }), 1280).side).toBe('left');
+    expect(bubbleSpot(seat('master', 1100, { w: 340, h: 136 }), 1280).side).toBe('right');
+  });
+
+  it('同一列相邻两个座位的气泡不会叠在一起', () => {
+    const a = bubbleSpot(seat('left', 100, { y: 150 }), 1280);
+    const b = bubbleSpot(seat('left', 100, { y: 150 + 224 + 8 }), 1280);
+    expect(b.y - a.y).toBeGreaterThan(40);
   });
 });

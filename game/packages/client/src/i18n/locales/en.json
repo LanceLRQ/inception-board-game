@@ -200,17 +200,54 @@
     }
   },
   "avatar": {
-    "roll": "Roll Avatar",
-    "rolls": "Rolled {{count}} times",
-    "save": "Save",
-    "saving": "Saving...",
-    "undo": "Undo"
+    "current": "Current avatar",
+    "roll": "Roll a new avatar",
+    "reroll": "Roll again",
+    "saving": "Saving…",
+    "saveFailed": "Couldn't save your avatar, try again later"
   },
   "chat": {
-    "toggle": "Chat",
-    "panel_title": "Quick Phrases",
-    "no_presets": "No phrases in this category",
-    "cooldown": "Cooldown... {{seconds}}s"
+    "toggle": "Phrases",
+    "cooldown": "Cooldown... {{seconds}}s",
+    "title": "Quick phrases",
+    "desc": "Pick a phrase to send to everyone in this match",
+    "recent": "Recent messages ({{n}})",
+    "recentEmpty": "Nobody has spoken yet",
+    "categories": "Phrase categories",
+    "category": {
+      "greeting": "Greetings",
+      "tactic": "Tactics",
+      "emotion": "Reactions",
+      "feedback": "Feedback"
+    },
+    "greet": {
+      "hi": "Hello, everyone!",
+      "ready": "I'm ready",
+      "welcome": "Welcome to the dream",
+      "gl": "GL HF!"
+    },
+    "tactic": {
+      "push": "Let's push!",
+      "retreat": "Retreat first",
+      "focus": "Focus on this layer",
+      "wait": "Wait one turn",
+      "trap": "Watch for traps",
+      "signal": "Beware the Dream Master"
+    },
+    "emotion": {
+      "wow": "Wow!",
+      "oops": "My bad",
+      "lucky": "Lucky!",
+      "gg": "GG, well played",
+      "sigh": "Sigh...",
+      "laugh": "Hahaha"
+    },
+    "feedback": {
+      "thanks": "Thanks!",
+      "sorry": "Sorry",
+      "nicemove": "Nice move",
+      "bye": "Well done, everyone!"
+    }
   },
   "copyright": {
     "short": "Fan-made non-commercial recreation. Original game © publisher.",
@@ -221,9 +258,9 @@
     "original_publisher": "Original {{title}} © {{publisher}} ({{website}})."
   },
   "loading": {
-    "title": "Preparing dream...",
-    "waiting": "Waiting for resources...",
-    "failed": "{{count}} card images failed to load, using placeholders"
+    "title": "Preparing the dream...",
+    "failed": "{{count}} card images couldn't load; text placeholders will be shown",
+    "progress": "Loaded {{loaded}} / {{total}}"
   },
   "match": {
     "reject": {
@@ -262,12 +299,32 @@
   },
   "report": {
     "button": "Report",
-    "button_aria": "Report Player",
-    "dialog_title": "Report Player",
+    "button_aria": "Report {{name}}",
+    "dialog_title": "Report player",
     "target_label": "Reporting: {{name}}",
-    "description_label": "Description (optional, max 500 chars)",
-    "submit": "Submit Report",
-    "submitting": "Submitting..."
+    "description_label": "Details (optional, up to {{max}} characters)",
+    "submit": "Submit report",
+    "submitting": "Submitting...",
+    "reported": "Reported",
+    "section": "Report a player",
+    "reason_label": "Reason",
+    "reason": {
+      "cheating": "Cheating",
+      "afk": "AFK / abandoning",
+      "abusive": "Abusive behavior",
+      "other": "Other"
+    },
+    "close": "Close",
+    "done": "Report received, thank you.",
+    "error": {
+      "duplicate": "You have already reported this player in this match.",
+      "forbidden": "Only players of this match can report.",
+      "not_found": "This match's record can't be found, so it can't be reported right now.",
+      "invalid": "This report can't be accepted. Try another target or reason.",
+      "rate_limited": "Too many requests. Please try again shortly.",
+      "network": "Network unstable, the report wasn't delivered. Please retry.",
+      "unknown": "Report failed. Please try again later."
+    }
   },
   "tutorial": {
     "step_count": "Step {{current}} / {{total}}",
@@ -831,5 +888,17 @@
   },
   "die": {
     "combat": "Combat die {{n}}"
+  },
+  "cardArt": {
+    "category": {
+      "thief": "Thief",
+      "dream-master": "Dream Master",
+      "action": "Action",
+      "nightmare": "Nightmare",
+      "vault": "Vault",
+      "bribe": "Bribe",
+      "dream": "Dream",
+      "other": "Card"
+    }
   }
 }

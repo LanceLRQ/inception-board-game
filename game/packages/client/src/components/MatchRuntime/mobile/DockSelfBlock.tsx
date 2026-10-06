@@ -1,6 +1,7 @@
 // 手牌坞里的本人身份块：角色头像（点按看角色详情）、角色名、所在层 / 技能状态
 
 import { useTranslation } from 'react-i18next';
+import { CardArt } from '../../CardArt';
 import { getCardImageUrl } from '../../../lib/cardImages';
 import { getCharacterSkillSummary } from '../../../lib/cards';
 import type { SelfInfo } from '../controllerTypes';
@@ -34,9 +35,7 @@ export function DockSelfBlock({ self, skillName, onPreview }: DockSelfBlockProps
         data-testid="human-character-preview"
         className="relative size-11 shrink-0 touch-manipulation overflow-hidden rounded-[10px] border border-acc bg-panel tablet:size-14"
       >
-        {imageUrl && (
-          <img src={imageUrl} alt="" draggable={false} className="size-full object-cover" />
-        )}
+        {imageUrl && <CardArt src={imageUrl} className="size-full" />}
       </button>
       <div className="min-w-0 max-[359px]:hidden" data-testid="human-character">
         <b className="block truncate font-heading text-xs font-bold tracking-[.06em] tablet:text-base">

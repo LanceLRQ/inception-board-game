@@ -16,6 +16,9 @@ import {
   type ServerMatchMessage,
 } from '@icgame/game-engine';
 import { logger } from '../infra/logger.js';
+import type { ChatPresetFaction } from '@icgame/shared';
+import { parseChatBroadcast } from './chatMessage.js';
+import type { RouteResult, WSMessageRouter } from './messageRouter.js';
 import type { MatchRoom, StepOutput } from '../match/MatchRoom.js';
 import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from '../services/BanChecker.js';
@@ -86,6 +89,7 @@ export function seatInfos(room: Pick<MatchRoom, 'seats'>, status: SeatStatusSour
       seat: s.seat,
       nickname: s.nickname,
       isBot: s.isBot,
+      ...(s.avatarSeed ? { avatarSeed: s.avatarSeed } : {}),
       connected: s.isBot ? true : status.isConnected(s.seat),
       takenOver,
       ...(reason !== undefined ? { takeoverReason: reason } : {}),
@@ -229,4 +233,43 @@ export async function handleMatchMessage(
     logger.error({ err, matchID: ctx.matchID, seat: ctx.seat }, 'handle match message failed');
     return rejected(intentId, 'internal_error');
   }
+}
+
+/**
+ * 聊天时用来判断「这个座位算哪个阵营」。只看公开信息：梦主座位是公开的，其余一律算盗梦者，
+ * 不读个人的真实阵营（被贿赂转阵营是隐藏信息，不能从聊天权限里泄露）。
+ */
+export function chatFactionOf(room: Pick<MatchRoom, 'current'>, seat: string): ChatPresetFaction {
+  return room.current().G.dreamMasterID === seat ? 'master' : 'thief';
+}
+
+export interface ChatInboundDeps {
+  matches: Pick<MatchService, 'get'>;
+  moveGateway: Pick<MoveGateway, 'consumeRate'>;
+  router: Pick<WSMessageRouter, 'route'>;
+}
+
+/**
+ * 处理一条入站的预设短语消息：形状校验 → 限流 → 交给路由（短语白名单、阵营、3 秒冷却、广播）。
+ * 返回要回给这条连接的消息；成功时没有回复，广播由聊天服务发出。
+ */
+export async function handleChatInbound(
+  event: string,
+  payload: unknown,
+  ctx: MatchMessageContext,
+  deps: ChatInboundDeps,
+): Promise<RouteResult> {
+  const msg = parseChatBroadcast(event, payload);
+  if (msg === null) {
+    return { reply: { type: 'icg:error', code: 'INVALID_MESSAGE', message: 'Malformed chat' } };
+  }
+  // 与 move、sync 共用同一份限流计数：刷聊天也会挤占自己的操作配额
+  if (!(await deps.moveGateway.consumeRate(ctx.playerID))) {
+    return { reply: { type: 'icg:error', code: 'RATE_LIMITED', message: 'Too many requests' } };
+  }
+  const room = deps.matches.get(ctx.matchID);
+  if (room === null) {
+    return { reply: { type: 'icg:error', code: 'NOT_IN_MATCH', message: 'Not in this match' } };
+  }
+  return deps.router.route({ ...ctx, faction: chatFactionOf(room, ctx.seat) }, msg);
 }

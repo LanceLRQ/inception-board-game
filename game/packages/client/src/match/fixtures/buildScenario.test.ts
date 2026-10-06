@@ -360,6 +360,22 @@ describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () =
   });
 });
 
+describe('buildFixtureScenario · 意念判官的行动阶段', () => {
+  it('本人是意念判官，行动阶段轮到自己，手里有 SHOOT，同层有可选目标，没有待决状态', () => {
+    const { state, viewer } = buildFixtureMatch('thief-sudger');
+    const me = state.G.players[viewer]!;
+    expect(me.characterId).toBe('thief_sudger_of_mind');
+    expect(state.G.currentPlayerID).toBe(viewer);
+    expect(state.G.turnPhase).toBe('action');
+    expect(me.hand).toContain('action_shoot');
+    expect(state.G.pendingSudgerRolls ?? null).toBeNull();
+    const sameLayer = state.G.playerOrder.filter(
+      (id) => id !== viewer && state.G.players[id]!.currentLayer === me.currentLayer,
+    );
+    expect(sameLayer.length).toBeGreaterThan(0);
+  });
+});
+
 describe('buildFixtureScenario · 棋局梦主', () => {
   it('本人是棋局梦主，行动阶段轮到自己，易位可用', () => {
     const sc = buildFixtureScenario('master-chess');

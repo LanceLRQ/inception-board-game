@@ -8,8 +8,17 @@ export interface IdentityResult {
   warning: string;
 }
 
+/** 建档 / 恢复后取一次账号上的头像种子；失败不影响登录，头像按账号 id 推导 */
+function syncAvatar(setAvatarSeed: (seed: string) => void): void {
+  identityApi
+    .me()
+    .then((me) => setAvatarSeed(me.avatarSeed))
+    .catch(() => undefined);
+}
+
 export function useAuth() {
-  const { playerId, token, nickname, setIdentity, setNickname, clearIdentity } = useIdentityStore();
+  const { playerId, token, nickname, setIdentity, setNickname, setAvatarSeed, clearIdentity } =
+    useIdentityStore();
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(!token);
   const mountedRef = useRef(false);
@@ -25,6 +34,7 @@ export function useAuth() {
       .me()
       .then((me) => {
         setNickname(me.nickname);
+        setAvatarSeed(me.avatarSeed);
       })
       .catch(() => {
         clearIdentity();
@@ -32,7 +42,7 @@ export function useAuth() {
       .finally(() => {
         setIsInitialized(true);
       });
-  }, [token, setNickname, clearIdentity]);
+  }, [token, setNickname, setAvatarSeed, clearIdentity]);
 
   const initIdentity = useCallback(
     async (inputNickname: string): Promise<IdentityResult> => {
@@ -41,12 +51,13 @@ export function useAuth() {
         const res = await identityApi.init(inputNickname);
         localStorage.setItem('icgame-token', res.token);
         setIdentity(res.playerId, res.token, res.nickname);
+        syncAvatar(setAvatarSeed);
         return { recoveryCode: res.recoveryCode, warning: res.recoveryCodeWarning };
       } finally {
         setIsLoading(false);
       }
     },
-    [setIdentity],
+    [setIdentity, setAvatarSeed],
   );
 
   const recoverIdentity = useCallback(
@@ -56,13 +67,14 @@ export function useAuth() {
         const res = await identityApi.recover(code);
         localStorage.setItem('icgame-token', res.token);
         setIdentity(res.playerId, res.token, res.nickname);
+        syncAvatar(setAvatarSeed);
         // 恢复码一次性：用过的码已作废，这里返回的新码需要展示给用户保存
         return { recoveryCode: res.recoveryCode, warning: res.recoveryCodeWarning };
       } finally {
         setIsLoading(false);
       }
     },
-    [setIdentity],
+    [setIdentity, setAvatarSeed],
   );
 
   const logout = useCallback(() => {

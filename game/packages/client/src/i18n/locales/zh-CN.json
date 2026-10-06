@@ -200,17 +200,54 @@
     }
   },
   "avatar": {
+    "current": "当前头像",
     "roll": "摇骰换头像",
-    "rolls": "已摇骰 {{count}} 次",
-    "save": "保存",
-    "saving": "保存中...",
-    "undo": "撤销"
+    "reroll": "换一个",
+    "saving": "保存中…",
+    "saveFailed": "没能保存头像，请稍后再试"
   },
   "chat": {
-    "toggle": "聊天",
-    "panel_title": "预设短语",
-    "no_presets": "当前分类无可用短语",
-    "cooldown": "冷却中...{{seconds}}s"
+    "toggle": "短语",
+    "cooldown": "冷却中...{{seconds}}s",
+    "title": "预设短语",
+    "desc": "选一条短语发给同局的所有人",
+    "recent": "最近消息（{{n}}）",
+    "recentEmpty": "还没有人说话",
+    "categories": "短语分类",
+    "category": {
+      "greeting": "问候",
+      "tactic": "战术",
+      "emotion": "情绪",
+      "feedback": "反馈"
+    },
+    "greet": {
+      "hi": "大家好！",
+      "ready": "我准备好了",
+      "welcome": "欢迎来到梦境",
+      "gl": "祝玩得开心！"
+    },
+    "tactic": {
+      "push": "我们推进！",
+      "retreat": "先撤退",
+      "focus": "集火这一层",
+      "wait": "等我一回合",
+      "trap": "小心陷阱",
+      "signal": "注意梦主"
+    },
+    "emotion": {
+      "wow": "哇！",
+      "oops": "我失误了",
+      "lucky": "运气真好",
+      "gg": "GG 打得漂亮",
+      "sigh": "哎呀...",
+      "laugh": "哈哈哈"
+    },
+    "feedback": {
+      "thanks": "谢谢！",
+      "sorry": "抱歉",
+      "nicemove": "这步真妙",
+      "bye": "辛苦大家！"
+    }
   },
   "copyright": {
     "short": "本项目为爱好者非商业复刻，原版版权归发行商所有。",
@@ -222,8 +259,8 @@
   },
   "loading": {
     "title": "正在准备梦境...",
-    "waiting": "等待资源清单...",
-    "failed": "{{count}} 张卡图加载失败，将使用占位"
+    "failed": "{{count}} 张卡图没能加载，将显示文字占位",
+    "progress": "已加载 {{loaded}} / {{total}}"
   },
   "match": {
     "reject": {
@@ -262,12 +299,32 @@
   },
   "report": {
     "button": "举报",
-    "button_aria": "举报玩家",
+    "button_aria": "举报 {{name}}",
     "dialog_title": "举报玩家",
     "target_label": "举报目标：{{name}}",
-    "description_label": "详细描述（可选，最多 500 字）",
+    "description_label": "补充说明（可选，最多 {{max}} 字）",
     "submit": "提交举报",
-    "submitting": "提交中..."
+    "submitting": "提交中...",
+    "reported": "已举报",
+    "section": "举报玩家",
+    "reason_label": "举报理由",
+    "reason": {
+      "cheating": "作弊行为",
+      "afk": "挂机 / 弃局",
+      "abusive": "言语不当",
+      "other": "其他原因"
+    },
+    "close": "关闭",
+    "done": "已收到你的举报，谢谢。",
+    "error": {
+      "duplicate": "这局你已经举报过这位玩家了。",
+      "forbidden": "只有这局的玩家才能举报。",
+      "not_found": "找不到这局对局的记录，暂时无法举报。",
+      "invalid": "这条举报无法受理，请换个对象或理由。",
+      "rate_limited": "操作太频繁，请稍后再试。",
+      "network": "网络不稳，举报没有送达，请重试。",
+      "unknown": "举报失败，请稍后再试。"
+    }
   },
   "tutorial": {
     "step_count": "第 {{current}} / {{total}} 步",
@@ -831,5 +888,17 @@
   },
   "die": {
     "combat": "战斗骰 {{n}}"
+  },
+  "cardArt": {
+    "category": {
+      "thief": "盗梦者",
+      "dream-master": "梦主",
+      "action": "行动牌",
+      "nightmare": "梦魇",
+      "vault": "金库",
+      "bribe": "贿赂",
+      "dream": "梦境",
+      "other": "卡牌"
+    }
   }
 }

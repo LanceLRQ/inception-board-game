@@ -13,7 +13,8 @@ import { requestErrorMessage } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { readOnlineMatch } from '../../lib/onlineMatchMemo';
 import { useAuth } from '../../hooks/useAuth';
-import { useIdentityStore } from '../../stores/useIdentityStore';
+import { useAvatar } from '../../hooks/useAvatar';
+import { AvatarPicker } from '../../components/AvatarPicker';
 import {
   RecoveryCodeDialog,
   type RecoveryCodeDialogKind,
@@ -43,7 +44,8 @@ export default function Lobby() {
   const navigate = useNavigate();
   const { isAuthenticated, isInitialized, initIdentity, recoverIdentity, nickname, playerId } =
     useAuth();
-  const avatarSeed = useIdentityStore((s) => s.avatarSeed);
+  const avatar = useAvatar();
+  const avatarSeed = avatar.seed;
 
   // 昵称初始化
   const [inputNickname, setInputNickname] = useState('');
@@ -104,12 +106,7 @@ export default function Lobby() {
   const createRoomMutation = useMutation({
     mutationKey: ['lobby', 'createRoom'],
     mutationFn: (size: number) =>
-      roomApi.createRoom(
-        { playerId: playerId ?? '', nickname, avatarSeed: String(avatarSeed) },
-        {
-          maxPlayers: size,
-        },
-      ),
+      roomApi.createRoom({ playerId: playerId ?? '', nickname, avatarSeed }, { maxPlayers: size }),
     onSuccess: (res, size) => {
       logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers: size });
       navigate(`/room/${res.code}`);
@@ -123,7 +120,7 @@ export default function Lobby() {
       roomApi.joinRoom(roomCode, {
         playerId: playerId ?? '',
         nickname,
-        avatarSeed: String(avatarSeed),
+        avatarSeed,
       }),
     onSuccess: (_room, roomCode) => {
       logger.flow('lobby', 'joinRoom ok', { code: roomCode });
@@ -269,12 +266,20 @@ export default function Lobby() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 bg-background p-6 text-foreground">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
-        <span className="text-sm text-dim" data-testid="lobby-nickname">
+        <span className="min-w-0 truncate text-sm text-dim" data-testid="lobby-nickname">
           {nickname}
         </span>
       </div>
+
+      <AvatarPicker
+        seed={avatar.seed}
+        onRoll={avatar.roll}
+        rolling={avatar.rolling}
+        failed={avatar.failed}
+        testId="lobby-avatar"
+      />
 
       {resumable && (
         <Button

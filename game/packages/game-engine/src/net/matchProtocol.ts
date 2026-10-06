@@ -19,6 +19,8 @@ export interface SeatInfo {
   seat: string;
   nickname: string;
   isBot: boolean;
+  /** 像素头像的种子，公开信息；旧版服务端与本地来源可能没有，界面按座位或昵称推导 */
+  avatarSeed?: string;
   /** 真人座位当前是否在线；Bot 座位恒为 true */
   connected: boolean;
   /** 是否已由 Bot 接管（掉线或挂机） */

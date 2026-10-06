@@ -1,133 +1,84 @@
-// AssetLoadingScreen - 启动预加载进度屏
+// AssetLoadingScreen - 进入对局前的素材加载界面：显示真实的已加载 / 总数，失败的素材不阻塞进入
 //
-// 特性：
-//   - 启动时调用 AssetPreloader.loadManifest + preloadCritical
-//   - 显示进度条 + 已加载 / 总数 + 字节数
-//   - 失败卡图数量提示（不阻断）
-//   - prefers-reduced-motion 时 pulse 动画降级为静态
-//
-// 不阻断：即便 manifest 加载失败，5s 后也会 onComplete 放行（弱网模式）
+// 缓存里已有素材时几乎瞬间加载完，所以只有加载超过 GATE_DELAY_MS 才显示（不闪一下）；
+// 超过 GATE_MAX_MS 还没加载完就放行：剩下的素材在对局里按需加载，卡图失败时由 CardArt 显示文字占位。
+// 样式只用语义令牌；用户选了减少动效时脉冲动画由全局样式取消。
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { assetPreloader, type PreloadProgress } from '../../lib/assetPreloader.js';
-import { cn } from '../../lib/utils.js';
+import type { PreloadProgress } from '../MatchRuntime/controllerTypes';
 
-export interface AssetLoadingScreenProps {
-  /** 全部完成（含失败）后触发，由外层 router 决定下一步 */
-  readonly onComplete: () => void;
-  /** 最长等待时间（ms），超时强制放行。默认 5000 */
-  readonly timeoutMs?: number;
-}
+/** 加载超过这么久才显示加载界面 */
+export const GATE_DELAY_MS = 250;
+/** 加载界面最长停留时间，超时放行 */
+export const GATE_MAX_MS = 8_000;
 
-// 纯函数：格式化字节数（便于单测）
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-// 纯函数：基于 progress 计算百分比 (0..100)，0 状态按 0 算
+/** 纯函数：进度百分比 (0..100)，总数为 0 按 0 算 */
 export function computePercent(p: Pick<PreloadProgress, 'loaded' | 'total'>): number {
   if (p.total <= 0) return 0;
   return Math.min(100, Math.round((p.loaded / p.total) * 100));
 }
 
-export function AssetLoadingScreen({ onComplete, timeoutMs = 5000 }: AssetLoadingScreenProps) {
+/** 纯函数：此刻是否要显示加载界面（进度还没走完、已过延迟、没到放行上限） */
+export function gateShown(
+  progress: Pick<PreloadProgress, 'loaded' | 'total'> | null,
+  elapsedMs: number,
+): boolean {
+  if (progress === null || progress.total <= 0) return false;
+  if (progress.loaded >= progress.total) return false;
+  return elapsedMs >= GATE_DELAY_MS && elapsedMs < GATE_MAX_MS;
+}
+
+export function MatchAssetGate({ entry }: { readonly entry: PreloadProgress | null }) {
   const { t } = useTranslation();
-  const [progress, setProgress] = useState<PreloadProgress>({
-    tier: 'critical',
-    loaded: 0,
-    total: 0,
-    failed: [],
-    bytesLoaded: 0,
-    bytesTotal: 0,
-  });
-  const [done, setDone] = useState(false);
-
+  const active = entry !== null && entry.total > 0 && entry.loaded < entry.total;
+  // 计时从素材开始加载算起；两个定时点各翻一次状态，之后不再需要时钟
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    let cancelled = false;
-    const hardTimeout = setTimeout(() => {
-      if (!cancelled && !done) {
-        setDone(true);
-        onComplete();
-      }
-    }, timeoutMs);
-
-    (async () => {
-      await assetPreloader.loadManifest();
-      if (cancelled) return;
-      const finalProg = await assetPreloader.preloadCritical((p) => {
-        if (!cancelled) setProgress(p);
-      });
-      if (cancelled) return;
-      setProgress(finalProg);
-      setDone(true);
-      clearTimeout(hardTimeout);
-      onComplete();
-    })().catch(() => {
-      // 兜底：loadManifest/preloadCritical 都有自己的 catch，这里不应进入
-      if (!cancelled && !done) {
-        setDone(true);
-        onComplete();
-      }
-    });
-
+    if (!active) return;
+    const show = setTimeout(() => setElapsed(GATE_DELAY_MS), GATE_DELAY_MS);
+    const giveUp = setTimeout(() => setElapsed(GATE_MAX_MS), GATE_MAX_MS);
     return () => {
-      cancelled = true;
-      clearTimeout(hardTimeout);
+      clearTimeout(show);
+      clearTimeout(giveUp);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onComplete 稳定引用由父组件保证
-  }, []);
+  }, [active]);
 
-  const pct = computePercent(progress);
-
+  if (!entry || !gateShown(entry, elapsed)) return null;
+  const pct = computePercent(entry);
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background p-8"
+      className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-background p-8 text-foreground"
       role="status"
       aria-live="polite"
-      aria-label={t('loading.title', { defaultValue: '正在准备梦境...' })}
+      data-testid="asset-loading-screen"
     >
       <div
-        className={cn(
-          'flex h-20 w-20 items-center justify-center rounded-full bg-primary/20 text-3xl font-bold text-primary',
-          'motion-safe:animate-pulse',
-        )}
-        aria-hidden="true"
+        className="flex size-16 items-center justify-center border border-acc font-heading text-xl font-bold tracking-[.2em] text-acc-bright motion-safe:animate-pulse"
+        aria-hidden
       >
         ICO
       </div>
-
-      <h1 className="mt-6 text-xl font-semibold text-foreground">
-        {t('loading.title', { defaultValue: '正在准备梦境...' })}
-      </h1>
-
+      <h1 className="font-heading text-lg font-bold tracking-[.1em]">{t('loading.title')}</h1>
       <div
-        className="mt-6 h-2 w-64 overflow-hidden rounded-full bg-muted"
+        className="h-1.5 w-64 max-w-full overflow-hidden bg-line"
         role="progressbar"
-        aria-valuenow={pct}
         aria-valuemin={0}
-        aria-valuemax={100}
+        aria-valuemax={entry.total}
+        aria-valuenow={entry.loaded}
+        aria-label={t('loading.title')}
       >
         <div
-          className="h-full bg-primary transition-[width] duration-200"
+          className="h-full bg-acc transition-[width] duration-200"
           style={{ width: `${pct}%` }}
         />
       </div>
-
-      <p className="mt-2 text-sm text-muted-foreground">
-        {progress.total > 0
-          ? `${progress.loaded} / ${progress.total} · ${formatBytes(progress.bytesLoaded)}`
-          : t('loading.waiting', { defaultValue: '等待资源清单...' })}
+      <p className="text-sm tabular-nums text-dim" data-testid="asset-loading-count">
+        {t('loading.progress', { loaded: entry.loaded, total: entry.total })}
       </p>
-
-      {progress.failed.length > 0 && (
-        <p className="mt-2 text-xs text-destructive">
-          {t('loading.failed', {
-            defaultValue: '{{count}} 张卡图加载失败，将使用占位',
-            count: progress.failed.length,
-          })}
+      {entry.failed > 0 && (
+        <p className="text-xs text-blood" data-testid="asset-loading-failed">
+          {t('loading.failed', { count: entry.failed })}
         </p>
       )}
     </div>

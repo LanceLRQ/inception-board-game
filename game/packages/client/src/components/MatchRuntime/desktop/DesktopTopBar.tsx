@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Timer } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { MatchController } from '../controllerTypes';
+import { ChatMenu } from './ChatMenu';
 
 interface DesktopTopBarProps {
   readonly controller: MatchController;
@@ -61,7 +62,10 @@ export function DesktopTopBar({ controller, topRight }: DesktopTopBarProps) {
           </span>
         )}
       </div>
-      <span className="flex shrink-0 items-center gap-2">{topRight}</span>
+      <span className="flex shrink-0 items-center gap-2">
+        <ChatMenu controller={controller} />
+        {topRight}
+      </span>
     </header>
   );
 }

@@ -18,6 +18,8 @@ import type { TimingConfig } from '../match/scheduling.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import {
   authorizeHandshake,
+  chatFactionOf,
+  handleChatInbound,
   handleMatchMessage,
   seatInfos,
   remainingMs,
@@ -199,6 +201,15 @@ describe('seatInfos', () => {
     expect(infos[0]).toMatchObject({ seat: '0', isBot: false, connected: true, takenOver: false });
     expect(infos[2]).toMatchObject({ seat: '2', isBot: false, connected: false, takenOver: true });
     expect(infos[1]).toMatchObject({ seat: '1', isBot: true, connected: true, takenOver: false });
+  });
+});
+
+describe('seatInfos 头像种子', () => {
+  it('座位表带出每个座位的头像种子（公开信息）', async () => {
+    const h = await makeMatch();
+    const room = h.svc.get('room-1')!;
+    const infos = seatInfos(room, { isConnected: () => true, isTakenOver: () => false });
+    expect(infos.every((i) => i.avatarSeed === 's')).toBe(true);
   });
 });
 
@@ -583,5 +594,69 @@ describe('remainingMs', () => {
   it('剩余毫秒不受时钟绝对值影响：同样的差值，不同的时钟起点结果相同', () => {
     expect(remainingMs(1_700_000_030_000, 1_700_000_000_000)).toBe(30_000);
     expect(remainingMs(30_000, 0)).toBe(30_000);
+  });
+});
+
+describe('chatFactionOf', () => {
+  it('梦主座位是 master，其余座位一律 thief（不读个人的真实阵营）', async () => {
+    const h = await makeMatch();
+    const room = h.svc.get('room-1')!;
+    const masterSeat = room.current().G.dreamMasterID;
+    expect(chatFactionOf(room, masterSeat)).toBe('master');
+    const other = room.seats().find((s) => s.seat !== masterSeat)!.seat;
+    expect(chatFactionOf(room, other)).toBe('thief');
+  });
+});
+
+describe('handleChatInbound', () => {
+  async function setup(consume = true) {
+    const h = await makeMatch();
+    const route = vi.fn(async () => ({}));
+    const consumeRate = vi.fn(async () => consume);
+    const deps = { matches: h.svc, moveGateway: { consumeRate }, router: { route } };
+    return { h, route, consumeRate, deps };
+  }
+  const ctx = { matchID: 'room-1', playerID: 'acct-0', seat: '0' };
+  const good = { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' };
+
+  it('形状不对：回 INVALID_MESSAGE，不限流也不路由', async () => {
+    const { route, consumeRate, deps } = await setup();
+    const out = await handleChatInbound('icg:chatBroadcast', { message: 3 }, ctx, deps);
+    expect(out.reply).toMatchObject({ type: 'icg:error', code: 'INVALID_MESSAGE' });
+    expect(consumeRate).not.toHaveBeenCalled();
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it('超过限流：回 RATE_LIMITED，不路由', async () => {
+    const { route, deps } = await setup(false);
+    const out = await handleChatInbound('icg:chatBroadcast', good, ctx, deps);
+    expect(out.reply).toMatchObject({ code: 'RATE_LIMITED' });
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it('对局不存在：回 NOT_IN_MATCH', async () => {
+    const { deps } = await setup();
+    const out = await handleChatInbound(
+      'icg:chatBroadcast',
+      good,
+      { ...ctx, matchID: 'nope' },
+      deps,
+    );
+    expect(out.reply).toMatchObject({ code: 'NOT_IN_MATCH' });
+  });
+
+  it('通过：座位与账号取自握手，阵营按公开的梦主座位推出，一并交给路由', async () => {
+    const { h, route, deps } = await setup();
+    const masterSeat = h.svc.get('room-1')!.current().G.dreamMasterID;
+    await handleChatInbound(
+      'icg:chatBroadcast',
+      { ...good, seat: '3', playerID: 'someone-else' },
+      { ...ctx, seat: masterSeat },
+      deps,
+    );
+    expect(route).toHaveBeenCalledWith(
+      { matchID: 'room-1', playerID: 'acct-0', seat: masterSeat, faction: 'master' },
+      { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' },
+    );
   });
 });

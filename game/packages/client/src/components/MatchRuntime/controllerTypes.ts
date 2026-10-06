@@ -4,7 +4,11 @@
 // 布局组件（desktop/ 与 mobile/）与弹窗群（MatchDialogs）只消费 MatchController，彼此不互相依赖。
 
 import type { MatchView, RunnerCtx, SeatInfo } from '@icgame/game-engine';
+import type { ChatPresetPhrase } from '@icgame/shared';
+import type { ChatEntry } from '../../match/chat';
 import type { MatchSource, MoveOutcome } from '../../match/matchSource';
+import type { ReportOutcome, ReportReason } from '../../lib/reportApi';
+import type { ReportTarget } from './reportTargets';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 import type { ChessVaultInfo } from '../ChessTransposeDialog';
 import type { GravityTargetOption } from '../GravityTargetPickerDialog';
@@ -49,7 +53,7 @@ export interface HandCardItem {
   readonly pending: boolean;
 }
 
-/** 卡图预载进度 */
+/** 卡图预加载进度 */
 export interface PreloadProgress {
   readonly loaded: number;
   readonly total: number;
@@ -244,6 +248,30 @@ export interface PreviewModel {
   readonly close: () => void;
 }
 
+/** 对局内预设短语：只有联机对局可用；入口按 available 显示 */
+export interface ChatModel {
+  readonly available: boolean;
+  /** 本人座位能发的短语（梦主看不到盗梦者专用的战术短语） */
+  readonly presets: readonly ChatPresetPhrase[];
+  /** 最近的消息，旧的在前 */
+  readonly messages: readonly ChatEntry[];
+  /** 此刻还在显示的气泡，键是发送者座位 */
+  readonly bubbles: ReadonlyMap<string, ChatEntry>;
+  /** 发送冷却剩余秒数；可以发为 0 */
+  readonly cooldownSeconds: number;
+  readonly send: (presetId: string) => void;
+}
+
+/** 局后举报：有真人对手且来源支持举报时才有 */
+export interface ReportModel {
+  readonly targets: readonly ReportTarget[];
+  readonly submit: (
+    seat: string,
+    reason: ReportReason,
+    description?: string,
+  ) => Promise<ReportOutcome>;
+}
+
 export interface MatchController {
   // 就绪与全局
   readonly ready: boolean;
@@ -252,7 +280,12 @@ export interface MatchController {
   readonly isRemote: boolean;
   readonly winner: string | null;
   readonly winReason: string | null;
+  /** 空闲阶段的后台预加载进度（顶栏细线）；没有为 null */
   readonly preload: PreloadProgress | null;
+  /** 进入对局前的素材加载进度（加载界面）；没有为 null */
+  readonly entryAssets: PreloadProgress | null;
+  /** 进入对局前的素材已取完（或不需要取）；界面根节点据此打 data-assets-ready 标记 */
+  readonly assetsReady: boolean;
 
   // 视图与座位
   /** 当前视图的对局状态；就绪前为 undefined */
@@ -286,6 +319,9 @@ export interface MatchController {
     readonly roll: number | null;
     readonly onComplete: () => void;
   };
+
+  readonly chat: ChatModel;
+  readonly report: ReportModel | null;
 
   // 其他展示数据
   readonly skillPanel: SkillPanelModel | null;

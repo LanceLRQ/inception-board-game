@@ -1,109 +1,56 @@
-// AvatarPicker - "摇骰子"换头像 UI
-// 像素头像选择器
+// AvatarPicker - 头像预览 + 「换一个」
 //
-// 交互：
-//   - 大头像预览（当前 seed）
-//   - 下方 🎲 按钮：每点一次生成新随机 seed
-//   - "保存" 按钮：回调上层持久化 avatarSeed
-//   - "撤销" 按钮：恢复为传入的初始 seed
+// 点「换一个」就摇一个新种子并保存到账号；保存成功后才换图，失败时留在原头像并提示。
+// 样式只用语义令牌；按钮高度不小于 44px。
 
-import { useCallback, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { generateRandomAvatarSeed } from '@icgame/shared';
+import { Dices } from 'lucide-react';
 import { PixelAvatar } from '../PixelAvatar';
 import { cn } from '../../lib/utils';
-import { Dice1 } from 'lucide-react';
 
 export interface AvatarPickerProps {
-  readonly initialSeed: string;
-  readonly onSave?: (seed: string) => void | Promise<void>;
+  readonly seed: string;
+  readonly onRoll: () => void | Promise<void>;
+  /** 保存中：按钮禁用 */
+  readonly rolling?: boolean;
+  /** 上一次保存失败：显示提示 */
+  readonly failed?: boolean;
+  /** 头像预览边长（默认 64） */
+  readonly size?: number;
   readonly className?: string;
-  /** 预览尺寸（默认 128） */
-  readonly previewSize?: number;
-  /** 是否禁用保存按钮（上层保存中） */
-  readonly saving?: boolean;
+  readonly testId?: string;
 }
 
 export function AvatarPicker({
-  initialSeed,
-  onSave,
+  seed,
+  onRoll,
+  rolling = false,
+  failed = false,
+  size = 64,
   className,
-  previewSize = 128,
-  saving = false,
+  testId = 'avatar-picker',
 }: AvatarPickerProps) {
   const { t } = useTranslation();
-  const [currentSeed, setCurrentSeed] = useState<string>(initialSeed);
-  const [rollCount, setRollCount] = useState(0);
-
-  const roll = useCallback(() => {
-    setCurrentSeed(generateRandomAvatarSeed());
-    setRollCount((c) => c + 1);
-  }, []);
-
-  const undo = useCallback(() => {
-    setCurrentSeed(initialSeed);
-    setRollCount(0);
-  }, [initialSeed]);
-
-  const handleSave = useCallback(async () => {
-    if (!onSave || currentSeed === initialSeed) return;
-    await onSave(currentSeed);
-  }, [onSave, currentSeed, initialSeed]);
-
-  const hasChanged = currentSeed !== initialSeed;
-
   return (
-    <div className={cn('flex flex-col items-center gap-4 rounded-xl bg-card p-4', className)}>
-      {/* 头像预览（摇骰时轻微抖动） */}
-      <motion.div
-        key={currentSeed}
-        initial={{ scale: 0.92, rotate: -4 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 340, damping: 18 }}
-      >
-        <PixelAvatar seed={currentSeed} size={previewSize} />
-      </motion.div>
-
-      <div className="text-xs text-muted-foreground">
-        {t('avatar.rolls', { count: rollCount, defaultValue: `已摇骰 ${rollCount} 次` })}
-      </div>
-
-      <div className="flex gap-2">
+    <div className={cn('flex items-center gap-3', className)} data-testid={testId}>
+      <PixelAvatar seed={seed} size={size} ariaLabel={t('avatar.current')} />
+      <div className="flex min-w-0 flex-col items-start gap-1">
         <button
           type="button"
-          onClick={roll}
-          className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
-          aria-label={t('avatar.roll', { defaultValue: '摇骰换头像' })}
+          onClick={() => void onRoll()}
+          disabled={rolling}
+          aria-label={t('avatar.roll')}
+          data-testid={`${testId}-roll`}
+          className="inline-flex min-h-11 touch-manipulation items-center gap-1.5 border border-line-strong bg-panel px-3 text-sm text-foreground active:translate-y-px disabled:opacity-50"
         >
-          <Dice1 className="h-4 w-4" /> {t('avatar.roll', { defaultValue: '摇一摇' })}
+          <Dices className="size-4" aria-hidden />
+          {rolling ? t('avatar.saving') : t('avatar.reroll')}
         </button>
-        {hasChanged ? (
-          <button
-            type="button"
-            onClick={undo}
-            className="rounded-full bg-muted px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70"
-          >
-            {t('avatar.undo', { defaultValue: '撤销' })}
-          </button>
-        ) : null}
-        {onSave ? (
-          <button
-            type="button"
-            disabled={!hasChanged || saving}
-            onClick={handleSave}
-            className={cn(
-              'rounded-full px-4 py-2 text-sm transition-colors',
-              hasChanged && !saving
-                ? 'bg-ok text-background hover:bg-ok/90 active:scale-95'
-                : 'bg-muted text-muted-foreground cursor-not-allowed opacity-60',
-            )}
-          >
-            {saving
-              ? t('avatar.saving', { defaultValue: '保存中...' })
-              : t('avatar.save', { defaultValue: '保存' })}
-          </button>
-        ) : null}
+        {failed && (
+          <span className="text-xs text-blood" role="alert" data-testid={`${testId}-error`}>
+            {t('avatar.saveFailed')}
+          </span>
+        )}
       </div>
     </div>
   );

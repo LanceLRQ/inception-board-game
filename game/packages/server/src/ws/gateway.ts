@@ -23,8 +23,10 @@ import type { MatchRoom, StepOutput } from '../match/MatchRoom.js';
 import type { MatchService } from '../match/MatchService.js';
 import { verifyToken } from '../infra/jwt.js';
 import { logger } from '../infra/logger.js';
+import { CHAT_BROADCAST_EVENT } from './chatMessage.js';
 import {
   authorizeHandshake,
+  handleChatInbound,
   handleMatchMessage,
   seatInfos,
   stateMessage,
@@ -313,6 +315,17 @@ export class SocketGateway {
           return;
         }
 
+        if (event === CHAT_BROADCAST_EVENT) {
+          const chat = await handleChatInbound(
+            event,
+            payload,
+            { matchID, playerID, seat },
+            { matches, moveGateway: this.deps.moveGateway, router: this.deps.router },
+          );
+          if (chat.reply) socket.emit(chat.reply.type, chat.reply);
+          return;
+        }
+
         const msg = normalizeInbound(event, payload);
         if (!msg) return;
         const result = await this.deps.router.route({ matchID, playerID, seat }, msg);
@@ -348,8 +361,12 @@ export class SocketGateway {
   }
 }
 
-/** 把 onAny 的 (event, payload) 还原为心跳或聊天消息（导出供测试） */
+/**
+ * 把 onAny 的 (event, payload) 还原为心跳消息（导出供测试）。
+ * 聊天消息不走这里：它要先过 parseChatBroadcast 的形状校验与限流，见 handleChatInbound。
+ */
 export function normalizeInbound(event: string, payload: unknown): ClientMessage | null {
+  if (event === CHAT_BROADCAST_EVENT) return null;
   // 客户端可直接 emit(ClientMessage.type, message)，payload 即完整消息
   if (
     payload &&

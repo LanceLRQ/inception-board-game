@@ -11,7 +11,7 @@ function makePlayers(ids: string[]): Record<string, StagePlayer> {
       {
         id,
         nickname: id,
-        avatarSeed: 0,
+        avatarSeed: `s-${id}`,
         faction: id === 'M' ? 'master' : 'thief',
         characterId: '',
         isRevealed: false,

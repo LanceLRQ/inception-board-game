@@ -167,4 +167,48 @@ describe('全内存开发服务', () => {
     expect(missing.status).toBe(200);
     expect(await missing.text()).not.toContain('ZZZZZZ');
   });
+
+  it('举报：对真人座位成功，同一局重复举报 409，举报自己与 Bot 座位 400，局外人 403', async () => {
+    dev = await startDevServer({ port: 0 });
+    const base = dev.url;
+    const a = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+      nickname: '甲',
+    });
+    const b = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+      nickname: '乙',
+    });
+    const outsider = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+      nickname: '丙',
+    });
+    const room = await api<{ code: string }>(base, 'POST', '/rooms', a.token, { maxPlayers: 4 });
+    await api(base, 'POST', `/rooms/${room.code}/join`, b.token);
+    await api(base, 'POST', `/rooms/${room.code}/fill-ai`, a.token);
+    const started = await api<{ matchId: string }>(
+      base,
+      'POST',
+      `/rooms/${room.code}/start`,
+      a.token,
+    );
+    const [sa, sb] = await Promise.all([
+      firstState(base, a.token, started.matchId),
+      firstState(base, b.token, started.matchId),
+    ]);
+
+    const post = (token: string, body: unknown): Promise<Response> =>
+      fetch(`${base}/matches/${started.matchId}/report`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+    const botSeat = [0, 1, 2, 3].find((n) => String(n) !== sa.seat && String(n) !== sb.seat)!;
+
+    expect((await post(a.token, { targetSeat: Number(sb.seat), reason: 'afk' })).status).toBe(201);
+    expect((await post(a.token, { targetSeat: Number(sb.seat), reason: 'afk' })).status).toBe(409);
+    expect((await post(a.token, { targetSeat: Number(sa.seat), reason: 'afk' })).status).toBe(400);
+    expect((await post(a.token, { targetSeat: botSeat, reason: 'afk' })).status).toBe(400);
+    expect(
+      (await post(outsider.token, { targetSeat: Number(sa.seat), reason: 'afk' })).status,
+    ).toBe(403);
+    expect((await post(b.token, { targetSeat: Number(sa.seat), reason: 'nope' })).status).toBe(400);
+  });
 });

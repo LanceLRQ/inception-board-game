@@ -4,6 +4,8 @@
 // 底部一行最新动态。梦主视角下，视图里多给的信息（未翻开的梦魇、未开金库的内容）如实显示。
 
 import { useTranslation } from 'react-i18next';
+import { CardArt } from '../../CardArt';
+import { PixelAvatar } from '../../PixelAvatar';
 import type { TFunction } from 'i18next';
 import { ChevronRight, Crown, Skull, TriangleAlert, Vault } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -46,6 +48,7 @@ function Occupants({ occupants }: { occupants: readonly BoardOccupant[] }) {
             o.isSelf ? 'border-acc text-foreground' : 'border-line-strong text-dim',
           )}
         >
+          <PixelAvatar seed={o.avatarSeed} size={12} rounded={false} />
           {o.isMaster && (
             <Crown className="size-2.5 shrink-0 text-acc-bright tablet:size-3.5" aria-hidden />
           )}
@@ -89,7 +92,7 @@ function VaultMark({
       )}
     >
       {url ? (
-        <img src={url} alt="" draggable={false} className="size-full object-cover" />
+        <CardArt src={url} className="size-full" />
       ) : (
         <Vault className="m-auto size-3 text-dim" aria-hidden />
       )}

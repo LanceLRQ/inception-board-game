@@ -17,6 +17,7 @@ import { DockInfoBar } from './DockInfoBar';
 import { DockOps } from './DockOps';
 import { DockSelfBlock } from './DockSelfBlock';
 import { MobileHandCard } from './MobileHandCard';
+import { ChatSheet } from './ChatSheet';
 import { MobileSkillSheet } from './MobileSkillSheet';
 import {
   cardCategoryOf,
@@ -63,6 +64,8 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
   // 读牌记录跟着回合与阶段走：换了阶段（抽牌后、进入弃牌等）自然失效
   const stamp = `${turn.number}:${turn.phase}`;
   const [skillOpen, setSkillOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const openChat = controller.chat.available ? () => setChatOpen(true) : undefined;
   const suppressClick = useRef(false);
 
   // 读牌记录只在那一格仍是同一张牌时有效，手牌变化后自然失效
@@ -191,6 +194,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
                   controller={controller}
                   skillReady={skills.length > 0}
                   onOpenSkill={() => setSkillOpen(true)}
+                  onOpenChat={openChat}
                   layout="row"
                 />
               </div>
@@ -217,6 +221,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
               controller={controller}
               skillReady={skills.length > 0}
               onOpenSkill={() => setSkillOpen(true)}
+              onOpenChat={openChat}
               layout="column"
             />
           </div>
@@ -249,6 +254,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
                 controller={controller}
                 skillReady={skills.length > 0}
                 onOpenSkill={() => setSkillOpen(true)}
+                onOpenChat={openChat}
                 layout="row"
               />
             </div>
@@ -259,6 +265,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
         <CopyrightNotice variant="line" className="w-full" />
       </div>
       <MobileSkillSheet open={skillOpen} onOpenChange={setSkillOpen} panel={skillPanel} />
+      <ChatSheet open={chatOpen} onOpenChange={setChatOpen} controller={controller} />
     </section>
   );
 }

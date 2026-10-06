@@ -3,7 +3,9 @@
 // 设计：
 //   - 无状态渲染组件：给 seed 就出图
 //   - 直接输出 SVG（scale 任意，不需要 canvas 2D）
-//   - aria-label 读作 "玩家头像 (seed 后 6 位)"
+//   - 头像自带的调色板（来自共享的生成算法）是浅底配彩色像素，在任何主题下都靠一圈描边
+//     与周围分开：描边用主题的强分隔线令牌，亮色与暗色主题下都看得清
+//   - 没有 aria-label 时视为装饰性（座位牌、占位者标签旁已有昵称），不朗读
 
 import { useMemo } from 'react';
 import { generatePixelAvatar } from '@icgame/shared';
@@ -14,6 +16,7 @@ export interface PixelAvatarProps {
   readonly size?: number; // 渲染像素宽度（默认 48）
   readonly rounded?: boolean; // 是否圆角（默认 true）
   readonly className?: string;
+  /** 需要朗读时给；不给就是装饰性头像 */
   readonly ariaLabel?: string;
 }
 
@@ -24,28 +27,32 @@ export function PixelAvatar({
   className,
   ariaLabel,
 }: PixelAvatarProps) {
-  const avatar = useMemo(() => generatePixelAvatar(seed), [seed]);
+  const avatar = useMemo(() => generatePixelAvatar(seed || 'player'), [seed]);
 
   // 每个像素的边长（8×8 网格分 size）
   const pixelSize = size / 8;
 
   return (
     <div
-      role="img"
-      aria-label={ariaLabel ?? `玩家头像 ${seed.slice(-6)}`}
+      role={ariaLabel ? 'img' : 'presentation'}
+      aria-label={ariaLabel}
+      aria-hidden={ariaLabel ? undefined : true}
+      data-testid="pixel-avatar"
+      data-seed={seed}
       className={cn(
-        'inline-block overflow-hidden shadow-sm ring-1 ring-border',
-        rounded ? 'rounded-lg' : '',
+        'inline-block shrink-0 overflow-hidden border border-line-strong',
+        rounded ? 'rounded-[3px]' : '',
         className,
       )}
       style={{ width: size, height: size, background: avatar.backgroundColor }}
     >
       <svg
-        width={size}
-        height={size}
+        width="100%"
+        height="100%"
         viewBox={`0 0 ${size} ${size}`}
         shapeRendering="crispEdges"
         aria-hidden="true"
+        className="block"
       >
         {avatar.grid.map((row, y) =>
           row.map((filled, x) =>

@@ -12,6 +12,7 @@
  *   ms-handcard（含 -art / -badge）       手牌
  *   ms-dock（含 -self / -ops）           底部坞
  *   ms-btn                              按钮；data-variant = primary
+ *   ms-bubble                           座位旁的预设短语气泡；data-side = bottom（尖角朝下）| top（朝上）| left（朝左）| right（朝右）
  *   ms-response                         响应窗口 / 提示卡
  *
  * 状态用数据属性表达：data-current / data-lost / data-master / data-revealed /
@@ -186,6 +187,51 @@ button.ms-card:not(:disabled):hover {
 }
 .ms-dock-ops {
   border-left: 1px solid var(--ms-line);
+}
+/* 预设短语气泡：靠令牌配色，各主题下都与背景分得开；尖角用旋转的小方块拼出，不依赖主题皮肤 */
+.ms-bubble {
+  position: relative;
+  background: var(--ms-panel2);
+  border: 1px solid var(--ms-line2);
+  color: var(--ms-ink);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ms-bg) 70%, transparent);
+}
+.ms-bubble::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: var(--ms-panel2);
+  border: solid var(--ms-line2);
+  border-width: 0;
+}
+.ms-bubble[data-side='bottom']::after {
+  left: 14px;
+  bottom: -4px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  transform: rotate(45deg);
+}
+.ms-bubble[data-side='top']::after {
+  left: 14px;
+  top: -4px;
+  border-left-width: 1px;
+  border-top-width: 1px;
+  transform: rotate(45deg);
+}
+.ms-bubble[data-side='right']::after {
+  right: -4px;
+  top: 10px;
+  border-right-width: 1px;
+  border-top-width: 1px;
+  transform: rotate(45deg);
+}
+.ms-bubble[data-side='left']::after {
+  left: -4px;
+  top: 10px;
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+  transform: rotate(45deg);
 }
 .ms-btn {
   border: 1px solid var(--ms-line2);

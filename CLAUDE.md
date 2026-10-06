@@ -60,6 +60,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 对局界面：桌面（座位环 + 按主题加载的中央舞台 + 底部坞）与移动（行动轴 + 层塔 + 一体式手牌坞）双布局，主题换肤
 - 好友房联机对局：房主建房、其他人凭房间码加入、空位可补 Bot，开始后全体进入同一局服务端权威对局；刷新或断线后回到同一局
 - 房间等待页：成员变化、补 Bot、开始游戏由服务端经 `/rooms` 命名空间推送（只发给房间成员），推送不可用时退回每 15 秒轮询（页面不可见时暂停）；房间码一键复制、邀请链接 `/invite/房间码`（带二维码与系统分享），聊天软件抓取该链接时得到不含成员信息的分享卡片；联机倒计时按服务端给的剩余毫秒用单调时钟倒数，不受本机时钟影响；数据请求统一走 TanStack Query（`lib/queryClient.ts`）
+- 联机对局内的预设短语（只传短语 id，服务端按座位限流与校验，座位旁气泡 + 最近消息列表）、像素头像（账号上的头像种子经座位表公开，大厅与设置页可「换一个」）、局后举报（胜负覆盖层里对每位真人对手举报，接口按座位解析目标）
+- 卡图分三阶段预加载（进站取关键素材、进对局前取牌种全集与本人视图里可见的牌并显示真实进度、空闲时再取其余），卡图走运行时缓存而不进预缓存，加载失败降级为卡名文字 + 类别色块
 - 匿名身份（JWT + 恢复码）、房间创建与加入、新手教程、PWA 离线访问
 - 工程基建：pnpm + Turborepo monorepo、单元测试 3300+ 条、双浏览器联机端到端用例、Docker Compose 部署文件
 
@@ -73,14 +75,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **已有实现但尚未接入运行路径**
 
-- 成就、最佳玩家评分、举报与运营审核的后端接口和计算函数（尚未消费对局数据）
-- 聊天、头像、举报等客户端组件（尚未挂载到页面）
+- 成就、最佳玩家评分、运营审核（举报的处理端）的后端接口和计算函数（尚未消费对局数据）
 
 **已知缺口**
 
 - 部分角色技能与世界观未接入对局，另有若干规则细节与原版有出入
 - 尚不支持 3 人局
-- 旁观、公开匹配、对局内聊天、回放播放器、多实例部署
+- 旁观、公开匹配、自由输入的聊天（目前只有预设短语）、回放播放器、多实例部署
 - 联机对局没有事件驱动的动画，状态变化直接刷新
 - 启发式 Bot、渗透测试、动画音效、完整的无障碍支持与英文本地化
 - 持续集成流水线已编写，尚未实际运行
@@ -163,7 +164,7 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | **联机** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` | `match/useRemoteMatchSource.ts`：服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
 | **固定场景** | `/game/:matchId` 不带 `online` / `friend` 参数（常用 `/game/debug`） | `components/FixtureMatchRuntime/index.tsx` | `match/useFixtureMatchSource.ts`：固定种子建局、调整局面后经引擎的视角过滤得到视图（构造见 `match/fixtures/buildScenario.ts`），发出的 move 只记日志、不推进状态 | 开发调试、UI 走查、视角 / 人数 / 待应答状态切换 |
 
-**固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries` 盗梦者视角下轮到本人应答对应的待决状态（依次是被 SHOOT 的双鱼·游离、恐怖分子·狂热、天秤分牌、天秤挑一份、意念判官选骰、处女·完美、白羊·星尘；不与 `as=master` 叠加）；`?as=master&chess=1` 梦主是「棋局」，行动阶段自动弹出易位弹窗；`?discard=1` 盗梦者处于弃牌阶段、手牌超出上限（梦主视角与响应窗口参数优先）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
+**固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries` 盗梦者视角下轮到本人应答对应的待决状态（依次是被 SHOOT 的双鱼·游离、恐怖分子·狂热、天秤分牌、天秤挑一份、意念判官选骰、处女·完美、白羊·星尘；不与 `as=master` 叠加）；`?as=master&chess=1` 梦主是「棋局」，行动阶段自动弹出易位弹窗；`?discard=1` 盗梦者处于弃牌阶段、手牌超出上限（梦主视角与响应窗口参数优先）；`?character=sudger` 盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的出牌入口；梦主视角、响应窗口、待应答与弃牌参数优先）；`?chat=1` 打开预设短语通道并注入几条示例消息（固定场景没有连接，发出的短语只在本机回显）；`?outcome=1` 对局已结束、对手按真人对待，走查局后举报（`?outcome=duplicate` / `failed` 让举报接口回「已举报过」/ 网络失败；可与其他参数叠加）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
 
 ### 代码分层
 
@@ -242,7 +243,7 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 
 **改 UI 时的自检清单：**
 
-1. 访问 `/local` 确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
+1. 访问 `/local` 确认新视觉生效；涉及座位牌 / 行动轴 / 手牌坞的改动，另看 `/game/debug?chat=1`（短语入口与座位气泡）与 `/game/debug?outcome=1`（局后举报）；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
 2. 访问 `/game/debug`、`/game/debug?as=master`、`/game/debug?pending=1` 确认三个固定场景都正常；改应答窗口 / 弹窗时再逐个看 `?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries`；改座位环或坞时再看 `/game/debug?players=4` 与 `?players=10`
 3. 桌面 1024×768、1280×800、1440×900、1920×1080，移动 iPhone 12（390×844）都要走查：整页不滚动、座位不重叠、主操作按钮在视口内（`packages/e2e/tests/desktop-layout.spec.ts` 与 `mobile-layout.spec.ts` 守护）；改了排布或尺寸时再补平板竖屏 768×1024 / 820×1180、平板横屏 1180×820、手机横屏 844×390 / 667×375、小手机 360×640、大屏 2560×1440，`?discard=1` 的弃牌阶段也要看（`responsive.spec.ts` 守护）
    - 新增或改动可点击元素：命中区不小于 44×44（靠内边距 / `min-h` / 伪元素扩大，不放大视觉尺寸；注意 `overflow-hidden` 会裁掉伪元素的命中区），相邻目标的命中区不得重叠（`touch-targets.spec.ts` 守护）
@@ -279,6 +280,7 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 
 约定形式：`<domain>/<subsystem>`，例：
 - `game/worker`（对局 worker 流程）
+- `game/chat`（预设短语收发）、`game/report`（局后举报）、`game/assets`（素材预加载）
 - `game/move`（玩家 move）
 - `ai/worker`（Worker 内 Bot 决策，走 DEBUG）
 - `lobby`、`room`、`identity`

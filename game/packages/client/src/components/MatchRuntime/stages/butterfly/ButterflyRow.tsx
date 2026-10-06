@@ -12,6 +12,7 @@ import { Die } from '../../../Die';
 import type { BoardLayer, BoardNightmare, BoardVault } from '../../model/boardModel';
 import { ButterflyGlyph } from './ButterflyGlyph';
 import { occupantLine, ridgeShape, rowTag, vaultCaption } from './butterflyRows';
+import { PixelAvatar } from '../../../PixelAvatar';
 
 interface ButterflyRowProps {
   readonly row: BoardLayer;
@@ -197,6 +198,7 @@ export function ButterflyRow({ row, focus, onFocus, onOpenCard }: ButterflyRowPr
                   data-self={o.isSelf || undefined}
                   className="butterfly-occ flex max-w-44 items-center gap-1 text-[11px]"
                 >
+                  <PixelAvatar seed={o.avatarSeed} size={14} rounded={false} />
                   {o.isMaster && <Crown className="size-3 shrink-0 text-acc" aria-hidden />}
                   <span className="truncate">
                     {o.isSelf ? t('seat.me') : o.name}

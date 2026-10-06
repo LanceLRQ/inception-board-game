@@ -13,9 +13,9 @@ describe('normalizeInbound', () => {
       expect(normalizeInbound('icg:heartbeat', msg)).toEqual(msg);
     });
 
-    it('preserves a chat broadcast message', () => {
+    it('does not pass chat through: chat must go through the validated chat path', () => {
       const msg = { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' };
-      expect(normalizeInbound('icg:chatBroadcast', msg)).toEqual(msg);
+      expect(normalizeInbound('icg:chatBroadcast', msg)).toBeNull();
     });
   });
 

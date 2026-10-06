@@ -1,0 +1,71 @@
+// 素材预加载：进站只取关键素材；进对局前的加载界面显示真实进度；失败的素材不阻塞，卡图降级为文字加类别色块
+
+import { test, expect, waitForAppReady } from './fixtures/index.js';
+
+/** 卡图请求（只匹配 /cards/ 下的 webp；开发服务器里的 shared/src/cards/*.ts 模块不能被拦） */
+const CARD_IMAGES = /\/cards\/.*\.webp(?:\?.*)?$/;
+
+test.describe('素材预加载', () => {
+  test('进站（首页）只取界面必需的小图，不取角色牌与行动牌', async ({ page }) => {
+    const cardRequests: string[] = [];
+    page.on('request', (req) => {
+      const url = decodeURIComponent(new URL(req.url()).pathname);
+      if (url.startsWith('/cards/')) cardRequests.push(url);
+    });
+    await page.goto('/');
+    await waitForAppReady(page);
+    await page.waitForTimeout(1_500);
+    expect(cardRequests.length).toBeGreaterThanOrEqual(1);
+    expect(cardRequests.length).toBeLessThan(15);
+    expect(cardRequests.some((u) => u.startsWith('/cards/thief/') && !u.includes('背面'))).toBe(
+      false,
+    );
+    expect(cardRequests.some((u) => u.startsWith('/cards/action/') && !u.includes('背面'))).toBe(
+      false,
+    );
+  });
+
+  test('进对局前取得慢：显示已加载 / 总数的真实进度，取完后放行', async ({ page }) => {
+    let n = 0;
+    await page.route(CARD_IMAGES, async (route) => {
+      n += 1;
+      await new Promise((r) => setTimeout(r, 300 + (n % 4) * 150));
+      await route.continue();
+    });
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    const screen = page.getByTestId('asset-loading-screen');
+    await expect(screen).toBeVisible({ timeout: 8_000 });
+    const text = (await page.getByTestId('asset-loading-count').textContent()) ?? '';
+    const m = /(\d+)\s*\/\s*(\d+)/.exec(text);
+    expect(m, `进度文字应含「已加载 n / 总数」：${text}`).not.toBeNull();
+    expect(Number(m![2])).toBeGreaterThan(10);
+    await expect(screen).toHaveCount(0, { timeout: 25_000 });
+    await expect(page.getByTestId('runtime-stage')).toBeVisible();
+  });
+
+  test('素材全部加载失败：不阻塞进入对局，卡图降级为卡名文字与类别色块，没有破图', async ({
+    page,
+  }) => {
+    await page.route(CARD_IMAGES, (route) => route.abort());
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+    // 加载界面最多停留几秒就放行
+    await expect(page.getByTestId('asset-loading-screen')).toHaveCount(0, { timeout: 15_000 });
+    const hand = page.getByTestId('human-hand');
+    await expect(hand.locator('[data-testid="card-art-fallback"]').first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(hand.locator('[data-testid="card-art-fallback"]').first()).not.toBeEmpty();
+    // 页面里没有留下加载失败的 <img>
+    const broken = await page.evaluate(
+      () => [...document.images].filter((img) => img.complete && img.naturalWidth === 0).length,
+    );
+    expect(broken).toBe(0);
+    // 类别色块带分类标记，换主题也只用令牌
+    await expect(
+      hand.locator('[data-testid="card-art-fallback"][data-category="action"]').first(),
+    ).toBeVisible();
+  });
+});

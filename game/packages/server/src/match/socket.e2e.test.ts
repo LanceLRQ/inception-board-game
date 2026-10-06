@@ -375,6 +375,123 @@ describe('伪造与畸形请求', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 三之二、预设短语
+// ---------------------------------------------------------------------------
+
+describe('预设短语', () => {
+  async function chatRoom(opts: Parameters<typeof startServer>[0] = {}) {
+    const server = await boot({
+      timing: { turnTimeoutMs: 60_000, pendingTimeoutMs: 60_000, responseTimeoutCapMs: 60_000 },
+      ...opts,
+    });
+    const { room, accounts } = makeRoom({ humans: 4, bots: 0 });
+    await server.rt.matches.createFromRoom(room);
+    const cs = await joinAll(server, accounts, room.id);
+    await waitUntil(() => allInPlaying(cs), '进入对局阶段');
+    return { server, room, accounts, cs };
+  }
+  const chatOf = (c: TestClient) =>
+    c.received
+      .filter((r) => r.event === 'icg:chatMessage')
+      .map((r) => (r.payload as { message: { sender: string; phraseId: string } }).message);
+
+  it('同一局的所有连接都收到，发送者是座位号；冷却内再发被拒绝', async () => {
+    const { cs } = await chatRoom();
+    const [a, b, c] = cs as [TestClient, TestClient, TestClient];
+    a.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'greet_hi',
+    });
+    await waitUntil(() => [a, b, c].every((x) => chatOf(x).length === 1), '三个连接都收到短语');
+    for (const x of [a, b, c]) {
+      expect(chatOf(x)[0]).toMatchObject({ sender: a.seat, phraseId: 'greet_hi' });
+    }
+    // 3 秒冷却：同一座位马上再发，只收到错误，不再广播
+    a.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'greet_hi',
+    });
+    await waitUntil(
+      () =>
+        a.received.some(
+          (r) => r.event === 'icg:error' && (r.payload as { code: string }).code === 'COOLDOWN',
+        ),
+      '冷却内被拒绝',
+    );
+    expect(chatOf(b)).toHaveLength(1);
+  });
+
+  it('任意文本、未知短语、畸形载荷都不会广播，连接保持', async () => {
+    const { cs } = await chatRoom();
+    const [a, b] = cs as [TestClient, TestClient];
+    a.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: '大家好，加我微信',
+    });
+    a.socket.emit('icg:chatBroadcast', { scope: 'match', message: 'x'.repeat(500) });
+    a.socket.emit('icg:chatBroadcast', { scope: 'room', message: 'greet_hi' });
+    a.socket.emit('icg:chatBroadcast', 'greet_hi');
+    a.socket.emit('icg:chatBroadcast', null);
+    await waitUntil(
+      () => a.received.filter((r) => r.event === 'icg:error').length >= 5,
+      '每条畸形消息都有回应',
+    );
+    expect(chatOf(a)).toHaveLength(0);
+    expect(chatOf(b)).toHaveLength(0);
+    expect(a.connected).toBe(true);
+  });
+
+  it('梦主不能发盗梦者专用的战术短语；盗梦者可以', async () => {
+    const { cs } = await chatRoom();
+    const master = (cs[0]!.latestView()!.G as { dreamMasterID: string }).dreamMasterID;
+    const masterClient = cs.find((c) => c.seat === master)!;
+    const thiefClient = cs.find((c) => c.seat !== master)!;
+    masterClient.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'tactic_push',
+    });
+    await waitUntil(
+      () =>
+        masterClient.received.some(
+          (r) =>
+            r.event === 'icg:error' && (r.payload as { code: string }).code === 'FACTION_FORBIDDEN',
+        ),
+      '梦主发盗梦者短语被拒绝',
+    );
+    thiefClient.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'tactic_push',
+    });
+    await waitUntil(() => chatOf(masterClient).length === 1, '盗梦者的短语广播给所有人');
+  });
+
+  it('别的对局的连接收不到', async () => {
+    const server = await boot({
+      timing: { turnTimeoutMs: 60_000, pendingTimeoutMs: 60_000, responseTimeoutCapMs: 60_000 },
+    });
+    const one = makeRoom({ humans: 4, bots: 0 });
+    const two = makeRoom({ humans: 4, bots: 0 });
+    await server.rt.matches.createFromRoom(one.room);
+    await server.rt.matches.createFromRoom(two.room);
+    const a = await joinAll(server, one.accounts, one.room.id);
+    const b = await joinAll(server, two.accounts, two.room.id);
+    await waitUntil(() => allInPlaying([...a, ...b]), '两局都进入对局阶段');
+    a[0]!.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'greet_hi',
+    });
+    await waitUntil(() => chatOf(a[1]!).length === 1, '本局收到');
+    for (const x of b) expect(chatOf(x)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 四、重启恢复
 // ---------------------------------------------------------------------------
 

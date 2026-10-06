@@ -8,6 +8,7 @@ import { RotateCw, X } from 'lucide-react';
 import type { CardID } from '@icgame/shared';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
+import { CardArt } from '../CardArt';
 import { getCardImageUrl, getCardBackImageUrl, hasCardBackImage } from '../../lib/cardImages';
 import { getCardName, getCharacterSkillSummary } from '../../lib/cards';
 
@@ -107,13 +108,11 @@ function ModalContent({
             className="flex w-full max-w-[260px] items-center justify-center"
           >
             {displayUrl ? (
-              <img
+              <CardArt
                 src={displayUrl}
                 alt={displayName}
-                className="h-auto w-full rounded-md shadow-lg short-land:max-h-[calc(100dvh-5rem)] short-land:w-auto short-land:object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                }}
+                fallback={displayName || cardId}
+                className="aspect-[745/1040] h-auto w-full rounded-md text-base shadow-lg short-land:max-h-[calc(100dvh-5rem)] short-land:w-auto short-land:object-contain"
               />
             ) : (
               <div className="flex h-60 w-full items-center justify-center rounded-md bg-panel-2 text-dim">
