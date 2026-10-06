@@ -6,6 +6,10 @@
 @import '@fontsource-variable/noto-serif-sc';
 @import '@fontsource/ibm-plex-mono/latin-400.css';
 @import '@fontsource/ibm-plex-mono/latin-600.css';
+
+/* 主题皮肤：钩子类名的基础样式与各主题的差异样式 */
+@import './skins/base.css';
+@import './skins/noir.css';
 /*
  ---break---
  */

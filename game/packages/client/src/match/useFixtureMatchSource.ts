@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { logger } from '../lib/logger';
-import type { FixtureScenarioId } from './fixtures/scenarios';
+import type { FixtureScenarioSpec } from './fixtures/scenarios';
 import type { FixtureScenario } from './fixtures/buildScenario';
 import type { MatchSource } from './matchSource';
 
@@ -24,6 +24,7 @@ export function createFixtureSource(scenario: FixtureScenario): MatchSource {
     makeMove: async (move, args = []) => {
       logger.flow('game/fixture', 'move dispatched (state not advanced)', {
         scenario: scenario.id,
+        players: scenario.players,
         move,
         args,
       });
@@ -48,30 +49,32 @@ export const FIXTURE_LOADING_SOURCE: MatchSource = {
   resume: () => {},
 };
 
-/** 按场景编号取固定场景来源；场景切换后先回到加载态，再换成新场景 */
-export function useFixtureMatchSource(id: FixtureScenarioId): MatchSource {
-  const [loaded, setLoaded] = useState<{ id: FixtureScenarioId; source: MatchSource } | null>(null);
+/** 按场景取固定场景来源；场景切换后先回到加载态，再换成新场景 */
+export function useFixtureMatchSource(spec: FixtureScenarioSpec): MatchSource {
+  const { id, players } = spec;
+  const key = `${id}:${players}`;
+  const [loaded, setLoaded] = useState<{ key: string; source: MatchSource } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void import('./fixtures/buildScenario')
       .then(({ buildFixtureScenario }) => {
         if (cancelled) return;
-        logger.flow('game/fixture', 'scenario ready', { scenario: id });
-        setLoaded({ id, source: createFixtureSource(buildFixtureScenario(id)) });
+        logger.flow('game/fixture', 'scenario ready', { scenario: id, players });
+        setLoaded({ key, source: createFixtureSource(buildFixtureScenario(id, players)) });
       })
       .catch((e) => {
         logger.error('game/fixture', 'scenario build failed', e);
         if (cancelled) return;
         setLoaded({
-          id,
+          key,
           source: { ...FIXTURE_LOADING_SOURCE, connection: 'failed', error: (e as Error).message },
         });
       });
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, players, key]);
 
-  return loaded !== null && loaded.id === id ? loaded.source : FIXTURE_LOADING_SOURCE;
+  return loaded !== null && loaded.key === key ? loaded.source : FIXTURE_LOADING_SOURCE;
 }

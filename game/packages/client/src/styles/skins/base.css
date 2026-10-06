@@ -1,0 +1,232 @@
+/*
+ * 皮肤钩子类名的基础样式：对局界面的共用组件只带这些稳定的类名，
+ * 这里给出与主题无关的缺省外观（只用语义令牌），每个主题的差异写在 skins/<主题 id>.css，
+ * 并限定在 [data-theme='<id>'] 之下。命名统一前缀 ms-。
+ *
+ *   ms-stage / ms-ambient / ms-center   桌面舞台、背景氛围层、中央舞台区域
+ *   ms-topbar                           片头条
+ *   ms-seat（含 -flag / -revtag / -name）  座位牌；ms-faction-dot 阵营点
+ *   ms-card                             卡牌画框（座位卡面、身份卡、金库缩略图）
+ *   ms-layerbadge                       层徽
+ *   ms-die（含 -pip）                    骰子；data-kind = lock | combat
+ *   ms-handcard（含 -art / -badge）       手牌
+ *   ms-dock（含 -self / -ops）           底部坞
+ *   ms-btn                              按钮；data-variant = primary
+ *   ms-response                         响应窗口 / 提示卡
+ *
+ * 状态用数据属性表达：data-current / data-lost / data-master / data-revealed /
+ * data-selected / data-blocked / data-category。
+ */
+
+/* ---------- 舞台 ---------- */
+.ms-stage {
+  background: var(--ms-panel);
+}
+.ms-center {
+  container-type: size;
+}
+.ms-topbar {
+  border-bottom: 1px solid var(--ms-line);
+  background: color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+
+/* ---------- 座位牌 ---------- */
+.ms-seat {
+  background: var(--ms-panel2);
+  border: 1px solid var(--ms-line2);
+}
+.ms-seat[data-current] {
+  border-color: var(--ms-acc);
+  box-shadow: 0 0 0 1px var(--ms-accsoft);
+}
+.ms-seat[data-current] .ms-seat-name {
+  color: var(--ms-accb);
+}
+.ms-seat[data-current] .ms-seat-flag {
+  color: var(--ms-acc);
+  animation: ms-pulse 2.2s ease-in-out infinite;
+}
+.ms-seat[data-lost] {
+  opacity: 0.45;
+  filter: grayscale(0.9);
+}
+.ms-seat[data-lost] .ms-seat-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--ms-blood);
+}
+.ms-seat-flag {
+  color: var(--ms-faint);
+}
+.ms-seat[data-lost]:not([data-current]) .ms-seat-flag {
+  color: var(--ms-blood);
+}
+.ms-seat-revtag {
+  font-family: var(--ms-mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  padding: 2px 5px;
+  color: var(--ms-dim);
+  background: color-mix(in srgb, var(--ms-bg) 82%, transparent);
+  border: 1px solid var(--ms-line);
+}
+.ms-seat [data-revealed='true'] .ms-seat-revtag {
+  color: var(--ms-accb);
+}
+.ms-faction-dot {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ms-lock);
+}
+.ms-faction-dot[data-faction='master'] {
+  background: var(--ms-acc);
+}
+
+/* ---------- 卡牌画框 / 层徽 ---------- */
+.ms-card {
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line2);
+}
+button.ms-card:not(:disabled):hover {
+  border-color: var(--ms-acc);
+}
+.ms-layerbadge {
+  font-family: var(--ms-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  padding: 1px 6px;
+  color: var(--ms-dim);
+  border: 1px solid var(--ms-line2);
+}
+
+/* ---------- 骰子：颜色取令牌，形状与质感由皮肤决定 ---------- */
+.ms-die {
+  --die-color: var(--ms-lock);
+  --die-fill: var(--die-color);
+  --die-pip: var(--ms-bg);
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: var(--die-fill);
+}
+.ms-die[data-kind='combat'] {
+  --die-color: var(--ms-blood);
+}
+.ms-die[data-empty] {
+  background: transparent;
+  border: 1px dashed var(--die-color);
+}
+.ms-die-pip {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--die-pip);
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- 手牌 ---------- */
+.ms-handcard {
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line2);
+  border-top-width: 2px;
+  border-top-color: var(--ms-acc);
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    box-shadow 0.25s,
+    border-color 0.2s;
+  cursor: pointer;
+}
+.ms-handcard[data-category='attack'] {
+  border-top-color: var(--ms-blood);
+}
+.ms-handcard[data-category='unlock'] {
+  border-top-color: var(--ms-lock);
+}
+.ms-handcard:hover {
+  transform: translateY(-8px);
+  border-color: var(--ms-acc);
+  z-index: 2;
+}
+.ms-handcard[data-selected],
+.ms-handcard[data-reading] {
+  transform: translateY(-12px);
+  border-color: var(--ms-acc);
+  box-shadow: 0 0 0 1px var(--ms-acc);
+}
+.ms-handcard[data-blocked] {
+  opacity: 0.45;
+  filter: saturate(0.4);
+  cursor: not-allowed;
+}
+.ms-handcard-art {
+  border-bottom: 1px solid var(--ms-line);
+  background: var(--ms-bg);
+}
+.ms-handcard-badge {
+  background: var(--ms-acc);
+  color: var(--ms-bg);
+}
+.ms-handcard[data-blocked] .ms-handcard-badge {
+  background: var(--ms-bg);
+  color: var(--ms-dim);
+}
+
+/* ---------- 底部坞 / 按钮 / 响应窗口 ---------- */
+.ms-dock {
+  border-top: 1px solid var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-bg) 92%, var(--ms-panel));
+}
+.ms-dock-self {
+  border-right: 1px solid var(--ms-line);
+}
+.ms-dock-ops {
+  border-left: 1px solid var(--ms-line);
+}
+.ms-btn {
+  border: 1px solid var(--ms-line2);
+  background: transparent;
+  color: var(--ms-dim);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    background-color 0.2s;
+}
+.ms-btn:not(:disabled):hover {
+  border-color: var(--ms-dim);
+  color: var(--ms-ink);
+}
+.ms-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ms-btn[data-variant='primary'] {
+  background: var(--ms-acc);
+  border-color: var(--ms-acc);
+  color: var(--ms-bg);
+  font-weight: 700;
+}
+.ms-btn[data-variant='primary']:not(:disabled):hover {
+  background: var(--ms-accb);
+  border-color: var(--ms-accb);
+  color: var(--ms-bg);
+}
+.ms-response {
+  border: 1px solid color-mix(in srgb, var(--ms-acc) 40%, transparent);
+  background: color-mix(in srgb, var(--ms-bg) 94%, var(--ms-panel));
+}
+
+@keyframes ms-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}

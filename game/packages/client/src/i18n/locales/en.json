@@ -80,7 +80,6 @@
       "turnEnd": "Turn End"
     },
     "yourTurn": "Your Turn",
-    "botTurn": "AI {{id}} Turn",
     "playerTurn": "{{name}}'s Turn",
     "yourInfo": "Your Status",
     "faction": "Faction",
@@ -267,13 +266,22 @@
       }
     },
     "thief_shade": {
-      "skill_0": { "name": "Shade · Follow", "desc": "Move to the dream master's layer" }
+      "skill_0": {
+        "name": "Shade · Follow",
+        "desc": "Move to the dream master's layer"
+      }
     },
     "thief_apollo": {
-      "skill_0": { "name": "Apollo · Worship", "desc": "Pick a target player to resolve Worship" }
+      "skill_0": {
+        "name": "Apollo · Worship",
+        "desc": "Pick a target player to resolve Worship"
+      }
     },
     "thief_tourist": {
-      "skill_0": { "name": "Tourist · Assist", "desc": "Assist a chosen player (1/turn)" }
+      "skill_0": {
+        "name": "Tourist · Assist",
+        "desc": "Assist a chosen player (1/turn)"
+      }
     },
     "thief_martyr": {
       "skill_0": {
@@ -282,7 +290,10 @@
       }
     },
     "thief_chemist": {
-      "skill_0": { "name": "Chemist · Refine", "desc": "Refine a chosen hand card" }
+      "skill_0": {
+        "name": "Chemist · Refine",
+        "desc": "Refine a chosen hand card"
+      }
     },
     "thief_gemini": {
       "skill_0": {
@@ -351,10 +362,16 @@
       }
     },
     "dm_uranus_firmament": {
-      "skill_0": { "name": "Uranus · Power", "desc": "Move a chosen player to a target layer" }
+      "skill_0": {
+        "name": "Uranus · Power",
+        "desc": "Move a chosen player to a target layer"
+      }
     },
     "dm_mars_battlefield": {
-      "skill_0": { "name": "Mars · Slaughter", "desc": "Resolve slaughter on a target layer" },
+      "skill_0": {
+        "name": "Mars · Slaughter",
+        "desc": "Resolve slaughter on a target layer"
+      },
       "world": {
         "name": "Mars · Battlefield",
         "desc": "Discard 2 non-SHOOT → pick 1 SHOOT from discard pile"
@@ -435,13 +452,6 @@
       "deck": "Deck {{n}}",
       "deckAria": "{{n}} cards left in the deck"
     },
-    "layerName": {
-      "0": "Lost layer",
-      "1": "Layer 1",
-      "2": "Layer 2",
-      "3": "Layer 3",
-      "4": "Layer 4"
-    },
     "chips": {
       "aria": "Dream layers",
       "lockValue": "Heart lock {{n}}",
@@ -451,15 +461,31 @@
     },
     "rail": {
       "aria": "Turn order",
-      "me": "Me",
       "lost": "LOST",
       "hand": "{{n}} cards",
-      "handAria": "{{n}} cards in hand",
       "current": "Acting now",
       "master": "Master",
-      "seeDetail": "View {{name}}'s character",
-      "hidden": "Identity hidden",
-      "layerAria": "On layer {{layer}}"
+      "hidden": "Identity hidden"
+    },
+    "dock": {
+      "grip": "Expand or collapse hand",
+      "skillIdle": "Skill not ready",
+      "hint": "Tap a card to read it, hold 2s for the full card",
+      "discardInfo": "Discard phase · {{selected}}/{{required}} chosen · tap cards to discard",
+      "blocked": "Can't play now",
+      "selected": "Selected",
+      "selectedDiscard": "Chosen to discard",
+      "skillSheet": "Character skill",
+      "skillSheetDesc": "Choose a skill to use"
+    }
+  },
+  "board": {
+    "layerName": {
+      "0": "Lost layer",
+      "1": "Layer 1",
+      "2": "Layer 2",
+      "3": "Layer 3",
+      "4": "Layer 4"
     },
     "tower": {
       "aria": "Dream layer tower",
@@ -495,61 +521,117 @@
       "lastPlayedShoot": "{{name}} played {{card}} · rolled {{roll}}",
       "lastPlayed": "{{name}} played {{card}}"
     },
+    "banner": {
+      "mine": "Your turn",
+      "other": "{{actor}}'s turn",
+      "full": "{{turn}} — {{phase}}"
+    }
+  },
+  "handInfo": {
+    "category": {
+      "attack": "Attack",
+      "unlock": "Unlock",
+      "support": "Support"
+    },
+    "target": {
+      "none": "No target",
+      "player": "Pick a target player",
+      "layer": "Pick a target layer",
+      "choice": "Pick a mode or targets after playing",
+      "decree": "Played together with SHOOT"
+    },
+    "verdict": {
+      "ok": "You can play it now",
+      "notMyTurn": "Can't play: not your turn",
+      "notActionPhase": "Can't play: not the action phase",
+      "gameOver": "The match is over",
+      "discardPhase": "Discard phase: tap cards to discard",
+      "noUi": "Can't be played directly right now"
+    },
+    "wait": "Waiting"
+  },
+  "outcome": {
+    "aria": "Match result"
+  },
+  "preload": {
+    "aria": "Card art loading",
+    "label": "Art {{loaded}}/{{total}}"
+  },
+  "response": {
+    "aria": "Unlock response",
+    "title": "{{name}} unlocks layer {{layer}}",
+    "countdown": "Auto-pass in {{seconds}}s · play Unlock to cancel",
+    "noTimer": "Play Unlock to cancel, otherwise it resolves",
+    "noCard": "No Unlock in hand, you can only pass",
+    "play": "Play Unlock",
+    "pass": "Pass"
+  },
+  "dock": {
+    "skill": "Skill",
+    "skillAria": "Use character skill",
+    "hand": "Hand",
+    "noHand": "No cards in hand",
+    "lostLayer": "Lost layer",
+    "layerStatus": "Layer {{layer}}",
+    "skillReady": "Skill \"{{name}}\" ready",
+    "commit": "Play"
+  },
+  "seat": {
+    "me": "Me",
+    "layerAria": "On layer {{layer}}",
+    "handAria": "{{n}} cards in hand",
+    "seeDetail": "View {{name}}'s character"
+  },
+  "desktop": {
+    "seat": {
+      "hiddenName": "?",
+      "current": "ACTING",
+      "lost": "LOST",
+      "master": "MASTER",
+      "unrevealed": "HIDDEN",
+      "revealed": "REVEALED",
+      "worldView": "World view: {{names}}"
+    },
+    "top": {
+      "brand": "INCEPTION CITY",
+      "match": "MATCH {{id}}"
+    },
     "response": {
-      "aria": "Unlock response",
-      "title": "{{name}} unlocks layer {{layer}}",
-      "countdown": "Auto-pass in {{seconds}}s · play Unlock to cancel",
-      "noTimer": "Play Unlock to cancel, otherwise it resolves",
-      "noCard": "No Unlock in hand, you can only pass",
-      "play": "Play Unlock",
-      "pass": "Pass"
+      "title": "RESPONSE WINDOW",
+      "body": "{{name}} played [Unlock] on layer {{layer}}."
     },
     "dock": {
-      "grip": "Expand or collapse hand",
-      "wait": "Waiting",
-      "skill": "Skill",
-      "skillAria": "Use character skill",
-      "skillReady": "Skill \"{{name}}\" ready",
-      "skillIdle": "Skill not ready",
-      "lostLayer": "Lost layer",
-      "layerStatus": "Layer {{layer}}",
-      "hand": "Hand",
-      "noHand": "No cards in hand",
-      "commit": "Play",
-      "hint": "Tap a card to read it, hold 2s for the full card",
-      "discardInfo": "Discard phase · {{selected}}/{{required}} chosen · tap cards to discard",
-      "category": {
-        "attack": "Attack",
-        "unlock": "Unlock",
-        "support": "Support"
+      "handCount": "Hand {{n}}",
+      "commit": "Play {{card}}"
+    },
+    "hand": {
+      "state": {
+        "selected": "Selected",
+        "selectedDiscard": "To discard",
+        "blocked": "Blocked"
       },
       "target": {
         "none": "No target",
-        "player": "Pick a target player",
-        "layer": "Pick a target layer",
-        "choice": "Pick a mode or targets after playing",
-        "decree": "Played together with SHOOT"
-      },
-      "verdict": {
-        "ok": "You can play it now",
-        "notMyTurn": "Can't play: not your turn",
-        "notActionPhase": "Can't play: not the action phase",
-        "gameOver": "The match is over",
-        "discardPhase": "Discard phase: tap cards to discard",
-        "noUi": "Can't be played directly right now"
-      },
-      "blocked": "Can't play now",
-      "selected": "Selected",
-      "selectedDiscard": "Chosen to discard",
-      "skillSheet": "Character skill",
-      "skillSheetDesc": "Choose a skill to use"
+        "player": "Pick a player",
+        "layer": "Pick a layer",
+        "choice": "Choose after playing",
+        "decree": "Played with SHOOT"
+      }
     },
-    "outcome": {
-      "aria": "Match result"
+    "stage": {
+      "loading": "Loading board…"
     },
-    "preload": {
-      "aria": "Card art loading",
-      "label": "Art {{loaded}}/{{total}}"
+    "board": {
+      "title": "DREAM CROSS-SECTION",
+      "round": "Turn {{n}}",
+      "deck": "Deck {{remaining}} / {{total}}",
+      "deckAria": "Cards left in deck",
+      "focusLayer": "Focus layer {{layer}} · {{name}}",
+      "focusLayerTag": "FOCUS",
+      "vaultKnown": "Vault · {{content}}"
     }
+  },
+  "die": {
+    "combat": "Combat die {{n}}"
   }
 }

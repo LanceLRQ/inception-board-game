@@ -7,23 +7,24 @@ import { ChevronRight, Crown, Skull, TriangleAlert, Vault } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { getCardImageUrl } from '../../../lib/cardImages';
 import { getCardName } from '../../../lib/cards';
-import { LockDie } from './LockDie';
-import type { TowerNightmare, TowerOccupant, TowerRow, TowerVault } from './towerModel';
-import { deriveFocusNote } from './towerModel';
-import type { Activity } from './latestActivity';
+import { Die } from '../../Die';
+import type {
+  BoardModel,
+  BoardNightmare,
+  BoardOccupant,
+  BoardLayer,
+  BoardVault,
+} from '../model/boardModel';
+import { visibleBoardLayers } from '../model/boardModel';
 
 interface MobileTowerProps {
-  readonly rows: readonly TowerRow[];
-  readonly focusLayer: number;
+  readonly board: BoardModel;
   readonly dockOpen: boolean;
-  readonly activity: Activity | null;
-  readonly pendingUnlock: { playerID: string; layer: number } | null;
-  readonly nicknameOf: (playerID: string) => string;
   /** 打开金库详情（金库牌卡面编号） */
   readonly onOpenVault: (face: string) => void;
 }
 
-function Occupants({ occupants }: { occupants: readonly TowerOccupant[] }) {
+function Occupants({ occupants }: { occupants: readonly BoardOccupant[] }) {
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 gap-1 overflow-hidden">
@@ -37,7 +38,7 @@ function Occupants({ occupants }: { occupants: readonly TowerOccupant[] }) {
           )}
         >
           {o.isMaster && <Crown className="size-2.5 shrink-0 text-acc-bright" aria-hidden />}
-          <span className="truncate">{o.isSelf ? t('mobile.rail.me') : o.name}</span>
+          <span className="truncate">{o.isSelf ? t('seat.me') : o.name}</span>
         </span>
       ))}
     </div>
@@ -50,22 +51,22 @@ function VaultMark({
   large,
   onOpen,
 }: {
-  vault: TowerVault;
+  vault: BoardVault;
   large?: boolean;
   onOpen: (face: string) => void;
 }) {
   const { t } = useTranslation();
   const label = vault.opened
-    ? t('mobile.tower.vaultOpened', {
-        content: t(`mobile.tower.vaultContent.${vault.contentType}`),
+    ? t('board.tower.vaultOpened', {
+        content: t(`board.tower.vaultContent.${vault.contentType}`),
       })
-    : t('mobile.tower.vaultClosed');
+    : t('board.tower.vaultClosed');
   const url = getCardImageUrl(vault.face);
   return (
     <button
       type="button"
       onClick={() => onOpen(vault.face)}
-      aria-label={`${t('mobile.tower.openVault')}：${label}`}
+      aria-label={`${t('board.tower.openVault')}：${label}`}
       title={label}
       data-testid={`vault-thumb-${vault.id}`}
       className={cn(
@@ -82,14 +83,14 @@ function VaultMark({
   );
 }
 
-function NightmareTag({ nightmare }: { nightmare: TowerNightmare }) {
+function NightmareTag({ nightmare }: { nightmare: BoardNightmare }) {
   const { t } = useTranslation();
   const name = nightmare.cardId ? getCardName(nightmare.cardId) : null;
   const text = nightmare.revealed
     ? name
-      ? t('mobile.tower.nightmareNamed', { name })
-      : t('mobile.tower.nightmareRevealed')
-    : t('mobile.tower.nightmareReady');
+      ? t('board.tower.nightmareNamed', { name })
+      : t('board.tower.nightmareRevealed')
+    : t('board.tower.nightmareReady');
   return (
     <span
       data-testid="nightmare-tag"
@@ -107,13 +108,19 @@ function NightmareTag({ nightmare }: { nightmare: TowerNightmare }) {
 function HeartLock({ value, size }: { value: number; size: number }) {
   return (
     <span className="flex shrink-0 items-center gap-1 font-mono text-[9.5px] tracking-[.05em] text-lock">
-      <LockDie value={value} size={size} />
+      <Die value={value} kind="lock" size={size} />
       {value}
     </span>
   );
 }
 
-function CompactSlab({ row, onOpenVault }: { row: TowerRow; onOpenVault: (face: string) => void }) {
+function CompactSlab({
+  row,
+  onOpenVault,
+}: {
+  row: BoardLayer;
+  onOpenVault: (face: string) => void;
+}) {
   const { t } = useTranslation();
   const isLost = row.layer === 0;
   return (
@@ -129,11 +136,11 @@ function CompactSlab({ row, onOpenVault }: { row: TowerRow; onOpenVault: (face: 
         L{row.layer}
       </span>
       <span className="w-11 shrink-0 font-heading text-[11px] font-semibold tracking-[.1em] whitespace-nowrap">
-        {t(`mobile.layerName.${row.layer}`)}
+        {t(`board.layerName.${row.layer}`)}
       </span>
       {isLost ? (
         <span className="min-w-0 truncate font-mono text-[9px] tracking-[.06em] text-faint">
-          {row.occupants.length > 0 ? t('mobile.tower.lostHere') : t('mobile.tower.lostEmpty')}
+          {row.occupants.length > 0 ? t('board.tower.lostHere') : t('board.tower.lostEmpty')}
         </span>
       ) : (
         <>
@@ -154,22 +161,18 @@ function CompactSlab({ row, onOpenVault }: { row: TowerRow; onOpenVault: (face: 
 function FocusSlab({
   row,
   dockOpen,
-  note,
-  unlocking,
   onOpenVault,
 }: {
-  row: TowerRow;
+  row: BoardLayer;
   dockOpen: boolean;
-  note: string;
-  unlocking: boolean;
   onOpenVault: (face: string) => void;
 }) {
   const { t } = useTranslation();
   const isLost = row.layer === 0;
-  const tag = unlocking
-    ? t('mobile.tower.unlocking')
+  const tag = row.unlocking
+    ? t('board.tower.unlocking')
     : row.hasViewer
-      ? t('mobile.tower.herePlayer')
+      ? t('board.tower.herePlayer')
       : null;
   return (
     <div
@@ -186,7 +189,7 @@ function FocusSlab({
           L{row.layer}
         </span>
         <span className="min-w-0 flex-1 truncate font-heading text-[11px] font-semibold tracking-[.1em]">
-          {t(`mobile.layerName.${row.layer}`)} · {t('mobile.tower.focusTag')}
+          {t(`board.layerName.${row.layer}`)} · {t('board.tower.focusTag')}
         </span>
         {tag && (
           <span className="shrink-0 border border-acc px-[7px] py-[3px] font-mono text-[8.5px] tracking-[.14em] whitespace-nowrap text-acc-bright">
@@ -205,65 +208,51 @@ function FocusSlab({
             <VaultMark vault={v} large onOpen={onOpenVault} />
             <span className="font-mono text-[9px] tracking-[.05em] text-dim">
               {v.opened
-                ? t('mobile.tower.vaultOpened', {
-                    content: t(`mobile.tower.vaultContent.${v.contentType}`),
+                ? t('board.tower.vaultOpened', {
+                    content: t(`board.tower.vaultContent.${v.contentType}`),
                   })
                 : v.contentType !== 'hidden'
-                  ? t('mobile.tower.vaultMasterKnows', {
-                      content: t(`mobile.tower.vaultContent.${v.contentType}`),
+                  ? t('board.tower.vaultMasterKnows', {
+                      content: t(`board.tower.vaultContent.${v.contentType}`),
                     })
-                  : t('mobile.tower.vaultClosed')}
+                  : t('board.tower.vaultClosed')}
             </span>
           </span>
         ))}
         {row.nightmare && <NightmareTag nightmare={row.nightmare} />}
         <Occupants occupants={row.occupants} />
       </div>
-      <p className="truncate font-mono text-[9px] tracking-[.05em] text-dim">{note}</p>
+      <p className="truncate font-mono text-[9px] tracking-[.05em] text-dim">
+        {t(row.note.key, row.note.params)}
+      </p>
     </div>
   );
 }
 
-export function MobileTower({
-  rows,
-  focusLayer,
-  dockOpen,
-  activity,
-  pendingUnlock,
-  nicknameOf,
-  onOpenVault,
-}: MobileTowerProps) {
+export function MobileTower({ board, dockOpen, onOpenVault }: MobileTowerProps) {
   const { t } = useTranslation();
+  const { activity, focusLayer } = board;
   return (
     <div
-      aria-label={t('mobile.tower.aria')}
+      aria-label={t('board.tower.aria')}
       data-testid="layer-tower"
       className="flex min-w-0 flex-1 flex-col gap-[7px] overflow-y-auto px-3 pb-2 pt-[9px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {rows.map((row) => {
-        if (row.layer !== focusLayer) {
-          return <CompactSlab key={row.layer} row={row} onOpenVault={onOpenVault} />;
-        }
-        const note = deriveFocusNote(row, pendingUnlock, nicknameOf);
-        return (
-          <FocusSlab
-            key={row.layer}
-            row={row}
-            dockOpen={dockOpen}
-            note={t(note.key, note.params)}
-            unlocking={!!pendingUnlock && pendingUnlock.layer === row.layer}
-            onOpenVault={onOpenVault}
-          />
-        );
-      })}
+      {visibleBoardLayers(board.layers, focusLayer, dockOpen).map((row) =>
+        row.layer !== focusLayer ? (
+          <CompactSlab key={row.layer} row={row} onOpenVault={onOpenVault} />
+        ) : (
+          <FocusSlab key={row.layer} row={row} dockOpen={dockOpen} onOpenVault={onOpenVault} />
+        ),
+      )}
       {!dockOpen && activity && (
         <p
           className="flex shrink-0 items-center gap-[7px] px-0.5 py-px font-mono text-[9px] tracking-[.05em] text-faint"
           data-testid="latest-activity"
-          aria-label={t('mobile.activity.aria')}
+          aria-label={t('board.activity.aria')}
         >
           <ChevronRight className="size-2.5 shrink-0 text-dim" aria-hidden />
-          <span className="truncate">{t(`mobile.activity.${activity.kind}`, activity.params)}</span>
+          <span className="truncate">{t(`board.activity.${activity.kind}`, activity.params)}</span>
         </p>
       )}
     </div>

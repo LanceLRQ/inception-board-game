@@ -1,16 +1,14 @@
 // SHOOT 骰子动画浮层 —— 射击牌打出后展示骰面快速切换，落定后停留 1s 再回调
-// Dice3D
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { diceSvgPath } from '../Dice3D';
-import type { DiceColor } from '../Dice3D';
+import { Die, type DieKind } from '../Die';
 
 export interface ShootDiceOverlayProps {
   /** 原始骰值 1-6，有值时展示动画 */
   roll: number | null | undefined;
-  /** 骰子颜色（SHOOT 红 / 心锁蓝），默认红 */
-  color?: DiceColor;
+  /** 骰子种类（SHOOT 的战斗骰 / 心锁骰），默认战斗骰 */
+  kind?: DieKind;
   /** 动画完成（骰面落定 + 停留）后回调 */
   onComplete?: () => void;
 }
@@ -20,7 +18,7 @@ const ROLL_ANIMATION_MS = 500;
 // 落定后展示终值的停留时间
 const SHOW_FINAL_MS = 1000;
 
-export function ShootDiceOverlay({ roll, color = 'red', onComplete }: ShootDiceOverlayProps) {
+export function ShootDiceOverlay({ roll, kind = 'combat', onComplete }: ShootDiceOverlayProps) {
   const [visible, setVisible] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [displayFace, setDisplayFace] = useState(1);
@@ -89,12 +87,7 @@ export function ShootDiceOverlay({ roll, color = 'red', onComplete }: ShootDiceO
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           >
-            <img
-              src={diceSvgPath(color, displayFace)}
-              alt={`骰子 ${displayFace}`}
-              className="h-16 w-16 select-none"
-              draggable={false}
-            />
+            <Die value={displayFace} kind={kind} size={64} className="select-none" />
             <span className="text-sm font-medium text-foreground">
               {rolling ? '掷骰中...' : displayFace}
             </span>

@@ -10,7 +10,7 @@ describe('ShootDiceOverlay props 类型', () => {
   });
 
   it('roll 有值时合法', () => {
-    const props: ShootDiceOverlayProps = { roll: 5, color: 'red' };
+    const props: ShootDiceOverlayProps = { roll: 5, kind: 'combat' };
     expect(props.roll).toBe(5);
   });
 
@@ -19,9 +19,9 @@ describe('ShootDiceOverlay props 类型', () => {
     expect(props.roll).toBeUndefined();
   });
 
-  it('支持蓝骰颜色', () => {
-    const props: ShootDiceOverlayProps = { roll: 3, color: 'blue' };
-    expect(props.color).toBe('blue');
+  it('支持心锁骰', () => {
+    const props: ShootDiceOverlayProps = { roll: 3, kind: 'lock' };
+    expect(props.kind).toBe('lock');
   });
 
   it('支持 onComplete 回调', () => {

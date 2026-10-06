@@ -5,7 +5,7 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
 import type { HandCardItem } from '../controllerTypes';
-import { cardCategoryOf, cardTargetKind, type CardVerdict } from './dockDerive';
+import { cardCategoryOf, cardTargetKind, type CardVerdict } from '../model/handDerive';
 
 interface DockInfoBarProps {
   /** 正在读的牌；没有为 null */
@@ -35,11 +35,11 @@ export function DockInfoBar({ item, verdict, discard, onCommit }: DockInfoBarPro
           {item.name}
         </b>
         {' · '}
-        {t(`mobile.dock.category.${cardCategoryOf(item.card)}`)}
-        {target && ` · ${t(`mobile.dock.target.${target}`)}`}
+        {t(`handInfo.category.${cardCategoryOf(item.card)}`)}
+        {target && ` · ${t(`handInfo.target.${target}`)}`}
         {' —— '}
         <span className={cn(verdict.canPlay ? 'text-ok' : 'text-dim')}>
-          {t(`mobile.dock.verdict.${verdict.reason}`)}
+          {t(`handInfo.verdict.${verdict.reason}`)}
         </span>
       </span>
     );
@@ -60,7 +60,7 @@ export function DockInfoBar({ item, verdict, discard, onCommit }: DockInfoBarPro
           data-testid="hand-commit-play"
           className="min-h-[42px] shrink-0 touch-manipulation border border-acc bg-acc px-4 text-[11.5px] font-semibold tracking-[.08em] text-background active:translate-y-px"
         >
-          {t('mobile.dock.commit')}
+          {t('dock.commit')}
         </button>
       )}
     </div>

@@ -4,10 +4,16 @@
 import type { Page } from '@playwright/test';
 import { test, expect, pickCardsToDiscard, waitForAppReady } from './fixtures/index.js';
 
-/** 座位标识的前缀：宽屏是围坐布局的座位，窄屏是行动轴上的格子（断点 1024px） */
-function seatPrefix(page: Page): string {
+/**
+ * 座位标识的前缀与「看得到的座位数」（断点 1024px）：
+ *   - 宽屏：座位环上的座位牌，本人在底部坞里，不占座位环，所以是人数减 1；
+ *   - 窄屏：行动轴上的格子，本人也在其中，所以等于人数。
+ */
+function seatsOf(page: Page, players: number): { prefix: string; count: number } {
   const width = page.viewportSize()?.width ?? 1280;
-  return width >= 1024 ? 'player-seat-' : 'rail-slot-';
+  return width >= 1024
+    ? { prefix: 'player-seat-', count: players - 1 }
+    : { prefix: 'rail-slot-', count: players };
 }
 
 test.describe('人机对战 LocalMatch', () => {
@@ -28,13 +34,12 @@ test.describe('人机对战 LocalMatch', () => {
 
     // 等待 BGIO 从 setup 走到 playing（turnPhase 进入 draw）
     await expect(page.getByText(/回合\s*[1-9]/)).toBeVisible({ timeout: 15_000 });
-    // 3 个 AI 玩家的座位应都可见（"玩家明细"列表默认折叠，不能拿它当可见性依据）
-    const prefix = seatPrefix(page);
+    // 3 个 AI 玩家的座位应都可见
+    const { prefix, count } = seatsOf(page, 4);
     for (const id of ['1', '2', '3']) {
       await expect(page.getByTestId(`${prefix}${id}`)).toBeVisible();
     }
-    // 座位总数 = 玩家数（含真人自己）
-    await expect(page.locator(`[data-testid^="${prefix}"]`)).toHaveCount(4);
+    await expect(page.locator(`[data-testid^="${prefix}"]`)).toHaveCount(count);
   });
 
   test('人类玩家手牌随抽牌增加，流程推进到 action 阶段', async ({ page }) => {
@@ -115,10 +120,10 @@ test.describe('人机对战 LocalMatch', () => {
 
     await expect(page.getByText(/回合\s*\d+/)).toBeVisible({ timeout: 10_000 });
     // 5 人局：4 个 AI 座位都应可见
-    const prefix = seatPrefix(page);
+    const { prefix, count } = seatsOf(page, 5);
     for (const id of ['1', '2', '3', '4']) {
       await expect(page.getByTestId(`${prefix}${id}`)).toBeVisible();
     }
-    await expect(page.locator(`[data-testid^="${prefix}"]`)).toHaveCount(5);
+    await expect(page.locator(`[data-testid^="${prefix}"]`)).toHaveCount(count);
   });
 });

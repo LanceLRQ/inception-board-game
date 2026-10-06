@@ -80,7 +80,6 @@
       "turnEnd": "回合结束"
     },
     "yourTurn": "你的回合",
-    "botTurn": "AI {{id}} 回合",
     "playerTurn": "{{name}} 回合",
     "yourInfo": "你的状态",
     "faction": "阵营",
@@ -241,20 +240,48 @@
     "choiceIncrease": "+",
     "choiceDecrease": "-",
     "master": {
-      "reveal_nightmare": { "name": "显现梦魇", "desc": "翻开目标层的一张暗置梦魇牌" },
-      "discard_nightmare": { "name": "弃置梦魇", "desc": "弃掉目标层的一张明置梦魇" },
-      "discard_hidden_nightmare": { "name": "弃置暗置梦魇", "desc": "弃掉目标层的一张暗置梦魇" },
-      "activate_nightmare": { "name": "激活梦魇", "desc": "激活目标层的一张明置梦魇" },
+      "reveal_nightmare": {
+        "name": "显现梦魇",
+        "desc": "翻开目标层的一张暗置梦魇牌"
+      },
+      "discard_nightmare": {
+        "name": "弃置梦魇",
+        "desc": "弃掉目标层的一张明置梦魇"
+      },
+      "discard_hidden_nightmare": {
+        "name": "弃置暗置梦魇",
+        "desc": "弃掉目标层的一张暗置梦魇"
+      },
+      "activate_nightmare": {
+        "name": "激活梦魇",
+        "desc": "激活目标层的一张明置梦魇"
+      },
       "secret_passage_teleport": {
         "name": "密道·传送",
         "desc": "弃 1 张梦境穿梭剂 → 将 1 名盗梦者送入迷失层（限 2 次/回合）"
       },
-      "deal_bribe": { "name": "派发贿赂", "desc": "从贿赂池随机派 1 张贿赂给指定盗梦者" }
+      "deal_bribe": {
+        "name": "派发贿赂",
+        "desc": "从贿赂池随机派 1 张贿赂给指定盗梦者"
+      }
     },
-    "thief_shade": { "skill_0": { "name": "影子·随行", "desc": "移动到梦主所在层" } },
-    "thief_apollo": { "skill_0": { "name": "阿波罗·崇拜", "desc": "指定一名目标玩家结算崇拜" } },
+    "thief_shade": {
+      "skill_0": {
+        "name": "影子·随行",
+        "desc": "移动到梦主所在层"
+      }
+    },
+    "thief_apollo": {
+      "skill_0": {
+        "name": "阿波罗·崇拜",
+        "desc": "指定一名目标玩家结算崇拜"
+      }
+    },
     "thief_tourist": {
-      "skill_0": { "name": "穿行者·支助", "desc": "指定一名玩家进行支助（每回合限 1 次）" }
+      "skill_0": {
+        "name": "穿行者·支助",
+        "desc": "指定一名玩家进行支助（每回合限 1 次）"
+      }
     },
     "thief_martyr": {
       "skill_0": {
@@ -262,7 +289,12 @@
         "desc": "略过出牌阶段掷 1 颗骰子，3–6 则当层心锁 +2 或 -2，之后死亡并弃掉所有手牌"
       }
     },
-    "thief_chemist": { "skill_0": { "name": "药剂师·调剂", "desc": "指定 1 张手牌进行调剂" } },
+    "thief_chemist": {
+      "skill_0": {
+        "name": "药剂师·调剂",
+        "desc": "指定 1 张手牌进行调剂"
+      }
+    },
     "thief_gemini": {
       "skill_0": {
         "name": "双子·命运",
@@ -276,7 +308,10 @@
       }
     },
     "thief_architect": {
-      "skill_0": { "name": "筑梦师·迷宫", "desc": "弃 1 张 SHOOT 类牌 + 选 1 名同层玩家建造迷宫" }
+      "skill_0": {
+        "name": "筑梦师·迷宫",
+        "desc": "弃 1 张 SHOOT 类牌 + 选 1 名同层玩家建造迷宫"
+      }
     },
     "thief_darwin": {
       "skill_0": {
@@ -291,7 +326,10 @@
       }
     },
     "thief_luna": {
-      "skill_0": { "name": "露娜·月蚀", "desc": "弃 2 张 SHOOT → 击杀同层任意玩家" }
+      "skill_0": {
+        "name": "露娜·月蚀",
+        "desc": "弃 2 张 SHOOT → 击杀同层任意玩家"
+      }
     },
     "thief_athena": {
       "skill_0": {
@@ -300,21 +338,44 @@
       }
     },
     "thief_forger": {
-      "skill_0": { "name": "欺诈师·诡计", "desc": "选目标玩家 + 还 1 张手牌（回合限 1 次）" }
+      "skill_0": {
+        "name": "欺诈师·诡计",
+        "desc": "选目标玩家 + 还 1 张手牌（回合限 1 次）"
+      }
     },
     "thief_libra": {
-      "skill_0": { "name": "天秤·平衡", "desc": "指定 1 名目标玩家进行平衡分堆（回合限 1 次）" }
+      "skill_0": {
+        "name": "天秤·平衡",
+        "desc": "指定 1 名目标玩家进行平衡分堆（回合限 1 次）"
+      }
     },
     "thief_lord_of_war": {
-      "skill_0": { "name": "战争之王·黑市", "desc": "弃 2 张手牌 → 从弃牌堆取 1 张（回合限 1 次）" }
+      "skill_0": {
+        "name": "战争之王·黑市",
+        "desc": "弃 2 张手牌 → 从弃牌堆取 1 张（回合限 1 次）"
+      }
     },
     "thief_gaia": {
-      "skill_0": { "name": "盖亚·撼动", "desc": "同层玩家各自 +1 或 -1 层（每回合限 2 次）" }
+      "skill_0": {
+        "name": "盖亚·撼动",
+        "desc": "同层玩家各自 +1 或 -1 层（每回合限 2 次）"
+      }
     },
-    "dm_uranus_firmament": { "skill_0": { "name": "天王星·权力", "desc": "指定玩家移动到目标层" } },
+    "dm_uranus_firmament": {
+      "skill_0": {
+        "name": "天王星·权力",
+        "desc": "指定玩家移动到目标层"
+      }
+    },
     "dm_mars_battlefield": {
-      "skill_0": { "name": "火星·杀戮", "desc": "指定目标层进行杀戮结算" },
-      "world": { "name": "火星·战场", "desc": "弃 2 张非 SHOOT → 从弃牌堆取 1 张 SHOOT" }
+      "skill_0": {
+        "name": "火星·杀戮",
+        "desc": "指定目标层进行杀戮结算"
+      },
+      "world": {
+        "name": "火星·战场",
+        "desc": "弃 2 张非 SHOOT → 从弃牌堆取 1 张 SHOOT"
+      }
     },
     "dm_pluto_hell": {
       "skill_0": {
@@ -323,10 +384,16 @@
       }
     },
     "dm_saturn_territory": {
-      "free_move": { "name": "土星·自由移动", "desc": "盗梦者持贿赂时可自由移动到目标层" }
+      "free_move": {
+        "name": "土星·自由移动",
+        "desc": "盗梦者持贿赂时可自由移动到目标层"
+      }
     },
     "dm_imperial_city": {
-      "skill_0": { "name": "皇城·重金", "desc": "指定目标 + 选贿赂池 1 张派发" }
+      "skill_0": {
+        "name": "皇城·重金",
+        "desc": "指定目标 + 选贿赂池 1 张派发"
+      }
     }
   },
   "recovery": {
@@ -385,13 +452,6 @@
       "deck": "牌库 {{n}}",
       "deckAria": "牌库剩余 {{n}} 张"
     },
-    "layerName": {
-      "0": "迷失层",
-      "1": "第一层",
-      "2": "第二层",
-      "3": "第三层",
-      "4": "第四层"
-    },
     "chips": {
       "aria": "梦境层",
       "lockValue": "心锁 {{n}}",
@@ -401,15 +461,31 @@
     },
     "rail": {
       "aria": "行动顺序",
-      "me": "我",
       "lost": "迷失",
       "hand": "手{{n}}",
-      "handAria": "手牌 {{n}} 张",
       "current": "当前行动",
       "master": "梦主",
-      "seeDetail": "查看 {{name}} 的角色",
-      "hidden": "身份未翻开",
-      "layerAria": "在第 {{layer}} 层"
+      "hidden": "身份未翻开"
+    },
+    "dock": {
+      "grip": "展开或收起手牌",
+      "skillIdle": "技能未就绪",
+      "hint": "点一张牌读信息，长按 2 秒看大图",
+      "discardInfo": "弃牌阶段 · 已选 {{selected}}/{{required}} · 点牌选择要弃的牌",
+      "blocked": "此刻打不出",
+      "selected": "已选",
+      "selectedDiscard": "已选弃牌",
+      "skillSheet": "角色技能",
+      "skillSheetDesc": "选择要发动的技能"
+    }
+  },
+  "board": {
+    "layerName": {
+      "0": "迷失层",
+      "1": "第一层",
+      "2": "第二层",
+      "3": "第三层",
+      "4": "第四层"
     },
     "tower": {
       "aria": "梦境层塔",
@@ -445,61 +521,117 @@
       "lastPlayedShoot": "{{name}} 打出【{{card}}】· 掷出 {{roll}}",
       "lastPlayed": "{{name}} 打出【{{card}}】"
     },
+    "banner": {
+      "mine": "你的回合",
+      "other": "{{actor}} 的回合",
+      "full": "{{turn}} — {{phase}}"
+    }
+  },
+  "handInfo": {
+    "category": {
+      "attack": "攻击",
+      "unlock": "解封",
+      "support": "辅助"
+    },
+    "target": {
+      "none": "无需目标",
+      "player": "需选择目标玩家",
+      "layer": "需选择目标层",
+      "choice": "打出后选择结算方式或目标",
+      "decree": "随 SHOOT 一起打出"
+    },
+    "verdict": {
+      "ok": "现在可以打出",
+      "notMyTurn": "现在不能打：还没轮到你",
+      "notActionPhase": "现在不能打：当前不是出牌阶段",
+      "gameOver": "对局已结束",
+      "discardPhase": "弃牌阶段：点牌选择要弃的牌",
+      "noUi": "现在不能直接打出"
+    },
+    "wait": "等待"
+  },
+  "outcome": {
+    "aria": "对局结果"
+  },
+  "preload": {
+    "aria": "卡图加载进度",
+    "label": "卡图 {{loaded}}/{{total}}"
+  },
+  "response": {
+    "aria": "解封响应",
+    "title": "{{name}} 解封第 {{layer}} 层",
+    "countdown": "{{seconds}}s 后自动放弃 · 可打出【解封】取消",
+    "noTimer": "可打出【解封】取消 · 否则解封生效",
+    "noCard": "手中无【解封】，只能放弃",
+    "play": "打出解封",
+    "pass": "放弃"
+  },
+  "dock": {
+    "skill": "技能",
+    "skillAria": "使用角色技能",
+    "hand": "手牌",
+    "noHand": "没有手牌",
+    "lostLayer": "迷失层",
+    "layerStatus": "第 {{layer}} 层",
+    "skillReady": "技能「{{name}}」待命",
+    "commit": "打出"
+  },
+  "seat": {
+    "me": "我",
+    "layerAria": "在第 {{layer}} 层",
+    "handAria": "手牌 {{n}} 张",
+    "seeDetail": "查看 {{name}} 的角色"
+  },
+  "desktop": {
+    "seat": {
+      "hiddenName": "？",
+      "current": "行动中",
+      "lost": "迷失",
+      "master": "梦主",
+      "unrevealed": "未翻露",
+      "revealed": "已翻露",
+      "worldView": "世界观：{{names}}"
+    },
+    "top": {
+      "brand": "盗梦都市",
+      "match": "对局 {{id}}"
+    },
     "response": {
-      "aria": "解封响应",
-      "title": "{{name}} 解封第 {{layer}} 层",
-      "countdown": "{{seconds}}s 后自动放弃 · 可打出【解封】取消",
-      "noTimer": "可打出【解封】取消 · 否则解封生效",
-      "noCard": "手中无【解封】，只能放弃",
-      "play": "打出解封",
-      "pass": "放弃"
+      "title": "响应窗口",
+      "body": "{{name}} 打出【解封】尝试解锁第 {{layer}} 层。"
     },
     "dock": {
-      "grip": "展开或收起手牌",
-      "wait": "等待",
-      "skill": "技能",
-      "skillAria": "使用角色技能",
-      "skillReady": "技能「{{name}}」待命",
-      "skillIdle": "技能未就绪",
-      "lostLayer": "迷失层",
-      "layerStatus": "第 {{layer}} 层",
-      "hand": "手牌",
-      "noHand": "没有手牌",
-      "commit": "打出",
-      "hint": "点一张牌读信息，长按 2 秒看大图",
-      "discardInfo": "弃牌阶段 · 已选 {{selected}}/{{required}} · 点牌选择要弃的牌",
-      "category": {
-        "attack": "攻击",
-        "unlock": "解封",
-        "support": "辅助"
+      "handCount": "手牌 {{n}}",
+      "commit": "打出 {{card}}"
+    },
+    "hand": {
+      "state": {
+        "selected": "已选",
+        "selectedDiscard": "已选弃牌",
+        "blocked": "不可打"
       },
       "target": {
         "none": "无需目标",
-        "player": "需选择目标玩家",
-        "layer": "需选择目标层",
-        "choice": "打出后选择结算方式或目标",
-        "decree": "随 SHOOT 一起打出"
-      },
-      "verdict": {
-        "ok": "现在可以打出",
-        "notMyTurn": "现在不能打：还没轮到你",
-        "notActionPhase": "现在不能打：当前不是出牌阶段",
-        "gameOver": "对局已结束",
-        "discardPhase": "弃牌阶段：点牌选择要弃的牌",
-        "noUi": "现在不能直接打出"
-      },
-      "blocked": "此刻打不出",
-      "selected": "已选",
-      "selectedDiscard": "已选弃牌",
-      "skillSheet": "角色技能",
-      "skillSheetDesc": "选择要发动的技能"
+        "player": "选目标玩家",
+        "layer": "选目标层",
+        "choice": "打出后选择",
+        "decree": "随 SHOOT 打出"
+      }
     },
-    "outcome": {
-      "aria": "对局结果"
+    "stage": {
+      "loading": "中央舞台加载中…"
     },
-    "preload": {
-      "aria": "卡图加载进度",
-      "label": "卡图 {{loaded}}/{{total}}"
+    "board": {
+      "title": "梦 境 剖 面",
+      "round": "第 {{n}} 回合",
+      "deck": "牌库 {{remaining}} / {{total}}",
+      "deckAria": "牌库剩余",
+      "focusLayer": "聚焦第 {{layer}} 层 · {{name}}",
+      "focusLayerTag": "焦点层",
+      "vaultKnown": "金库 · {{content}}"
     }
+  },
+  "die": {
+    "combat": "战斗骰 {{n}}"
   }
 }

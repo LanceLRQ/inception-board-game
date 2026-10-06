@@ -17,10 +17,7 @@ import { otherTurnLabel } from './turnLabel';
 import {
   activeSkillTargetIds,
   buildActiveSkillContext,
-  buildLayerViews,
   buildPlayArgs,
-  buildPlayerRows,
-  buildPlayerViews,
   classifyShoot,
   commitPlanFor,
   decreeApplicable,
@@ -133,8 +130,11 @@ export function useMatchController(source: MatchSource): MatchController {
   const turnPhase = (G?.turnPhase as string) ?? '';
   const currentPlayerID = (ctx?.currentPlayer as string) ?? '';
   const isMyTurn = mySeat !== null && currentPlayerID === mySeat;
-  const otherTurn = otherTurnLabel(seatById.get(currentPlayerID), currentPlayerID);
   const players = G?.players;
+  const otherTurn = otherTurnLabel(
+    seatById.get(currentPlayerID),
+    (players?.[currentPlayerID]?.nickname as string | undefined) ?? currentPlayerID,
+  );
   const humanPlayer = mySeat === null ? undefined : players?.[mySeat];
   const vaultsRaw = G?.vaults;
   const dreamMasterID = (G?.dreamMasterID as string) ?? '';
@@ -377,9 +377,7 @@ export function useMatchController(source: MatchSource): MatchController {
   const tapHandCard = (index: number) => {
     const card = humanHand[index];
     if (card === undefined) return;
-    const mode = handCardMode(card, handModeInput);
-    if (mode === 'discard') toggleDiscard(index);
-    else if (mode === 'play') startPlay(card);
+    if (handCardMode(card, handModeInput) === 'discard') toggleDiscard(index);
   };
 
   // 确认打出一张牌：无目标直接发 move；需要目标 / 穿梭剂 / 万有引力与一步出牌相同，进入各自的选择流程
@@ -480,7 +478,6 @@ export function useMatchController(source: MatchSource): MatchController {
     makeMove,
     play: {
       pending: effectivePending,
-      start: startPlay,
       commit: commitPlay,
       confirmNoTarget: confirmPlayNoTarget,
       confirmTargetPlayer: confirmPlayTargetPlayer,
@@ -565,7 +562,5 @@ export function useMatchController(source: MatchSource): MatchController {
 
     skillPanel,
     preview: { cardId: previewCard, open: openPreview, close: closePreview },
-    overview: { layers: buildLayerViews(G), players: buildPlayerViews(players) },
-    playerRows: buildPlayerRows(G, { mySeat, currentSeat: currentPlayerID, seatById }),
   };
 }

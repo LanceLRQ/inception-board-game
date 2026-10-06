@@ -4,27 +4,19 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getCardName } from '../../../lib/cards';
-import { adaptViewToStage } from '../viewAdapter';
+import { useBoardModel } from '../model/useBoardModel';
+import { buildSeatViews } from '../model/seatModel';
 import { markersBySeat } from '../seatMarkers';
 import type { MatchController } from '../controllerTypes';
-import { deriveActivity } from './latestActivity';
+import { MatchOutcome } from '../shared/MatchOutcome';
+import { PreloadLine } from '../shared/PreloadLine';
 import { MobileDock } from './MobileDock';
 import { MobileLayerChips } from './MobileLayerChips';
 import { MobileNotices } from './MobileNotices';
-import { MobileOutcome } from './MobileOutcome';
-import { MobilePreloadLine } from './MobilePreloadLine';
 import { MobileRail } from './MobileRail';
 import { MobileTopBar } from './MobileTopBar';
 import { MobileTower } from './MobileTower';
-import { buildRailSlots } from './railModel';
-import {
-  buildLayerChips,
-  buildTowerRows,
-  resolveFocusLayer,
-  visibleTowerRows,
-  type FocusPick,
-} from './towerModel';
+import { buildLayerChips } from '../model/boardModel';
 
 interface MobileLayoutProps {
   readonly controller: MatchController;
@@ -36,35 +28,15 @@ interface MobileLayoutProps {
 
 export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutProps) {
   const { t } = useTranslation();
-  const { stage, view, winner } = controller;
+  const { stage, winner } = controller;
   const [dockOpen, setDockOpen] = useState(false);
-  const [focusPick, setFocusPick] = useState<FocusPick | null>(null);
 
-  const state = useMemo(
-    () =>
-      stage
-        ? adaptViewToStage({ G: stage.G, ctx: stage.ctx, humanPlayerID: stage.humanPlayerID })
-        : null,
-    [stage],
-  );
+  const { state, board, focusLayer, focusOn } = useBoardModel(controller);
   const seatMarkers = useMemo(() => (stage ? markersBySeat(stage.seats) : undefined), [stage]);
-  const rows = useMemo(
-    () => (state ? buildTowerRows(state, view?.layers) : []),
-    [state, view?.layers],
-  );
   const slots = useMemo(
-    () => (state ? buildRailSlots(state, seatMarkers) : []),
+    () => (state ? buildSeatViews(state, seatMarkers) : []),
     [state, seatMarkers],
   );
-
-  const viewerLayer = controller.self?.layer ?? controller.viewerLayer;
-  const focusLayer = resolveFocusLayer(focusPick, viewerLayer);
-  const activity = deriveActivity({
-    view,
-    awaiting: controller.turn.awaiting,
-    nicknameOf: controller.nicknameOf,
-    cardNameOf: getCardName,
-  });
 
   return (
     <div
@@ -73,7 +45,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
       data-layout="mobile"
     >
       <MobileTopBar controller={controller} topRight={topRight} />
-      <MobilePreloadLine preload={controller.preload} />
+      <PreloadLine preload={controller.preload} />
 
       {!controller.ready && (
         <div className="flex flex-1 items-center justify-center text-sm text-dim">
@@ -86,24 +58,16 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
         </p>
       )}
 
-      {state && (
+      {state && board && (
         <>
           <MobileLayerChips
-            chips={buildLayerChips(rows)}
+            chips={buildLayerChips(board.layers)}
             focusLayer={focusLayer}
-            onFocus={(layer) => setFocusPick({ layer, viewerLayer })}
+            onFocus={focusOn}
           />
           <div className="flex min-h-0 flex-1" data-testid="runtime-stage">
             <MobileRail slots={slots} onOpenDetail={controller.preview.open} />
-            <MobileTower
-              rows={visibleTowerRows(rows, focusLayer, dockOpen)}
-              focusLayer={focusLayer}
-              dockOpen={dockOpen}
-              activity={activity}
-              pendingUnlock={view?.pendingUnlock ?? null}
-              nicknameOf={controller.nicknameOf}
-              onOpenVault={controller.preview.open}
-            />
+            <MobileTower board={board} dockOpen={dockOpen} onOpenVault={controller.preview.open} />
           </div>
           <MobileNotices controller={controller} />
           <MobileDock controller={controller} open={dockOpen} onOpenChange={setDockOpen} />
@@ -111,7 +75,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
       )}
 
       {winner && (
-        <MobileOutcome
+        <MatchOutcome
           winner={winner}
           winReason={controller.winReason}
           isRemote={controller.isRemote}

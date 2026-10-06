@@ -1,16 +1,14 @@
 // 对局界面控制层的对外类型：布局只读这个对象，不直接碰对局来源与视图推导
 //
 // 控制层（useMatchController）拥有全部状态推导、出牌 / 弃牌 / 选目标的本地状态与回调；
-// 布局组件（ClassicLayout 等）与弹窗群（MatchDialogs）只消费 MatchController，彼此不互相依赖。
+// 布局组件（desktop/ 与 mobile/）与弹窗群（MatchDialogs）只消费 MatchController，彼此不互相依赖。
 
 import type { MatchView, RunnerCtx, SeatInfo } from '@icgame/game-engine';
 import type { MatchSource, MoveOutcome } from '../../match/matchSource';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 import type { ChessVaultInfo } from '../ChessTransposeDialog';
 import type { GravityTargetOption } from '../GravityTargetPickerDialog';
-import type { LayerMapProps } from '../LayerMap';
 import type { AwaitingNotice } from './awaitingNotice';
-import type { SeatMarker } from './seatMarkers';
 
 /** 包好提示与日志的 move 派发；silent 的 move 被拒时不弹提示 */
 export type MatchMakeMove = (
@@ -95,7 +93,7 @@ export interface HandModel {
   readonly overflow: number;
   /** 弃牌阶段且轮到本人且超出上限：必须选牌弃掉 */
   readonly mustDiscard: boolean;
-  /** 点第 index 张手牌：弃牌阶段切换选中（按位置，同名牌各算一张），行动阶段进入出牌流程 */
+  /** 弃牌阶段点第 index 张手牌：切换选中（按位置，同名牌各算一张）；其他阶段无操作 */
   readonly tap: (index: number) => void;
 }
 
@@ -119,8 +117,6 @@ export interface DecreeModel {
 export interface PlayModel {
   /** 当前有效的出牌意图；牌不在手牌或不在行动阶段时为 null */
   readonly pending: PendingPlay | null;
-  /** 选中一张牌并进入出牌流程（经典布局的一步出牌） */
-  readonly start: (card: string) => void;
   /**
    * 确认打出一张牌（两步出牌的第二步）：无目标的牌直接发 move，
    * 需要目标的牌进入选目标流程（之后与 start 相同）；牌此刻不能打则无操作。
@@ -206,29 +202,6 @@ export interface PreviewModel {
   readonly close: () => void;
 }
 
-/** 梦主旧视图（层级总览）所需 */
-export interface OverviewModel {
-  readonly layers: LayerMapProps['layers'];
-  readonly players: LayerMapProps['players'];
-}
-
-/** 玩家明细列表的一行 */
-export interface PlayerRow {
-  readonly id: string;
-  /** 已揭示的角色；被过滤时为空串 */
-  readonly characterId: string;
-  readonly isMaster: boolean;
-  readonly isCurrent: boolean;
-  readonly isSelf: boolean;
-  /** 非本人时显示的名字：真人用昵称，Bot 用「AI N」 */
-  readonly otherName: string;
-  readonly markers: readonly SeatMarker[];
-  readonly faction: string;
-  readonly layer: number;
-  readonly isAlive: boolean;
-  readonly handCount: number;
-}
-
 export interface MatchController {
   // 就绪与全局
   readonly ready: boolean;
@@ -274,7 +247,4 @@ export interface MatchController {
   // 其他展示数据
   readonly skillPanel: SkillPanelModel | null;
   readonly preview: PreviewModel;
-  readonly overview: OverviewModel;
-  /** 玩家明细列表；视图里没有玩家时为 null */
-  readonly playerRows: readonly PlayerRow[] | null;
 }

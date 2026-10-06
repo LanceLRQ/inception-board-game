@@ -6,7 +6,7 @@ import { Ban, Check } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useCardPressDetail } from '../../../hooks/useCardPressDetail';
 import type { HandCardItem } from '../controllerTypes';
-import type { CardCategory } from './dockDerive';
+import type { CardCategory } from '../model/handDerive';
 
 const CATEGORY_BAR: Record<CardCategory, string> = {
   attack: 'bg-blood',

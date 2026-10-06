@@ -7,10 +7,10 @@ import { useTranslation } from 'react-i18next';
 import { Play } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
-import type { RailSlotView } from './railModel';
+import type { SeatView } from '../model/seatModel';
 
 interface MobileRailProps {
-  readonly slots: readonly RailSlotView[];
+  readonly slots: readonly SeatView[];
   readonly onOpenDetail: (characterId: string) => void;
 }
 
@@ -18,7 +18,7 @@ function RailSlot({
   slot,
   onOpenDetail,
 }: {
-  slot: RailSlotView;
+  slot: SeatView;
   onOpenDetail: (characterId: string) => void;
 }) {
   const { t } = useTranslation();
@@ -30,14 +30,14 @@ function RailSlot({
 
   const status = [
     slot.isMaster ? t('mobile.rail.master') : null,
-    slot.isViewer ? t('mobile.rail.me') : null,
+    slot.isViewer ? t('seat.me') : null,
     isCurrent ? t('mobile.rail.current') : null,
     slot.isLost ? t('mobile.rail.lost') : null,
   ]
     .filter(Boolean)
     .join(' · ');
   const avatarLabel = slot.characterId
-    ? t('mobile.rail.seeDetail', { name: slot.nickname })
+    ? t('seat.seeDetail', { name: slot.nickname })
     : `${slot.nickname} · ${t('mobile.rail.hidden')}`;
 
   return (
@@ -78,13 +78,13 @@ function RailSlot({
       <div className="flex gap-[3px] font-mono text-[8px] leading-none tracking-[.04em]">
         <span
           className="border border-line bg-panel px-[3px] py-0.5 text-dim"
-          aria-label={t('mobile.rail.layerAria', { layer: slot.layer })}
+          aria-label={t('seat.layerAria', { layer: slot.layer })}
         >
           L{slot.layer}
         </span>
         <span
           className="border border-dashed border-line bg-panel px-[3px] py-0.5 text-faint"
-          aria-label={t('mobile.rail.handAria', { n: slot.handCount })}
+          aria-label={t('seat.handAria', { n: slot.handCount })}
         >
           {t('mobile.rail.hand', { n: slot.handCount })}
         </span>
@@ -102,7 +102,7 @@ function RailSlot({
         {isCurrent && <Play className="size-2 shrink-0 fill-current" aria-hidden />}
         {slot.isViewer && (
           <span className="shrink-0 border border-acc px-px text-[7px] leading-none text-acc-bright">
-            {t('mobile.rail.me')}
+            {t('seat.me')}
           </span>
         )}
         <span className="truncate">{slot.nickname}</span>

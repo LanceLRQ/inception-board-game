@@ -19,12 +19,11 @@ import {
 } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import type { CardID, Layer } from '@icgame/shared';
-import type { FixtureScenarioId } from './scenarios';
+import { FIXTURE_DEFAULT_PLAYERS, type FixtureScenarioId } from './scenarios';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
 const FIXTURE_SEED = 'fixture-scene';
-const PLAYER_COUNT = 6;
 const FIXTURE_TURN_NUMBER = 5;
 
 /** 解封响应窗口场景里，回合主人打出的牌 */
@@ -49,6 +48,8 @@ const cards = (...ids: string[]): CardID[] => ids as CardID[];
 
 export interface FixtureScenario {
   readonly id: FixtureScenarioId;
+  /** 人数 */
+  readonly players: number;
   /** 本人座位 */
   readonly seat: string;
   /** 本人座位看到的视图（引擎过滤后的结果） */
@@ -58,9 +59,9 @@ export interface FixtureScenario {
 }
 
 /** 完成开局布置后的对局状态 */
-function startedMatch(): MatchState<SetupState> {
+function startedMatch(players: number): MatchState<SetupState> {
   const created = createMatch(game, {
-    numPlayers: PLAYER_COUNT,
+    numPlayers: players,
     setupData: { rngSeed: FIXTURE_SEED },
     seed: FIXTURE_SEED,
   });
@@ -162,11 +163,14 @@ const isPendingScenario = (id: FixtureScenarioId): boolean =>
  * 场景的完整对局状态（只在服务端与测试里应当出现的那种）和本人座位。
  * 界面不会拿到它，只会拿到 buildFixtureScenario 过滤后的视图。
  */
-export function buildFixtureMatch(id: FixtureScenarioId): {
+export function buildFixtureMatch(
+  id: FixtureScenarioId,
+  players: number = FIXTURE_DEFAULT_PLAYERS,
+): {
   state: MatchState<SetupState>;
   viewer: string;
 } {
-  const base = startedMatch();
+  const base = startedMatch(players);
   const master = base.G.dreamMasterID;
   const thieves = base.G.playerOrder.filter((seat) => seat !== master);
   const viewer = isMasterScenario(id) ? master : thieves[0]!;
@@ -223,8 +227,11 @@ function nicknameIn(view: MatchViewState, seat: string): string {
   return typeof nick === 'string' && nick ? nick : seat;
 }
 
-export function buildFixtureScenario(id: FixtureScenarioId): FixtureScenario {
-  const { state, viewer } = buildFixtureMatch(id);
+export function buildFixtureScenario(
+  id: FixtureScenarioId,
+  players: number = FIXTURE_DEFAULT_PLAYERS,
+): FixtureScenario {
+  const { state, viewer } = buildFixtureMatch(id, players);
   const view = viewMatch(game, state, viewer);
   const seats: SeatInfo[] = view.ctx.playOrder.map((seat) => ({
     seat,
@@ -233,5 +240,5 @@ export function buildFixtureScenario(id: FixtureScenarioId): FixtureScenario {
     connected: true,
     takenOver: false,
   }));
-  return { id, seat: viewer, view, seats };
+  return { id, players, seat: viewer, view, seats };
 }

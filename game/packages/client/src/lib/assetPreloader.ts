@@ -9,7 +9,7 @@
 // 降级：
 //   - navigator.connection.saveData === true → 跳过 match-entry 自动预加载
 //   - manifest 加载失败 → 启动继续但卡图走惰性 <img loading="lazy">
-//   - 单项失败 → 记 failed[]，由 GameCard 层 fallback 到卡背
+//   - 单项失败 → 记 failed[]，由 CardArt 降级为文字占位
 
 export type AssetTier = 'critical' | 'match-entry' | 'idle';
 

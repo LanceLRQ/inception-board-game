@@ -73,22 +73,19 @@ export function createConsoleErrorRecorder(page: Page): { errors: string[] } {
   return { errors };
 }
 
-/** 对局界面按视口宽度分两套布局，断点 1024px：宽屏经典布局，窄屏移动布局 */
+/** 对局界面按视口宽度分两套布局，断点 1024px：宽屏桌面布局，窄屏移动布局 */
 export function isNarrowViewport(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1280) < 1024;
 }
 
 /**
- * 点第 index 张手牌并打出（不区分布局）：
- *   - 宽屏：点牌即进入出牌流程；
- *   - 窄屏：两步出牌，点牌读信息后，再点信息条里的「打出」。
+ * 点第 index 张手牌并打出（不区分布局）：两种布局都是两步出牌，
+ * 点牌选中后，再点「打出」按钮才进入出牌流程。
  * 需要目标的牌之后会弹出选目标弹窗，调用方自行断言。
  */
 export async function selectAndPlayCard(page: Page, index: number): Promise<void> {
   await page.getByTestId(`card-${index}`).click();
-  if (isNarrowViewport(page)) {
-    await page.getByTestId('hand-commit-play').click();
-  }
+  await page.getByTestId('hand-commit-play').click();
 }
 
 /**

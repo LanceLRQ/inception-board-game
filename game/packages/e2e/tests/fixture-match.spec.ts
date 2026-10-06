@@ -29,32 +29,29 @@ for (const scene of SCENES) {
   });
 }
 
-test('固定场景 pending=1 出现解封响应入口，缺省场景没有（宽屏弹窗，窄屏响应条）', async ({
+test('固定场景 pending=1 出现解封响应入口，缺省场景没有（宽屏响应窗口，窄屏响应条，都不弹窗）', async ({
   page,
 }) => {
-  // 宽屏用弹窗承载，窄屏用手牌坞上方的响应条，两种入口互斥
+  // 宽屏用舞台右上角的响应窗口承载，窄屏用手牌坞上方的响应条；两种布局都不再弹窗
   const narrow = isNarrowViewport(page);
   const dialog = page.getByTestId('unlock-response-dialog');
-  const bar = page.getByTestId('unlock-response-bar');
+  const inline = page.getByTestId(narrow ? 'unlock-response-bar' : 'unlock-response-window');
 
   await page.goto('/game/debug');
   await waitForAppReady(page);
   await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
   await expect(dialog).toHaveCount(0);
-  await expect(bar).toHaveCount(0);
+  await expect(inline).toHaveCount(0);
 
   await page.goto('/game/debug?pending=1');
   await waitForAppReady(page);
-  if (narrow) {
-    await expect(bar).toBeVisible({ timeout: 10_000 });
-    await expect(dialog).toHaveCount(0);
-  } else {
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
-    await expect(bar).toHaveCount(0);
-  }
+  await expect(inline).toBeVisible({ timeout: 10_000 });
+  await expect(dialog).toHaveCount(0);
 });
 
-test('固定场景：选一张需要目标的牌并打出，两种布局都会弹出选目标弹窗', async ({ page }) => {
+test('固定场景：选一张需要目标的牌并打出（两步出牌），两种布局都会弹出选目标弹窗', async ({
+  page,
+}) => {
   await page.goto('/game/debug');
   await waitForAppReady(page);
   await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });

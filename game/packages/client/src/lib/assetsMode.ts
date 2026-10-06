@@ -1,7 +1,7 @@
 // ASSETS_MODE 开关
 //
 // 作用：
-//   - 构建时 Vite env `VITE_ASSETS_MODE=placeholder` → 所有 GameCard 走文字占位，不加载卡图
+//   - 构建时 Vite env `VITE_ASSETS_MODE=placeholder` → 所有卡图（CardArt）走文字占位，不加载卡图
 //   - 私有部署/开源 fork 没有授权卡图时，设置此值即可完整运行
 //
 // 纯函数导出便于测试；Hook 包装留给上层。

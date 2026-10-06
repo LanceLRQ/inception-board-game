@@ -1,19 +1,11 @@
 // 对局界面控制层的纯推导：不依赖 React，输入是按座位裁剪过的视图，输出是界面要用的数据与参数。
 // useMatchController 只负责把这些函数接到状态与回调上。
 
-import type {
-  MatchView,
-  MatchViewState,
-  PlayerView,
-  RunnerCtx,
-  SeatInfo,
-} from '@icgame/game-engine';
+import type { MatchView, MatchViewState, PlayerView, RunnerCtx } from '@icgame/game-engine';
 import { actionMoveFor, getCardName } from '../../lib/cards';
 import { getCardImageUrl } from '../../lib/cardImages';
 import type { ActiveSkillContext } from '../../lib/activeSkills';
-import type { LayerMapProps } from '../LayerMap';
-import { seatMarkers } from './seatMarkers';
-import type { HandCardItem, HandCardMode, PendingPlay, PlayerRow } from './controllerTypes';
+import type { HandCardItem, HandCardMode, PendingPlay } from './controllerTypes';
 
 /** 手牌上限：弃牌阶段超出的张数必须弃掉 */
 export const HAND_LIMIT = 5;
@@ -412,86 +404,6 @@ export function nicknameMap(players: MatchView['players'] | undefined): Record<s
         Object.entries(players).map(([pid, p]) => [pid, (p.nickname as string) ?? pid]),
       )
     : {};
-}
-
-// ---------------------------------------------------------------------------
-// 层与玩家的展示数据
-// ---------------------------------------------------------------------------
-
-/** 层级总览（LayerMap）所需的每层数据 */
-export function buildLayerViews(
-  G: Pick<MatchView, 'layers' | 'vaults'> | undefined,
-): LayerMapProps['layers'] {
-  const layersRaw = G?.layers;
-  const vaultsRaw = G?.vaults;
-  if (!layersRaw) return [];
-  return Object.values(layersRaw).map((l) => ({
-    layer: l.layer as number,
-    heartLockValue: (l.heartLockValue as number) ?? 0,
-    vaultCount:
-      vaultsRaw?.filter((v) => (v.layer as number) === (l.layer as number) && !v.isOpened).length ??
-      0,
-    openedVaults:
-      vaultsRaw
-        ?.filter((v) => (v.layer as number) === (l.layer as number) && v.isOpened)
-        .map((v) => ({
-          contentType: v.contentType as 'secret' | 'coin' | 'empty',
-        })) ?? [],
-    nightmareRevealed: !!l.nightmareRevealed,
-    nightmareCardId: l.nightmareId ?? null,
-    playerIds: l.playersInLayer ?? [],
-  }));
-}
-
-/** 层级总览（LayerMap）所需的玩家表 */
-export function buildPlayerViews(
-  players: MatchView['players'] | undefined,
-): LayerMapProps['players'] {
-  if (!players) return {};
-  return Object.fromEntries(
-    Object.entries(players).map(([id, p]) => [
-      id,
-      {
-        id,
-        nickname: (p.nickname as string) ?? id,
-        faction: (p.faction as string) ?? 'thief',
-        currentLayer: (p.currentLayer as number) ?? 1,
-        isAlive: !!p.isAlive,
-      },
-    ]),
-  );
-}
-
-export interface PlayerRowsInput {
-  readonly mySeat: string | null;
-  readonly currentSeat: string;
-  readonly seatById: ReadonlyMap<string, SeatInfo>;
-}
-
-/** 玩家明细列表的每行数据；视图里没有玩家返回 null */
-export function buildPlayerRows(
-  G: Pick<MatchView, 'players' | 'dreamMasterID'> | undefined,
-  input: PlayerRowsInput,
-): PlayerRow[] | null {
-  const players = G?.players;
-  if (!players) return null;
-  const dreamMasterID = G?.dreamMasterID ?? '';
-  return Object.entries(players).map(([id, p]) => {
-    const seatInfo = input.seatById.get(id);
-    return {
-      id,
-      characterId: typeof p.characterId === 'string' ? p.characterId : '',
-      isMaster: id === dreamMasterID,
-      isCurrent: id === input.currentSeat,
-      isSelf: id === input.mySeat,
-      otherName: seatInfo?.isBot === false ? seatInfo.nickname || id : `AI ${id}`,
-      markers: seatMarkers(seatInfo),
-      faction: String(p.faction),
-      layer: p.currentLayer,
-      isAlive: !!p.isAlive,
-      handCount: (p.handCount as number | undefined) ?? 0,
-    };
-  });
 }
 
 /** 万有引力池挑选：轮到谁挑；池不存在或顺序为空时回退到 fallback */

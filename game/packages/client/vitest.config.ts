@@ -8,7 +8,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       // 样式表默认会被清空；一致性测试需要用 ?raw 读到样式表原文
-      css: { include: [/styles\/index\.css\?raw/] },
+      css: { include: [/styles\/.*\.css\?raw/] },
       coverage: coverageOptions({ statements: 50, branches: 48, functions: 46, lines: 51 }),
     },
   }),

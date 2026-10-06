@@ -1,0 +1,225 @@
+/*
+ * 「深眠影院」皮肤：影院式暗场，黄铜描边与微光，直角画框，方形骰子。
+ * 全部限定在 [data-theme='noir'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
+ */
+
+/* ---------- 舞台与背景氛围 ---------- */
+[data-theme='noir'] .ms-stage {
+  background:
+    radial-gradient(
+      ellipse 62% 46% at 50% 46%,
+      color-mix(in srgb, var(--ms-acc) 5%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 100% 70% at 50% 110%,
+      color-mix(in srgb, var(--ms-lock) 7%, transparent),
+      transparent 60%
+    ),
+    var(--ms-panel);
+}
+[data-theme='noir'] .noir-ambient {
+  background: radial-gradient(
+    ellipse 120% 90% at 50% 40%,
+    transparent 55%,
+    color-mix(in srgb, var(--ms-bg) 55%, transparent) 100%
+  );
+}
+[data-theme='noir'] .noir-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(84%, 1100px);
+  height: 84%;
+  transform: translate(-50%, -50%);
+  border: 1px dashed color-mix(in srgb, var(--ms-ink) 10%, transparent);
+  border-radius: 50%;
+}
+[data-theme='noir'] .noir-orbit::after {
+  content: '';
+  position: absolute;
+  inset: 46px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ms-ink) 5%, transparent);
+}
+[data-theme='noir'] .ms-topbar {
+  letter-spacing: 0.18em;
+  background: color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+
+/* ---------- 座位牌 ---------- */
+[data-theme='noir'] .ms-seat {
+  border-radius: 0;
+  background: var(--ms-panel2);
+}
+[data-theme='noir'] .ms-seat[data-current] {
+  box-shadow:
+    0 0 0 1px var(--ms-accsoft),
+    0 0 34px color-mix(in srgb, var(--ms-acc) 16%, transparent);
+}
+[data-theme='noir'] .ms-seat[data-master] {
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ms-bg) 70%, transparent);
+}
+[data-theme='noir'] .ms-seat[data-master][data-current] {
+  box-shadow:
+    0 0 0 1px var(--ms-accsoft),
+    0 0 34px color-mix(in srgb, var(--ms-acc) 16%, transparent);
+}
+[data-theme='noir'] .ms-seat-flag {
+  letter-spacing: 0.32em;
+}
+
+/* ---------- 卡面画框 / 层徽 / 骰子 ---------- */
+[data-theme='noir'] .ms-card {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 85%, var(--ms-panel));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+[data-theme='noir'] .ms-card img {
+  filter: saturate(0.92);
+}
+[data-theme='noir'] .ms-layerbadge {
+  border-radius: 0;
+}
+[data-theme='noir'] .ms-die {
+  --die-fill: color-mix(in srgb, var(--die-color) 16%, var(--ms-bg));
+  --die-pip: var(--die-color);
+  border-radius: 0;
+  border: 1px solid color-mix(in srgb, var(--die-color) 45%, transparent);
+}
+[data-theme='noir'] .ms-die[data-empty] {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
+[data-theme='noir'] .ms-handcard {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 85%, var(--ms-panel));
+}
+[data-theme='noir'] .ms-handcard:hover {
+  box-shadow: 0 18px 36px color-mix(in srgb, var(--ms-bg) 70%, transparent);
+}
+[data-theme='noir'] .ms-handcard[data-selected],
+[data-theme='noir'] .ms-handcard[data-reading] {
+  box-shadow:
+    0 0 0 1px var(--ms-acc),
+    0 14px 34px color-mix(in srgb, var(--ms-acc) 14%, transparent);
+}
+[data-theme='noir'] .ms-dock {
+  background: color-mix(in srgb, var(--ms-bg) 92%, var(--ms-panel));
+  backdrop-filter: blur(6px);
+}
+[data-theme='noir'] .ms-btn {
+  border-radius: 0;
+  letter-spacing: 0.24em;
+}
+[data-theme='noir'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--ms-acc) 28%, transparent);
+}
+[data-theme='noir'] .ms-response {
+  border-radius: 0;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+
+/* ---------- 中央舞台：梦境剖面 ---------- */
+[data-theme='noir'] .noir-head {
+  border-bottom: 1px solid var(--ms-line2);
+}
+[data-theme='noir'] .noir-banner {
+  color: var(--ms-acc);
+  background: var(--ms-accsoft);
+  border: 1px solid var(--ms-accsoft);
+}
+[data-theme='noir'] .noir-row {
+  border: 1px solid var(--ms-line);
+  background: color-mix(in srgb, var(--ms-panel) 82%, transparent);
+}
+[data-theme='noir'] .noir-rowname {
+  color: var(--ms-faint);
+}
+[data-theme='noir'] .noir-rowname:focus-visible {
+  outline-offset: -2px;
+}
+[data-theme='noir'] .noir-row-focus {
+  border-color: var(--ms-acc);
+  background: color-mix(in srgb, var(--ms-acc) 6%, var(--ms-panel));
+  box-shadow:
+    0 8px 40px color-mix(in srgb, var(--ms-bg) 50%, transparent),
+    0 0 0 1px var(--ms-accsoft);
+}
+[data-theme='noir'] .noir-row-focus .noir-rowname {
+  color: var(--ms-accb);
+}
+[data-theme='noir'] .noir-row[data-lost] {
+  border-style: dashed;
+  background: transparent;
+  padding-block: 6px;
+}
+[data-theme='noir'] .noir-row[data-viewer-layer]:not([data-focus]) {
+  border-color: var(--ms-line2);
+}
+[data-theme='noir'] .noir-chip {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-family: var(--ms-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--ms-dim);
+  border: 1px solid var(--ms-line2);
+}
+[data-theme='noir'] .noir-chip[data-opened] {
+  color: var(--ms-acc);
+  border-color: color-mix(in srgb, var(--ms-acc) 50%, transparent);
+}
+[data-theme='noir'] .noir-vault[data-opened] {
+  border-color: color-mix(in srgb, var(--ms-acc) 55%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ms-acc) 18%, transparent);
+}
+[data-theme='noir'] .noir-nightmare {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  font-family: var(--ms-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  color: var(--ms-blood);
+  border: 1px dashed color-mix(in srgb, var(--ms-blood) 55%, transparent);
+  background: transparent;
+}
+[data-theme='noir'] .noir-nightmare.border-solid {
+  border-style: solid;
+}
+[data-theme='noir'] .noir-focus-tag {
+  padding: 2px 7px;
+  color: var(--ms-accb);
+  border: 1px solid var(--ms-acc);
+}
+[data-theme='noir'] .noir-occ {
+  padding: 3px 9px;
+  color: var(--ms-dim);
+  background: var(--ms-panel2);
+  border: 1px solid var(--ms-line2);
+}
+[data-theme='noir'] .noir-occ[data-self] {
+  color: var(--ms-ink);
+  border-color: var(--ms-acc);
+}
+[data-theme='noir'] .noir-deck {
+  border-top: 1px solid var(--ms-line);
+}
+[data-theme='noir'] .noir-deckbar {
+  background: var(--ms-line);
+}
+/* 中央区高度不够时收起占位者那一行，保证各层行都放得下 */
+@container (max-height: 380px) {
+  [data-theme='noir'] .noir-occline {
+    display: none;
+  }
+}

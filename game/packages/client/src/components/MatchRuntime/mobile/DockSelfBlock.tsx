@@ -18,10 +18,8 @@ export function DockSelfBlock({ self, skillName, onPreview }: DockSelfBlockProps
   const imageUrl = getCardImageUrl(self.characterId);
   const name = summary?.name ?? t('localMatch.you');
   const layerText =
-    self.layer === 0
-      ? t('mobile.dock.lostLayer')
-      : t('mobile.dock.layerStatus', { layer: self.layer });
-  const status = skillName ? t('mobile.dock.skillReady', { name: skillName }) : null;
+    self.layer === 0 ? t('dock.lostLayer') : t('dock.layerStatus', { layer: self.layer });
+  const status = skillName ? t('dock.skillReady', { name: skillName }) : null;
 
   return (
     <div
@@ -32,7 +30,7 @@ export function DockSelfBlock({ self, skillName, onPreview }: DockSelfBlockProps
         type="button"
         disabled={!self.characterId}
         onClick={() => onPreview(self.characterId)}
-        aria-label={`${t('mobile.rail.seeDetail', { name })}`}
+        aria-label={`${t('seat.seeDetail', { name })}`}
         data-testid="human-character-preview"
         className="relative size-11 shrink-0 touch-manipulation overflow-hidden rounded-[10px] border border-acc bg-panel"
       >

@@ -3,11 +3,11 @@
 // 只是状态来自一个确定的场景，操作不会推进状态。
 
 import { useFixtureMatchSource } from '../../match/useFixtureMatchSource';
-import type { FixtureScenarioId } from '../../match/fixtures/scenarios';
+import type { FixtureScenarioSpec } from '../../match/fixtures/scenarios';
 import { MatchRuntime } from '../MatchRuntime';
 
 interface FixtureMatchRuntimeProps {
-  readonly scenario: FixtureScenarioId;
+  readonly scenario: FixtureScenarioSpec;
   /** 顶部状态栏右上角补充文字 */
   readonly topRight?: React.ReactNode;
   /** 结束/重开回调（固定场景不会结束，仅为界面接口完整） */

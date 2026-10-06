@@ -1,23 +1,17 @@
-// 3D 骰子组件 - SVG 底图 + CSS 3D 变换 + reduced-motion 降级
-// 技术验证原型：experimental_demo/dice-svg-css3d
-//
-// 变更：
-//   - 骰子面从 CSS Grid 点阵升级为预渲染 SVG 图（/dice/dice-{color}-{face}.svg）
-//   - 保留 3D rotate + rolling 动画
-//   - reduced-motion 降级：直接展示终值 SVG
+// 3D 骰子组件：六个骰面用 Die 组件绘制（颜色取令牌、形状随主题皮肤），CSS 3D 变换做翻滚；
+// reduced-motion 降级：直接展示终值骰面。
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../lib/utils.js';
 import { useSoundEffect } from '../../hooks/useSoundEffect.js';
-
-export type DiceColor = 'red' | 'blue';
+import { Die, type DieKind } from '../Die';
 
 export interface Dice3DProps {
   /** 最终面值 (1-6)，undefined 表示正在掷 */
   value?: number;
-  /** 骰子颜色 */
-  color?: DiceColor;
+  /** 骰子种类：战斗骰（红）/ 心锁骰（蓝） */
+  kind?: DieKind;
   /** 是否正在掷骰动画中 */
   rolling?: boolean;
   /** 掷骰完成回调 */
@@ -38,26 +32,13 @@ const FACE_ROTATION: Record<number, { x: number; y: number }> = {
   6: { x: 90, y: 0 },
 };
 
-export function diceSvgPath(color: DiceColor, face: number): string {
-  return `/dice/dice-${color}-${face}.svg`;
-}
-
-function DiceFace({ value, color, size }: { value: number; color: DiceColor; size: number }) {
-  return (
-    <img
-      src={diceSvgPath(color, value)}
-      alt=""
-      aria-hidden="true"
-      className="h-full w-full select-none"
-      draggable={false}
-      style={{ width: size, height: size }}
-    />
-  );
+function DiceFace({ value, kind, size }: { value: number; kind: DieKind; size: number }) {
+  return <Die value={value} kind={kind} size={size} label="" className="select-none" />;
 }
 
 export function Dice3D({
   value,
-  color = 'red',
+  kind = 'combat',
   rolling = false,
   onRollComplete,
   size = 48,
@@ -94,7 +75,7 @@ export function Dice3D({
 
   const rotation = useMemo(() => FACE_ROTATION[displayValue] ?? { x: 0, y: 0 }, [displayValue]);
 
-  // reduced-motion 降级：直接展示 SVG 终值
+  // reduced-motion 降级：直接展示终值
   if (prefersReduced) {
     return (
       <div
@@ -102,7 +83,7 @@ export function Dice3D({
         style={{ width: size, height: size }}
         aria-label={`骰子 ${displayValue}`}
       >
-        <DiceFace value={displayValue} color={color} size={size} />
+        <DiceFace value={displayValue} kind={kind} size={size} />
       </div>
     );
   }
@@ -138,7 +119,7 @@ export function Dice3D({
               backfaceVisibility: 'hidden',
             }}
           >
-            <DiceFace value={face} color={color} size={size} />
+            <DiceFace value={face} kind={kind} size={size} />
           </div>
         ))}
       </motion.div>

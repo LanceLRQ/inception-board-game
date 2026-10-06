@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
 import type { MatchController } from '../controllerTypes';
-import { deriveMainAction } from './dockDerive';
+import { deriveMainAction } from '../model/handDerive';
 
 interface DockOpsProps {
   readonly controller: MatchController;
@@ -42,14 +42,14 @@ export function DockOps({ controller, skillReady, onOpenSkill, layout }: DockOps
         type="button"
         disabled={!skillReady}
         onClick={onOpenSkill}
-        aria-label={t('mobile.dock.skillAria')}
+        aria-label={t('dock.skillAria')}
         data-testid="dock-skill"
         className={cn(
           'min-h-[42px] min-w-[68px] touch-manipulation border border-line-strong bg-transparent px-3 text-[11.5px] tracking-[.08em] whitespace-nowrap text-dim active:translate-y-px disabled:opacity-40',
           layout === 'row' && 'flex-1',
         )}
       >
-        {t('mobile.dock.skill')}
+        {t('dock.skill')}
       </button>
       <button
         type="button"

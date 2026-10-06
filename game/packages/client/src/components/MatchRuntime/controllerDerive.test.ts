@@ -1,16 +1,13 @@
 // 对局界面控制层纯推导的测试：输入尽量用固定场景里引擎真实产出的视图
 
 import { describe, it, expect } from 'vitest';
-import type { MatchView, RunnerCtx, SeatInfo } from '@icgame/game-engine';
+import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import { buildFixtureScenario } from '../../match/fixtures/buildScenario';
 import {
   HAND_LIMIT,
   activeSkillTargetIds,
   buildActiveSkillContext,
-  buildLayerViews,
   buildPlayArgs,
-  buildPlayerRows,
-  buildPlayerViews,
   classifyShoot,
   decreeApplicable,
   decreeCardsIn,
@@ -594,116 +591,6 @@ describe('buildActiveSkillContext', () => {
     const nicks = nicknameMap(thiefG.players);
     for (const [id, p] of Object.entries(thiefG.players)) expect(nicks[id]).toBe(p.nickname);
     expect(nicknameMap(undefined)).toEqual({});
-  });
-});
-
-describe('层与玩家的展示数据', () => {
-  it('buildLayerViews：每层一项，金库数只算未开的，已开的列出内容', () => {
-    const layers = buildLayerViews(thiefG);
-    expect(layers).toHaveLength(Object.keys(thiefG.layers).length);
-    for (const l of layers) {
-      const raw = thiefG.layers[l.layer]!;
-      expect(l.heartLockValue).toBe(raw.heartLockValue);
-      expect(l.playerIds).toEqual(raw.playersInLayer);
-      expect(l.nightmareRevealed).toBe(raw.nightmareRevealed);
-      expect(l.vaultCount).toBe(
-        thiefG.vaults.filter((v) => v.layer === l.layer && !v.isOpened).length,
-      );
-      expect(l.openedVaults).toHaveLength(
-        thiefG.vaults.filter((v) => v.layer === l.layer && v.isOpened).length,
-      );
-    }
-  });
-
-  it('buildLayerViews：已翻开的梦魇带牌号，没有视图时为空', () => {
-    const G = {
-      layers: {
-        1: {
-          layer: 1,
-          heartLockValue: 3,
-          playersInLayer: ['2'],
-          nightmareRevealed: true,
-          nightmareId: 'nm_x',
-        },
-      },
-      vaults: [
-        { id: 'v1', layer: 1, isOpened: true, contentType: 'coin' },
-        { id: 'v2', layer: 1, isOpened: false, contentType: null },
-        { id: 'v3', layer: 2, isOpened: false, contentType: null },
-      ],
-    } as unknown as MatchView;
-    expect(buildLayerViews(G)).toEqual([
-      {
-        layer: 1,
-        heartLockValue: 3,
-        vaultCount: 1,
-        openedVaults: [{ contentType: 'coin' }],
-        nightmareRevealed: true,
-        nightmareCardId: 'nm_x',
-        playerIds: ['2'],
-      },
-    ]);
-    expect(buildLayerViews(undefined)).toEqual([]);
-  });
-
-  it('buildPlayerViews：昵称、阵营、所在层、存活', () => {
-    const views = buildPlayerViews(thiefG.players);
-    for (const [id, p] of Object.entries(thiefG.players)) {
-      expect(views[id]).toEqual({
-        id,
-        nickname: p.nickname,
-        faction: p.faction,
-        currentLayer: p.currentLayer,
-        isAlive: p.isAlive,
-      });
-    }
-    expect(buildPlayerViews(undefined)).toEqual({});
-  });
-});
-
-describe('buildPlayerRows', () => {
-  const seatById = new Map<string, SeatInfo>(thief.seats.map((s) => [s.seat, s]));
-
-  it('每个玩家一行，标出本人、当前行动者与梦主', () => {
-    const rows = buildPlayerRows(thiefG, {
-      mySeat: thief.seat,
-      currentSeat: thief.seat,
-      seatById,
-    })!;
-    expect(rows.map((r) => r.id)).toEqual(Object.keys(thiefG.players));
-    expect(rows.filter((r) => r.isSelf).map((r) => r.id)).toEqual([thief.seat]);
-    expect(rows.filter((r) => r.isCurrent).map((r) => r.id)).toEqual([thief.seat]);
-    expect(rows.filter((r) => r.isMaster).map((r) => r.id)).toEqual([thiefG.dreamMasterID]);
-  });
-
-  it('他人的名字：真人用昵称，Bot 用「AI N」', () => {
-    const seats = new Map<string, SeatInfo>([
-      ['1', { seat: '1', nickname: '小明', isBot: false, connected: true, takenOver: false }],
-      ['2', { seat: '2', nickname: '', isBot: false, connected: true, takenOver: false }],
-      ['3', { seat: '3', nickname: 'x', isBot: true, connected: true, takenOver: false }],
-    ]);
-    const G = {
-      dreamMasterID: '3',
-      players: {
-        '1': { characterId: null, faction: 'thief', currentLayer: 1, isAlive: true, handCount: 2 },
-        '2': { characterId: null, faction: 'thief', currentLayer: 2, isAlive: false, handCount: 0 },
-        '3': { characterId: 'dm_x', faction: 'master', currentLayer: 3, isAlive: true },
-        '4': { characterId: null, faction: 'thief', currentLayer: 1, isAlive: true, handCount: 1 },
-      },
-    } as unknown as MatchView;
-    const rows = buildPlayerRows(G, { mySeat: null, currentSeat: '', seatById: seats })!;
-    expect(rows.map((r) => r.otherName)).toEqual(['小明', '2', 'AI 3', 'AI 4']);
-    expect(rows[0]).toMatchObject({ characterId: '', handCount: 2, layer: 1, isAlive: true });
-    expect(rows[1]!.isAlive).toBe(false);
-    expect(rows[2]).toMatchObject({ characterId: 'dm_x', isMaster: true, handCount: 0 });
-  });
-
-  it('没有玩家时返回 null；状态标识来自座位表', () => {
-    expect(buildPlayerRows(undefined, { mySeat: null, currentSeat: '', seatById })).toBeNull();
-    const rows = buildPlayerRows(thiefG, { mySeat: thief.seat, currentSeat: '', seatById })!;
-    const other = rows.find((r) => r.id !== thief.seat)!;
-    expect(other.markers).toEqual(['bot']);
-    expect(rows.find((r) => r.id === thief.seat)!.markers).toEqual([]);
   });
 });
 

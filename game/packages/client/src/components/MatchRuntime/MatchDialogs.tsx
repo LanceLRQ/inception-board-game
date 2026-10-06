@@ -1,4 +1,5 @@
 // 对局弹窗群：响应类弹窗与出牌流程里的选目标 / 选模式 / 多步选择弹窗
+// 解封响应不在这里：两个布局各自用内联的响应窗口 / 响应条承载。
 // 只依赖控制层 MatchController；不关心页面布局，任何布局都可以直接挂载。
 
 import { useTranslation } from 'react-i18next';
@@ -6,7 +7,6 @@ import { cn } from '../../lib/utils';
 import { getCardName } from '../../lib/cards';
 import { CardDetailModal } from '../CardDetailModal';
 import { MasterNightmareDecisionDialog } from '../MasterNightmareDecisionDialog';
-import { UnlockResponseDialog } from '../UnlockResponseDialog';
 import { MasterPeekBribeDialog } from '../MasterPeekBribeDialog';
 import { ShooterLayerPickerDialog } from '../ShooterLayerPickerDialog';
 import { PeekerVaultRevealDialog } from '../PeekerVaultRevealDialog';
@@ -23,11 +23,9 @@ import type { MatchController } from './controllerTypes';
 
 interface MatchDialogsProps {
   readonly controller: MatchController;
-  /** 不弹解封响应弹窗：布局自己用内联的响应条承载这个窗口（移动布局） */
-  readonly skipUnlockResponse?: boolean;
 }
 
-export function MatchDialogs({ controller, skipUnlockResponse = false }: MatchDialogsProps) {
+export function MatchDialogs({ controller }: MatchDialogsProps) {
   const { t } = useTranslation();
   const { view, viewerSeat, viewerLayer, dreamMasterID, makeMove, nicknameOf } = controller;
   const { play, gravity, chess, graft } = controller;
@@ -48,16 +46,6 @@ export function MatchDialogs({ controller, skipUnlockResponse = false }: MatchDi
         dreamMasterID={dreamMasterID}
         makeMove={makeMove}
       />
-      {!skipUnlockResponse && (
-        <UnlockResponseDialog
-          G={view}
-          viewerPlayerID={viewerSeat}
-          nicknameOf={nicknameOf}
-          makeMove={makeMove}
-          autoPass={controller.kind === 'local'}
-          deadlineAt={controller.turn.deadlineAt}
-        />
-      )}
       <MasterPeekBribeDialog
         G={view}
         viewerPlayerID={viewerSeat}

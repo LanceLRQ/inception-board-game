@@ -36,8 +36,9 @@ describe('对局界面不写死本人座位', () => {
     expect(Object.keys(modules)).toEqual(
       expect.arrayContaining([
         './index.tsx',
-        './RuntimeStage.tsx',
-        './viewAdapter.ts',
+        './useMatchController.ts',
+        './model/viewAdapter.ts',
+        './desktop/DesktopLayout.tsx',
         '../../pages/Game/index.tsx',
       ]),
     );

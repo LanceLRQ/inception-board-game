@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { checkInvariants, type MatchView } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
-import { computeUnlockResponseState } from '../../components/UnlockResponseBanner/logic';
-import { FIXTURE_SCENARIO_IDS, type FixtureScenarioId } from './scenarios';
+import { computeUnlockResponseState } from '../../components/UnlockResponse/logic';
+import {
+  FIXTURE_DEFAULT_PLAYERS,
+  FIXTURE_MAX_PLAYERS,
+  FIXTURE_MIN_PLAYERS,
+  FIXTURE_SCENARIO_IDS,
+  type FixtureScenarioId,
+} from './scenarios';
 import { buildFixtureMatch, buildFixtureScenario } from './buildScenario';
 
 const viewG = (id: FixtureScenarioId): MatchView => buildFixtureScenario(id).view.G as MatchView;
@@ -11,7 +17,8 @@ describe('buildFixtureScenario · 通用', () => {
   it.each(FIXTURE_SCENARIO_IDS)('场景 %s 能构造，本人座位在座位表与视图里', (id) => {
     const sc = buildFixtureScenario(id);
     const G = sc.view.G as MatchView;
-    expect(sc.view.ctx.playOrder).toHaveLength(6);
+    expect(sc.players).toBe(FIXTURE_DEFAULT_PLAYERS);
+    expect(sc.view.ctx.playOrder).toHaveLength(FIXTURE_DEFAULT_PLAYERS);
     expect(sc.view.ctx.playOrder).toContain(sc.seat);
     expect(G.players[sc.seat]).toBeDefined();
     expect(Array.isArray(G.players[sc.seat]!.hand)).toBe(true);
@@ -177,5 +184,45 @@ describe('buildFixtureScenario · 梦主角色', () => {
   it('梦主是没有回合内主动技能面板的角色，不会一进场景就弹出技能选择', () => {
     const G = viewG('master');
     expect(G.players[G.dreamMasterID]!.characterId).not.toBe('dm_chess');
+  });
+});
+
+describe('buildFixtureScenario · 指定人数', () => {
+  const counts = Array.from(
+    { length: FIXTURE_MAX_PLAYERS - FIXTURE_MIN_PLAYERS + 1 },
+    (_, i) => FIXTURE_MIN_PLAYERS + i,
+  );
+
+  it.each(counts)('%i 人：每个场景都能构造，座位数与人数一致', (n) => {
+    for (const id of FIXTURE_SCENARIO_IDS) {
+      const sc = buildFixtureScenario(id, n);
+      expect(sc.players).toBe(n);
+      expect(sc.view.ctx.playOrder).toHaveLength(n);
+      expect(sc.seats).toHaveLength(n);
+      expect(sc.seats.filter((s) => !s.isBot)).toHaveLength(1);
+    }
+  });
+
+  it.each(counts)('%i 人：完整状态满足规则不变量，视图仍经引擎过滤', (n) => {
+    for (const id of FIXTURE_SCENARIO_IDS) {
+      expect(checkInvariants(buildFixtureMatch(id, n).state.G)).toEqual([]);
+    }
+    const sc = buildFixtureScenario('thief', n);
+    const G = sc.view.G as MatchView;
+    for (const [seat, p] of Object.entries(G.players)) {
+      if (seat !== sc.seat) expect(p.hand).toBeNull();
+    }
+  });
+
+  it('同一人数每次构造结果深相等（确定）', () => {
+    expect(buildFixtureScenario('thief-pending', 10)).toEqual(
+      buildFixtureScenario('thief-pending', 10),
+    );
+  });
+
+  it('不同人数的局面不同', () => {
+    expect(buildFixtureScenario('thief', 4).seats).not.toEqual(
+      buildFixtureScenario('thief', 10).seats,
+    );
   });
 });

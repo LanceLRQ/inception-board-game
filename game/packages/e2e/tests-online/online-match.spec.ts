@@ -206,8 +206,8 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
       [b, seatA],
     ] as const) {
       await expect(me.page.getByTestId('human-hand')).toHaveCount(1);
-      const mine = seatOf(me);
-      await expect(me.page.getByTestId(`player-seat-${mine}`)).toBeVisible();
+      // 桌面布局里本人不占座位环（由底部坞承载），环上只有其他座位
+      await expect(me.page.getByTestId(`player-seat-${seatOf(me)}`)).toHaveCount(0);
       await expect(me.page.getByTestId(`player-seat-${other}`)).toBeVisible();
       // 对方座位上没有任何手牌牌面，只显示张数
       await expect(
@@ -314,14 +314,14 @@ test('真人一直不操作会被托管，提示条出现，取消托管后提�
     const banner = a.page.getByTestId('self-takeover-banner');
     await expect(banner).toBeVisible({ timeout: 60_000 });
     await expect(banner).toContainText(/托管|auto-play/i);
-    // 座位上的标识区分了挂机托管（限定在舞台座位内：折叠的座位清单里还有一份同名标识）
-    const stage = a.page.getByTestId('runtime-stage');
-    await expect(stage.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(1);
+    // 本人的身份块上标出了挂机托管，与别人看到的「这人挂机了」是同一种标识
+    const marker = a.page.getByTestId(`seat-marker-idle_takeover-${seat}`);
+    await expect(marker).toHaveCount(1);
 
     // 提示条的按钮点得到，且不挡住操作栏：点击后提示条消失
     await a.page.getByTestId('self-takeover-resume').click();
     await expect(banner).toBeHidden({ timeout: 5_000 });
-    await expect(stage.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(0);
+    await expect(marker).toHaveCount(0);
 
     // 取消之后座位回到等待真人：继续不操作，再次被托管，说明计数是从 0 重新开始的
     await expect(banner).toBeVisible({ timeout: 60_000 });

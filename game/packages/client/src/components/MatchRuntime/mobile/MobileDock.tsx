@@ -20,8 +20,8 @@ import {
   cardTargetKind,
   cardVerdict,
   isBlockedInAction,
-  sheetDragOutcome,
-} from './dockDerive';
+} from '../model/handDerive';
+import { sheetDragOutcome } from './sheetDrag';
 
 interface MobileDockProps {
   readonly controller: MatchController;
@@ -92,8 +92,8 @@ export function MobileDock({ controller, open, onOpenChange }: MobileDockProps) 
     hand.items.map((item) => {
       const target = cardTargetKind(item.card);
       const caption = [
-        t(`mobile.dock.category.${cardCategoryOf(item.card)}`),
-        target ? t(`mobile.dock.target.${target}`) : null,
+        t(`handInfo.category.${cardCategoryOf(item.card)}`),
+        target ? t(`handInfo.target.${target}`) : null,
       ]
         .filter(Boolean)
         .join(' · ');
@@ -114,7 +114,7 @@ export function MobileDock({ controller, open, onOpenChange }: MobileDockProps) 
 
   return (
     <section
-      aria-label={t('mobile.dock.hand')}
+      aria-label={t('dock.hand')}
       data-testid="hand-dock"
       data-open={open}
       className="relative z-10 box-border flex shrink-0 flex-col border-t border-line-strong bg-panel pb-safe transition-[height] duration-300 ease-[cubic-bezier(.32,.72,.28,1)]"
@@ -152,7 +152,7 @@ export function MobileDock({ controller, open, onOpenChange }: MobileDockProps) 
               {hand.available && hand.items.length > 0 ? (
                 renderCards(false)
               ) : (
-                <p className="self-center text-[10px] text-faint">{t('mobile.dock.noHand')}</p>
+                <p className="self-center text-[10px] text-faint">{t('dock.noHand')}</p>
               )}
             </div>
             <DockOps
@@ -183,7 +183,7 @@ export function MobileDock({ controller, open, onOpenChange }: MobileDockProps) 
               {hand.available && hand.items.length > 0 ? (
                 renderCards(true)
               ) : (
-                <p className="text-[10px] text-faint">{t('mobile.dock.noHand')}</p>
+                <p className="text-[10px] text-faint">{t('dock.noHand')}</p>
               )}
             </div>
             <div className="shrink-0 border-t border-line px-4 pb-2 pt-2">

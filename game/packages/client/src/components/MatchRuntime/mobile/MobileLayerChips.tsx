@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { Lock, PackageOpen } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import type { LayerChip } from './towerModel';
+import type { LayerChip } from '../model/boardModel';
 
 interface MobileLayerChipsProps {
   readonly chips: readonly LayerChip[];
