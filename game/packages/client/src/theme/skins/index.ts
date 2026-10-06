@@ -4,11 +4,13 @@
 import type { ThemeId } from '../themes';
 import { blueprintSkin } from './blueprint';
 import { noirSkin } from './noir';
+import { totemSkin } from './totem';
 import type { ThemeSkin } from './types';
 
 export const SKINS: Readonly<Record<ThemeId, ThemeSkin>> = {
   noir: noirSkin,
   blueprint: blueprintSkin,
+  totem: totemSkin,
 };
 
 export function getSkin(id: ThemeId): ThemeSkin {

@@ -153,3 +153,56 @@ describe('「筑梦蓝图」皮肤样式', () => {
     }
   });
 });
+
+describe('「陀螺未停」皮肤样式', () => {
+  const css = stripComments(skinCss['../../styles/skins/totem.css']!);
+
+  it('专属类名都带 totem- 前缀，不借用别的主题的类名', () => {
+    const classes = new Set(
+      selectors(css).flatMap((s) => [...s.matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]!)),
+    );
+    for (const name of classes) {
+      expect(name.startsWith('ms-') || name.startsWith('totem-'), name).toBe(true);
+    }
+    expect(css).not.toContain('noir-');
+    expect(css).not.toContain('blueprint-');
+  });
+
+  it('动效在系统「减少动效」与 data-motion=reduced 下都会停掉', () => {
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain(":root[data-motion='reduced']");
+  });
+
+  it('装饰效果各有独立的 data-fx-off 开关；同类效果沿用 blueprint 的名字', () => {
+    for (const fx of ['maze', 'totem', 'flow']) {
+      expect(css, fx).toContain(`:root[data-fx-off~='${fx}']`);
+    }
+  });
+
+  it('层级调色可由 data-fx-off="tint" 关闭：所有调色规则都排除了它', () => {
+    const tintRules = selectors(css).filter(
+      (s) => s.includes('data-tint-layer') || / \[data-layer='[0-4]'\]$/.test(s),
+    );
+    expect(tintRules.length).toBeGreaterThan(0);
+    for (const sel of tintRules) {
+      expect(sel, sel).toContain(":not([data-fx-off~='tint'])");
+    }
+  });
+
+  it('每一层（0–4）都有自己的层色规则，第 1–4 层引用 --ms-totem-l<层号>', () => {
+    for (const layer of [0, 1, 2, 3, 4]) {
+      expect(css, `data-layer=${layer}`).toContain(`[data-layer='${layer}']`);
+    }
+    for (const layer of [1, 2, 3, 4]) {
+      expect(css, `l${layer}`).toContain(`var(--ms-totem-l${layer})`);
+    }
+  });
+
+  it('关键帧由基础样式提供，皮肤只引用', () => {
+    expect(css).not.toContain('@keyframes');
+    for (const name of ['ms-spin', 'ms-flow', 'ms-dash', 'ms-wobble']) {
+      expect(baseCss).toContain(`@keyframes ${name}`);
+    }
+    for (const name of ['ms-flow', 'ms-dash', 'ms-wobble']) expect(css).toContain(name);
+  });
+});

@@ -78,9 +78,24 @@ describe('主题表', () => {
     expect(bp.tokens.line2).toBe('rgba(186,214,236,.34)');
   });
 
+  it('totem 是暗色主题，取值与约定一致', () => {
+    const totem = getTheme('totem');
+    expect(totem.scheme).toBe('dark');
+    expect(totem.themeColor).toBe('#0B0F16');
+    expect(totem.tokens.bg).toBe('#0B0F16');
+    expect(totem.tokens.panel).toBe('#10161F');
+    expect(totem.tokens.ink).toBe('#DCE5F0');
+    expect(totem.tokens.acc).toBe('#C9A35F');
+    expect(totem.tokens.accb).toBe('#E8CC8E');
+    expect(totem.tokens.lock).toBe('#7FB4D9');
+    expect(totem.tokens.line2).toBe('rgba(200,215,235,.24)');
+  });
+
   it('各主题的令牌取值互不相同（换主题必须看得出来）', () => {
-    const [a, b] = [getTheme('noir').tokens, getTheme('blueprint').tokens];
-    for (const k of ['bg', 'panel', 'ink', 'line2'] as const) expect(a[k]).not.toBe(b[k]);
+    const all = THEME_IDS.map((id) => getTheme(id).tokens);
+    for (const k of ['bg', 'panel', 'ink', 'line2'] as const) {
+      expect(new Set(all.map((tokens) => tokens[k])).size, k).toBe(all.length);
+    }
   });
 
   it('默认主题与存储键', () => {
@@ -94,6 +109,7 @@ describe('isThemeId / resolveThemeId', () => {
   it('认得主题 id', () => {
     expect(isThemeId('noir')).toBe(true);
     expect(isThemeId('blueprint')).toBe(true);
+    expect(isThemeId('totem')).toBe(true);
   });
 
   it('不认旧值、空值与原型链上的名字', () => {
@@ -105,6 +121,7 @@ describe('isThemeId / resolveThemeId', () => {
   it('不认识的值回落到默认主题', () => {
     expect(resolveThemeId('noir')).toBe('noir');
     expect(resolveThemeId('blueprint')).toBe('blueprint');
+    expect(resolveThemeId('totem')).toBe('totem');
     for (const v of ['light', 'dark', 'system', null, undefined, 42]) {
       expect(resolveThemeId(v)).toBe(DEFAULT_THEME_ID);
     }

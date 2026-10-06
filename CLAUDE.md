@@ -205,6 +205,8 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | `ms-btn` | 坞与响应窗口里的按钮 | `data-variant="primary"` |
 | `ms-response` | 响应窗口 / 提示卡 | - |
 
+**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`flow`、`maze`（迷宫底纹）、`tint`（层级调色）。
+
 **新增一个主题要动的地方：**
 
 1. `theme/themes.ts` 的 `THEMES` 加主题（18 个令牌）+ `styles/index.css` 加同样的 `[data-theme='<id>']` 块 + 两份 i18n 的 `theme.names.<id>`（`themeCss.test.ts`、`themes.test.ts` 会检查一致性）

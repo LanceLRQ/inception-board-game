@@ -97,6 +97,32 @@ export const THEMES = {
       mono: "'IBM Plex Mono','SF Mono',monospace",
     },
   },
+  totem: {
+    id: 'totem',
+    nameKey: 'theme.names.totem',
+    scheme: 'dark',
+    themeColor: '#0B0F16',
+    tokens: {
+      bg: '#0B0F16',
+      panel: '#10161F',
+      panel2: '#141B26',
+      ink: '#DCE5F0',
+      dim: '#8B99AE',
+      faint: '#57647A',
+      line: 'rgba(200,215,235,.08)',
+      line2: 'rgba(200,215,235,.24)',
+      acc: '#C9A35F',
+      accb: '#E8CC8E',
+      accsoft: 'rgba(201,163,95,.13)',
+      lock: '#7FB4D9',
+      blood: '#C4685A',
+      ok: '#7DA58E',
+      grade: '#C9A35F',
+      serif: "'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif",
+      sans: "'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif",
+      mono: "'IBM Plex Mono','SF Mono',monospace",
+    },
+  },
 } as const satisfies Record<string, ThemeDefinition>;
 
 export type ThemeId = keyof typeof THEMES;

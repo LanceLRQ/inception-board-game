@@ -1,0 +1,568 @@
+/*
+ * 「陀螺未停」皮肤：夜里的梦——长夜底色、黄铜陀螺、迷宫底纹，四层各套一层电影调色。
+ * 全部限定在 [data-theme='totem'] 之下；颜色一律由令牌推导（color-mix）与层色变量（--ms-totem-l<层号>），
+ * 不写颜色字面量。
+ *
+ * 层级调色：布局根容器带 data-tint-layer（焦点层），强调色整体换成该层的调色；
+ * 带 data-layer 的元素（层行、层徽、层标签）用自己那一层的颜色做 --ms-grade。
+ * 两者都可由 data-fx-off="tint" 关闭，回退为统一的黄铜色。
+ *
+ * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
+ *   tint  层级调色    maze  迷宫底纹    totem  陀螺自旋与微晃    flow  穿层虚线流动
+ * 系统「减少动效」与 data-motion='reduced' 下全部动画停掉。
+ */
+
+/* ---------- 层级调色 ---------- */
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-tint-layer='1'] {
+  --totem-tint: var(--ms-totem-l1);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-tint-layer='2'] {
+  --totem-tint: var(--ms-totem-l2);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-tint-layer='3'] {
+  --totem-tint: var(--ms-totem-l3);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-tint-layer='4'] {
+  --totem-tint: var(--ms-totem-l4);
+}
+/* 强调色三件套与 shadcn 的 primary / ring 一起换（它们在 :root 上已按缺省强调色算好，需要在这里重算） */
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-tint-layer]:not([data-tint-layer='0']) {
+  --ms-acc: var(--totem-tint);
+  --ms-accb: color-mix(in srgb, var(--totem-tint) 72%, var(--ms-ink));
+  --ms-accsoft: color-mix(in srgb, var(--totem-tint) 13%, transparent);
+  --ms-grade: var(--totem-tint);
+  --primary: var(--ms-acc);
+  --ring: var(--ms-acc);
+  --accent: var(--ms-accsoft);
+  --accent-foreground: var(--ms-accb);
+}
+
+/* 每个带 data-layer 的元素用自己那一层的颜色；迷失层用暗色 */
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-layer='0'] {
+  --ms-grade: var(--ms-faint);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-layer='1'] {
+  --ms-grade: var(--ms-totem-l1);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-layer='2'] {
+  --ms-grade: var(--ms-totem-l2);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-layer='3'] {
+  --ms-grade: var(--ms-totem-l3);
+}
+[data-theme='totem']:root:not([data-fx-off~='tint']) [data-layer='4'] {
+  --ms-grade: var(--ms-totem-l4);
+}
+
+/* ---------- 舞台与背景氛围 ---------- */
+[data-theme='totem'] .ms-stage {
+  background:
+    radial-gradient(
+      ellipse 56% 46% at 50% 46%,
+      color-mix(in srgb, var(--ms-acc) 6%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--ms-panel) 80%, var(--ms-bg)), var(--ms-bg));
+}
+/* 暗角：画面四周压暗，像胶片 */
+[data-theme='totem'] .totem-ambient {
+  background: radial-gradient(
+    ellipse 120% 92% at 50% 42%,
+    transparent 52%,
+    color-mix(in srgb, var(--ms-bg) 62%, transparent) 100%
+  );
+}
+/* 阿里阿德涅的迷宫：同心断弧，铺在中央舞台背后 */
+[data-theme='totem'] .totem-maze {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  height: min(118%, 1100px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  color: var(--ms-acc);
+  opacity: 0.075;
+}
+[data-theme='totem'] .totem-maze path {
+  stroke: currentColor;
+  stroke-width: 0.8;
+}
+[data-theme='totem'] .totem-maze circle {
+  fill: currentColor;
+}
+[data-theme='totem'] .ms-topbar {
+  letter-spacing: 0.18em;
+  background: color-mix(in srgb, var(--ms-bg) 78%, transparent);
+}
+
+/* ---------- 座位牌：夜里的画框 ---------- */
+[data-theme='totem'] .ms-seat {
+  border-radius: 0;
+  background: var(--ms-panel);
+  box-shadow: 0 12px 32px -14px color-mix(in srgb, var(--ms-bg) 90%, transparent);
+}
+/* 框内细线：黄铜细描边 */
+[data-theme='totem'] .ms-seat::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--ms-acc) 14%, transparent);
+  pointer-events: none;
+}
+[data-theme='totem'] .ms-seat[data-current] {
+  box-shadow:
+    0 0 0 1px var(--ms-accsoft),
+    0 0 34px color-mix(in srgb, var(--ms-acc) 22%, transparent),
+    0 12px 32px -14px color-mix(in srgb, var(--ms-bg) 90%, transparent);
+}
+[data-theme='totem'] .ms-seat[data-lost] {
+  border-style: dashed;
+}
+[data-theme='totem'] .ms-seat-flag {
+  letter-spacing: 0.34em;
+}
+/* 卡面下沿压暗，文字画在上面更清楚 */
+[data-theme='totem'] .ms-seat:not([data-density='compact']) .ms-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 55%,
+    color-mix(in srgb, var(--ms-bg) 50%, transparent)
+  );
+}
+
+/* ---------- 卡面画框 / 层徽 / 骰子 ---------- */
+[data-theme='totem'] .ms-card {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 82%, var(--ms-panel));
+}
+/* 层徽：左侧一粒层色的点，层色随层号变 */
+[data-theme='totem'] .ms-layerbadge {
+  position: relative;
+  padding-left: 15px;
+  border-radius: 0;
+  letter-spacing: 0.1em;
+}
+[data-theme='totem'] .ms-layerbadge::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--ms-grade);
+}
+[data-theme='totem'] .ms-layerbadge[data-layer='0'] {
+  border-style: dashed;
+}
+/* 灌铅骰：心锁蓝与战斗红都是功能色，带一圈柔光 */
+[data-theme='totem'] .ms-die {
+  --die-fill: color-mix(in srgb, var(--die-color) 9%, var(--ms-bg));
+  --die-pip: var(--die-color);
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--die-color) 50%, transparent);
+}
+[data-theme='totem'] .ms-die-pip {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--die-color) 55%, transparent);
+}
+[data-theme='totem'] .ms-die[data-empty] {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
+[data-theme='totem'] .ms-handcard {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 90%, var(--ms-panel));
+}
+[data-theme='totem'] .ms-handcard:hover {
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--ms-bg) 70%, transparent);
+}
+[data-theme='totem'] .ms-handcard[data-selected],
+[data-theme='totem'] .ms-handcard[data-reading] {
+  box-shadow:
+    0 0 0 1px var(--ms-acc),
+    0 14px 34px color-mix(in srgb, var(--ms-acc) 16%, transparent);
+}
+[data-theme='totem'] .ms-handcard-badge {
+  border-radius: 0;
+}
+[data-theme='totem'] .ms-dock {
+  background: color-mix(in srgb, var(--ms-bg) 95%, var(--ms-panel));
+  backdrop-filter: blur(6px);
+}
+[data-theme='totem'] .ms-btn {
+  border-radius: 0;
+  letter-spacing: 0.24em;
+}
+[data-theme='totem'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+  box-shadow: 0 6px 26px color-mix(in srgb, var(--ms-acc) 30%, transparent);
+}
+[data-theme='totem'] .ms-response {
+  border-radius: 0;
+  border-color: color-mix(in srgb, var(--ms-acc) 45%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+
+/* ---------- 中央舞台：陀螺仪 + 梦层塔 ---------- */
+/* 陀螺仪：窄的时候是塔上方的一条，宽的时候是左侧一列 */
+[data-theme='totem'] .totem-gyro {
+  padding: 8px 12px;
+  border: 1px solid var(--ms-line);
+  background: color-mix(in srgb, var(--ms-bg) 70%, var(--ms-panel));
+}
+[data-theme='totem'] .totem-gyro-title {
+  color: var(--ms-ink);
+}
+[data-theme='totem'] .totem-read {
+  color: var(--ms-dim);
+}
+[data-theme='totem'] .totem-read-sub {
+  color: var(--ms-faint);
+}
+[data-theme='totem'] .totem-dial {
+  aspect-ratio: 186 / 200;
+  height: 64px;
+}
+/* 表圈：底圈 + 剩余牌库的描边 + 12 格刻度 */
+[data-theme='totem'] .totem-gauge {
+  left: 4.3%;
+  top: 6%;
+  width: 91.4%;
+  height: 85%;
+  transform: rotate(-90deg);
+}
+[data-theme='totem'] .totem-gauge-track {
+  fill: none;
+  stroke: var(--ms-line2);
+  stroke-width: 3;
+}
+[data-theme='totem'] .totem-gauge-fill {
+  fill: none;
+  stroke: var(--ms-acc);
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ms-acc) 50%, transparent));
+  transition: stroke-dashoffset 0.6s ease;
+}
+[data-theme='totem'] .totem-gauge-tick {
+  stroke: color-mix(in srgb, var(--ms-ink) 22%, transparent);
+  stroke-width: 1;
+}
+/* 陀螺：绕支点微晃，碟肩两道虚环流动表示自旋 */
+[data-theme='totem'] .totem-top {
+  left: 18.8%;
+  top: 1%;
+  width: 62.4%;
+  height: 87%;
+  transform-origin: 50% 91%;
+  animation: ms-wobble 1.7s ease-in-out infinite;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--ms-acc) 20%, transparent));
+}
+[data-theme='totem'] .totem-stop-0 {
+  stop-color: color-mix(in srgb, var(--ms-acc) 6%, var(--ms-bg));
+}
+[data-theme='totem'] .totem-stop-1 {
+  stop-color: color-mix(in srgb, var(--ms-acc) 26%, var(--ms-bg));
+}
+[data-theme='totem'] .totem-stop-2 {
+  stop-color: color-mix(in srgb, var(--ms-accb) 62%, var(--ms-bg));
+}
+[data-theme='totem'] .totem-stop-3 {
+  stop-color: color-mix(in srgb, var(--ms-acc) 34%, var(--ms-bg));
+}
+[data-theme='totem'] .totem-stop-4 {
+  stop-color: color-mix(in srgb, var(--ms-acc) 11%, var(--ms-bg));
+}
+[data-theme='totem'] .totem-stop-5 {
+  stop-color: color-mix(in srgb, var(--ms-acc) 4%, var(--ms-bg));
+}
+[data-theme='totem'] .totem-top-shadow {
+  fill: color-mix(in srgb, var(--ms-acc) 20%, transparent);
+}
+[data-theme='totem'] .totem-top-ghost {
+  opacity: 0.38;
+}
+[data-theme='totem'] .totem-top-lit {
+  fill: none;
+  stroke: var(--ms-accb);
+  stroke-width: 1.3;
+  opacity: 0.6;
+}
+[data-theme='totem'] .totem-top-lit-dim {
+  fill: none;
+  stroke: var(--ms-accb);
+  stroke-width: 1;
+  opacity: 0.32;
+}
+[data-theme='totem'] .totem-top-cut {
+  fill: none;
+  stroke: var(--ms-bg);
+  stroke-width: 1.4;
+  opacity: 0.5;
+}
+[data-theme='totem'] .totem-spin {
+  fill: none;
+  stroke-width: 1.1;
+}
+[data-theme='totem'] .totem-spin-a {
+  stroke: var(--ms-accb);
+  opacity: 0.42;
+  animation: ms-dash 1.05s linear infinite;
+}
+[data-theme='totem'] .totem-spin-b {
+  stroke: var(--ms-acc);
+  opacity: 0.22;
+  animation: ms-dash 1.6s linear infinite reverse;
+}
+[data-theme='totem'] .totem-glow {
+  bottom: 2%;
+  left: 50%;
+  width: 52.7%;
+  height: 8%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in srgb, var(--ms-acc) 26%, transparent),
+    transparent 70%
+  );
+  filter: blur(4px);
+}
+
+/* 梦层塔 */
+[data-theme='totem'] .totem-head {
+  border-bottom: 1px solid var(--ms-line2);
+}
+[data-theme='totem'] .totem-head-focus {
+  color: var(--ms-acc);
+}
+[data-theme='totem'] .totem-turn {
+  color: var(--ms-accb);
+  background: var(--ms-accsoft);
+  border: 1px solid var(--ms-accsoft);
+}
+/* 穿层虚线：右缘自上而下，往下永远走得通 */
+[data-theme='totem'] .totem-kick {
+  position: absolute;
+  right: 5px;
+  top: 4px;
+  bottom: 12px;
+  width: 1px;
+  background-image: linear-gradient(180deg, var(--ms-line2) 55%, transparent 45%);
+  background-size: 1px 9px;
+  animation: ms-flow 1.8s linear infinite;
+}
+[data-theme='totem'] .totem-kick-head {
+  color: var(--ms-acc);
+}
+
+/* 石板：左缘层色竖条，底色从层色渐隐 */
+[data-theme='totem'] .totem-slab {
+  border: 1px solid var(--ms-line);
+  border-left: 3px solid var(--ms-grade);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ms-grade) 11%, transparent), transparent 72%),
+    var(--ms-panel);
+}
+[data-theme='totem'] .totem-slab[data-viewer-layer]:not([data-focus]) {
+  border-color: var(--ms-line2);
+  border-left-color: var(--ms-grade);
+}
+[data-theme='totem'] .totem-slab[data-focus] {
+  border-color: var(--ms-grade);
+  box-shadow:
+    0 10px 36px -8px color-mix(in srgb, var(--ms-bg) 70%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ms-grade) 18%, transparent);
+}
+/* 迷失层：虚线框，没有层色 */
+[data-theme='totem'] .totem-slab[data-lost] {
+  border-style: dashed;
+  border-left-color: var(--ms-grade);
+  background: transparent;
+}
+[data-theme='totem'] .totem-slab[data-lost][data-focus] {
+  background: color-mix(in srgb, var(--ms-grade) 6%, transparent);
+}
+[data-theme='totem'] .totem-slabname {
+  color: var(--ms-dim);
+}
+[data-theme='totem'] .totem-slabname > span:first-child {
+  color: var(--ms-grade);
+}
+[data-theme='totem'] .totem-slabname:focus-visible {
+  outline-offset: -2px;
+}
+[data-theme='totem'] .totem-slab[data-focus] .totem-slabname {
+  color: var(--ms-ink);
+}
+[data-theme='totem'] .totem-slab[data-lost]:not([data-focus]) .totem-slabname {
+  color: var(--ms-faint);
+}
+/* 彭罗斯阶梯 */
+[data-theme='totem'] .totem-penrose {
+  opacity: 0.8;
+}
+[data-theme='totem'] .totem-penrose-base {
+  stroke: var(--ms-faint);
+  stroke-width: 1.2;
+  fill: color-mix(in srgb, var(--ms-faint) 8%, transparent);
+}
+[data-theme='totem'] .totem-penrose-hot {
+  stroke: var(--ms-acc);
+  stroke-width: 1.2;
+  fill: color-mix(in srgb, var(--ms-acc) 10%, transparent);
+}
+[data-theme='totem'] .totem-penrose-hot-line {
+  stroke: var(--ms-acc);
+  stroke-width: 1.2;
+  fill: none;
+}
+[data-theme='totem'] .totem-chip {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  font-family: var(--ms-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--ms-dim);
+  border: 1px solid var(--ms-line);
+}
+[data-theme='totem'] .totem-chip[data-opened] {
+  color: var(--ms-acc);
+  border-color: color-mix(in srgb, var(--ms-acc) 50%, transparent);
+}
+[data-theme='totem'] .totem-vault[data-opened] {
+  border-color: color-mix(in srgb, var(--ms-acc) 55%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 22%, transparent);
+}
+[data-theme='totem'] .totem-nightmare {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  font-family: var(--ms-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--ms-blood);
+  border: 1px dashed color-mix(in srgb, var(--ms-blood) 55%, transparent);
+  background: transparent;
+}
+[data-theme='totem'] .totem-nightmare[data-revealed] {
+  border-style: solid;
+}
+[data-theme='totem'] .totem-tag {
+  padding: 1px 6px;
+  color: var(--ms-accb);
+  border: 1px solid var(--ms-acc);
+}
+[data-theme='totem'] .totem-occ {
+  padding: 2px 9px 2px 5px;
+  color: var(--ms-dim);
+  background: var(--ms-panel2);
+  border: 1px solid var(--ms-line2);
+}
+[data-theme='totem'] .totem-occ[data-self] {
+  color: var(--ms-ink);
+  border-color: color-mix(in srgb, var(--ms-lock) 55%, transparent);
+}
+/* 中央区高度不够时收起占位者那一行，保证各层石板都放得下 */
+@container (max-height: 368px) {
+  [data-theme='totem'] .totem-occline {
+    display: none;
+  }
+}
+
+/* 宽的时候陀螺仪是左侧一列：陀螺放大、读数居中 */
+@container (min-width: 520px) {
+  [data-theme='totem'] .totem-gyro {
+    justify-content: center;
+    padding: 14px 12px;
+  }
+  [data-theme='totem'] .totem-gyro-title {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ms-line2);
+  }
+  /* 高度随中央区走，宽度不超过这一列 */
+  [data-theme='totem'] .totem-dial {
+    width: min(100%, calc(clamp(116px, 40cqh, 200px) * 0.93));
+    height: auto;
+  }
+  [data-theme='totem'] .totem-read {
+    margin-top: 12px;
+  }
+}
+
+/* ---------- 移动端：只换令牌与皮肤样式，没有专属舞台 ---------- */
+[data-theme='totem'] [data-layout='mobile'] {
+  background-image: radial-gradient(
+    ellipse 120% 46% at 50% 0%,
+    color-mix(in srgb, var(--ms-acc) 9%, transparent),
+    transparent 72%
+  );
+}
+/* 层塔里每一层的底色从层色渐隐；迷失层保持透明 */
+[data-theme='totem'] [data-layout='mobile'] [data-testid^='layer-row-'] {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ms-grade) 11%, transparent),
+    transparent 72%
+  );
+}
+[data-theme='totem'] [data-layout='mobile'] [data-testid='layer-row-0'] {
+  background-image: none;
+}
+/* 层标签：左侧一粒层色的点 */
+[data-theme='totem'] [data-layout='mobile'] [data-testid^='layer-chip-']::before {
+  content: '';
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ms-grade);
+}
+/* 行动轴上的层徽跟着层色 */
+[data-theme='totem'] [data-layout='mobile'] [data-testid^='rail-slot-'] [data-layer] {
+  color: var(--ms-grade);
+}
+
+/* ---------- 动效开关 ---------- */
+[data-theme='totem']:root[data-fx-off~='maze'] .totem-maze {
+  display: none;
+}
+[data-theme='totem']:root[data-fx-off~='totem'] .totem-top,
+[data-theme='totem']:root[data-fx-off~='totem'] .totem-spin {
+  animation: none;
+}
+[data-theme='totem']:root[data-fx-off~='flow'] .totem-kick {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='totem'] .totem-top,
+  [data-theme='totem'] .totem-spin,
+  [data-theme='totem'] .totem-kick,
+  [data-theme='totem'] .ms-seat-flag {
+    animation: none;
+  }
+}
+[data-theme='totem']:root[data-motion='reduced'] .totem-top,
+[data-theme='totem']:root[data-motion='reduced'] .totem-spin,
+[data-theme='totem']:root[data-motion='reduced'] .totem-kick,
+[data-theme='totem']:root[data-motion='reduced'] .ms-seat-flag {
+  animation: none;
+}
+[data-theme='totem']:root[data-motion='reduced'] .totem-gauge-fill,
+[data-theme='totem']:root[data-motion='reduced'] .ms-handcard,
+[data-theme='totem']:root[data-motion='reduced'] .ms-btn {
+  transition: none;
+}

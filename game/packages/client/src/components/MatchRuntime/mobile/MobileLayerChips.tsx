@@ -30,6 +30,7 @@ export function MobileLayerChips({ chips, focusLayer, onFocus }: MobileLayerChip
             aria-label={t('mobile.chips.chip', { layer: chip.layer, lock: chip.heartLock })}
             onClick={() => onFocus(chip.layer)}
             data-testid={`layer-chip-${chip.layer}`}
+            data-layer={chip.layer}
             className={cn(
               "relative flex h-[26px] min-w-0 flex-1 touch-manipulation items-center justify-center gap-[3px] overflow-hidden border px-1 font-mono text-[10px] tracking-[.04em] whitespace-nowrap after:absolute after:-inset-[9px] after:content-['']",
               active ? 'border-acc bg-acc-soft text-acc-bright' : 'border-line bg-panel text-dim',

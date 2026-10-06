@@ -6,6 +6,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MatchController } from '../controllerTypes';
+import { tintLayerAttr } from '../../../theme/layerTints';
 import { useBoardModel } from '../model/useBoardModel';
 import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
@@ -24,13 +25,14 @@ interface DesktopLayoutProps {
 export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayoutProps) {
   const { t } = useTranslation();
   const { winner } = controller;
-  const { state, board, focusOn } = useBoardModel(controller);
+  const { state, board, focusLayer, focusOn } = useBoardModel(controller);
 
   return (
     <div
       className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
       data-testid="local-runtime"
       data-layout="desktop"
+      data-tint-layer={tintLayerAttr(focusLayer)}
     >
       <DesktopTopBar controller={controller} topRight={topRight} />
       <PreloadLine preload={controller.preload} />

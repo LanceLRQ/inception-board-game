@@ -143,7 +143,8 @@
     "pick": "选择主题",
     "names": {
       "noir": "深眠影院",
-      "blueprint": "筑梦蓝图"
+      "blueprint": "筑梦蓝图",
+      "totem": "陀螺未停"
     }
   },
   "avatar": {
@@ -638,6 +639,12 @@
         "deckValue": "{{remaining}} / {{total}}",
         "sheetDeck": "牌库",
         "focusValue": "L{{layer}} · 心锁 {{n}}"
+      },
+      "totem": {
+        "gyro": "陀 螺 仪",
+        "tower": "梦 层 塔",
+        "focus": "焦点 L{{layer}}",
+        "left": "剩余 {{percent}}%"
       }
     }
   },

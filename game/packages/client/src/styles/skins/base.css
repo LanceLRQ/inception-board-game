@@ -242,3 +242,19 @@ button.ms-card:not(:disabled):hover {
     background-position: 0 9px;
   }
 }
+/* 虚线描边沿路径流动：偏移量等于一个虚线周期（25 = 10 + 15 = 6 + 19），循环衔接无跳变 */
+@keyframes ms-dash {
+  to {
+    stroke-dashoffset: -25;
+  }
+}
+/* 绕支点微晃（陀螺未停） */
+@keyframes ms-wobble {
+  0%,
+  100% {
+    transform: rotate(-2.4deg);
+  }
+  50% {
+    transform: rotate(2.4deg);
+  }
+}

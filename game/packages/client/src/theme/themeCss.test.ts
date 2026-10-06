@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import css from '../styles/index.css?raw';
+import { TINT_LAYERS, TOTEM_LAYER_TINTS, totemLayerVar } from './layerTints';
 import { THEMES, THEME_IDS, TOKEN_NAMES, tokenVar } from './themes';
 
 const norm = (v: string): string => v.replace(/\s+/g, ' ').trim();
@@ -43,6 +44,17 @@ describe('主题表与样式表一致', () => {
       }
     });
   }
+
+  it("[data-theme='totem'] 的层级调色变量与 layerTints.ts 一致，其它主题不带这些变量", () => {
+    const totem = declarations(ruleBodies("[data-theme='totem']").join(';'));
+    for (const layer of TINT_LAYERS) {
+      expect(totem.get(totemLayerVar(layer)), totemLayerVar(layer)).toBe(TOTEM_LAYER_TINTS[layer]);
+    }
+    for (const id of THEME_IDS.filter((x) => x !== 'totem')) {
+      const decls = declarations(ruleBodies(`[data-theme='${id}']`).join(';'));
+      for (const layer of TINT_LAYERS) expect(decls.has(totemLayerVar(layer)), id).toBe(false);
+    }
+  });
 
   it(':root 上有一份缺省令牌，与默认主题一致', () => {
     const rootBodies = ruleBodies(':root').filter((b) => b.includes('--ms-bg'));

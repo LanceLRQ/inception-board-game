@@ -4,6 +4,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { tintLayerAttr } from '../../../theme/layerTints';
 import { useBoardModel } from '../model/useBoardModel';
 import { buildSeatViews } from '../model/seatModel';
 import { markersBySeat } from '../seatMarkers';
@@ -43,6 +44,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
       className="flex h-dvh touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground"
       data-testid="local-runtime"
       data-layout="mobile"
+      data-tint-layer={tintLayerAttr(focusLayer)}
     >
       <MobileTopBar controller={controller} topRight={topRight} />
       <PreloadLine preload={controller.preload} />

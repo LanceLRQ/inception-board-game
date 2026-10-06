@@ -126,6 +126,7 @@ function CompactSlab({
   return (
     <div
       data-testid={`layer-row-${row.layer}`}
+      data-layer={row.layer}
       data-viewer-layer={row.hasViewer || undefined}
       className={cn(
         'flex min-h-[34px] flex-[1_0_auto] items-center gap-2 border border-l-[3px] border-line border-l-grade px-2.5 py-[5px]',
@@ -177,6 +178,7 @@ function FocusSlab({
   return (
     <div
       data-testid={`layer-row-${row.layer}`}
+      data-layer={row.layer}
       data-focus="true"
       data-viewer-layer={row.hasViewer || undefined}
       className={cn(

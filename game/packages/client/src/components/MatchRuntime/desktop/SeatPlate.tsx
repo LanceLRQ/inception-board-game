@@ -72,7 +72,11 @@ export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: 
 
   const meta = (
     <div className={cn('flex items-center gap-1.5', !horizontal && 'justify-center')}>
-      <span className="ms-layerbadge" aria-label={t('seat.layerAria', { layer: seat.layer })}>
+      <span
+        className="ms-layerbadge"
+        data-layer={seat.layer}
+        aria-label={t('seat.layerAria', { layer: seat.layer })}
+      >
         L{seat.layer}
       </span>
       <span

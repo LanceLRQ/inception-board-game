@@ -11,6 +11,7 @@
 @import './skins/base.css';
 @import './skins/noir.css';
 @import './skins/blueprint.css';
+@import './skins/totem.css';
 /*
  ---break---
  */
@@ -136,6 +137,33 @@
   --ms-serif: 'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif;
   --ms-sans: 'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif;
   --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
+}
+
+/* prettier-ignore */
+[data-theme='totem'] {
+  --ms-bg: #0B0F16;
+  --ms-panel: #10161F;
+  --ms-panel2: #141B26;
+  --ms-ink: #DCE5F0;
+  --ms-dim: #8B99AE;
+  --ms-faint: #57647A;
+  --ms-line: rgba(200,215,235,.08);
+  --ms-line2: rgba(200,215,235,.24);
+  --ms-acc: #C9A35F;
+  --ms-accb: #E8CC8E;
+  --ms-accsoft: rgba(201,163,95,.13);
+  --ms-lock: #7FB4D9;
+  --ms-blood: #C4685A;
+  --ms-ok: #7DA58E;
+  --ms-grade: #C9A35F;
+  --ms-serif: 'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif;
+  --ms-sans: 'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif;
+  --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
+  /* 层级调色：与 src/theme/layerTints.ts 逐字一致（themeCss.test.ts 校验） */
+  --ms-totem-l1: #8FB0C8;
+  --ms-totem-l2: #E0BC7E;
+  --ms-totem-l3: #BFD4E6;
+  --ms-totem-l4: #9AA098;
 }
 
 /* shadcn 变量统一从语义令牌映射，换主题只需换令牌 */

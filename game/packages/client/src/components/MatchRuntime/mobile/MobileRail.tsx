@@ -78,6 +78,7 @@ function RailSlot({
       <div className="flex gap-[3px] font-mono text-[8px] leading-none tracking-[.04em]">
         <span
           className="border border-line bg-panel px-[3px] py-0.5 text-dim"
+          data-layer={slot.layer}
           aria-label={t('seat.layerAria', { layer: slot.layer })}
         >
           L{slot.layer}
