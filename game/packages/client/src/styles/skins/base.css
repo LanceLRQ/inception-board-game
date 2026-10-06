@@ -230,3 +230,15 @@ button.ms-card:not(:disabled):hover {
     opacity: 1;
   }
 }
+
+/* 通用动画：皮肤样式里的规则都限定在主题之下，关键帧不能写在那里，统一放这里供各主题引用 */
+@keyframes ms-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ms-flow {
+  to {
+    background-position: 0 9px;
+  }
+}

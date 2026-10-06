@@ -66,6 +66,23 @@ describe('主题表', () => {
     );
   });
 
+  it('blueprint 是暗色主题，取值与约定一致', () => {
+    const bp = getTheme('blueprint');
+    expect(bp.scheme).toBe('dark');
+    expect(bp.themeColor).toBe('#0B1624');
+    expect(bp.tokens.bg).toBe('#0B1624');
+    expect(bp.tokens.panel).toBe('#0F1E30');
+    expect(bp.tokens.ink).toBe('#D7E3EF');
+    expect(bp.tokens.acc).toBe('#C9A35F');
+    expect(bp.tokens.lock).toBe('#7FB4D9');
+    expect(bp.tokens.line2).toBe('rgba(186,214,236,.34)');
+  });
+
+  it('各主题的令牌取值互不相同（换主题必须看得出来）', () => {
+    const [a, b] = [getTheme('noir').tokens, getTheme('blueprint').tokens];
+    for (const k of ['bg', 'panel', 'ink', 'line2'] as const) expect(a[k]).not.toBe(b[k]);
+  });
+
   it('默认主题与存储键', () => {
     expect(DEFAULT_THEME_ID).toBe('noir');
     expect(THEME_IDS).toContain(DEFAULT_THEME_ID);
@@ -76,6 +93,7 @@ describe('主题表', () => {
 describe('isThemeId / resolveThemeId', () => {
   it('认得主题 id', () => {
     expect(isThemeId('noir')).toBe(true);
+    expect(isThemeId('blueprint')).toBe(true);
   });
 
   it('不认旧值、空值与原型链上的名字', () => {
@@ -86,6 +104,7 @@ describe('isThemeId / resolveThemeId', () => {
 
   it('不认识的值回落到默认主题', () => {
     expect(resolveThemeId('noir')).toBe('noir');
+    expect(resolveThemeId('blueprint')).toBe('blueprint');
     for (const v of ['light', 'dark', 'system', null, undefined, 42]) {
       expect(resolveThemeId(v)).toBe(DEFAULT_THEME_ID);
     }

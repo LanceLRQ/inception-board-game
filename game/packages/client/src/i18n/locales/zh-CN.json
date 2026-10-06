@@ -142,7 +142,8 @@
   "theme": {
     "pick": "选择主题",
     "names": {
-      "noir": "深眠影院"
+      "noir": "深眠影院",
+      "blueprint": "筑梦蓝图"
     }
   },
   "avatar": {
@@ -628,7 +629,16 @@
       "deckAria": "牌库剩余",
       "focusLayer": "聚焦第 {{layer}} 层 · {{name}}",
       "focusLayerTag": "焦点层",
-      "vaultKnown": "金库 · {{content}}"
+      "vaultKnown": "金库 · {{content}}",
+      "blueprint": {
+        "title": "梦 境 剖 面 图",
+        "section": "剖视 A-A · 第 {{n}} 回合",
+        "sheetFocus": "焦点层",
+        "sheetRound": "回合",
+        "deckValue": "{{remaining}} / {{total}}",
+        "sheetDeck": "牌库",
+        "focusValue": "L{{layer}} · 心锁 {{n}}"
+      }
     }
   },
   "die": {

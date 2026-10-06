@@ -1,0 +1,428 @@
+/*
+ * 「筑梦蓝图」皮肤：深普鲁士蓝图纸、制图白线、网格底、轴测楼板与图签。
+ * 全部限定在 [data-theme='blueprint'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
+ * 动效：陀螺旋转、穿层虚线流动可由 data-fx-off 单独关闭（totem / flow），网格底可关闭（grid）；
+ * 系统「减少动效」与 data-motion='reduced' 下全部停掉。
+ */
+
+/* ---------- 舞台与背景氛围 ---------- */
+[data-theme='blueprint'] .ms-stage {
+  background:
+    radial-gradient(
+      ellipse 70% 52% at 50% 46%,
+      color-mix(in srgb, var(--ms-lock) 7%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ms-panel) 90%, var(--ms-lock)),
+      var(--ms-panel)
+    );
+}
+[data-theme='blueprint'] .blueprint-ambient {
+  background: radial-gradient(
+    ellipse 120% 90% at 50% 45%,
+    transparent 55%,
+    color-mix(in srgb, var(--ms-bg) 60%, transparent) 100%
+  );
+}
+/* 图纸网格：24px 细格 + 120px 主格 */
+[data-theme='blueprint'] .blueprint-grid,
+[data-theme='blueprint'] [data-layout='mobile'] {
+  --bp-grid-fine: color-mix(in srgb, var(--ms-line) 46%, transparent);
+  --bp-grid-main: var(--ms-line);
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 23px, var(--bp-grid-fine) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 23px, var(--bp-grid-fine) 23px 24px),
+    repeating-linear-gradient(0deg, transparent 0 119px, var(--bp-grid-main) 119px 120px),
+    repeating-linear-gradient(90deg, transparent 0 119px, var(--bp-grid-main) 119px 120px);
+}
+[data-theme='blueprint'] .blueprint-grid {
+  position: absolute;
+  inset: 0;
+}
+/* 过中心的剖切轴线：点划线 */
+[data-theme='blueprint'] .blueprint-axis {
+  position: absolute;
+  --bp-axis: color-mix(in srgb, var(--ms-ink) 9%, transparent);
+}
+[data-theme='blueprint'] .blueprint-axis-h {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--bp-axis) 0 16px,
+    transparent 16px 22px,
+    var(--bp-axis) 22px 25px,
+    transparent 25px 31px
+  );
+}
+[data-theme='blueprint'] .blueprint-axis-v {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--bp-axis) 0 16px,
+    transparent 16px 22px,
+    var(--bp-axis) 22px 25px,
+    transparent 25px 31px
+  );
+}
+[data-theme='blueprint'] .ms-topbar {
+  letter-spacing: 0.18em;
+  border-bottom-color: var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-bg) 82%, transparent);
+}
+
+/* ---------- 座位牌：图纸标记，四角带制图角标 ---------- */
+[data-theme='blueprint'] .ms-seat {
+  --bp-tick: color-mix(in srgb, var(--ms-ink) 70%, transparent);
+  border-radius: 0;
+  background:
+    linear-gradient(var(--bp-tick), var(--bp-tick)) left top / 10px 2px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) left top / 2px 10px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) right top / 10px 2px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) right top / 2px 10px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) left bottom / 10px 2px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) left bottom / 2px 10px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) right bottom / 10px 2px no-repeat,
+    linear-gradient(var(--bp-tick), var(--bp-tick)) right bottom / 2px 10px no-repeat,
+    color-mix(in srgb, var(--ms-panel) 90%, transparent);
+}
+[data-theme='blueprint'] .ms-seat[data-current] {
+  --bp-tick: var(--ms-accb);
+  box-shadow:
+    0 0 0 1px var(--ms-accsoft),
+    0 0 32px color-mix(in srgb, var(--ms-acc) 18%, transparent);
+}
+[data-theme='blueprint'] .ms-seat[data-lost] {
+  border-style: dashed;
+}
+[data-theme='blueprint'] .ms-seat[data-master] {
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+[data-theme='blueprint'] .ms-seat[data-master][data-current] {
+  box-shadow:
+    0 0 0 1px var(--ms-accsoft),
+    0 0 32px color-mix(in srgb, var(--ms-acc) 18%, transparent);
+}
+[data-theme='blueprint'] .ms-seat-flag {
+  letter-spacing: 0.3em;
+}
+
+/* ---------- 卡面画框 / 层徽 / 骰子 ---------- */
+[data-theme='blueprint'] .ms-card {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ms-bg) 80%, var(--ms-panel));
+}
+/* 座位里的卡面外再套一圈细框，像图纸上的装订线 */
+[data-theme='blueprint'] .ms-seat:not([data-density='compact']) .ms-card {
+  outline: 1px solid var(--ms-line);
+  outline-offset: 2px;
+}
+[data-theme='blueprint'] .ms-layerbadge {
+  border-radius: 0;
+  border-style: solid;
+  letter-spacing: 0.12em;
+}
+[data-theme='blueprint'] .ms-die {
+  --die-fill: color-mix(in srgb, var(--die-color) 10%, var(--ms-bg));
+  --die-pip: var(--die-color);
+  border-radius: 1px;
+  border: 1px solid color-mix(in srgb, var(--die-color) 52%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ms-bg) 70%, transparent);
+}
+[data-theme='blueprint'] .ms-die-pip {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--die-color) 55%, transparent);
+}
+[data-theme='blueprint'] .ms-die[data-empty] {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+
+/* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
+[data-theme='blueprint'] .ms-handcard {
+  border-radius: 0;
+  background: var(--ms-bg);
+}
+[data-theme='blueprint'] .ms-handcard:hover {
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--ms-bg) 75%, transparent);
+}
+[data-theme='blueprint'] .ms-handcard[data-selected],
+[data-theme='blueprint'] .ms-handcard[data-reading] {
+  box-shadow:
+    0 0 0 1px var(--ms-acc),
+    0 14px 32px color-mix(in srgb, var(--ms-acc) 14%, transparent);
+}
+[data-theme='blueprint'] .ms-handcard > span:last-child {
+  border-top: 1px dashed var(--ms-line);
+}
+[data-theme='blueprint'] .ms-handcard-badge {
+  border-radius: 0;
+}
+[data-theme='blueprint'] .ms-dock {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 23px,
+      color-mix(in srgb, var(--ms-line) 46%, transparent) 23px 24px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 23px,
+      color-mix(in srgb, var(--ms-line) 46%, transparent) 23px 24px
+    ),
+    color-mix(in srgb, var(--ms-bg) 94%, var(--ms-panel));
+  backdrop-filter: blur(6px);
+}
+[data-theme='blueprint'] .ms-btn {
+  border-radius: 0;
+  letter-spacing: 0.24em;
+}
+[data-theme='blueprint'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--ms-acc) 30%, transparent);
+}
+[data-theme='blueprint'] .ms-response {
+  border-radius: 0;
+  border-left: 3px solid var(--ms-acc);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
+}
+
+/* ---------- 中央舞台：梦境剖面图 ---------- */
+[data-theme='blueprint'] .blueprint-head {
+  border-bottom: 1px solid var(--ms-line2);
+}
+[data-theme='blueprint'] .blueprint-turn {
+  color: var(--ms-accb);
+  background: var(--ms-accsoft);
+  border: 1px solid var(--ms-accsoft);
+}
+/* 回合陀螺：黄铜锥面渐变的圆盘，缓缓旋转 */
+[data-theme='blueprint'] .blueprint-totem {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--ms-accb),
+    color-mix(in srgb, var(--ms-acc) 45%, var(--ms-bg)),
+    var(--ms-accb),
+    color-mix(in srgb, var(--ms-acc) 30%, var(--ms-bg)),
+    var(--ms-accb)
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ms-acc) 45%, transparent);
+  animation: ms-spin 2.6s linear infinite;
+}
+[data-theme='blueprint'] .blueprint-totem::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ms-bg) 55%, transparent);
+}
+/* 穿层虚线：自上而下贯穿各层 */
+[data-theme='blueprint'] .blueprint-kick {
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  bottom: 12px;
+  width: 1px;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ms-ink) 38%, transparent) 55%,
+    transparent 45%
+  );
+  background-size: 1px 9px;
+  animation: ms-flow 1.8s linear infinite;
+}
+[data-theme='blueprint'] .blueprint-kick-head {
+  color: color-mix(in srgb, var(--ms-ink) 42%, transparent);
+  left: -3px;
+}
+
+/* 楼板：顶面 + 前面 + 右侧面，线宽不随拉伸变化 */
+[data-theme='blueprint'] .blueprint-plane {
+  padding-block: 3px 5px;
+}
+[data-theme='blueprint'] .blueprint-slab polygon {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+  stroke-linejoin: miter;
+}
+[data-theme='blueprint'] .blueprint-slab-top {
+  fill: color-mix(in srgb, var(--ms-ink) 5%, transparent);
+  stroke: color-mix(in srgb, var(--ms-ink) 38%, transparent);
+}
+[data-theme='blueprint'] .blueprint-slab-front {
+  fill: color-mix(in srgb, var(--ms-ink) 9%, var(--ms-bg));
+  stroke: color-mix(in srgb, var(--ms-ink) 30%, transparent);
+}
+[data-theme='blueprint'] .blueprint-slab-side {
+  fill: color-mix(in srgb, var(--ms-bg) 86%, transparent);
+  stroke: color-mix(in srgb, var(--ms-ink) 30%, transparent);
+}
+[data-theme='blueprint'] .blueprint-plane[data-viewer-layer]:not([data-focus]) .blueprint-slab-top {
+  stroke: color-mix(in srgb, var(--ms-ink) 58%, transparent);
+}
+[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-slab-top {
+  fill: color-mix(in srgb, var(--ms-acc) 8%, transparent);
+  stroke: var(--ms-acc);
+  stroke-width: 1.4;
+}
+[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-slab-front {
+  fill: color-mix(in srgb, var(--ms-acc) 26%, var(--ms-bg));
+  stroke: color-mix(in srgb, var(--ms-acc) 70%, transparent);
+}
+[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-slab-side {
+  fill: color-mix(in srgb, var(--ms-acc) 12%, var(--ms-bg));
+  stroke: color-mix(in srgb, var(--ms-acc) 70%, transparent);
+}
+/* 迷失层：图面之外的虚线基础 */
+[data-theme='blueprint'] .blueprint-plane[data-lost] .blueprint-slab-top {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-ink) 24%, transparent);
+  stroke-dasharray: 5 5;
+}
+[data-theme='blueprint'] .blueprint-plane[data-lost][data-focus] .blueprint-slab-top {
+  fill: color-mix(in srgb, var(--ms-acc) 5%, transparent);
+  stroke: var(--ms-acc);
+}
+[data-theme='blueprint'] .blueprint-planename {
+  color: var(--ms-dim);
+}
+[data-theme='blueprint'] .blueprint-planename:focus-visible {
+  outline-offset: -2px;
+}
+[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-planename {
+  color: var(--ms-accb);
+}
+[data-theme='blueprint'] .blueprint-plane[data-lost]:not([data-focus]) .blueprint-planename {
+  color: var(--ms-faint);
+}
+[data-theme='blueprint'] .blueprint-chip {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  font-family: var(--ms-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--ms-dim);
+  border: 1px solid var(--ms-line);
+  background: color-mix(in srgb, var(--ms-bg) 55%, transparent);
+}
+[data-theme='blueprint'] .blueprint-chip[data-opened] {
+  color: var(--ms-acc);
+  border-color: color-mix(in srgb, var(--ms-acc) 50%, transparent);
+}
+[data-theme='blueprint'] .blueprint-vault[data-opened] {
+  border-color: var(--ms-acc);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 22%, transparent);
+}
+[data-theme='blueprint'] .blueprint-nightmare {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  font-family: var(--ms-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: var(--ms-blood);
+  border: 1px dashed color-mix(in srgb, var(--ms-blood) 55%, transparent);
+  background: transparent;
+}
+[data-theme='blueprint'] .blueprint-nightmare[data-revealed] {
+  border-style: solid;
+}
+[data-theme='blueprint'] .blueprint-tag {
+  padding: 1px 6px;
+  color: var(--ms-accb);
+  border: 1px solid var(--ms-acc);
+}
+[data-theme='blueprint'] .blueprint-occ {
+  padding: 2px 8px;
+  color: var(--ms-dim);
+  background: color-mix(in srgb, var(--ms-bg) 60%, var(--ms-panel));
+  border: 1px solid var(--ms-line2);
+}
+[data-theme='blueprint'] .blueprint-occ[data-self] {
+  color: var(--ms-ink);
+  border-color: var(--ms-acc);
+}
+/* 图签：工程图右下角的标题栏 */
+[data-theme='blueprint'] .blueprint-sheet {
+  font-family: var(--ms-mono);
+  border: 1px solid var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-bg) 80%, transparent);
+}
+[data-theme='blueprint'] .blueprint-sheet-cell {
+  min-width: 0;
+  padding: 3px 9px;
+  border-right: 1px solid var(--ms-line);
+}
+[data-theme='blueprint'] .blueprint-sheet-cell:last-child {
+  border-right: none;
+}
+[data-theme='blueprint'] .blueprint-sheet dt {
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  color: var(--ms-faint);
+}
+[data-theme='blueprint'] .blueprint-sheet dd {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ms-ink);
+}
+/* 牌库刻度尺 */
+[data-theme='blueprint'] .blueprint-ruler {
+  background: repeating-linear-gradient(90deg, var(--ms-line2) 0 1px, transparent 1px 9px);
+}
+[data-theme='blueprint'] .blueprint-ruler > i {
+  opacity: 0.75;
+}
+/* 中央区高度不够时收起占位者那一行，保证各层楼板都放得下 */
+@container (max-height: 400px) {
+  [data-theme='blueprint'] .blueprint-occline {
+    display: none;
+  }
+}
+
+/* ---------- 动效开关 ---------- */
+[data-theme='blueprint']:root[data-fx-off~='grid'] .blueprint-grid {
+  display: none;
+}
+[data-theme='blueprint']:root[data-fx-off~='grid'] [data-layout='mobile'] {
+  background-image: none;
+}
+[data-theme='blueprint']:root[data-fx-off~='totem'] .blueprint-totem {
+  animation: none;
+}
+[data-theme='blueprint']:root[data-fx-off~='flow'] .blueprint-kick {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='blueprint'] .blueprint-totem,
+  [data-theme='blueprint'] .blueprint-kick,
+  [data-theme='blueprint'] .ms-seat-flag {
+    animation: none;
+  }
+}
+[data-theme='blueprint']:root[data-motion='reduced'] .blueprint-totem,
+[data-theme='blueprint']:root[data-motion='reduced'] .blueprint-kick,
+[data-theme='blueprint']:root[data-motion='reduced'] .ms-seat-flag {
+  animation: none;
+}
+[data-theme='blueprint']:root[data-motion='reduced'] .ms-handcard,
+[data-theme='blueprint']:root[data-motion='reduced'] .ms-btn {
+  transition: none;
+}

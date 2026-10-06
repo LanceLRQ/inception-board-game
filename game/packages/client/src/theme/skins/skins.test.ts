@@ -120,3 +120,36 @@ describe('皮肤样式', () => {
     }
   });
 });
+
+describe('「筑梦蓝图」皮肤样式', () => {
+  const css = stripComments(skinCss['../../styles/skins/blueprint.css']!);
+
+  it('专属类名都带 blueprint- 前缀，不借用别的主题的类名', () => {
+    const classes = new Set(
+      selectors(css).flatMap((s) => [...s.matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1]!)),
+    );
+    for (const name of classes) {
+      expect(name.startsWith('ms-') || name.startsWith('blueprint-'), name).toBe(true);
+    }
+    expect(css).not.toContain('noir-');
+  });
+
+  it('动效在系统「减少动效」与 data-motion=reduced 下都会停掉', () => {
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain(":root[data-motion='reduced']");
+  });
+
+  it('装饰效果各有独立的 data-fx-off 开关', () => {
+    for (const fx of ['grid', 'totem', 'flow']) {
+      expect(css, fx).toContain(`:root[data-fx-off~='${fx}']`);
+    }
+  });
+
+  it('关键帧由基础样式提供（皮肤样式里的规则必须限定在主题之下，放不了关键帧）', () => {
+    expect(css).not.toContain('@keyframes');
+    for (const name of ['ms-spin', 'ms-flow']) {
+      expect(baseCss).toContain(`@keyframes ${name}`);
+      expect(css).toContain(name);
+    }
+  });
+});

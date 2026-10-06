@@ -71,6 +71,32 @@ export const THEMES = {
       mono: "'IBM Plex Mono','SF Mono',monospace",
     },
   },
+  blueprint: {
+    id: 'blueprint',
+    nameKey: 'theme.names.blueprint',
+    scheme: 'dark',
+    themeColor: '#0B1624',
+    tokens: {
+      bg: '#0B1624',
+      panel: '#0F1E30',
+      panel2: '#13263B',
+      ink: '#D7E3EF',
+      dim: '#8FA6BC',
+      faint: '#5C7089',
+      line: 'rgba(186,214,236,.13)',
+      line2: 'rgba(186,214,236,.34)',
+      acc: '#C9A35F',
+      accb: '#E6C684',
+      accsoft: 'rgba(201,163,95,.14)',
+      lock: '#7FB4D9',
+      blood: '#C4685A',
+      ok: '#7DB596',
+      grade: '#C9A35F',
+      serif: "'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif",
+      sans: "'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif",
+      mono: "'IBM Plex Mono','SF Mono',monospace",
+    },
+  },
 } as const satisfies Record<string, ThemeDefinition>;
 
 export type ThemeId = keyof typeof THEMES;

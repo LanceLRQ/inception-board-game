@@ -57,7 +57,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **可用**
 
 - 本地人机对局（引擎与 Bot 都运行在浏览器内）：回合流程、4–10 人、20 种行动牌、6 张梦魇牌，以及 38 名盗梦者与 15 名梦主的大部分技能
-- 对局界面：桌面（座位环 + 按主题加载的中央舞台 + 底部坞）与移动（行动轴 + 层塔 + 一体式手牌坞）双布局，主题换肤（目前一个主题）
+- 对局界面：桌面（座位环 + 按主题加载的中央舞台 + 底部坞）与移动（行动轴 + 层塔 + 一体式手牌坞）双布局，主题换肤
 - 好友房联机对局：房主建房、其他人凭房间码加入、空位可补 Bot，开始后全体进入同一局服务端权威对局；刷新或断线后回到同一局
 - 匿名身份（JWT + 恢复码）、房间创建与加入、新手教程、PWA 离线访问
 - 工程基建：pnpm + Turborepo monorepo、单元测试 3300+ 条、双浏览器联机端到端用例、Docker Compose 部署文件
@@ -183,10 +183,10 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | 层 | 内容 | 位置 |
 |----|------|------|
 | 令牌 | 颜色、字体（18 个语义令牌，对应 CSS 变量 `--ms-*`） | `theme/themes.ts`（主表）与 `styles/index.css` 里的 `[data-theme='<id>']` 块，逐字一致，由 `theme/themeCss.test.ts` 保证 |
-| 皮肤件 | 少量按主题切换的样式：卡牌画框、骰子、层徽、座位框、背景氛围 | 共用组件只带稳定的钩子类名，基础样式在 `styles/skins/base.css`，每个主题的差异在 `styles/skins/<id>.css`，全部限定在 `[data-theme='<id>']` 之下；皮肤样式里**不许有颜色字面量**（装饰性取值用 `color-mix()` 基于令牌推导），由 `theme/skins/skins.test.ts` 保证 |
+| 皮肤件 | 少量按主题切换的样式：卡牌画框、骰子、层徽、座位框、背景氛围 | 共用组件只带稳定的钩子类名，基础样式在 `styles/skins/base.css`，每个主题的差异在 `styles/skins/<id>.css`，全部限定在 `[data-theme='<id>']` 之下（关键帧放 `base.css`）；皮肤样式里**不许有颜色字面量**（装饰性取值用 `color-mix()` 基于令牌推导），由 `theme/skins/skins.test.ts` 保证 |
 | 中央舞台 | 桌面端中央区，每个主题一个结构不同的组件，吃同一份盘面数据 | `components/MatchRuntime/stages/<id>/`，经 `React.lazy` 加载成独立 chunk，不进首屏包 |
 
-移动端布局五个主题共用一套结构、只靠令牌换肤，没有按主题分叉的中央舞台。
+移动端布局所有主题共用一套结构、只靠令牌换肤，没有按主题分叉的中央舞台。
 
 **皮肤注册表**在 `theme/skins/`：`ThemeSkin`（`types.ts`）含 `CenterStage`（懒加载的中央舞台）、可选的 `Ambient`（铺在桌面舞台最底层的背景氛围）、`center`（中央舞台在舞台上占的宽度比例与最小高度，座位规划按它让位）；`index.ts` 的 `SKINS` 登记每个主题；`useThemeSkin()` 按当前主题取皮肤。中央舞台的接口是 `stages/types.ts` 的 `CenterStageProps`：`board`（`BoardModel`，与主题无关的盘面数据）+ `onFocusLayer` + `onOpenCard`。中央舞台只展示，不处理出牌与选目标；金库缩略图可点开详情（详情禁止翻面），梦境层牌不触发详情。
 

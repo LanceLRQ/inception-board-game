@@ -10,6 +10,7 @@
 /* 主题皮肤：钩子类名的基础样式与各主题的差异样式 */
 @import './skins/base.css';
 @import './skins/noir.css';
+@import './skins/blueprint.css';
 /*
  ---break---
  */
@@ -109,6 +110,28 @@
   --ms-lock: #6FA8DC;
   --ms-blood: #A8443A;
   --ms-ok: #7FA97F;
+  --ms-grade: #C9A35F;
+  --ms-serif: 'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif;
+  --ms-sans: 'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif;
+  --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
+}
+
+/* prettier-ignore */
+[data-theme='blueprint'] {
+  --ms-bg: #0B1624;
+  --ms-panel: #0F1E30;
+  --ms-panel2: #13263B;
+  --ms-ink: #D7E3EF;
+  --ms-dim: #8FA6BC;
+  --ms-faint: #5C7089;
+  --ms-line: rgba(186,214,236,.13);
+  --ms-line2: rgba(186,214,236,.34);
+  --ms-acc: #C9A35F;
+  --ms-accb: #E6C684;
+  --ms-accsoft: rgba(201,163,95,.14);
+  --ms-lock: #7FB4D9;
+  --ms-blood: #C4685A;
+  --ms-ok: #7DB596;
   --ms-grade: #C9A35F;
   --ms-serif: 'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif;
   --ms-sans: 'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif;

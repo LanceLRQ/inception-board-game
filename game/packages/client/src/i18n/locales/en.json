@@ -142,7 +142,8 @@
   "theme": {
     "pick": "Choose theme",
     "names": {
-      "noir": "Cinematic Noir"
+      "noir": "Cinematic Noir",
+      "blueprint": "Architect's Blueprint"
     }
   },
   "avatar": {
@@ -628,7 +629,16 @@
       "deckAria": "Cards left in deck",
       "focusLayer": "Focus layer {{layer}} · {{name}}",
       "focusLayerTag": "FOCUS",
-      "vaultKnown": "Vault · {{content}}"
+      "vaultKnown": "Vault · {{content}}",
+      "blueprint": {
+        "title": "DREAM SECTION DRAWING",
+        "section": "SECTION A-A · TURN {{n}}",
+        "sheetFocus": "FOCUS",
+        "sheetRound": "TURN",
+        "deckValue": "{{remaining}} / {{total}}",
+        "sheetDeck": "DECK",
+        "focusValue": "L{{layer}} · Lock {{n}}"
+      }
     }
   },
   "die": {
