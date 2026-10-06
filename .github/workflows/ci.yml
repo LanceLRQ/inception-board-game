@@ -71,7 +71,14 @@ jobs:
         working-directory: game
       - run: pnpm --filter @icgame/server exec prisma generate
         working-directory: game
-      - run: pnpm exec playwright install --with-deps chromium chrome
+      # 浏览器安装包下载偶发中断，失败后重试
+      - run: |
+          for attempt in 1 2 3; do
+            pnpm exec playwright install --with-deps chromium chrome && exit 0
+            echo "playwright install failed (attempt $attempt)"
+            sleep 10
+          done
+          exit 1
       - run: pnpm test --project=desktop-chrome
       # 两个浏览器联机打完一局（全内存服务端，不需要数据库）
       - run: pnpm test:online
@@ -99,7 +106,14 @@ jobs:
           cache-dependency-path: game/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: game
-      - run: pnpm exec playwright install --with-deps chromium
+      # 浏览器安装包下载偶发中断，失败后重试
+      - run: |
+          for attempt in 1 2 3; do
+            pnpm exec playwright install --with-deps chromium && exit 0
+            echo "playwright install failed (attempt $attempt)"
+            sleep 10
+          done
+          exit 1
       - run: pnpm test --project=mobile-android
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -127,7 +141,14 @@ jobs:
           cache-dependency-path: game/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: game
-      - run: pnpm exec playwright install --with-deps webkit
+      # 浏览器安装包下载偶发中断，失败后重试
+      - run: |
+          for attempt in 1 2 3; do
+            pnpm exec playwright install --with-deps webkit && exit 0
+            echo "playwright install failed (attempt $attempt)"
+            sleep 10
+          done
+          exit 1
       - run: pnpm test --project=mobile-ios
 
   security:
