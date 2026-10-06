@@ -110,6 +110,11 @@ export class MatchRoom {
 
   private timer: unknown = null;
   private deadline: number | null = null;
+  /**
+   * 最近一次挂截止计时时的局面版本与截止时间。计时器换成 Bot 的短延迟后它仍然保留：
+   * 座位在同一局面下从托管回到真人时沿用它，不重新给一整段时限。
+   */
+  private stateDeadline: { stateID: number; at: number } | null = null;
   /** 每次重新排程加 1，已入队但过期的计时任务据此丢弃 */
   private generation = 0;
   private autoRejects = 0;
@@ -275,6 +280,7 @@ export class MatchRoom {
    * 按当前状态挂一个计时器（自动行动的短延迟或截止）。
    * keepExisting 为真时，与已挂计时器同类的计划沿用原计时器：
    * 截止只会提前、不会推后；自动步的延迟不重新计时。
+   * 同一局面下此前挂过截止的（中途换成过自动步的短延迟也算），新截止不晚于那一次。
    */
   private schedule(keepExisting = false): void {
     if (this.closed || this.over || this.autoRejects >= MAX_AUTO_FAILURES) {
@@ -297,18 +303,22 @@ export class MatchRoom {
 
     const { timers } = this.deps;
     let delayMs = plan.delayMs;
-    if (keepExisting && this.timer !== null) {
-      if (plan.kind === 'auto' && this.deadline === null) return;
-      if (plan.kind === 'deadline' && this.deadline !== null) {
-        const target = Math.min(this.deadline, timers.now() + plan.delayMs);
-        if (target >= this.deadline) return;
+    if (keepExisting) {
+      if (plan.kind === 'auto' && this.timer !== null && this.deadline === null) return;
+      const prior = this.stateDeadline;
+      if (plan.kind === 'deadline' && prior !== null && prior.stateID === this.state.stateID) {
+        const target = Math.min(prior.at, timers.now() + plan.delayMs);
+        if (this.timer !== null && this.deadline !== null && target >= this.deadline) return;
         delayMs = Math.max(0, target - timers.now());
       }
     }
 
     this.clearTimer();
     const gen = this.generation;
-    if (plan.kind === 'deadline') this.deadline = timers.now() + delayMs;
+    if (plan.kind === 'deadline') {
+      this.deadline = timers.now() + delayMs;
+      this.stateDeadline = { stateID: this.state.stateID, at: this.deadline };
+    }
     this.timer = timers.setTimeout(() => {
       this.timer = null;
       void this.enqueue(() => (plan.kind === 'auto' ? this.runAuto(gen) : this.runTimeout(gen)));

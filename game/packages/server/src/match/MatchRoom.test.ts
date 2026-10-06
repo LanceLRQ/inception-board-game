@@ -622,6 +622,56 @@ describe('MatchRoom 重新排程不延长等待', () => {
     expect(h.steps[0]!.source).toBe('timeout');
   });
 
+  it('座位被托管后在 Bot 行动之前回到真人：沿用托管前的截止时间，不重新给满额时限', () => {
+    const h = makeHarness(5, humans, {}, stateAfterSetup(5));
+    h.room.start();
+    const first = h.room.deadlineAt()!;
+
+    h.timers.t += timing.turnTimeoutMs / 2;
+    for (const s of humans) h.takenOver.add(s);
+    h.room.reschedule();
+    expect(h.room.deadlineAt()).toBeNull();
+
+    h.timers.t += 1;
+    h.takenOver.clear();
+    h.room.reschedule();
+    expect(h.room.deadlineAt()).toBe(first);
+    expect(h.timers.pending()).toHaveLength(1);
+    expect(h.timers.pending()[0]!.at).toBe(first);
+  });
+
+  it('托管前的截止时间已过才回到真人：立即按超时代发', async () => {
+    const h = makeHarness(5, humans, {}, stateAfterSetup(5));
+    h.room.start();
+    const first = h.room.deadlineAt()!;
+
+    for (const s of humans) h.takenOver.add(s);
+    h.room.reschedule();
+    h.timers.t = first + 1;
+    h.takenOver.clear();
+    h.room.reschedule();
+    expect(h.timers.pending()[0]!.at).toBe(h.timers.now());
+
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+  });
+
+  it('托管期间 Bot 已经走了一步：回到真人后按新局面给满额时限', async () => {
+    const h = makeHarness(5, humans, {}, stateAfterSetup(5));
+    h.room.start();
+    h.timers.t += timing.turnTimeoutMs / 2;
+    for (const s of humans) h.takenOver.add(s);
+    h.room.reschedule();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('bot');
+
+    h.takenOver.clear();
+    h.room.reschedule();
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.turnTimeoutMs);
+  });
+
   it('Bot 延迟期间反复 reschedule，Bot 仍在原定时刻行动', async () => {
     const h = makeHarness(5);
     h.room.start();
