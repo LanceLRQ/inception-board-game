@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src/",
     "clean": "rm -rf dist *.tsbuildinfo",
     "assets:sync": "tsx scripts/sync-assets.ts",

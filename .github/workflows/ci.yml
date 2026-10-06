@@ -49,7 +49,8 @@ jobs:
           cache-dependency-path: game/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @icgame/server exec prisma generate
-      - run: pnpm test
+      # 跑全部单元测试并检查各包的覆盖率阈值
+      - run: pnpm test:coverage
       - run: pnpm --filter @icgame/bot regression
 
   e2e-desktop:

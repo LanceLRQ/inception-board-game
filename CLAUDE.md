@@ -115,6 +115,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pnpm install                          # 安装依赖
 pnpm dev                              # 启动全部开发服务（服务端 + 客户端）
 pnpm test                             # 全部包的单元测试（不含端到端）
+pnpm test:coverage                    # 同上，并检查各包的覆盖率阈值（阈值在各包 vitest.config.ts）
 pnpm test:e2e                         # 端到端测试（需先装好 Playwright 浏览器）
 pnpm --filter @icgame/server test     # 只跑某个包的单元测试
 pnpm --filter @icgame/e2e test:online # 双浏览器联机端到端（全内存服务端，需本机装有 Chrome）
