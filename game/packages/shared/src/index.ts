@@ -142,3 +142,11 @@ export type {
 // 昵称规范化与校验
 export { NICKNAME_MAX_LENGTH, normalizeNickname, validateNickname } from './nickname/validate.js';
 export type { NicknameValidation } from './nickname/validate.js';
+
+// 对局人数范围（服务端、房间页、引擎共用）
+export {
+  MATCH_MIN_PLAYERS,
+  MATCH_MAX_PLAYERS,
+  isMatchPlayerCount,
+  playersShortOfMinimum,
+} from './rules/playerCount.js';

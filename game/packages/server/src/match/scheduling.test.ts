@@ -102,6 +102,54 @@ describe('planNext', () => {
     expect(plan).toEqual({ kind: 'deadline', delayMs: 33_333 });
   });
 
+  it('轮到真人应答（被 SHOOT、天秤分牌、处女）时不立刻代答：挂待结算时限，到时限才由系统代答', () => {
+    const s = afterSetup();
+    const owner = s.ctx.currentPlayer;
+    const human = s.ctx.playOrder.find((id) => id !== owner)!;
+    const pendings: Array<[string, Record<string, unknown>, string]> = [
+      [
+        '被 SHOOT 的双鱼',
+        {
+          pendingShootResponse: {
+            shooterID: owner,
+            targetPlayerID: human,
+            cardId: 'action_shoot',
+            sameLayerRequired: false,
+            deathFaces: [1],
+            moveFaces: [2],
+            extraOnMove: null,
+            responseType: 'pisces',
+          },
+        },
+        'respondShootPass',
+      ],
+      [
+        '天秤分牌',
+        { pendingLibra: { bonderPlayerID: owner, targetPlayerID: human, split: null } },
+        'resolveLibraSplit',
+      ],
+      [
+        '处女',
+        { pendingVirgoChoice: { virgoID: human, triggerRoll: 6, shooterID: owner } },
+        'respondVirgoPerfect',
+      ],
+    ];
+    for (const [label, patch, timeoutMove] of pendings) {
+      const state = {
+        ...s,
+        G: { ...s.G, turnPhase: 'action', ...patch },
+      } as unknown as MatchState<SetupState>;
+      // 该座位是真人：不返回自动动作，而是挂待结算的时限
+      expect(planNext(state, [human], timing), label).toEqual({ kind: 'deadline', delayMs: 2222 });
+      // 座位是 Bot（或到时限以全部自动代答）：由系统以本人名义代答
+      expect(planNext(state, [], timing).kind, label).toBe('auto');
+      expect(timeoutAction(state), label).toMatchObject({
+        playerID: expect.any(String),
+        move: timeoutMove,
+      });
+    }
+  });
+
   it('对局已结束返回 none', () => {
     const s = afterSetup();
     const over = {

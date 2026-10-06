@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RoomState } from '../../lib/roomApi';
-import { isRoomMember, resolveGameRedirect } from './roomLogic';
+import { MATCH_MIN_PLAYERS } from '@icgame/shared';
+import { isRoomMember, resolveGameRedirect, startGate } from './roomLogic';
 
 function makeRoom(overrides: Partial<RoomState> = {}): RoomState {
   return {
@@ -52,5 +53,34 @@ describe('resolveGameRedirect', () => {
   it('本地模拟：跳到房间编号对应的本地对局', () => {
     const room = makeRoom({ status: 'playing' });
     expect(resolveGameRedirect(room, 'p1', true)).toBe('/game/room-1');
+  });
+});
+
+describe('startGate', () => {
+  const withPlayers = (n: number): RoomState =>
+    makeRoom({
+      players: Array.from({ length: n }, (_, i) => ({
+        playerId: `p${i}`,
+        nickname: `N${i}`,
+        avatarSeed: String(i),
+        seat: i,
+        isBot: false,
+        joinedAt: 0,
+      })),
+    });
+
+  it('人数下限取自共享常量：3 人不能开始，还差 1 人', () => {
+    expect(startGate(withPlayers(3))).toEqual({ canStart: false, missing: 1 });
+  });
+
+  it('1 人、2 人还差 3、2 人；够 4 人（含）以上可以开始', () => {
+    expect(startGate(withPlayers(1))).toEqual({ canStart: false, missing: 3 });
+    expect(startGate(withPlayers(2))).toEqual({ canStart: false, missing: 2 });
+    expect(startGate(withPlayers(MATCH_MIN_PLAYERS))).toEqual({ canStart: true, missing: 0 });
+    expect(startGate(withPlayers(8))).toEqual({ canStart: true, missing: 0 });
+  });
+
+  it('房间还没加载时不能开始', () => {
+    expect(startGate(null)).toEqual({ canStart: false, missing: 0 });
   });
 });

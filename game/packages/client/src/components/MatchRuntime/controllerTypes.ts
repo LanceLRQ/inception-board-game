@@ -9,6 +9,12 @@ import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/active
 import type { ChessVaultInfo } from '../ChessTransposeDialog';
 import type { GravityTargetOption } from '../GravityTargetPickerDialog';
 import type { AwaitingNotice } from './awaitingNotice';
+import type {
+  AwaitedAction,
+  AwaitedDraft,
+  AwaitedSheet,
+  MineAwaited,
+} from './response/awaitedResponse';
 
 /** 包好提示与日志的 move 派发；silent 的 move 被拒时不弹提示 */
 export type MatchMakeMove = (
@@ -72,7 +78,7 @@ export interface TurnModel {
   /** 服务端截止时间的剩余秒数；没有截止时间为 null */
   readonly deadlineSeconds: number | null;
   readonly deadlineAt: number | null;
-  /** 对局正在等某位玩家应答（且界面没有对应操作）时的提示 */
+  /** 对局正在等某位玩家应答时的提示（谁在等由视图决定）；轮到本人且 response 有操作界面时，等待提示不再显示，由应答窗口承担 */
   readonly awaiting: AwaitingNotice | null;
 }
 
@@ -171,12 +177,48 @@ export interface GravityModel {
 }
 
 export interface ChessModel {
+  /** 易位弹窗是否打开：回合进入行动阶段时自动弹出一次，关闭后本回合不再自动弹出，可再从技能入口主动打开 */
   readonly open: boolean;
+  /** 梦主「棋局」在行动阶段且没有别的待办：技能入口可用 */
+  readonly available: boolean;
+  /** 从技能入口主动打开 */
+  readonly show: () => void;
   readonly vaults: ChessVaultInfo[];
   readonly picked: number[];
   readonly toggle: (vaultIndex: number) => void;
   readonly confirm: () => Promise<void>;
   readonly cancel: () => void;
+}
+
+/** 轮到本人应答时的弹窗：选牌、分牌、选层；草稿跟随待决状态，换了一次待决状态就清空 */
+export interface ResponseSheetModel {
+  /** 打开的弹窗；没有为 null */
+  readonly open: AwaitedSheet | null;
+  readonly draft: AwaitedDraft;
+  /** 草稿已选完、可以确认 */
+  readonly canConfirm: boolean;
+  readonly close: () => void;
+  readonly confirm: () => void;
+  readonly pickDiscard: (index: number) => void;
+  readonly toggleSecondPile: (index: number) => void;
+  readonly pickReviveTarget: (id: string) => void;
+  readonly pickTeleportLayer: (layer: number) => void;
+  readonly pickEchoLayer: (layer: number) => void;
+  readonly pickEchoAction: (action: 'restore' | 'add') => void;
+  /** 天秤·挑一份：点哪份就发哪份 */
+  readonly pickPile: (pile: 'pile1' | 'pile2') => void;
+}
+
+/** 被 SHOOT 时的响应、天秤、意念判官、处女、白羊：轮到本人时的操作界面 */
+export interface ResponseModel {
+  /** 轮到本人应答的情形；没有待决状态或轮到别人为 null */
+  readonly awaited: MineAwaited | null;
+  /** 窗口 / 响应条上的按钮 */
+  readonly actions: readonly AwaitedAction[];
+  /** 服务端截止时间的剩余秒数；没有截止时间（本地对局、白羊）为 null */
+  readonly deadlineSeconds: number | null;
+  readonly perform: (action: AwaitedAction) => void;
+  readonly sheet: ResponseSheetModel;
 }
 
 export interface GraftModel {
@@ -239,6 +281,7 @@ export interface MatchController {
   readonly gravity: GravityModel;
   readonly chess: ChessModel;
   readonly graft: GraftModel;
+  readonly response: ResponseModel;
   readonly shootDice: {
     readonly roll: number | null;
     readonly onComplete: () => void;

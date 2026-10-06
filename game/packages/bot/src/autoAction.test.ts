@@ -159,17 +159,24 @@ describe('nextAutoAction · 判定顺序', () => {
       expect(applyMove(game, s, action!).ok).toBe(true);
     });
 
-    it('真人参与时也自动完成（单机没有分牌界面），仍以各自本人的名义发出', () => {
+    it('轮到真人（分牌的目标 / 挑牌的发动者）时等他操作，返回 null', () => {
       const s = libraState(null);
       const target = s.G.pendingLibra!.targetPlayerID;
-      expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toMatchObject({
-        playerID: target,
+      expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toBeNull();
+      const picked = libraState({ pile1: ['a'], pile2: ['b'] });
+      const bonder = picked.G.pendingLibra!.bonderPlayerID;
+      expect(nextAutoAction(picked, { humanPlayerIDs: [bonder] })).toBeNull();
+    });
+
+    it('真人只是另一方时，仍由 Bot 以本人名义代答', () => {
+      const s = libraState(null);
+      const bonder = s.G.pendingLibra!.bonderPlayerID;
+      expect(nextAutoAction(s, { humanPlayerIDs: [bonder] })).toMatchObject({
         move: 'resolveLibraSplit',
       });
       const picked = libraState({ pile1: ['a'], pile2: ['b'] });
-      const bonder = picked.G.pendingLibra!.bonderPlayerID;
-      expect(nextAutoAction(picked, { humanPlayerIDs: [bonder] })).toMatchObject({
-        playerID: bonder,
+      const target = picked.G.pendingLibra!.targetPlayerID;
+      expect(nextAutoAction(picked, { humanPlayerIDs: [target] })).toMatchObject({
         move: 'resolveLibraPick',
       });
     });
@@ -224,31 +231,19 @@ describe('nextAutoAction · 判定顺序', () => {
       });
     });
 
-    it('目标是真人：同样以目标本人的名义自动放弃（界面没有这个选择的入口）', () => {
-      for (const [responseType, move] of [
-        ['pisces', 'respondShootPass'],
-        ['terrorist', 'respondTerroristAccept'],
-      ] as const) {
-        const s = shootResponseState(responseType);
-        const target = s.G.pendingShootResponse!.targetPlayerID;
-        expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toMatchObject({
-          playerID: target,
-          move,
-          args: [],
-        });
-      }
-    });
-
-    it('目标是真人：自动动作被运行器接受，待结算被清空', () => {
+    it('目标是真人：等他应答，返回 null', () => {
       for (const responseType of ['pisces', 'terrorist'] as const) {
         const s = shootResponseState(responseType);
         const target = s.G.pendingShootResponse!.targetPlayerID;
-        const action = nextAutoAction(s, { humanPlayerIDs: [target] })!;
-        expect(action).not.toBeNull();
-        const res = applyMove(game, s, action);
-        expect(res.ok).toBe(true);
-        if (res.ok) expect(res.state.G.pendingShootResponse).toBeNull();
+        expect(nextAutoAction(s, { humanPlayerIDs: [target] })).toBeNull();
       }
+    });
+
+    it('目标不是真人：真人在场也由 Bot 以目标本人名义代答', () => {
+      const s = shootResponseState('pisces');
+      expect(nextAutoAction(s, { humanPlayerIDs: [s.ctx.currentPlayer] })).toMatchObject({
+        move: 'respondShootPass',
+      });
     });
 
     it('目标是 Bot：以目标本人的名义放弃闪避 / 接受惩罚，经运行器执行后待结算被清空', () => {
@@ -282,24 +277,17 @@ describe('nextAutoAction · 判定顺序', () => {
       });
     });
 
-    it('处女是真人：同样以处女本人的名义自动选择 skip，避免对局停住', () => {
+    it('处女是真人：等她选择，返回 null', () => {
       const s = virgoState();
       const virgo = s.G.pendingVirgoChoice!.virgoID;
-      expect(nextAutoAction(s, { humanPlayerIDs: [virgo] })).toMatchObject({
-        playerID: virgo,
-        move: 'respondVirgoPerfect',
-        args: ['skip'],
-      });
+      expect(nextAutoAction(s, { humanPlayerIDs: [virgo] })).toBeNull();
     });
 
-    it('真人是回合主人且是处女：自动动作被运行器接受，pendingVirgoChoice 被清空', () => {
-      const base = playingState();
-      const human = base.ctx.currentPlayer;
-      const s = withG(base, {
-        pendingVirgoChoice: { virgoID: human, triggerRoll: 6, shooterID: human },
-      });
+    it('真人是回合主人、处女是 Bot：以处女本人名义放弃，运行器接受', () => {
+      const s = virgoState();
+      const human = s.ctx.currentPlayer;
       const action = nextAutoAction(s, { humanPlayerIDs: [human] });
-      expect(action).not.toBeNull();
+      expect(action).toMatchObject({ playerID: s.G.pendingVirgoChoice!.virgoID });
       const res = applyMove(game, s, action!);
       expect(res.ok).toBe(true);
       if (res.ok) expect(res.state.G.pendingVirgoChoice).toBeNull();

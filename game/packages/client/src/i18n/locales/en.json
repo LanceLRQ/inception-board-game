@@ -52,7 +52,7 @@
     "bot": "AI",
     "seat": "Seat {{n}}",
     "empty": "Empty Seat",
-    "needPlayers": "Need at least {{n}} players to start",
+    "needPlayers": "{{n}} more player(s) needed to start (minimum {{min}})",
     "currentPlayers": "{{current}} / {{max}}",
     "notOwner": "Waiting for host to start"
   },
@@ -216,7 +216,7 @@
       "network": "Network unstable, action not delivered"
     },
     "waiting_others": "Waiting for other players to respond",
-    "waiting_auto": "This step can't be handled manually; the system will resolve it when time runs out",
+    "waiting_auto": "This step can't be handled right now, please wait",
     "deadline": "{{seconds}}s left",
     "connecting": "Connecting",
     "online_unavailable": "A server connection is required to join an online match",
@@ -399,6 +399,12 @@
         "desc": "Shift each same-layer player +1/-1 (up to 2/turn)"
       }
     },
+    "dm_chess": {
+      "skill_0": {
+        "name": "Chess · Transpose",
+        "desc": "Swap two unopened vaults (twice per game)"
+      }
+    },
     "dm_uranus_firmament": {
       "skill_0": {
         "name": "Uranus · Power",
@@ -554,7 +560,7 @@
       "aria": "Latest activity",
       "unlockWindow": "{{name}} played Unlock on layer {{layer}} · waiting for {{waiting}}",
       "shootResponse": "{{shooter}} shot {{target}} · waiting for a response",
-      "awaitingMine": "Waiting for your response; the system acts for you when time runs out",
+      "awaitingMine": "Waiting for your response",
       "awaitingOthers": "Waiting for other players",
       "lastPlayedShoot": "{{name}} played {{card}} · rolled {{roll}}",
       "lastPlayed": "{{name}} played {{card}}"
@@ -603,6 +609,106 @@
     "noCard": "No Unlock in hand, you can only pass",
     "play": "Play Unlock",
     "pass": "Pass"
+  },
+  "awaited": {
+    "aria": "Pending response",
+    "countdown": "The system acts for you in {{seconds}}s",
+    "playerLine": "{{name}}",
+    "shootEvade": {
+      "title": "Targeted by SHOOT",
+      "body": "{{name}} uses [{{card}}] on you. Before the roll you may use [Drift].",
+      "evade": "Drift · move to layer {{layer}}",
+      "pass": "Don't evade",
+      "cannot": "You are on layer 1 and cannot use [Drift]."
+    },
+    "zealot": {
+      "title": "Zeal",
+      "body": "{{name}}'s [{{card}}] carries [Zeal]: discard 1 card before the roll, or the roll gets -1.",
+      "discard": "Discard 1 card…",
+      "accept": "Keep cards (roll -1)",
+      "noHand": "You have no cards to discard."
+    },
+    "libraSplit": {
+      "title": "Libra · Balance",
+      "body": "{{name}} gave you their whole hand. Split the cards you hold into two piles; they will take one.",
+      "open": "Split cards…"
+    },
+    "libraPick": {
+      "title": "Libra · Balance",
+      "body": "{{name}} split the cards into two piles. Look them over and take one; the other goes back.",
+      "open": "View and choose…"
+    },
+    "sudger": {
+      "title": "Sudger of Mind · Verdict",
+      "body": "{{name}} rolled two dice. Choose one as the result of [{{card}}].",
+      "pick": "Use {{pick}} (rolled {{roll}})"
+    },
+    "result": {
+      "kill": "Kill",
+      "move": "Move",
+      "miss": "No effect"
+    },
+    "virgo": {
+      "title": "Virgo · Perfection",
+      "body": "A player rolled {{roll}}. You may use [Perfection] for one of three effects, or pass.",
+      "revive": "Revive a player…",
+      "drawTwo": "Draw 2 cards",
+      "teleport": "Teleport to any layer…",
+      "skip": "Don't use",
+      "dead": "You are dead and cannot use [Perfection].",
+      "noRevive": "There is no player to revive."
+    },
+    "aries": {
+      "title": "Aries · Stardust",
+      "body": "{{name}} was killed. You may flip the nightmare on layer {{layer}} and either activate or discard it.",
+      "activate": "Activate nightmare",
+      "discard": "Discard nightmare",
+      "nightmare": "Nightmare: {{name}}",
+      "unknown": "There is no nightmare left to flip on this layer.",
+      "plague": "When you activate Plague no bribes are dealt: the thieves on that layer hold none and go to limbo.",
+      "scope": "Valid until the end of this turn."
+    },
+    "sheet": {
+      "back": "Back",
+      "zealotDiscard": {
+        "title": "Choose a card to discard",
+        "desc": "Discard 1 card to avoid the -1 on the roll.",
+        "confirm": "Confirm discard"
+      },
+      "libraSplit": {
+        "title": "Split cards",
+        "desc": "Tap a card to move it between the two piles; one pile may be empty.",
+        "pile": "Pile {{n}} ({{count}})",
+        "empty": "(empty)",
+        "confirm": "Confirm split"
+      },
+      "libraPick": {
+        "title": "Choose a pile",
+        "desc": "You take the chosen pile; the other goes back to {{name}}.",
+        "pile": "Pile {{n}} ({{count}})",
+        "empty": "(empty)",
+        "take": "Take pile {{n}}"
+      },
+      "virgoRevive": {
+        "title": "Revive a player",
+        "desc": "The revived player returns to layer 1 with an empty hand.",
+        "confirm": "Confirm revive"
+      },
+      "virgoTeleport": {
+        "title": "Teleport to any layer",
+        "desc": "Choose a dream layer (limbo excluded).",
+        "confirm": "Confirm teleport",
+        "layer": "Layer {{layer}}"
+      },
+      "ariesEcho": {
+        "title": "Echo",
+        "desc": "Choose a layer: restore its original heart locks, or add 1 heart lock to it.",
+        "restore": "Restore original locks",
+        "add": "Add 1 heart lock",
+        "layer": "Layer {{layer}}",
+        "confirm": "Confirm"
+      }
+    }
   },
   "dock": {
     "skill": "Skill",

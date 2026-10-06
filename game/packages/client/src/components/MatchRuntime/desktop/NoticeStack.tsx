@@ -6,6 +6,7 @@ import { SelfTakeoverBanner } from '../../SelfTakeoverBanner';
 import { useElementSize } from '../../../hooks/useElementSize';
 import type { MatchController } from '../controllerTypes';
 import { AwaitingNotice } from '../shared/AwaitingNotice';
+import { AwaitedWindow } from './AwaitedWindow';
 import { ResponseWindow } from './ResponseWindow';
 import { EDGE_PAD, NOTICE_WIDTH } from './seatPlan';
 
@@ -31,8 +32,13 @@ export function NoticeStack({ controller, onReserve }: NoticeStackProps) {
       style={{ width: NOTICE_WIDTH }}
     >
       <SelfTakeoverBanner compact visible={takeover.bannerVisible} onResume={takeover.resume} />
-      <AwaitingNotice awaiting={turn.awaiting} className="ms-response px-3 py-2" />
+      <AwaitingNotice
+        awaiting={turn.awaiting}
+        hasResponseUi={controller.response.awaited !== null}
+        className="ms-response px-3 py-2"
+      />
       <ResponseWindow controller={controller} />
+      <AwaitedWindow controller={controller} />
     </div>
   );
 }

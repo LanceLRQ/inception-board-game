@@ -108,6 +108,11 @@ function runAutoStep(current: LocalMatchSession): void {
   const result = current.step();
 
   if (result.action === null) {
+    // 在等真人做可选的选择（白羊·星尘）：宽限期内定时回来看一眼
+    if (result.waiting) {
+      scheduleNext();
+      return;
+    }
     const { ctx } = current.view();
     if (ctx.gameover === undefined) {
       logAI('waiting for human input or no auto action', {

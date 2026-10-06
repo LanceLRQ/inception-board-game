@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { checkInvariants, type MatchView } from '@icgame/game-engine';
+import { InceptionCityGame, checkInvariants, viewMatch, type MatchView } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { HAND_LIMIT } from '../../components/MatchRuntime/controllerDerive';
 import { computeUnlockResponseState } from '../../components/UnlockResponse/logic';
+import {
+  awaitedActions,
+  awaitedResponse,
+  type MineAwaited,
+} from '../../components/MatchRuntime/response/awaitedResponse';
+import { chessAvailable } from '../../components/MatchRuntime/controllerDerive';
 import {
   FIXTURE_DEFAULT_PLAYERS,
   FIXTURE_MAX_PLAYERS,
@@ -236,5 +242,143 @@ describe('buildFixtureScenario · 指定人数', () => {
     expect(buildFixtureScenario('thief', 4).seats).not.toEqual(
       buildFixtureScenario('thief', 10).seats,
     );
+  });
+});
+
+/** 本人视角下轮到本人应答的情形 */
+function mineOf(id: FixtureScenarioId): MineAwaited {
+  const sc = buildFixtureScenario(id);
+  const found = awaitedResponse(sc.view.G as MatchView, sc.seat);
+  if (found === null || !found.mine) throw new Error(`场景 ${id} 应当轮到本人应答`);
+  return found;
+}
+
+/** 同一局面从别的座位看到的视图 */
+function viewFrom(id: FixtureScenarioId, seat: string): MatchView {
+  const { state } = buildFixtureMatch(id);
+  return viewMatch(InceptionCityGame, state, seat).G as MatchView;
+}
+
+describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () => {
+  it('被 SHOOT 的双鱼：窗口由对方真的打出 SHOOT 打开，本人可闪避到第 1 层', () => {
+    const a = mineOf('thief-pending-shoot');
+    expect(a).toMatchObject({ kind: 'shoot-evade', canEvade: true, evadeLayer: 1 });
+    const { state, viewer } = buildFixtureMatch('thief-pending-shoot');
+    expect(state.G.pendingShootResponse?.targetPlayerID).toBe(viewer);
+    expect(state.G.players[viewer]!.characterId).toBe('thief_pisces');
+  });
+
+  it('被 SHOOT 的恐怖分子窗口：本人有手牌可弃，也可以接受惩罚', () => {
+    const a = mineOf('thief-pending-terrorist');
+    expect(a.kind).toBe('shoot-zealot');
+    expect(a.kind === 'shoot-zealot' && a.hand.length).toBeGreaterThan(0);
+    expect(awaitedActions(a).map((x) => x.id)).toEqual(['discard', 'accept']);
+  });
+
+  it('天秤分牌：本人是被交付全部手牌的人，手牌里包含对方交来的牌', () => {
+    const a = mineOf('thief-pending-libra-split');
+    expect(a.kind).toBe('libra-split');
+    const { state, viewer } = buildFixtureMatch('thief-pending-libra-split');
+    expect(state.G.pendingLibra).toMatchObject({ targetPlayerID: viewer, split: null });
+    expect(a.kind === 'libra-split' && a.hand).toEqual(state.G.players[viewer]!.hand);
+  });
+
+  it('天秤挑一份：本人是发动者，看得到两份的内容', () => {
+    const a = mineOf('thief-pending-libra-pick');
+    expect(a.kind).toBe('libra-pick');
+    if (a.kind !== 'libra-pick') return;
+    expect(a.pile1.length + a.pile2.length).toBeGreaterThan(0);
+    const { state } = buildFixtureMatch('thief-pending-libra-pick');
+    const split = state.G.pendingLibra!.split!;
+    expect(a.pile1).toEqual(split.pile1);
+    expect(a.pile2).toEqual(split.pile2);
+  });
+
+  it('天秤：别的座位看不到两份的内容，只有张数', () => {
+    const { state, viewer } = buildFixtureMatch('thief-pending-libra-pick');
+    const bystander = state.G.playerOrder.find(
+      (id) => id !== viewer && id !== state.G.pendingLibra!.targetPlayerID,
+    )!;
+    const split = viewFrom('thief-pending-libra-pick', bystander).pendingLibra!.split!;
+    expect(split.pile1).toBeNull();
+    expect(split.pile2).toBeNull();
+    expect(split.pile1Count + split.pile2Count).toBeGreaterThan(0);
+  });
+
+  it('意念判官：本人是回合主人，两个骰值各有结算结果', () => {
+    const a = mineOf('thief-pending-sudger');
+    expect(a.kind).toBe('sudger');
+    if (a.kind !== 'sudger') return;
+    // 点数在场景里定为 1 与 4：普通 SHOOT 下一个击杀、一个移动
+    expect(a.rolls).toEqual([
+      { pick: 'A', roll: 1, result: 'kill' },
+      { pick: 'B', roll: 4, result: 'move' },
+    ]);
+  });
+
+  it('处女：本人是处女、有人死亡可复活，视图里别人看不到处女是谁', () => {
+    const a = mineOf('thief-pending-virgo');
+    expect(a).toMatchObject({ kind: 'virgo', alive: true, triggerRoll: 6 });
+    expect(a.kind === 'virgo' && a.reviveTargets.length).toBeGreaterThanOrEqual(1);
+    const { state, viewer } = buildFixtureMatch('thief-pending-virgo');
+    const other = state.G.playerOrder.find((id) => id !== viewer)!;
+    expect(viewFrom('thief-pending-virgo', other).pendingVirgoChoice!.virgoID).toBeNull();
+    expect(awaitedResponse(viewFrom('thief-pending-virgo', other), other)).toEqual({
+      mine: false,
+    });
+  });
+
+  it('白羊：梦魇是回音萦绕，只有白羊本人看得到那一层的梦魇', () => {
+    const a = mineOf('thief-pending-aries');
+    expect(a).toMatchObject({
+      kind: 'aries',
+      victimLayer: 2,
+      nightmareId: 'nightmare_echo',
+      params: 'echo',
+    });
+    const { state, viewer } = buildFixtureMatch('thief-pending-aries');
+    const other = state.G.playerOrder.find((id) => id !== viewer && id !== state.G.dreamMasterID)!;
+    const seen = viewFrom('thief-pending-aries', other);
+    expect(seen.layers[2]!.nightmareId).toBeNull();
+    expect(seen.pendingAriesChoice!.ariesID).toBeNull();
+  });
+
+  it.each([
+    'thief-pending-shoot',
+    'thief-pending-terrorist',
+    'thief-pending-libra-split',
+    'thief-pending-libra-pick',
+    'thief-pending-sudger',
+    'thief-pending-virgo',
+    'thief-pending-aries',
+  ] as const)('场景 %s：本人是盗梦者，不带解封响应窗口', (id) => {
+    const sc = buildFixtureScenario(id);
+    const G = sc.view.G as MatchView;
+    expect(G.players[sc.seat]!.faction).toBe('thief');
+    expect(G.pendingResponseWindow).toBeNull();
+    expect(computeUnlockResponseState(G, sc.seat).visible).toBe(false);
+  });
+});
+
+describe('buildFixtureScenario · 棋局梦主', () => {
+  it('本人是棋局梦主，行动阶段轮到自己，易位可用', () => {
+    const sc = buildFixtureScenario('master-chess');
+    const G = sc.view.G as MatchView;
+    const me = G.players[sc.seat]!;
+    expect(sc.seat).toBe(G.dreamMasterID);
+    expect(me.characterId).toBe('dm_chess');
+    expect(G.turnPhase).toBe('action');
+    expect(G.currentPlayerID).toBe(sc.seat);
+    expect(
+      chessAvailable({
+        characterId: me.characterId!,
+        isMyTurn: true,
+        turnPhase: G.turnPhase,
+        winner: null,
+        busy: false,
+        usedThisGame: me.skillUsedThisGame?.['dm_chess.skill_0'] ?? 0,
+        unopenedVaults: G.vaults.filter((v) => !v.isOpened).length,
+      }),
+    ).toBe(true);
   });
 });

@@ -19,6 +19,7 @@ import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
 import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
 import { ShootDiceOverlay } from '../ShootDiceOverlay';
+import { AwaitedResponseSheet } from './shared/AwaitedResponseSheet';
 import type { MatchController } from './controllerTypes';
 
 interface MatchDialogsProps {
@@ -38,6 +39,9 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         roll={controller.shootDice.roll}
         onComplete={controller.shootDice.onComplete}
       />
+
+      {/* 本人应答（被 SHOOT 时的响应、天秤、处女、白羊等）里需要选牌 / 分牌 / 选层的弹窗 */}
+      <AwaitedResponseSheet controller={controller} />
 
       {/* 响应类 Dialog 群（互斥业务保证同时只会有一个 open） */}
       <MasterNightmareDecisionDialog
@@ -153,6 +157,7 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         pool={gravity.pool.cards}
         currentPicker={gravity.pool.currentPicker}
         viewerPlayerID={viewerSeat}
+        nicknameOf={nicknameOf}
         cardNameOf={(cardId) => getCardName(cardId)}
         onPick={(c) => void gravity.pool.pick(c)}
       />

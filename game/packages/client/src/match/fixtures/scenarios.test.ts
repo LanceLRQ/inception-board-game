@@ -37,13 +37,45 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('discard=0')).toBe('thief');
   });
 
+  it('pending=各待应答名 进入轮到本人应答的盗梦者场景', () => {
+    expect(idOf('pending=shoot')).toBe('thief-pending-shoot');
+    expect(idOf('pending=terrorist')).toBe('thief-pending-terrorist');
+    expect(idOf('pending=libra-split')).toBe('thief-pending-libra-split');
+    expect(idOf('pending=libra-pick')).toBe('thief-pending-libra-pick');
+    expect(idOf('pending=sudger')).toBe('thief-pending-sudger');
+    expect(idOf('pending=virgo')).toBe('thief-pending-virgo');
+    expect(idOf('pending=aries')).toBe('thief-pending-aries');
+  });
+
+  it('待应答场景只在盗梦者视角：as=master 时忽略；弃牌参数让位于待应答', () => {
+    expect(idOf('as=master&pending=virgo')).toBe('master');
+    expect(idOf('pending=virgo&discard=1')).toBe('thief-pending-virgo');
+    expect(idOf('pending=constructor')).toBe('thief');
+    expect(idOf('pending=toString')).toBe('thief');
+  });
+
+  it('as=master&chess=1 进入梦主是棋局的场景；pending=1 优先，没有 as=master 时 chess 无效', () => {
+    expect(idOf('as=master&chess=1')).toBe('master-chess');
+    expect(idOf('as=master&chess=1&pending=1')).toBe('master-pending');
+    expect(idOf('chess=1')).toBe('thief');
+  });
+
   it('无法识别的取值按缺省处理', () => {
     expect(idOf('as=ghost&pending=yes')).toBe('thief');
     expect(idOf('as=thief&pending=0')).toBe('thief');
   });
 
   it('只会得到已登记的场景', () => {
-    for (const s of ['', 'as=master', 'pending=1', 'as=master&pending=1', 'discard=1']) {
+    for (const s of [
+      '',
+      'as=master',
+      'pending=1',
+      'as=master&pending=1',
+      'discard=1',
+      'pending=shoot',
+      'pending=aries',
+      'as=master&chess=1',
+    ]) {
       expect(FIXTURE_SCENARIO_IDS).toContain(idOf(s));
     }
   });

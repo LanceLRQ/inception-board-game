@@ -68,7 +68,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 信息隔离：发给每个连接的状态是按座位裁剪的白名单视图，事件的私密部分只发给被点名的座位；随机种子与完整状态不出服务端
 - 持久化：进行中的对局存 Redis，逐步记录存 PostgreSQL；服务重启后恢复未结束的对局；回放接口读取逐步记录并按座位裁剪
 - 客户端：本地对局与联机对局共用同一套对局界面，区别只在状态来源（本地 Worker 或服务端连接）；界面只拿到按座位裁剪的视图
-- 联机时有 6 类需要玩家应答的情形（如天秤、白羊、处女的选择，被射击时的响应）还没有操作界面：轮到真人应答时只显示等待提示，到时限后由服务端代为处理
+- 需要玩家应答的 6 类情形（被 SHOOT 时的响应——双鱼·游离 / 恐怖分子·狂热、天秤分牌与挑一份、意念判官选骰、处女·完美、白羊·星尘）都有操作界面：桌面在舞台右上的应答窗口（与【解封】响应窗口同一外壳），移动在手牌坞上方的响应条，要选牌 / 分牌 / 选层的打开应答弹窗；联机有截止时间时显示倒计时，到时限由服务端代为处理；本地对局轮到真人就等真人操作，只有 Bot 座位由自动行动代答（白羊的选择不挡人，本地对 Bot 的回合最多等 20 秒）
 
 **已有实现但尚未接入运行路径**
 
@@ -162,7 +162,7 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | **联机** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` | `match/useRemoteMatchSource.ts`：服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
 | **固定场景** | `/game/:matchId` 不带 `online` / `friend` 参数（常用 `/game/debug`） | `components/FixtureMatchRuntime/index.tsx` | `match/useFixtureMatchSource.ts`：固定种子建局、调整局面后经引擎的视角过滤得到视图（构造见 `match/fixtures/buildScenario.ts`），发出的 move 只记日志、不推进状态 | 开发调试、UI 走查、视角 / 人数 / 待应答状态切换 |
 
-**固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?discard=1` 盗梦者处于弃牌阶段、手牌超出上限（梦主视角与响应窗口参数优先）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
+**固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries` 盗梦者视角下轮到本人应答对应的待决状态（依次是被 SHOOT 的双鱼·游离、恐怖分子·狂热、天秤分牌、天秤挑一份、意念判官选骰、处女·完美、白羊·星尘；不与 `as=master` 叠加）；`?as=master&chess=1` 梦主是「棋局」，行动阶段自动弹出易位弹窗；`?discard=1` 盗梦者处于弃牌阶段、手牌超出上限（梦主视角与响应窗口参数优先）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
 
 ### 代码分层
 
@@ -242,7 +242,7 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 **改 UI 时的自检清单：**
 
 1. 访问 `/local` 确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
-2. 访问 `/game/debug`、`/game/debug?as=master`、`/game/debug?pending=1` 确认三个固定场景都正常；改座位环或坞时再看 `/game/debug?players=4` 与 `?players=10`
+2. 访问 `/game/debug`、`/game/debug?as=master`、`/game/debug?pending=1` 确认三个固定场景都正常；改应答窗口 / 弹窗时再逐个看 `?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries`；改座位环或坞时再看 `/game/debug?players=4` 与 `?players=10`
 3. 桌面 1024×768、1280×800、1440×900、1920×1080，移动 iPhone 12（390×844）都要走查：整页不滚动、座位不重叠、主操作按钮在视口内（`packages/e2e/tests/desktop-layout.spec.ts` 与 `mobile-layout.spec.ts` 守护）；改了排布或尺寸时再补平板竖屏 768×1024 / 820×1180、平板横屏 1180×820、手机横屏 844×390 / 667×375、小手机 360×640、大屏 2560×1440，`?discard=1` 的弃牌阶段也要看（`responsive.spec.ts` 守护）
    - 新增或改动可点击元素：命中区不小于 44×44（靠内边距 / `min-h` / 伪元素扩大，不放大视觉尺寸；注意 `overflow-hidden` 会裁掉伪元素的命中区），相邻目标的命中区不得重叠（`touch-targets.spec.ts` 守护）
 4. 改了 `StageState` / 对局状态 `G` / 盘面模型，同步更新 `model/` 下的推导与测试，以及固定场景的构造

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import { pickerLabelOf } from './logic';
 
 export interface GravityPoolPickerDialogProps {
   open: boolean;
@@ -18,6 +19,8 @@ export interface GravityPoolPickerDialogProps {
   currentPicker: string;
   /** 当前人类 viewer id（用于判断 "你" 字样） */
   viewerPlayerID: string;
+  /** 玩家昵称；真人对手与 Bot 都显示对局里的昵称 */
+  nicknameOf: (playerID: string) => string;
   cardNameOf?: (cardId: string) => string;
   onPick: (cardId: string) => void;
   onCancel?: () => void;
@@ -28,11 +31,12 @@ export function GravityPoolPickerDialog({
   pool,
   currentPicker,
   viewerPlayerID,
+  nicknameOf,
   cardNameOf,
   onPick,
   onCancel,
 }: GravityPoolPickerDialogProps) {
-  const pickerLabel = currentPicker === viewerPlayerID ? '你' : `AI ${currentPicker}`;
+  const pickerLabel = pickerLabelOf(currentPicker, viewerPlayerID, nicknameOf);
 
   return (
     <Dialog

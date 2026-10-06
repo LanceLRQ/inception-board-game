@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
+import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi } from '../../lib/roomApi';
 import { logger } from '../../lib/logger';
@@ -28,6 +29,12 @@ interface PendingRecoveryCode {
   warning: string;
   kind: RecoveryCodeDialogKind;
 }
+
+/** 建房可选的人数：与服务端、引擎共用的人数范围 */
+const PLAYER_COUNT_OPTIONS = Array.from(
+  { length: MATCH_MAX_PLAYERS - MATCH_MIN_PLAYERS + 1 },
+  (_, i) => MATCH_MIN_PLAYERS + i,
+);
 
 export default function Lobby() {
   const { t } = useTranslation();
@@ -285,7 +292,7 @@ export default function Lobby() {
           value={maxPlayers}
           onChange={(e) => setMaxPlayers(Number(e.target.value))}
         >
-          {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+          {PLAYER_COUNT_OPTIONS.map((n) => (
             <option key={n} value={n}>
               {n}
             </option>

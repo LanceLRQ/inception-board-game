@@ -24,6 +24,13 @@ const game: GameDef<SetupState> = InceptionCityGame;
 export const MAX_CONSECUTIVE_REJECTS = 3;
 
 /**
+ * 白羊·星尘由真人持有时，Bot 的回合最多先等她多久（毫秒）。
+ * 星尘的选择不挡住回合主人（引擎没有「放弃」这个 move，回合结束时选择自动失效），
+ * 不等的话 Bot 几百毫秒就走完回合，选择窗口一闪而过；到时仍未选择就让回合继续。
+ */
+export const ARIES_GRACE_MS = 20_000;
+
+/**
  * 主线程可见的对局视图：真人座位看到的白名单视图加流程信息与版本号，
  * 不含随机种子、牌库顺序、他人手牌。
  */
@@ -40,6 +47,8 @@ export interface StepResult {
   reason?: string;
   /** 是否还应当继续调度下一步 */
   continue: boolean;
+  /** 没有动作是因为在等真人做可选的选择（白羊·星尘）：需要稍后再来看一眼 */
+  waiting?: boolean;
 }
 
 export interface LocalMatchSessionOptions {
@@ -47,6 +56,8 @@ export interface LocalMatchSessionOptions {
   seed: string;
   /** 真人玩家 ID，默认是本地真人座位 */
   humanPlayerID?: string;
+  /** 当前时刻（毫秒）；测试用，默认 Date.now */
+  now?: () => number;
 }
 
 /** 把运行器的拒绝结果整理成一行说明 */
@@ -71,9 +82,13 @@ export class LocalMatchSession {
   /** 最近一次被拒的自动动作及其连续被拒次数 */
   private rejectedKey: string | null = null;
   private rejectedCount = 0;
+  private readonly now: () => number;
+  /** 正在等真人白羊选择：哪一次选择、从什么时候开始等 */
+  private ariesWait: { key: string; since: number } | null = null;
 
   constructor(options: LocalMatchSessionOptions) {
     this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
+    this.now = options.now ?? Date.now;
     this.state = createMatch(game, {
       numPlayers: options.playerCount,
       setupData: { rngSeed: options.seed },
@@ -105,8 +120,24 @@ export class LocalMatchSession {
     return { ok: true };
   }
 
+  /** 真人白羊的选择还在宽限期内：Bot 的回合先不往下走 */
+  private waitingForAries(): boolean {
+    const { G } = this.state;
+    const aries = G.pendingAriesChoice;
+    if (aries === null || aries.ariesID !== this.humanPlayerID) {
+      this.ariesWait = null;
+      return false;
+    }
+    // 回合主人就是真人时，他操作的节奏本来就由真人掌握
+    if (G.currentPlayerID === this.humanPlayerID) return false;
+    const key = `${G.turnNumber}:${aries.victimID}:${aries.victimLayer}`;
+    if (this.ariesWait?.key !== key) this.ariesWait = { key, since: this.now() };
+    return this.now() - this.ariesWait.since < ARIES_GRACE_MS;
+  }
+
   /** 执行一步自动行动 */
   step(): StepResult {
+    if (this.waitingForAries()) return { action: null, ok: true, continue: true, waiting: true };
     const action = nextAutoAction(this.state, { humanPlayerIDs: [this.humanPlayerID] });
     if (action === null) return { action: null, ok: true, continue: false };
 

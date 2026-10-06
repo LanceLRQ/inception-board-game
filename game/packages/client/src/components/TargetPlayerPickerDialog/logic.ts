@@ -49,7 +49,7 @@ export function computeTargetOptions(inputs: TargetPickerInputs): TargetPlayerOp
     const disabled = sameLayerRequired && crossLayer;
     out.push({
       id,
-      name: p.nickname ?? `AI ${id}`,
+      name: p.nickname ?? id,
       disabled,
       crossLayerNumber: crossLayer ? p.currentLayer : null,
       currentLayer: p.currentLayer,

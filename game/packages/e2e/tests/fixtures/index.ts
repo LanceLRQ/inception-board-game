@@ -1,7 +1,7 @@
 // E2E 测试 Fixtures 和基础工具
 /* eslint-disable react-hooks/rules-of-hooks */
 
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 // 扩展 fixture：每个 test 自动注入版权 ack + 错误监听
 export const test = base.extend({
@@ -101,4 +101,53 @@ export async function pickCardsToDiscard(page: Page, required: number): Promise<
     picked += 1;
   }
   return picked;
+}
+
+/**
+ * 本地对局里轮到真人应答时（被 SHOOT、天秤、处女、意念判官、白羊），对局会等真人操作而不是代答。
+ * 随机对局的用例不关心这些选择，用这个函数给出最简单的答复：能放弃就放弃，没有放弃选项的选第一个合法操作。
+ * 返回这一轮是否答复过。
+ */
+export async function answerAwaitedResponse(page: Page): Promise<boolean> {
+  const panel = page.locator('[data-testid="awaited-window"], [data-testid="awaited-bar"]').first();
+  if (!(await panel.isVisible())) return false;
+  const decline = panel.locator('[data-testid^="awaited-action-"][data-decline="true"]').first();
+  if (await decline.isVisible()) {
+    await decline.click({ timeout: 1_500 });
+    return true;
+  }
+  const kind = await panel.getAttribute('data-kind');
+  if (kind === 'libra-split') {
+    await panel.getByTestId('awaited-action-split').click({ timeout: 1_500 });
+    await page.getByTestId('awaited-sheet-confirm').click({ timeout: 1_500 });
+  } else if (kind === 'libra-pick') {
+    await panel.getByTestId('awaited-action-pick').click({ timeout: 1_500 });
+    await page.getByTestId('awaited-take-1').click({ timeout: 1_500 });
+  } else if (kind === 'sudger') {
+    await panel.getByTestId('awaited-action-pick-a').click({ timeout: 1_500 });
+  } else if (kind === 'aries') {
+    await panel.getByTestId('awaited-action-discard').click({ timeout: 1_500 });
+  } else {
+    return false;
+  }
+  return true;
+}
+
+/** 等某个元素出现，等待期间随时答复轮到真人的应答；超时则抛出 */
+export async function waitVisibleAnswering(
+  page: Page,
+  target: Locator,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await target.isVisible()) return;
+    try {
+      await answerAwaitedResponse(page);
+    } catch {
+      /* 窗口刚好消失，下一轮再看 */
+    }
+    await page.waitForTimeout(250);
+  }
+  await target.waitFor({ state: 'visible', timeout: 1_000 });
 }

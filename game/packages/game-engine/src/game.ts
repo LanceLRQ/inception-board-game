@@ -136,6 +136,7 @@ import {
   respondToWindow,
   passOnResponse,
 } from './engine/abilities/response-chain.js';
+import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 import type { CardID, Faction, Layer } from '@icgame/shared';
 import type { GameDef } from './runner/matchRunner.js';
 
@@ -283,8 +284,8 @@ function parseBotSeats(raw: unknown, numPlayers: number): string[] {
 
 export const InceptionCityGame = {
   name: 'inception-city',
-  minPlayers: 4,
-  maxPlayers: 10,
+  minPlayers: MATCH_MIN_PLAYERS,
+  maxPlayers: MATCH_MAX_PLAYERS,
   disableUndo: true,
 
   setup: ({ ctx }: { ctx: { numPlayers: number } }, setupData?: Record<string, unknown>) => {

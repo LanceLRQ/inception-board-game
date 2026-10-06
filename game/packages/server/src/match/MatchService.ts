@@ -4,6 +4,7 @@
 // 对局种子只出现在快照与归档入参里：不写日志，也没有任何公开方法返回它。
 
 import { randomBytes } from 'node:crypto';
+import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS, isMatchPlayerCount } from '@icgame/shared';
 import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import {
@@ -25,9 +26,6 @@ import type { TimingConfig } from './scheduling.js';
 
 /** 对局结束后房间在注册表里多留一小段时间，让最后一条消息发完 */
 export const FINISHED_ROOM_LINGER_MS = 5_000;
-
-const MIN_PLAYERS = 4;
-const MAX_PLAYERS = 10;
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -75,8 +73,8 @@ export class MatchService {
     if (this.rooms.has(matchID) || this.creating.has(matchID)) {
       throw new AppError('CONFLICT', '该对局已存在');
     }
-    if (room.players.length < MIN_PLAYERS || room.players.length > MAX_PLAYERS) {
-      throw new AppError('CONFLICT', '需要 4–10 名玩家');
+    if (!isMatchPlayerCount(room.players.length)) {
+      throw new AppError('CONFLICT', `需要 ${MATCH_MIN_PLAYERS}–${MATCH_MAX_PLAYERS} 名玩家`);
     }
 
     this.creating.add(matchID);

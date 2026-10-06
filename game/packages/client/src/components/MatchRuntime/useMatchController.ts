@@ -12,12 +12,18 @@ import type { MatchSource } from '../../match/matchSource';
 import { toast } from '@/lib/toast';
 import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
 import { awaitingNotice } from './awaitingNotice';
+import { useAwaitedResponse } from './response/useAwaitedResponse';
 import { remainingSeconds, useSecondClock } from './deadline';
 import { otherTurnLabel } from './turnLabel';
 import {
   activeSkillTargetIds,
   buildActiveSkillContext,
+  chessAvailable,
+  chessDialogOpen,
+  type ChessDialogChoice,
+  unopenedVaultCount,
   buildPlayArgs,
+  CHESS_SKILL_ID,
   classifyShoot,
   commitPlanFor,
   decreeApplicable,
@@ -104,6 +110,13 @@ export function useMatchController(source: MatchSource): MatchController {
     () => (sourceView ? awaitingNotice(sourceView.G as MatchView, mySeat) : null),
     [sourceView, mySeat],
   );
+  const response = useAwaitedResponse({
+    view: sourceView ? (sourceView.G as MatchView) : undefined,
+    seat: mySeat,
+    makeMove,
+    deadlineSeconds,
+  });
+
   const isRemote = sourceKind === 'remote';
   const selfTakenOver = source.selfTakenOver;
   // 托管的开始与取消各打一条流程日志；首次渲染时本来就没托管，不记
@@ -191,10 +204,10 @@ export function useMatchController(source: MatchSource): MatchController {
     setGravityPicker(null);
   }, [gravityPicker, makeMove, setGravityPicker]);
 
-  // 棋局·易位：选中的 2 个金库索引
+  // 棋局·易位：选中的 2 个金库索引，以及本回合对弹窗做过的处理（关闭 / 主动打开）
   const [chessPick, setChessPick] = useState<number[]>([]);
+  const [chessChoice, setChessChoice] = useState<ChessDialogChoice | null>(null);
   const humanCharacterId = (humanPlayer?.characterId as string) ?? '';
-  const isChessMaster = humanCharacterId === 'dm_chess' && isMyTurn && turnPhase === 'action';
 
   const toggleChessPick = useCallback(
     (idx: number) => {
@@ -203,11 +216,21 @@ export function useMatchController(source: MatchSource): MatchController {
     [setChessPick],
   );
 
+  // 本回合关闭弹窗：不再自动弹出，之后仍可从技能入口主动打开
+  const dismissChess = useCallback(() => {
+    setChessPick([]);
+    setChessChoice({ turn: turnNumber, mode: 'dismissed' });
+  }, [turnNumber]);
+  const showChess = useCallback(() => {
+    setChessPick([]);
+    setChessChoice({ turn: turnNumber, mode: 'shown' });
+  }, [turnNumber]);
   const confirmChessTranspose = useCallback(async () => {
     if (chessPick.length !== 2) return;
-    await makeMove('useChessTranspose', [chessPick[0], chessPick[1]]);
+    const outcome = await makeMove('useChessTranspose', [chessPick[0], chessPick[1]]);
     setChessPick([]);
-  }, [chessPick, makeMove, setChessPick]);
+    if (outcome.ok) setChessChoice({ turn: turnNumber, mode: 'dismissed' });
+  }, [chessPick, makeMove, setChessPick, turnNumber]);
 
   // 贿赂派发：移除常驻主动 UI（违反规则）。
   // 规则：仅在盗梦者使用【梦境窥视】或打开金币金库时，梦主通过响应窗口决策派发。
@@ -412,6 +435,27 @@ export function useMatchController(source: MatchSource): MatchController {
         }
       : null;
 
+  // 棋局·易位：只在行动阶段、没有别的待办占着界面时可用
+  const hasOtherPending =
+    effectivePending !== null ||
+    dreamTransitPicker !== null ||
+    gravityPicker !== null ||
+    isHumanGraftPending ||
+    G?.pendingUnlock != null ||
+    G?.pendingGravity != null ||
+    G?.pendingResponseWindow != null ||
+    G?.pendingShootMove != null ||
+    response.awaited !== null;
+  const chessIsAvailable = chessAvailable({
+    characterId: humanCharacterId,
+    isMyTurn,
+    turnPhase,
+    winner,
+    busy: hasOtherPending,
+    usedThisGame: humanPlayer?.skillUsedThisGame?.[CHESS_SKILL_ID] ?? 0,
+    unopenedVaults: unopenedVaultCount(vaultsRaw ?? []),
+  });
+
   // 角色主动技能面板（影子·潜伏 / 阿波罗·崇拜）：非本人回合或对局结束不显示
   let skillPanel: SkillPanelModel | null = null;
   if (G && isMyTurn && !winner) {
@@ -420,6 +464,11 @@ export function useMatchController(source: MatchSource): MatchController {
       targetIds: activeSkillTargetIds(players, mySeat),
       nicknames: nicknameMap(players),
       invoke: (skill: ActiveSkillDescriptor, args: unknown[]) => {
+        // 棋局·易位要先选两个金库，打开弹窗而不是直接发 move
+        if (skill.move === 'useChessTranspose') {
+          showChess();
+          return;
+        }
         void makeMove(skill.move, args);
       },
     };
@@ -526,7 +575,7 @@ export function useMatchController(source: MatchSource): MatchController {
       targets: gravityPicker?.targets ?? [],
       options: Object.entries(players ?? {}).map(([id, p]) => ({
         id,
-        name: (p.nickname as string | undefined) ?? `AI ${id}`,
+        name: p.nickname,
         isAlive: p.isAlive as boolean,
       })),
       toggle: toggleGravityTarget,
@@ -540,7 +589,9 @@ export function useMatchController(source: MatchSource): MatchController {
       },
     },
     chess: {
-      open: isChessMaster && !effectivePending && !!vaultsRaw,
+      open: chessDialogOpen(chessIsAvailable, turnNumber, chessChoice),
+      available: chessIsAvailable,
+      show: showChess,
       vaults: (vaultsRaw ?? []).map((v) => ({
         id: v.id as string,
         layer: v.layer as number,
@@ -549,7 +600,7 @@ export function useMatchController(source: MatchSource): MatchController {
       picked: chessPick,
       toggle: toggleChessPick,
       confirm: confirmChessTranspose,
-      cancel: () => setChessPick([]),
+      cancel: dismissChess,
     },
     graft: {
       open: isHumanGraftPending,
@@ -558,6 +609,7 @@ export function useMatchController(source: MatchSource): MatchController {
       toggle: toggleGraftPick,
       confirm: confirmGraft,
     },
+    response,
     shootDice: { roll: shootDiceRoll, onComplete: handleDiceComplete },
 
     skillPanel,

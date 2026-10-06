@@ -65,7 +65,7 @@ export interface LayerView {
   playersInLayer: string[];
   nightmareRevealed: boolean;
   nightmareTriggered: boolean;
-  /** 未翻开时只有梦主（和对局结束后）看到 */
+  /** 未翻开时只有梦主（和对局结束后）看到；白羊选择发动或弃掉期间，被击杀者所在层的梦魇也给白羊本人 */
   nightmareId: CardID | null;
 }
 
@@ -418,8 +418,16 @@ function viewPlayer(id: string, p: PlayerSetup, who: Audience): PlayerView {
   };
 }
 
-function viewLayer(l: LayerSetup, who: Audience): LayerView {
-  const nightmareKnown = who.open || who.isMaster || l.nightmareRevealed;
+function viewLayer(l: LayerSetup, who: Audience, G: SetupState): LayerView {
+  // 白羊·星尘：白羊翻开被击杀者所在层的梦魇后才选择发动或弃掉，所以选择期间只对白羊本人给出这一层的梦魇
+  // 对照：docs/manual/05-dream-thieves.md 白羊「星尘」
+  const aries = G.pendingAriesChoice;
+  const ariesSees =
+    aries !== null &&
+    who.who !== null &&
+    who.who === aries.ariesID &&
+    aries.victimLayer === l.layer;
+  const nightmareKnown = who.open || who.isMaster || l.nightmareRevealed || ariesSees;
   return {
     layer: l.layer,
     heartLockValue: l.heartLockValue,
@@ -583,7 +591,7 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
     expansionEnabled: G.expansionEnabled,
 
     players: entries(G.players, (id, p) => viewPlayer(id, p, who)),
-    layers: entries(G.layers as Record<string, LayerSetup>, (_key, l) => viewLayer(l, who)),
+    layers: entries(G.layers as Record<string, LayerSetup>, (_key, l) => viewLayer(l, who, G)),
     vaults: G.vaults.map((v) => viewVault(v, G, who)),
     bribePool: G.bribePool.map((b) => viewBribe(b, G, who)),
     deck: { cardCount: G.deck.cards.length, discardPile: G.deck.discardPile.slice() },

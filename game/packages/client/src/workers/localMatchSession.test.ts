@@ -3,7 +3,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { AutoAction } from '@icgame/bot';
 import { HAND_LIMIT } from '@icgame/game-engine/config';
-import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS, buildMatchSeed } from './localMatchSession.js';
+import {
+  ARIES_GRACE_MS,
+  LocalMatchSession,
+  MAX_CONSECUTIVE_REJECTS,
+  buildMatchSeed,
+} from './localMatchSession.js';
 
 // 只替换 nextAutoAction，其余导出保持真实实现；override 为 null 时走真实判定
 const hooks = vi.hoisted(() => ({
@@ -259,5 +264,94 @@ describe('LocalMatchSession', () => {
       else expect(p.hand).toBeNull();
     }
     expect(JSON.stringify(view)).not.toContain('rngSeed');
+  });
+});
+
+/** 测试里直接改会话内部的完整状态（只在测试里这样做） */
+function patchState(session: LocalMatchSession, patch: Record<string, unknown>): void {
+  const inner = session as unknown as { state: { G: Record<string, unknown> } };
+  inner.state = { ...inner.state, G: { ...inner.state.G, ...patch } } as typeof inner.state;
+}
+
+/** 走到 Bot 的回合里（真人抽牌、结束行动、弃牌后 Bot 刚开始行动） */
+function intoBotTurn(session: LocalMatchSession): void {
+  runUntilIdle(session);
+  for (let i = 0; i < 6; i++) {
+    const { move, args } = humanPolicy(session);
+    expect(session.humanMove(move, args).ok).toBe(true);
+    if (session.view().G.currentPlayerID !== HUMAN) return;
+  }
+  throw new Error('没有走到 Bot 的回合');
+}
+
+describe('LocalMatchSession · 轮到真人应答时不代答', () => {
+  it('真人是天秤的目标：自动循环停下等真人，真人分牌后被接受', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    const hand = session.view().G.players[HUMAN]!.hand as string[];
+    patchState(session, {
+      pendingLibra: { bonderPlayerID: '1', targetPlayerID: HUMAN, split: null },
+    });
+    const r = session.step();
+    expect(r.action).toBeNull();
+    expect(r.continue).toBe(false);
+    expect(r.waiting).toBeUndefined();
+    expect(session.view().G.pendingLibra).not.toBeNull();
+
+    expect(session.humanMove('resolveLibraSplit', [hand, []]).ok).toBe(true);
+    expect(session.view().G.pendingLibra?.split).not.toBeNull();
+  });
+
+  it('真人是被 SHOOT 的目标 / 处女：同样等真人，不代答', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    patchState(session, {
+      pendingVirgoChoice: { virgoID: HUMAN, triggerRoll: 6, shooterID: '1' },
+    });
+    expect(session.step().action).toBeNull();
+    expect(session.humanMove('respondVirgoPerfect', ['skip']).ok).toBe(true);
+    expect(session.view().G.pendingVirgoChoice).toBeNull();
+  });
+
+  it('对 Bot 座位的待应答仍由 Bot 代答', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    patchState(session, {
+      pendingVirgoChoice: { virgoID: '2', triggerRoll: 6, shooterID: HUMAN },
+    });
+    const r = session.step();
+    expect(r.action).toMatchObject({ playerID: '2', move: 'respondVirgoPerfect' });
+    expect(r.ok).toBe(true);
+  });
+});
+
+describe('LocalMatchSession · 真人白羊的宽限期', () => {
+  it('Bot 的回合里真人白羊有选择：宽限期内先等，到点后继续；真人处理后立即解除', () => {
+    let clock = 1_000;
+    const session = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'aries-grace',
+      now: () => clock,
+    });
+    intoBotTurn(session);
+    patchState(session, { pendingAriesChoice: { ariesID: HUMAN, victimLayer: 1, victimID: '1' } });
+
+    const waiting = session.step();
+    expect(waiting).toMatchObject({ action: null, continue: true, waiting: true });
+    clock += ARIES_GRACE_MS - 1;
+    expect(session.step().waiting).toBe(true);
+    clock += 1;
+    const resumed = session.step();
+    expect(resumed.action).not.toBeNull();
+    expect(resumed.waiting).toBeUndefined();
+  });
+
+  it('回合主人就是真人时不等；没有白羊选择时不等', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    patchState(session, { pendingAriesChoice: { ariesID: HUMAN, victimLayer: 1, victimID: '1' } });
+    expect(session.step().waiting).toBeUndefined();
+    patchState(session, { pendingAriesChoice: null });
+    expect(session.step().waiting).toBeUndefined();
   });
 });

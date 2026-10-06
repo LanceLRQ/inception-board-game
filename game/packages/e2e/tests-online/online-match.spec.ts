@@ -118,6 +118,12 @@ async function actOnce(page: Page): Promise<boolean> {
   const end = page.getByTestId('action-end');
   const skip = page.getByTestId('action-skip-discard');
   const confirm = page.getByTestId('action-confirm-discard');
+  // 轮到本人应答（被 SHOOT 时的响应、处女等）：能放弃就放弃；没有放弃选项的（天秤分牌等）留给服务端到时限代答
+  const decline = page.locator('[data-testid^="awaited-action-"][data-decline="true"]').first();
+  if (await decline.isVisible()) {
+    await decline.click({ timeout: 1_500 });
+    return true;
+  }
   if (await draw.isVisible()) {
     await draw.click({ timeout: 1_500 });
     return true;

@@ -382,6 +382,8 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
       : [],
     marsBattlefieldActive:
       !!players && !!dreamMasterID && players[dreamMasterID]?.characterId === 'dm_mars_battlefield',
+    skillUsedThisGame: humanPlayer?.skillUsedThisGame ?? {},
+    unopenedVaults: Array.isArray(G.vaults) ? unopenedVaultCount(G.vaults) : 0,
   };
 }
 
@@ -416,4 +418,65 @@ export function gravityCurrentPicker(
       (pending?.pickCursor ?? 0) % Math.max(1, pending?.pickOrder?.length ?? 1)
     ] ?? fallback
   );
+}
+
+// ---------------------------------------------------------------------------
+// 棋局·易位弹窗
+// ---------------------------------------------------------------------------
+
+/** 棋局技能每局最多使用的次数（与引擎的每局限次一致） */
+export const CHESS_MAX_USES = 2;
+/** 棋局技能的登记号（视图里本人的 skillUsedThisGame 以它为键） */
+export const CHESS_SKILL_ID = 'dm_chess.skill_0';
+
+export interface ChessAvailabilityInput {
+  readonly characterId: string;
+  readonly isMyTurn: boolean;
+  readonly turnPhase: string;
+  readonly winner: string | null;
+  /** 此刻有别的待处理事项（出牌意图、各类待结算）占着界面 */
+  readonly busy: boolean;
+  /** 本人这一局已用的次数；视图里看不到时按 0 */
+  readonly usedThisGame: number;
+  /** 还没打开的金库数量：不足 2 个就没有可交换的 */
+  readonly unopenedVaults: number;
+}
+
+/** 棋局·易位此刻能否发动：本人是棋局梦主、行动阶段、次数没用完、至少有 2 个未开金库 */
+export function chessAvailable(input: ChessAvailabilityInput): boolean {
+  return (
+    input.characterId === 'dm_chess' &&
+    input.isMyTurn &&
+    input.turnPhase === 'action' &&
+    !input.winner &&
+    !input.busy &&
+    input.usedThisGame < CHESS_MAX_USES &&
+    input.unopenedVaults >= 2
+  );
+}
+
+/** 本回合对棋局弹窗做过的处理：关闭，或从技能入口主动打开 */
+export interface ChessDialogChoice {
+  readonly turn: number;
+  readonly mode: 'dismissed' | 'shown';
+}
+
+/**
+ * 棋局·易位弹窗是否打开。
+ * 本回合还没处理过：自动弹出一次；关闭后本回合不再自动弹出；从技能入口主动打开后保持打开直到再次关闭或确认。
+ * 记录的是别的回合时按「还没处理过」对待，所以换回合自动恢复。
+ */
+export function chessDialogOpen(
+  available: boolean,
+  turnNumber: number,
+  choice: ChessDialogChoice | null,
+): boolean {
+  if (!available) return false;
+  if (choice === null || choice.turn !== turnNumber) return true;
+  return choice.mode === 'shown';
+}
+
+/** 未开启的金库数量 */
+export function unopenedVaultCount(vaults: readonly { readonly isOpened?: unknown }[]): number {
+  return vaults.filter((v) => !v.isOpened).length;
 }

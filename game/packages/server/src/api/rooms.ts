@@ -1,5 +1,6 @@
 import Router from '@koa/router';
 import { z } from 'zod';
+import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { authMiddleware } from '../middleware/auth.js';
 import type { LobbyService } from '../services/LobbyService.js';
 import { AppError } from '../infra/errors.js';
@@ -13,7 +14,7 @@ export function createRoomsRouter(lobby: LobbyService): Router {
 
   // POST /rooms - 创建房间
   const createRoomSchema = z.object({
-    maxPlayers: z.number().int().min(4).max(10).default(6),
+    maxPlayers: z.number().int().min(MATCH_MIN_PLAYERS).max(MATCH_MAX_PLAYERS).default(6),
     ruleVariant: z.string().default('classic'),
     exCardsEnabled: z.boolean().default(false),
     expansionEnabled: z.boolean().default(false),

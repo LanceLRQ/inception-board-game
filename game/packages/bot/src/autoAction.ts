@@ -72,11 +72,11 @@ export function nextAutoAction(
     return { playerID: peekerID, move: 'peekerAcknowledge', args: [], why: `${peekerID} 确认看牌` };
   }
 
-  // 天秤：分牌由被要求分牌的目标发，挑牌由发动者发。
-  // 单机没有分牌界面，真人参与时同样自动完成（以各自本人的名义），避免对局停住。
+  // 天秤：分牌由被要求分牌的目标发，挑牌由发动者发；轮到真人就等他操作，Bot 以本人的名义代答。
   const libra = G.pendingLibra;
   if (libra) {
     if (!libra.split) {
+      if (isHuman(libra.targetPlayerID)) return null;
       return {
         playerID: libra.targetPlayerID,
         move: 'resolveLibraSplit',
@@ -84,6 +84,7 @@ export function nextAutoAction(
         why: `代 ${libra.targetPlayerID} 分牌`,
       };
     }
+    if (isHuman(libra.bonderPlayerID)) return null;
     return {
       playerID: libra.bonderPlayerID,
       move: 'resolveLibraPick',
@@ -92,12 +93,11 @@ export function nextAutoAction(
     };
   }
 
-  // SHOOT 响应窗口：被射击的目标放弃闪避 / 接受惩罚而不弃牌，一律以目标本人的名义发。
-  // 界面还没有这个选择的入口，目标是真人时同样自动放弃（与处女、天秤一致），
-  // 否则这个阻塞型待结算会挡住后续所有 move，对局就此停住。
+  // SHOOT 响应窗口：被射击的目标放弃闪避 / 接受惩罚而不弃牌，一律以目标本人的名义发；目标是真人就等他应答。
   const shoot = G.pendingShootResponse;
   if (shoot) {
     const target = shoot.targetPlayerID;
+    if (isHuman(target)) return null;
     if (shoot.responseType === 'terrorist') {
       return {
         playerID: target,
@@ -109,10 +109,10 @@ export function nextAutoAction(
     return { playerID: target, move: 'respondShootPass', args: [], why: `${target} 放弃闪避` };
   }
 
-  // 处女·完美：一律不发动。界面没有这个选择的入口，处女是真人时也由本人名义自动放弃
-  // （与天秤的处理一致），否则待结算闸门会挡住真人的其他 move，对局就此停住。
+  // 处女·完美：Bot 一律不发动，以处女本人的名义放弃；处女是真人就等她选择。
   const virgo = G.pendingVirgoChoice;
   if (virgo) {
+    if (isHuman(virgo.virgoID)) return null;
     return {
       playerID: virgo.virgoID,
       move: 'respondVirgoPerfect',

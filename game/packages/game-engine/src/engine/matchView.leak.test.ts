@@ -167,7 +167,11 @@ function scanMoment(
     for (const key of Object.keys(G.layers)) {
       const l = Number(key);
       const real = G.layers[l]!;
-      const allowed = gameOver || real.nightmareRevealed || viewer === G.dreamMasterID;
+      // 白羊选择发动或弃掉期间，被击杀者所在层的梦魇给白羊本人看（她先翻开再选）
+      const ariesChoice = G.pendingAriesChoice;
+      const ariesSees =
+        ariesChoice !== null && viewer === ariesChoice.ariesID && ariesChoice.victimLayer === l;
+      const allowed = gameOver || real.nightmareRevealed || viewer === G.dreamMasterID || ariesSees;
       if (!allowed) {
         expect(view.layers[l]!.nightmareId, `${at} 第${l}层梦魇`).toBeNull();
         counts.hiddenNightmares++;
@@ -610,6 +614,42 @@ describe('泄露扫描 · 结构性断言：改掉保密的值，视图逐字节
     });
     expectUnchanged(shoot('terrorist'), exceptOwner(c), 'SHOOT 响应类型', shoot('pisces'));
     expectChanged(shoot('terrorist'), [c], 'SHOOT 响应类型', shoot('pisces'));
+  });
+
+  it('白羊选择期间：被击杀者所在层的梦魇只给白羊本人，其余层与其余观察者不受影响', () => {
+    const withAries = (ariesID: string, victimLayer: number): SetupState => ({
+      ...G,
+      pendingAriesChoice: { ariesID, victimLayer, victimID: c },
+    });
+    const hidden = (view: MatchView, layer: number): string | null =>
+      view.layers[layer]!.nightmareId;
+    const real2 = G.layers[2]!.nightmareId;
+    expect(real2).not.toBeNull();
+    expect(G.layers[2]!.nightmareRevealed).toBe(false);
+
+    const ariesView = viewFor(withAries(b, 2), b, { gameOver: false });
+    expect(hidden(ariesView, 2)).toBe(real2);
+    // 只开放那一层，其余层仍然保密
+    for (const layer of [1, 3, 4]) {
+      if (!G.layers[layer]!.nightmareRevealed) expect(hidden(ariesView, layer)).toBeNull();
+    }
+    // 别人（含梦主以外的盗梦者、旁观者）看不到
+    for (const viewer of [a, c, d, null, 'ghost']) {
+      expect(hidden(viewFor(withAries(b, 2), viewer, { gameOver: false }), 2)).toBeNull();
+    }
+    // 选择结束（没有待选）后，白羊也看不到了
+    expect(hidden(viewFor(G, b, { gameOver: false }), 2)).toBeNull();
+    // 换一层：白羊看到的随之改变
+    expect(hidden(viewFor(withAries(b, 3), b, { gameOver: false }), 2)).toBeNull();
+    // 梦魇的真实内容变了，非白羊观察者的视图字节不变（不借此泄露）
+    const swapped: SetupState = {
+      ...withAries(b, 2),
+      layers: {
+        ...G.layers,
+        2: { ...G.layers[2]!, nightmareId: 'nightmare_echo' as CardID },
+      },
+    };
+    expectUnchanged(swapped, [a, c, d, null, 'ghost'], '换第 2 层的梦魇', withAries(b, 2));
   });
 
   it('对局结束后只公开该公开的：改种子与牌库仍然不影响任何人', () => {

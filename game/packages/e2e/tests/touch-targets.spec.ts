@@ -58,6 +58,14 @@ const SCENES = [
   ['响应窗口', '/game/debug?pending=1'],
   ['弃牌阶段', '/game/debug?discard=1'],
   ['10 人', '/game/debug?players=10'],
+  ['应答：被 SHOOT 的双鱼', '/game/debug?pending=shoot'],
+  ['应答：恐怖分子狂热', '/game/debug?pending=terrorist'],
+  ['应答：天秤分牌', '/game/debug?pending=libra-split'],
+  ['应答：天秤挑一份', '/game/debug?pending=libra-pick'],
+  ['应答：意念判官', '/game/debug?pending=sudger'],
+  ['应答：处女·完美', '/game/debug?pending=virgo'],
+  ['应答：白羊·星尘', '/game/debug?pending=aries'],
+  ['棋局易位弹窗', '/game/debug?as=master&chess=1'],
 ] as const;
 
 test.describe('触控目标 · 390×844', () => {
@@ -99,6 +107,24 @@ test.describe('触控目标 · 390×844', () => {
     await page.getByTestId('hand-commit-play').click();
     await expect(page.getByTestId('target-player-picker-dialog')).toBeVisible();
     await expectTouchClean(page, '选目标弹窗');
+  });
+
+  test('对局：应答弹窗（分牌、复活、回音萦绕）', async ({ page }) => {
+    await openScene(page, '/game/debug?pending=libra-split');
+    await page.getByTestId('awaited-action-split').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    await page.getByTestId('awaited-card-0').click();
+    await expectTouchClean(page, '分牌弹窗');
+
+    await openScene(page, '/game/debug?pending=virgo');
+    await page.getByTestId('awaited-action-revive').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    await expectTouchClean(page, '复活弹窗');
+
+    await openScene(page, '/game/debug?pending=aries');
+    await page.getByTestId('awaited-action-activate').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    await expectTouchClean(page, '回音萦绕弹窗');
   });
 
   test('对局：弃牌阶段选牌后', async ({ page }) => {

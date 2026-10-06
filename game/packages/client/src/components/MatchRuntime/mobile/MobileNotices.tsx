@@ -4,6 +4,7 @@
 import { SelfTakeoverBanner } from '../../SelfTakeoverBanner';
 import type { MatchController } from '../controllerTypes';
 import { AwaitingNotice } from '../shared/AwaitingNotice';
+import { MobileAwaitedBar } from './MobileAwaitedBar';
 import { MobileResponseBar } from './MobileResponseBar';
 
 interface MobileNoticesProps {
@@ -17,9 +18,11 @@ export function MobileNotices({ controller }: MobileNoticesProps) {
       <SelfTakeoverBanner compact visible={takeover.bannerVisible} onResume={takeover.resume} />
       <AwaitingNotice
         awaiting={turn.awaiting}
+        hasResponseUi={controller.response.awaited !== null}
         className="border-t border-line bg-panel px-3 py-1.5"
       />
       <MobileResponseBar controller={controller} />
+      <MobileAwaitedBar controller={controller} />
     </div>
   );
 }

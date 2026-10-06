@@ -66,6 +66,10 @@ export interface ActiveSkillContext {
   readonly bribePoolItems?: readonly { readonly index: number; readonly id: string }[];
   /** 火星·战场世界观是否激活（= 当前梦主 = dm_mars_battlefield） */
   readonly marsBattlefieldActive?: boolean;
+  /** 本人整局的技能使用次数（棋局·易位按整局限次） */
+  readonly skillUsedThisGame?: Record<string, number>;
+  /** 还没打开的金库数量（棋局·易位至少要 2 个） */
+  readonly unopenedVaults?: number;
 }
 
 export const SHADE_FOLLOW: ActiveSkillDescriptor = {
@@ -247,6 +251,21 @@ export const MARS_KILL: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master',
 };
 
+// 棋局·易位：不在技能面板里选参数，点了之后由对局界面打开金库交换弹窗（见 useMatchController 的 invoke）
+// 对照：docs/manual/06-dream-master.md 棋局 + engine/game.ts useChessTranspose
+export const CHESS_TRANSPOSE: ActiveSkillDescriptor = {
+  id: 'dm_chess.skill_0',
+  characterId: 'dm_chess',
+  move: 'useChessTranspose',
+  nameKey: 'skill.dm_chess.skill_0.name',
+  descKey: 'skill.dm_chess.skill_0.desc',
+  argKind: 'none',
+  extraCheck: (ctx) =>
+    ctx.faction === 'master' &&
+    (ctx.skillUsedThisGame?.['dm_chess.skill_0'] ?? 0) < 2 &&
+    (ctx.unopenedVaults ?? 0) >= 2,
+};
+
 export const PLUTO_BURNING: ActiveSkillDescriptor = {
   id: 'dm_pluto_hell.skill_0',
   characterId: 'dm_pluto_hell',
@@ -418,6 +437,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   ARCHITECT_MAZE,
   PLUTO_BURNING,
   MARS_KILL,
+  CHESS_TRANSPOSE,
   SATURN_FREE_MOVE,
   MASTER_REVEAL_NIGHTMARE,
   MASTER_DISCARD_NIGHTMARE,

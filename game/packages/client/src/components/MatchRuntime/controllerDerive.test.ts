@@ -8,6 +8,10 @@ import {
   activeSkillTargetIds,
   buildActiveSkillContext,
   buildPlayArgs,
+  CHESS_MAX_USES,
+  chessAvailable,
+  chessDialogOpen,
+  unopenedVaultCount,
   classifyShoot,
   decreeApplicable,
   decreeCardsIn,
@@ -603,5 +607,59 @@ describe('gravityCurrentPicker', () => {
   it('没有待决状态或顺序为空时回退', () => {
     expect(gravityCurrentPicker(null, 'me')).toBe('me');
     expect(gravityCurrentPicker({ pickOrder: [], pickCursor: 0 }, 'me')).toBe('me');
+  });
+});
+
+describe('棋局·易位弹窗', () => {
+  const base = {
+    characterId: 'dm_chess',
+    isMyTurn: true,
+    turnPhase: 'action',
+    winner: null,
+    busy: false,
+    usedThisGame: 0,
+    unopenedVaults: 4,
+  };
+
+  it('棋局梦主在自己的行动阶段、次数未满且有 2 个以上未开金库时可用', () => {
+    expect(chessAvailable(base)).toBe(true);
+  });
+
+  it.each([
+    ['不是棋局', { characterId: 'dm_neptune_ocean' }],
+    ['不是本人回合', { isMyTurn: false }],
+    ['不是行动阶段', { turnPhase: 'discard' }],
+    ['对局已结束', { winner: 'master' }],
+    ['有别的待办占着界面', { busy: true }],
+    ['次数已用完', { usedThisGame: CHESS_MAX_USES }],
+    ['未开金库不足 2 个', { unopenedVaults: 1 }],
+  ] as const)('%s：不可用', (_label, patch) => {
+    expect(chessAvailable({ ...base, ...patch })).toBe(false);
+  });
+
+  it('本回合还没处理过：自动弹出一次', () => {
+    expect(chessDialogOpen(true, 5, null)).toBe(true);
+  });
+
+  it('关闭后本回合不再自动弹出，下一回合恢复自动弹出', () => {
+    const dismissed = { turn: 5, mode: 'dismissed' } as const;
+    expect(chessDialogOpen(true, 5, dismissed)).toBe(false);
+    expect(chessDialogOpen(true, 6, dismissed)).toBe(true);
+  });
+
+  it('关闭后仍能从技能入口主动打开，主动打开的记录只在本回合有效', () => {
+    const shown = { turn: 5, mode: 'shown' } as const;
+    expect(chessDialogOpen(true, 5, shown)).toBe(true);
+    expect(chessDialogOpen(true, 6, shown)).toBe(true);
+    expect(chessDialogOpen(true, 6, { turn: 5, mode: 'dismissed' })).toBe(true);
+  });
+
+  it('技能不可用时弹窗必然关闭，不论记录是什么', () => {
+    expect(chessDialogOpen(false, 5, null)).toBe(false);
+    expect(chessDialogOpen(false, 5, { turn: 5, mode: 'shown' })).toBe(false);
+  });
+
+  it('unopenedVaultCount 只数没打开的', () => {
+    expect(unopenedVaultCount([{ isOpened: true }, { isOpened: false }, {}])).toBe(2);
   });
 });

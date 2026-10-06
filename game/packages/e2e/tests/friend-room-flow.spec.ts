@@ -139,6 +139,14 @@ test.describe('好友房 Lobby / Room 流程', () => {
             isBot: true,
             joinedAt: Date.now(),
           },
+          {
+            playerId: 'bot-3',
+            nickname: 'AI Lv.1-3',
+            avatarSeed: '3',
+            seat: 3,
+            isBot: true,
+            joinedAt: Date.now(),
+          },
         ],
       });
       return r.fulfill({
@@ -190,12 +198,13 @@ test.describe('好友房 Lobby / Room 流程', () => {
     await expect(page.getByTestId('room-copy')).toContainText(FAKE_CODE);
     await expect(page.getByTestId('room-count')).toContainText('1 / 6');
 
-    // 此时 1 人 < 3 → Start 应禁用
+    // 此时 1 人 < 4（服务端的人数下限）→ Start 应禁用，并写明还差几人
     await expect(page.getByTestId('room-start')).toBeDisabled();
+    await expect(page.getByTestId('room-need-players')).toContainText('还差 3 名');
 
-    // 6. 补 AI → 3 人
+    // 6. 补 AI → 4 人
     await page.getByTestId('room-fill-ai').click();
-    await expect(page.getByTestId('room-count')).toContainText('3 / 6', { timeout: 5_000 });
+    await expect(page.getByTestId('room-count')).toContainText('4 / 6', { timeout: 5_000 });
 
     // 7. Start 应可点
     await expect(page.getByTestId('room-start')).toBeEnabled();

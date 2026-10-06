@@ -2,7 +2,13 @@
 // 守护：BGIO 回合机制（ctx.currentPlayer ↔ G.currentPlayerID 对齐）与 Bot 自动推进
 
 import type { Page } from '@playwright/test';
-import { test, expect, pickCardsToDiscard, waitForAppReady } from './fixtures/index.js';
+import {
+  test,
+  expect,
+  pickCardsToDiscard,
+  waitForAppReady,
+  waitVisibleAnswering,
+} from './fixtures/index.js';
 
 /**
  * 座位标识的前缀与「看得到的座位数」（断点 1024px）：
@@ -76,8 +82,10 @@ test.describe('人机对战 LocalMatch', () => {
     await waitForAppReady(page);
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
 
-    // 轮到自己抽牌
-    await page.getByRole('button', { name: /抽牌|Draw/ }).click({ timeout: 15_000 });
+    // 轮到自己抽牌（等待期间若 Bot 的行动让真人要应答，就给出最简单的答复）
+    const draw = page.getByRole('button', { name: /抽牌|Draw/ });
+    await waitVisibleAnswering(page, draw, 15_000);
+    await draw.click({ timeout: 5_000 });
     // 结束行动
     await page.getByRole('button', { name: /结束行动|End Action/ }).click({ timeout: 5_000 });
     // 弃牌：手牌未超限时点「跳过弃牌」；超限（真人是梦主时常见）则先选够张数再确认
@@ -100,9 +108,7 @@ test.describe('人机对战 LocalMatch', () => {
     }
 
     // Bot 自动推进后再次回到自己回合
-    await page
-      .getByRole('button', { name: /抽牌|Draw/ })
-      .waitFor({ state: 'visible', timeout: 15_000 });
+    await waitVisibleAnswering(page, page.getByRole('button', { name: /抽牌|Draw/ }), 15_000);
 
     // 关键断言：整个流程无 move 被拒（Worker 记录被拒时的文字为 'move rejected'，error 与 warning 级都要查）
     const rejected = [...consoleErrors, ...consoleWarnings].filter((e) =>

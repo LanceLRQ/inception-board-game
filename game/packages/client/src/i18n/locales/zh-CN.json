@@ -52,7 +52,7 @@
     "bot": "AI",
     "seat": "座位 {{n}}",
     "empty": "空座位",
-    "needPlayers": "至少需要 {{n}} 名玩家才能开始",
+    "needPlayers": "还差 {{n}} 名玩家才能开始（至少 {{min}} 人）",
     "currentPlayers": "{{current}} / {{max}}",
     "notOwner": "等待房主开始游戏"
   },
@@ -216,7 +216,7 @@
       "network": "网络不稳，操作未送达"
     },
     "waiting_others": "等待其他玩家应答",
-    "waiting_auto": "这一步暂时不能手动操作，到时间后由系统代为处理",
+    "waiting_auto": "这一步暂时无法操作，请稍候",
     "deadline": "剩余 {{seconds}} 秒",
     "connecting": "正在连接",
     "online_unavailable": "需要连接服务器才能进入联机对局",
@@ -399,6 +399,12 @@
         "desc": "同层玩家各自 +1 或 -1 层（每回合限 2 次）"
       }
     },
+    "dm_chess": {
+      "skill_0": {
+        "name": "棋局·易位",
+        "desc": "交换两个未打开的金库（每局限 2 次）"
+      }
+    },
     "dm_uranus_firmament": {
       "skill_0": {
         "name": "天王星·权力",
@@ -554,7 +560,7 @@
       "aria": "最新动态",
       "unlockWindow": "{{name}} 打出【解封】→ 第 {{layer}} 层 · 等待 {{waiting}} 人响应",
       "shootResponse": "{{shooter}} 射击 {{target}} · 等待应答",
-      "awaitingMine": "等待你的应答，到时间后由系统代为处理",
+      "awaitingMine": "等待你的应答",
       "awaitingOthers": "等待其他玩家应答",
       "lastPlayedShoot": "{{name}} 打出【{{card}}】· 掷出 {{roll}}",
       "lastPlayed": "{{name}} 打出【{{card}}】"
@@ -603,6 +609,106 @@
     "noCard": "手中无【解封】，只能放弃",
     "play": "打出解封",
     "pass": "放弃"
+  },
+  "awaited": {
+    "aria": "待应答事项",
+    "countdown": "{{seconds}} 秒后由系统代为处理",
+    "playerLine": "{{name}}",
+    "shootEvade": {
+      "title": "被 SHOOT 瞄准",
+      "body": "{{name}} 对你使用【{{card}}】。掷骰前你可以发动【游离】。",
+      "evade": "游离 · 移到第 {{layer}} 层",
+      "pass": "不闪避",
+      "cannot": "你在第 1 层，无法发动【游离】。"
+    },
+    "zealot": {
+      "title": "狂热",
+      "body": "{{name}} 的【{{card}}】带有【狂热】：掷骰前弃 1 张手牌，否则掷骰结果 -1。",
+      "discard": "弃 1 张手牌…",
+      "accept": "不弃牌（掷骰 -1）",
+      "noHand": "你没有手牌可弃。"
+    },
+    "libraSplit": {
+      "title": "天秤 · 平衡",
+      "body": "{{name}} 把全部手牌交给了你。请把你手里的牌分成两份，对方会取走其中一份。",
+      "open": "分牌…"
+    },
+    "libraPick": {
+      "title": "天秤 · 平衡",
+      "body": "{{name}} 已把牌分成两份。看清内容后选走一份，另一份归还对方。",
+      "open": "查看并选择…"
+    },
+    "sudger": {
+      "title": "意念判官 · 定罪",
+      "body": "{{name}} 掷出了两颗骰子。请选择其中一颗，作为【{{card}}】的结果。",
+      "pick": "采用 {{pick}}（{{roll}} 点）"
+    },
+    "result": {
+      "kill": "击杀",
+      "move": "移动",
+      "miss": "无效果"
+    },
+    "virgo": {
+      "title": "处女 · 完美",
+      "body": "有玩家掷出了 {{roll}} 点。你可以三选一发动【完美】，也可以放弃。",
+      "revive": "复活一名玩家…",
+      "drawTwo": "抽 2 张牌",
+      "teleport": "传送到任一层…",
+      "skip": "不发动",
+      "dead": "你已死亡，无法发动【完美】。",
+      "noRevive": "没有可复活的玩家。"
+    },
+    "aries": {
+      "title": "白羊 · 星尘",
+      "body": "{{name}} 被击杀。你可以翻开第 {{layer}} 层的梦魇，选择发动或弃掉。",
+      "activate": "发动梦魇",
+      "discard": "弃掉梦魇",
+      "nightmare": "梦魇：{{name}}",
+      "unknown": "这一层已没有可翻开的梦魇。",
+      "plague": "邪念瘟疫由你发动时不派发贿赂：本层的盗梦者没有贿赂牌，将进入迷失层。",
+      "scope": "本回合结束前有效。"
+    },
+    "sheet": {
+      "back": "返回",
+      "zealotDiscard": {
+        "title": "选择要弃的手牌",
+        "desc": "弃 1 张手牌，掷骰结果就不会 -1。",
+        "confirm": "确认弃牌"
+      },
+      "libraSplit": {
+        "title": "分牌",
+        "desc": "点一张手牌，把它在两份之间切换；一份可以为空。",
+        "pile": "第 {{n}} 份（{{count}} 张）",
+        "empty": "（空）",
+        "confirm": "确认分牌"
+      },
+      "libraPick": {
+        "title": "选择一份",
+        "desc": "你取走选中的一份，另一份归还 {{name}}。",
+        "pile": "第 {{n}} 份（{{count}} 张）",
+        "empty": "（空）",
+        "take": "取走第 {{n}} 份"
+      },
+      "virgoRevive": {
+        "title": "复活一名玩家",
+        "desc": "被复活的玩家回到第 1 层，手牌清空。",
+        "confirm": "确认复活"
+      },
+      "virgoTeleport": {
+        "title": "传送到任一层",
+        "desc": "选择一个梦境层（不含迷失层）。",
+        "confirm": "确认传送",
+        "layer": "第 {{layer}} 层"
+      },
+      "ariesEcho": {
+        "title": "回音萦绕",
+        "desc": "选择一层梦境：恢复该层原有的心锁，或在该层增加 1 个心锁。",
+        "restore": "恢复原有心锁",
+        "add": "增加 1 个心锁",
+        "layer": "第 {{layer}} 层",
+        "confirm": "确认发动"
+      }
+    }
   },
   "dock": {
     "skill": "技能",

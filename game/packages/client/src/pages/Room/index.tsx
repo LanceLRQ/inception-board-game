@@ -6,16 +6,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Bot, Copy, LogOut, Play, Users } from 'lucide-react';
+import { MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
 import { isMockMode, roomApi, type RoomState } from '../../lib/roomApi';
 import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
-import { isRoomMember, resolveGameRedirect } from './roomLogic';
+import { isRoomMember, resolveGameRedirect, startGate } from './roomLogic';
 import { Button } from '@/components/ui/button';
 
 const POLL_INTERVAL_MS = 3_000;
-const MIN_PLAYERS = 3;
 
 export default function Room() {
   const { t } = useTranslation();
@@ -89,7 +89,7 @@ export default function Room() {
   }, [room, playerId, navigate]);
 
   const isOwner = !!room && !!playerId && room.ownerPlayerId === playerId;
-  const canStart = !!room && room.players.length >= MIN_PLAYERS;
+  const { canStart, missing: missingPlayers } = startGate(room);
 
   const handleFillAI = useCallback(async () => {
     if (!code) return;
@@ -271,8 +271,8 @@ export default function Room() {
             {t('room.start')}
           </Button>
           {!canStart && (
-            <p className="text-center text-xs text-dim">
-              {t('room.needPlayers', { n: MIN_PLAYERS })}
+            <p className="text-center text-xs text-dim" data-testid="room-need-players">
+              {t('room.needPlayers', { n: missingPlayers, min: MATCH_MIN_PLAYERS })}
             </p>
           )}
         </div>
