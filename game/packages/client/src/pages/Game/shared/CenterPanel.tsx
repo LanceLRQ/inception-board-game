@@ -13,11 +13,11 @@ import { getCardImageUrl } from '../../../lib/cardImages.js';
 import { getCardName } from '../../../lib/cards.js';
 import { cn } from '../../../lib/utils.js';
 import { Dialog, DialogHeader, DialogTitle } from '../../../components/ui/dialog.js';
-import type { MockMatchState, MockVault } from '../../../hooks/useMockMatch.js';
+import type { StageState, StageVault } from '../../../components/MatchRuntime/stageState.js';
 import type { CardID } from '@icgame/shared';
 
 export interface CenterPanelProps {
-  state: MockMatchState;
+  state: StageState;
   /** 焦点层：用于高亮当前 viewer / 梦主操作的层（不决定布局顺序，仅作视觉强调） */
   focusLayer: number;
   /** 点击金库（尚未接入；占位回调） */
@@ -38,7 +38,7 @@ function VaultCell({
   vault,
   onOpenVault,
 }: {
-  vault: MockVault | undefined;
+  vault: StageVault | undefined;
   onOpenVault?: (vaultId: string) => void;
 }) {
   if (!vault) {

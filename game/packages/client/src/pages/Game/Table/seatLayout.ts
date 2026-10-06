@@ -44,7 +44,7 @@ export function computeSeats(opts: ComputeSeatsOpts): Seat[] {
   const thieves = playerOrder.filter((id) => id !== viewerID && id !== masterID);
   const seats: Seat[] = [];
 
-  // 1. 梦主顶中央（viewer 自己是梦主 → 不渲染，由 ActionDock 承载）
+  // 1. 梦主顶中央（viewer 自己是梦主 → 不渲染，由手牌与操作区承载）
   if (!isViewerMaster && masterID) {
     seats.push({
       id: masterID,

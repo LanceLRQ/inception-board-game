@@ -39,7 +39,7 @@ export const cardFlip: Variants = {
 
 /**
  * 当前行动玩家的脉冲光（强调色）
- * 用于 PlayerSeat / RailSlot / ActionDock 外框
+ * 用于 PlayerSeat / RailSlot 外框
  */
 export const activeTurnPulse: Variants = {
   idle: { boxShadow: '0 0 0 0 color-mix(in srgb, var(--ms-acc) 0%, transparent)' },

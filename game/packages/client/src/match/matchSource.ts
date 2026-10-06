@@ -15,8 +15,8 @@ export type MoveOutcome =
   | { ok: false; code: MoveRejectCode | 'not_ready' | 'timeout' };
 
 export interface MatchSource {
-  /** 'local'：本机人机局；'remote'：服务端对局 */
-  readonly kind: 'local' | 'remote';
+  /** 'local'：本机人机局；'remote'：服务端对局；'fixture'：调试用的固定场景（无连接、无截止时间、不推进状态） */
+  readonly kind: 'local' | 'remote' | 'fixture';
   /** 最新视图；尚未就绪为 null */
   readonly view: MatchViewState | null;
   /** 本人的座位号；尚未就绪为 null */

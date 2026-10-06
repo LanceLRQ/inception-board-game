@@ -152,52 +152,51 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 - **服务端优先**：所有涉及隐藏信息的判定一律服务端执行，客户端只做展示
 - **UI 图标规范**：UI 层**禁止**使用 emoji 字符作为图标，所有图标必须使用 `lucide-react` 组件；注释/文档/测试中的 emoji 标记（如 `🤖` 徽章）不受此限制
 
-## 对局界面多路径地图（⚠️ 改 UI 前必读）
+## 对局界面地图（⚠️ 改 UI 前必读）
 
-**对局界面（Match UI）有两条并行渲染路径，任何视觉/布局改动都必须同步评估是否需要两路同改。路径 A 有本地与联机两个状态来源，共用同一套界面：**
+**对局界面（Match UI）只有一套：`components/MatchRuntime/`。** 它只依赖对局来源接口 `match/matchSource.ts`（`MatchSource`：视图、本人座位、座位表、发 move、连接状态等），状态来源有三种，界面代码完全相同：
 
-| 路径 | 入口 URL | 驱动组件 | 状态源 | 用途 |
+| 来源 | 入口 URL | 驱动组件 | 状态源 | 用途 |
 |------|---------|---------|-------|------|
-| **A · 真实对局（本地）** | `/local` / `/game/:matchId?friend=1&players=N` | `components/LocalMatchRuntime/index.tsx` → `components/MatchRuntime/` | 本地 Worker（`workers/localMatch.worker.ts`），由对局运行器驱动真实引擎，只向界面交出按座位裁剪的视图 | 人机对战；后端不可达时好友房的本地模式 |
-| **A · 真实对局（联机）** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` → `components/MatchRuntime/` | 服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
-| **B · Mock 调试视图** | `/game/:matchId` 不带 `online` / `friend` 参数 | `pages/Game/index.tsx → GameMockView` | `hooks/useMockMatch.ts`（静态 mock） | 开发调试、UI 走查、视角切换（`?as=master` / `?pending=1`） |
+| **本地** | `/local` / `/game/:matchId?friend=1&players=N` | `components/LocalMatchRuntime/index.tsx` | `match/useLocalMatchSource.ts`：本地 Worker（`workers/localMatch.worker.ts`）经对局运行器驱动真实引擎，只向界面交出按座位裁剪的视图 | 人机对战；后端不可达时好友房的本地模式 |
+| **联机** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` | `match/useRemoteMatchSource.ts`：服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
+| **固定场景** | `/game/:matchId` 不带 `online` / `friend` 参数（常用 `/game/debug`） | `components/FixtureMatchRuntime/index.tsx` | `match/useFixtureMatchSource.ts`：固定种子建局、调整局面后经引擎的视角过滤得到视图（构造见 `match/fixtures/buildScenario.ts`），发出的 move 只记日志、不推进状态 | 开发调试、UI 走查、视角与待应答状态切换 |
 
-**核心组件（所有路径共用）：**
+**固定场景的地址参数：** 缺省是盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
 
+**核心组件：**
+
+- `components/MatchRuntime/` — 对局界面本体；`RuntimeStage.tsx` 做视口分派（PC → `TableStage` / 移动 → `TurnOrderRail`），仅负责**展示层**；`viewAdapter.ts` 把视图（`G` / `ctx`）转为舞台用的 `StageState`（类型在 `stageState.ts`）
 - `components/PlayerSeat/` — PC 围坐座位节点（≥1024px）
-- `components/ActionDock/` — 底部操作栏
-- `components/TargetPickerDialog/` — 统一目标选择弹层（按 playerOrder + 角色卡面）
 - `components/GameCard/` — 卡牌渲染（`orientation` + 长按/双击查看详情）
 - `components/CardDetailModal/` — 详情弹窗（`disableFlip` 控制翻面）
 - `components/LayerBadge/` — 梦境层徽
 - `hooks/useCardPressDetail.ts` — 长按 2000ms / PC 双击 / 键盘统一交互
 - `hooks/useMediaQuery.ts` — PC/移动视口分派
-- `pages/Game/Table/` — PC 围坐椭圆舞台（`TableStage` / `MatchTable` / `seatLayout`）
-- `pages/Game/Track/` — 移动端星穹铁道行动轴（`TurnOrderRail` / `MatchTrack` / `MasterPanelCollapsible` / `turnOrder`）
-- `pages/Game/shared/` — 双路径复用（`CenterPanel` 中央桌面 / `MasterConsole` 梦主控制台）
+- `pages/Game/Table/` — PC 围坐椭圆舞台（`TableStage` / `seatLayout`）
+- `pages/Game/Track/` — 移动端星穹铁道行动轴（`TurnOrderRail` / `turnOrder`）
+- `pages/Game/shared/CenterPanel.tsx` — 中央桌面（焦点层 / 金库 / 心锁）
 
-**真实对局（路径 A）接入新 UI 的方式：**
+**对局界面的约束：**
 
-- `components/MatchRuntime/index.tsx` 是本地与联机共用的对局界面，只依赖对局来源接口 `match/matchSource.ts`（视图、发 move、本人座位、连接状态、座位信息）；本地实现是 `match/useLocalMatchSource.ts`，联机实现是 `match/useRemoteMatchSource.ts`
 - 界面拿到的永远是**按座位裁剪的视图**（他人手牌只有张数、牌库只有张数），不要在界面里读完整状态才有的字段；本人座位取自来源接口，不得写死座位号（`MatchRuntime/noHardcodedSeat.test.ts` 会拦）
-- 适配器 `components/MatchRuntime/viewAdapter.ts` 把视图（`G` / `ctx`）转为 `MockMatchState` 供新 UI 复用
-- `components/MatchRuntime/RuntimeStage.tsx` 做视口分派（PC → `TableStage` / 移动 → `TurnOrderRail`），仅负责**展示层**
 - 对局页的分流规则在 `pages/Game/resolveGameMode.ts`
-- MatchRuntime 自己的 Dialog 群（TargetPlayerPickerDialog、ShooterLayerPickerDialog、嫁接/万有引力/棋局易位等）**保留原样**——新 UI 的 `TargetPickerDialog` 仅服务于 Mock 调试路径
+- 选目标、响应窗口等交互由 `MatchRuntime` 自己的 Dialog 群承担（TargetPlayerPickerDialog、ShooterLayerPickerDialog、UnlockResponseDialog、嫁接/万有引力/棋局易位等）；座位与行动轴节点只展示、不选目标
+- 来源的 `kind` 是 `'local' | 'remote' | 'fixture'`：只有联机有截止时间、托管与重连；固定场景没有连接问题，响应窗口不会自动放弃，便于停在弹窗上走查
 
 **改 UI 时的自检清单：**
 
-1. 访问 `/local`（路径 A）确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
-2. 访问 `/game/debug?as=master`（路径 B）确认 mock 路径生效
+1. 访问 `/local` 确认新视觉生效；改动涉及连接状态、座位标识、等待提示时，再起服务端从好友房进一局联机对局确认
+2. 访问 `/game/debug`、`/game/debug?as=master`、`/game/debug?pending=1` 确认三个固定场景都正常
 3. PC 1280×800 + 移动 iPhone 12（390×844）两个视口都要走查
-4. 如果改动影响状态结构（`MockMatchState` / 对局状态 `G`），务必同步更新 `viewAdapter.ts` + 测试
+4. 如果改动影响状态结构（`StageState` / 对局状态 `G`），务必同步更新 `viewAdapter.ts`、固定场景的构造与测试
 
 **交互硬规范：**
 
 - 长按阈值：`lib/interactionConfig.ts` 的 `LONG_PRESS_MS = 2000ms`（PC + 移动端统一）
 - 金库牌 / 梦境层卡 **不触发**长按/双击详情（图案已明显）
 - 金库翻开后的详情 **禁止翻面**（背面属游戏机密，`CardDetailModal.disableFlip = true`）
-- 选目标统一走 `TargetPickerDialog` 弹层，Seat / RailSlot **只看不选**
+- 选目标统一走弹层（`TargetPlayerPickerDialog`），Seat / RailSlot **只看不选**
 
 ---
 

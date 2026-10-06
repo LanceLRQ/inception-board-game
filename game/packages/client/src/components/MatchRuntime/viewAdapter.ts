@@ -1,10 +1,10 @@
-// 将对局视图 G 与流程信息 ctx 适配为 MockMatchState 结构，复用新 UI（MatchTable / MatchTrack）
+// 将对局视图 G 与流程信息 ctx 适配为 StageState 结构，供对局舞台（TableStage / TurnOrderRail）使用
 //
 // 注意：这是纯展示层适配，不影响 MatchRuntime 的真实交互（pendingPlay / Dialog 群等）
 
 import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
-import type { MockMatchState, MockPlayer, MockLayer, MockVault } from '../../hooks/useMockMatch.js';
+import type { StageState, StagePlayer, StageLayer, StageVault } from './stageState.js';
 
 export interface AdaptViewToStageOpts {
   G: MatchView;
@@ -16,10 +16,10 @@ export interface AdaptViewToStageOpts {
 }
 
 /**
- * 把对局视图 G 与流程信息 ctx 转成 MockMatchState 视图。
+ * 把对局视图 G 与流程信息 ctx 转成 StageState 视图。
  * 入参已经是按座位裁剪过的视图：他人手牌为 null、只有张数，牌库只有张数。这里只做结构对齐。
  */
-export function adaptViewToStage(opts: AdaptViewToStageOpts): MockMatchState | null {
+export function adaptViewToStage(opts: AdaptViewToStageOpts): StageState | null {
   const { G, ctx, humanPlayerID, matchId = 'local-match' } = opts;
   const rawPlayers = G.players;
   if (!rawPlayers) return null;
@@ -28,7 +28,7 @@ export function adaptViewToStage(opts: AdaptViewToStageOpts): MockMatchState | n
   const playerOrder = Object.keys(rawPlayers).sort();
   const currentPlayerID = ctx.currentPlayer ?? playerOrder[0] ?? '';
 
-  const players: Record<string, MockPlayer> = {};
+  const players: Record<string, StagePlayer> = {};
   for (const id of playerOrder) {
     const p = rawPlayers[id]!;
     players[id] = {
@@ -46,7 +46,7 @@ export function adaptViewToStage(opts: AdaptViewToStageOpts): MockMatchState | n
     };
   }
 
-  const layers: Record<number, MockLayer> = {};
+  const layers: Record<number, StageLayer> = {};
   for (const [k, info] of Object.entries(G.layers ?? {})) {
     const layerNum = info.layer ?? Number(k);
     layers[layerNum] = {
@@ -57,7 +57,7 @@ export function adaptViewToStage(opts: AdaptViewToStageOpts): MockMatchState | n
     };
   }
 
-  const vaults: MockVault[] = (G.vaults ?? []).map((v, i) => ({
+  const vaults: StageVault[] = (G.vaults ?? []).map((v, i) => ({
     id: v.id ?? `vault_${i}`,
     layer: v.layer ?? 0,
     // 看不到内容的金库（null）按「未知」展示

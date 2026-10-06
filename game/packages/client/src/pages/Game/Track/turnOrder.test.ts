@@ -2,9 +2,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeRailSlots } from './turnOrder.js';
-import type { MockPlayer } from '../../../hooks/useMockMatch.js';
+import type { StagePlayer } from '../../../components/MatchRuntime/stageState.js';
 
-function makePlayers(ids: string[]): Record<string, MockPlayer> {
+function makePlayers(ids: string[]): Record<string, StagePlayer> {
   return Object.fromEntries(
     ids.map((id) => [
       id,
@@ -19,7 +19,7 @@ function makePlayers(ids: string[]): Record<string, MockPlayer> {
         hand: null,
         handCount: 0,
         isAlive: true,
-      } satisfies MockPlayer,
+      } satisfies StagePlayer,
     ]),
   );
 }

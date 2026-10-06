@@ -16,13 +16,13 @@ import { SeatStatusBadges } from '../../../components/SeatStatusBadges/index.js'
 import { activeTurnPulse, railSlotEnter } from '../../../styles/animations.js';
 import { getCardImageUrl, GENERIC_BACK_IMAGES } from '../../../lib/cardImages.js';
 import { computeRailSlots } from './turnOrder.js';
-import type { MockMatchState } from '../../../hooks/useMockMatch.js';
+import type { StageState } from '../../../components/MatchRuntime/stageState.js';
 import type { SeatMarker } from '../../../components/MatchRuntime/seatMarkers.js';
 
 export interface TurnOrderRailProps {
-  state: MockMatchState;
+  state: StageState;
   onOpenDetail: (cardId: string) => void;
-  /** 按座位号索引的状态标识；不传则不显示（Mock 调试路径无座位表） */
+  /** 按座位号索引的状态标识；不传则不显示 */
   seatMarkers?: Readonly<Record<string, readonly SeatMarker[]>>;
   className?: string;
 }

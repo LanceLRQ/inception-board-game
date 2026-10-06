@@ -401,7 +401,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
   const startPlay = useCallback(
     (card: string) => {
       // 新选一张牌 → 清掉其他 picker / pendingPlay，避免多个操作面板同时展开
-      // 对照：HandDrawer 单选语义 + useGameActions 单一 intent 模型
+      // 对照：HandDrawer 单选语义（同一时刻只有一个出牌意图）
       setPendingPlay(null);
       setDreamTransitPicker(null);
       setGravityPicker(null);
@@ -1074,7 +1074,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
         viewerPlayerID={viewerSeat}
         nicknameOf={(id) => (players?.[id]?.nickname as string | undefined) ?? id}
         makeMove={makeMove}
-        autoPass={!isRemote}
+        autoPass={sourceKind === 'local'}
         deadlineAt={deadlineAt}
       />
       <MasterPeekBribeDialog

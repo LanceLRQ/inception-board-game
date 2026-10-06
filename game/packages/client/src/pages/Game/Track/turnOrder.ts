@@ -1,6 +1,6 @@
 // 移动端行动轴的 slot 顺序计算（纯函数）
 
-import type { MockPlayer } from '../../../hooks/useMockMatch.js';
+import type { StagePlayer } from '../../../components/MatchRuntime/stageState.js';
 
 export interface RailSlotData {
   id: string;
@@ -13,7 +13,7 @@ export interface RailSlotData {
 
 export interface ComputeRailSlotsOpts {
   playerOrder: string[];
-  players: Record<string, MockPlayer | undefined>;
+  players: Record<string, StagePlayer | undefined>;
   viewerID: string;
   masterID: string;
   currentPlayerID: string;

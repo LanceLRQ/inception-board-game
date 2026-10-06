@@ -20,10 +20,10 @@ describe('resolveGameMode', () => {
     expect(resolveGameMode(q('friend=1&players=5'), null)).toEqual({ mode: 'local', players: 5 });
   });
 
-  it('friend=1 但人数不足、或没有任何参数 → mock', () => {
-    expect(resolveGameMode(q('friend=1&players=2'), null)).toEqual({ mode: 'mock' });
-    expect(resolveGameMode(q(''), 'jwt')).toEqual({ mode: 'mock' });
-    expect(resolveGameMode(q('as=master'), 'jwt')).toEqual({ mode: 'mock' });
+  it('friend=1 但人数不足、或没有任何参数 → fixture', () => {
+    expect(resolveGameMode(q('friend=1&players=2'), null)).toEqual({ mode: 'fixture' });
+    expect(resolveGameMode(q(''), 'jwt')).toEqual({ mode: 'fixture' });
+    expect(resolveGameMode(q('as=master'), 'jwt')).toEqual({ mode: 'fixture' });
   });
 
   it('online 优先于 friend', () => {

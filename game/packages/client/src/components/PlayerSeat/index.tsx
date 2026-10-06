@@ -16,11 +16,11 @@ import { SeatStatusBadges } from '../SeatStatusBadges/index.js';
 import { activeTurnPulse, seatEnter } from '../../styles/animations.js';
 import { getCardImageUrl } from '../../lib/cardImages.js';
 import type { Seat } from '../../pages/Game/Table/seatLayout.js';
-import type { MockPlayer } from '../../hooks/useMockMatch.js';
+import type { StagePlayer } from '../MatchRuntime/stageState.js';
 import type { SeatMarker } from '../MatchRuntime/seatMarkers.js';
 
 export interface PlayerSeatProps {
-  player: MockPlayer;
+  player: StagePlayer;
   seat: Seat;
   /** 轮到此玩家行动 */
   isCurrent: boolean;

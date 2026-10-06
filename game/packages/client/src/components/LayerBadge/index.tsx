@@ -1,5 +1,5 @@
 // LayerBadge - 梦境层数徽标（L0-L4）
-// 位置：PlayerSeat 右侧 / ActionDock 中
+// 位置：PlayerSeat 右侧
 
 import { cn } from '../../lib/utils.js';
 

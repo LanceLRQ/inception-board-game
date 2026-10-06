@@ -4,16 +4,16 @@ import type { ReactNode } from 'react';
 import { cn } from '../../../lib/utils.js';
 import { PlayerSeat } from '../../../components/PlayerSeat/index.js';
 import { computeSeats } from './seatLayout.js';
-import type { MockMatchState } from '../../../hooks/useMockMatch.js';
+import type { StageState } from '../../../components/MatchRuntime/stageState.js';
 import type { SeatMarker } from '../../../components/MatchRuntime/seatMarkers.js';
 
 export interface TableStageProps {
-  state: MockMatchState;
+  state: StageState;
   /** 长按某玩家角色卡查看详情 */
   onOpenCharacterDetail: (cardId: string) => void;
   /** 舞台中央节点（CenterPanel） */
   centerSlot?: ReactNode;
-  /** 按座位号索引的状态标识；不传则不显示（Mock 调试路径无座位表） */
+  /** 按座位号索引的状态标识；不传则不显示 */
   seatMarkers?: Readonly<Record<string, readonly SeatMarker[]>>;
   className?: string;
 }

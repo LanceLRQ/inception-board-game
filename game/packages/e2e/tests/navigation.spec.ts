@@ -27,10 +27,11 @@ test.describe('参数化路由 — 不应 404，允许降级展示', () => {
     await waitForAppReady(page);
   });
 
-  test('/game/:matchId 使用伪 matchId 可打开', async ({ page }) => {
+  test('/game/:matchId 使用伪 matchId 进入固定场景对局界面', async ({ page }) => {
     const res = await page.goto('/game/test-match-id');
     expect(res?.status()).toBeLessThan(400);
     await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
   });
 
   test('/replay/:matchId 使用伪 matchId 可打开', async ({ page }) => {

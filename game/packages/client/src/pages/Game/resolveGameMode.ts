@@ -1,10 +1,10 @@
-// 对局页分流：按地址参数与令牌决定进入联机 / 本地 / 调试视图
+// 对局页分流：按地址参数与令牌决定进入联机 / 本地 / 固定场景（调试）
 
 export type GameMode =
   | { mode: 'online' }
   | { mode: 'online-unavailable' }
   | { mode: 'local'; players: number }
-  | { mode: 'mock' };
+  | { mode: 'fixture' };
 
 /** 无后端时本地身份使用的伪令牌前缀 */
 const MOCK_TOKEN_PREFIX = 'mock-';
@@ -20,5 +20,5 @@ export function resolveGameMode(searchParams: URLSearchParams, token: string | n
   if (searchParams.get('friend') === '1' && players >= MIN_LOCAL_PLAYERS) {
     return { mode: 'local', players };
   }
-  return { mode: 'mock' };
+  return { mode: 'fixture' };
 }
