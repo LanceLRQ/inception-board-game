@@ -176,7 +176,9 @@ test.describe('好友房 Lobby / Room 流程', () => {
     await page.getByLabel('先给自己起个名字').fill(FAKE_NICKNAME);
     await page.getByRole('button', { name: /继续/ }).click();
 
-    // 3. 认证完成 → 显示创建/加入入口
+    // 3. 建档后先弹恢复码弹窗，确认保存后才进入创建/加入入口
+    await expect(page.getByTestId('recovery-code-value')).toHaveText('ABCD-1234');
+    await page.getByTestId('recovery-code-confirm').click();
     await expect(page.getByTestId('lobby-nickname')).toHaveText(FAKE_NICKNAME);
     await expect(page.getByTestId('lobby-create')).toBeVisible();
 

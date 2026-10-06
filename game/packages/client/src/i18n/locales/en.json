@@ -367,5 +367,55 @@
         "desc": "Choose target + pick 1 bribe from the pool to deal"
       }
     }
+  },
+  "recovery": {
+    "dialog": {
+      "title": {
+        "created": "Save your recovery code",
+        "recovered": "Account restored. Save your new recovery code",
+        "rotated": "Your new recovery code"
+      },
+      "defaultWarning": "This code is shown only once. Keep it safe; you can use it to restore your account on another device.",
+      "oldRevoked": "Your previous recovery code is no longer valid. Use this new one.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Copy failed. Please write the code down by hand.",
+      "confirm": "I have saved it"
+    },
+    "restore": {
+      "entry": "Already have an account? Restore with a recovery code",
+      "label": "Recovery code",
+      "placeholder": "XXXX-XXXX",
+      "submit": "Restore",
+      "hint": "After restoring, this code stops working and a new one is issued."
+    },
+    "error": {
+      "invalid": "The recovery code is invalid or has already been used. Each code works only once; please check for typos.",
+      "banned": "This account is banned and cannot be restored for now.",
+      "rateLimited": "Too many attempts. Please try again later.",
+      "format": "Invalid format. A recovery code has 8 letters or digits.",
+      "offline": "Offline mode: recovery codes are unavailable.",
+      "network": "Network or server error. Please try again later."
+    },
+    "rotateError": {
+      "unauthorized": "Your session has expired. Please go back to the lobby."
+    },
+    "account": {
+      "heading": "Account",
+      "nickname": "Nickname",
+      "status": "Recovery code",
+      "hasCode": "Issued",
+      "noCode": "No valid recovery code",
+      "createdAt": "Issued {{time}}",
+      "statusUnknown": "Status unavailable right now",
+      "rotate": "Regenerate recovery code",
+      "confirmTitle": "Regenerate recovery code?",
+      "confirmBody": "The old code stops working immediately; only the new code can restore your account. The new code is shown only once.",
+      "confirmYes": "Regenerate",
+      "confirmNo": "Cancel",
+      "notSignedIn": "No account yet. Pick a nickname in the lobby first; the recovery code status will show here.",
+      "toLobby": "Go to lobby",
+      "offlineNote": "Offline mode: the account lives only in this browser, has no recovery code and cannot be regenerated."
+    }
   }
 }

@@ -317,5 +317,55 @@
     "dm_imperial_city": {
       "skill_0": { "name": "皇城·重金", "desc": "指定目标 + 选贿赂池 1 张派发" }
     }
+  },
+  "recovery": {
+    "dialog": {
+      "title": {
+        "created": "请保存你的恢复码",
+        "recovered": "账号已恢复，请保存新的恢复码",
+        "rotated": "新的恢复码"
+      },
+      "defaultWarning": "此码只显示一次，请妥善保存，可用于换设备时恢复账号",
+      "oldRevoked": "之前的恢复码已经失效，请以这个新码为准。",
+      "copy": "复制",
+      "copied": "已复制",
+      "copyFailed": "复制失败，请手动抄写上面的恢复码。",
+      "confirm": "我已保存"
+    },
+    "restore": {
+      "entry": "已有账号？用恢复码恢复",
+      "label": "恢复码",
+      "placeholder": "XXXX-XXXX",
+      "submit": "恢复",
+      "hint": "恢复成功后，这个恢复码会失效，并换发一个新的。"
+    },
+    "error": {
+      "invalid": "恢复码无效或已经用过。恢复码只能使用一次，请检查是否抄错。",
+      "banned": "该账号已被封禁，暂时无法恢复。",
+      "rateLimited": "尝试次数过多，请稍后再试。",
+      "format": "恢复码格式不对，应为 8 位字母或数字。",
+      "offline": "当前是离线模式，无法使用恢复码。",
+      "network": "网络或服务端出错，请稍后再试。"
+    },
+    "rotateError": {
+      "unauthorized": "登录已失效，请回到大厅重新进入。"
+    },
+    "account": {
+      "heading": "账号",
+      "nickname": "昵称",
+      "status": "恢复码",
+      "hasCode": "已生成",
+      "noCode": "没有有效的恢复码",
+      "createdAt": "生成于 {{time}}",
+      "statusUnknown": "暂时无法读取状态",
+      "rotate": "重新生成恢复码",
+      "confirmTitle": "重新生成恢复码？",
+      "confirmBody": "旧的恢复码会立刻失效，之后只能用新码恢复账号。新码只显示一次。",
+      "confirmYes": "重新生成",
+      "confirmNo": "取消",
+      "notSignedIn": "还没有账号。请先到大厅设置昵称，创建账号后这里会显示恢复码状态。",
+      "toLobby": "去大厅",
+      "offlineNote": "当前是离线模式，账号只保存在这个浏览器里，没有恢复码，也不能重新生成。"
+    }
   }
 }

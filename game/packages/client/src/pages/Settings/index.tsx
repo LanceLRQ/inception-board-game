@@ -1,11 +1,14 @@
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { AudioControls } from '../../components/AudioControls';
+import { AccountSection } from './AccountSection';
 
 export default function Settings() {
   return (
     <div className="min-h-screen bg-background p-4 text-foreground">
       <h1 className="mb-6 text-2xl font-bold">设置</h1>
+
+      <AccountSection />
 
       <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">外观</h2>

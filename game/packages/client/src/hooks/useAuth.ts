@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api';
 import { identityApi } from '../lib/identityApi';
 import { useIdentityStore } from '../stores/useIdentityStore';
 
-interface RecoverResponse {
-  playerId: string;
-  nickname: string;
-  token: string;
-  expiresAt: number;
-  recoveryCode: string;
-  recoveryCodeWarning: string;
+/** 建档 / 恢复的结果；recoveryCode 为 null 表示不需要展示（离线模拟身份） */
+export interface IdentityResult {
+  recoveryCode: string | null;
+  warning: string;
 }
 
 export function useAuth() {
@@ -39,7 +35,7 @@ export function useAuth() {
   }, [token, setNickname, clearIdentity]);
 
   const initIdentity = useCallback(
-    async (inputNickname: string) => {
+    async (inputNickname: string): Promise<IdentityResult> => {
       setIsLoading(true);
       try {
         const res = await identityApi.init(inputNickname);
@@ -54,10 +50,10 @@ export function useAuth() {
   );
 
   const recoverIdentity = useCallback(
-    async (code: string) => {
+    async (code: string): Promise<IdentityResult> => {
       setIsLoading(true);
       try {
-        const res = await api.post<RecoverResponse>('/identity/recover', { code });
+        const res = await identityApi.recover(code);
         localStorage.setItem('icgame-token', res.token);
         setIdentity(res.playerId, res.token, res.nickname);
         // 恢复码一次性：用过的码已作废，这里返回的新码需要展示给用户保存
