@@ -232,9 +232,9 @@ export function useMatchController(source: MatchSource): MatchController {
     if (outcome.ok) setChessChoice({ turn: turnNumber, mode: 'dismissed' });
   }, [chessPick, makeMove, setChessPick, turnNumber]);
 
-  // 贿赂派发：移除常驻主动 UI（违反规则）。
-  // 规则：仅在盗梦者使用【梦境窥视】或打开金币金库时，梦主通过响应窗口决策派发。
-  // 对照：docs/manual/03-game-flow.md §贿赂&背叛者 + MasterPeekBribeBanner
+  // 贿赂派发没有常驻主动入口：仅在盗梦者使用【梦境窥视】（MasterPeekBribeDialog）
+  // 或打开金币金库（MasterNightmareDecisionDialog 三选一）时，由梦主应答。
+  // 对照：docs/manual/03-game-flow.md §贿赂&背叛者
   const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
   const playerLayer = (humanPlayer?.currentLayer as number) ?? 1;
 

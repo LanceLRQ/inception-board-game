@@ -1,32 +1,49 @@
 // 对局正在等某位玩家应答时，推导是否轮到本人（用于等待提示与动态栏）；本人的操作界面见 response/awaitedResponse.ts。
 // 点名以视图字段的实际形状为准；对本人不可见的点名（视图里为 null）一律视为不是本人。
 // 共鸣只是回合末自动结算的标记，不需要任何人应答，不在此列。
+// 金币金库的三选一等的是梦主，梦主的操作界面是 MasterNightmareDecisionDialog（弹窗），
+// 所以轮到梦主时标 hasOwnUi，等待提示不再叠一条「暂时无法操作」。
 
 import type { MatchView } from '@icgame/game-engine';
 
 export interface AwaitingNotice {
   /** 是否轮到本人应答 */
   mine: boolean;
+  /** 轮到本人时，操作界面是自己的弹窗（不经应答窗口 / 响应条），等待提示不必再显示 */
+  hasOwnUi?: true;
 }
 
-/** 当前正在等待应答的座位；没有待决状态返回 undefined，点名对本人不可见返回 null */
-function awaitedSeat(view: MatchView): string | null | undefined {
+interface Awaited {
+  /** 点名的座位；对本人不可见时为 null */
+  seat: string | null;
+  /** 轮到该座位时，是否有独立的弹窗承担操作 */
+  hasOwnUi?: true;
+}
+
+/** 当前正在等待应答的座位；没有待决状态返回 undefined */
+function awaitedSeat(view: MatchView): Awaited | undefined {
   // 阻塞类先判断，白羊选择不挡住回合主人，放最后
-  if (view.pendingShootResponse) return view.pendingShootResponse.targetPlayerID;
+  if (view.pendingShootResponse) return { seat: view.pendingShootResponse.targetPlayerID };
   if (view.pendingLibra) {
     // 目标先分牌，分牌后由发动者选一份
-    return view.pendingLibra.split
-      ? view.pendingLibra.bonderPlayerID
-      : view.pendingLibra.targetPlayerID;
+    return {
+      seat: view.pendingLibra.split
+        ? view.pendingLibra.bonderPlayerID
+        : view.pendingLibra.targetPlayerID,
+    };
   }
-  if (view.pendingSudgerRolls) return view.currentPlayerID;
-  if (view.pendingVirgoChoice) return view.pendingVirgoChoice.virgoID;
-  if (view.pendingAriesChoice) return view.pendingAriesChoice.ariesID;
+  if (view.pendingSudgerRolls) return { seat: view.currentPlayerID };
+  if (view.pendingVirgoChoice) return { seat: view.pendingVirgoChoice.virgoID };
+  // 金币金库三选一、梦境窥视是否派贿赂：都等梦主，梦主各有自己的弹窗
+  if (view.pendingVaultDecision) return { seat: view.dreamMasterID, hasOwnUi: true };
+  if (view.pendingPeekDecision) return { seat: view.dreamMasterID, hasOwnUi: true };
+  if (view.pendingAriesChoice) return { seat: view.pendingAriesChoice.ariesID };
   return undefined;
 }
 
 export function awaitingNotice(view: MatchView, seat: string | null): AwaitingNotice | null {
   const awaited = awaitedSeat(view);
   if (awaited === undefined) return null;
-  return { mine: seat !== null && awaited !== null && awaited === seat };
+  const mine = seat !== null && awaited.seat !== null && awaited.seat === seat;
+  return mine && awaited.hasOwnUi ? { mine, hasOwnUi: true } : { mine };
 }

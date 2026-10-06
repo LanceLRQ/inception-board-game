@@ -172,16 +172,6 @@ export const SECRET_PASSAGE_TELEPORT: ActiveSkillDescriptor = {
     (ctx.skillUsedThisTurn['secret_passage_teleport'] ?? 0) < 2,
 };
 
-export const MASTER_DISCARD_HIDDEN_NIGHTMARE: ActiveSkillDescriptor = {
-  id: '__any_master__.discard_hidden_nightmare',
-  characterId: '__any__',
-  move: 'masterDiscardHiddenNightmare',
-  nameKey: 'skill.master.discard_hidden_nightmare.name',
-  descKey: 'skill.master.discard_hidden_nightmare.desc',
-  argKind: 'targetLayer',
-  extraCheck: (ctx) => ctx.faction === 'master',
-};
-
 export const MASTER_ACTIVATE_NIGHTMARE: ActiveSkillDescriptor = {
   id: '__any_master__.activate_nightmare',
   characterId: '__any__',
@@ -220,16 +210,6 @@ export const SATURN_FREE_MOVE: ActiveSkillDescriptor = {
   descKey: 'skill.dm_saturn_territory.free_move.desc',
   argKind: 'targetLayer',
   extraCheck: (ctx) => ctx.faction === 'thief' && ctx.hasBribe === true,
-};
-
-export const MASTER_REVEAL_NIGHTMARE: ActiveSkillDescriptor = {
-  id: '__any_master__.reveal_nightmare',
-  characterId: '__any__',
-  move: 'masterRevealNightmare',
-  nameKey: 'skill.master.reveal_nightmare.name',
-  descKey: 'skill.master.reveal_nightmare.desc',
-  argKind: 'targetLayer',
-  extraCheck: (ctx) => ctx.faction === 'master',
 };
 
 export const MASTER_DISCARD_NIGHTMARE: ActiveSkillDescriptor = {
@@ -292,18 +272,6 @@ export const HALEY_IMPACT: ActiveSkillDescriptor = {
     // 每成功解封可触发 1 次，使用次数不得超过成功解封次数
     return unlocks > used;
   },
-};
-
-// 梦主·贿赂派发（所有梦主通用）—— 从贿赂池随机派 1 张给盗梦者
-// 对照：docs/manual/03-game-flow.md 贿赂阶段 + engine/game.ts masterDealBribe
-export const MASTER_DEAL_BRIBE: ActiveSkillDescriptor = {
-  id: '__any_master__.deal_bribe',
-  characterId: '__any__',
-  move: 'masterDealBribe',
-  nameKey: 'skill.master.deal_bribe.name',
-  descKey: 'skill.master.deal_bribe.desc',
-  argKind: 'targetPlayer',
-  extraCheck: (ctx) => ctx.faction === 'master' && ctx.bribePoolAvailable === true,
 };
 
 // 露娜·月蚀 —— 弃 2 张 SHOOT → 击杀同层任意玩家 → 翻面
@@ -382,18 +350,6 @@ export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
     (ctx.discardPile?.length ?? 0) > 0,
 };
 
-// 皇城·重金 —— 梦主指定池中 1 张贿赂派给盗梦者（替代随机抽）
-// 对照：cards-data.json dm_imperial_city + engine/game.ts masterDealBribeImperial
-export const IMPERIAL_DEAL_BRIBE: ActiveSkillDescriptor = {
-  id: 'dm_imperial_city.skill_0',
-  characterId: 'dm_imperial_city',
-  move: 'masterDealBribeImperial',
-  nameKey: 'skill.dm_imperial_city.skill_0.name',
-  descKey: 'skill.dm_imperial_city.skill_0.desc',
-  argKind: 'playerAndBribeIndex',
-  extraCheck: (ctx) => ctx.faction === 'master' && (ctx.bribePoolItems?.length ?? 0) > 0,
-};
-
 // 战争之王·黑市 —— 弃 2 张手牌 → 从弃牌堆取 1 张
 // 对照：docs/manual/05-dream-thieves.md 战争之王 + engine/game.ts playLordOfWarBlackMarket
 export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
@@ -440,18 +396,15 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   MARS_KILL,
   CHESS_TRANSPOSE,
   SATURN_FREE_MOVE,
-  MASTER_REVEAL_NIGHTMARE,
   MASTER_DISCARD_NIGHTMARE,
   PAPRIK_SALVATION,
   URANUS_POWER,
-  MASTER_DISCARD_HIDDEN_NIGHTMARE,
   MASTER_ACTIVATE_NIGHTMARE,
   SECRET_PASSAGE_TELEPORT,
   DARWIN_EVOLUTION,
   HALEY_IMPACT,
-  // MASTER_DEAL_BRIBE / IMPERIAL_DEAL_BRIBE 已从主动技能注册表移除。
-  // 规则约束：贿赂派发只能在盗梦者【梦境窥视】或打开金币金库的响应窗口触发，
-  // 而非梦主回合主动发起。保留常量定义供未来响应窗口复用。
+  // 贿赂派发不是梦主主动发起的技能：只在盗梦者打开金币金库（金库三选一弹窗）
+  // 或打出【梦境窥视】（派贿赂弹窗）时由梦主应答。
   // 对照：docs/manual/03-game-flow.md §贿赂&背叛者
   LUNA_ECLIPSE,
   ATHENA_AWE,

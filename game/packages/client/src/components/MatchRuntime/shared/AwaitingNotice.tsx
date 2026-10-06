@@ -13,7 +13,7 @@ interface AwaitingNoticeProps {
 
 export function AwaitingNotice({ awaiting, hasResponseUi, className }: AwaitingNoticeProps) {
   const { t } = useTranslation();
-  if (!awaiting || (awaiting.mine && hasResponseUi)) return null;
+  if (!awaiting || (awaiting.mine && (hasResponseUi || awaiting.hasOwnUi))) return null;
   return (
     <div className={cn('text-xs text-dim', className)} role="status" data-testid="awaiting-notice">
       {awaiting.mine
