@@ -82,6 +82,8 @@ import {
   isJupiterPeakLayerOK,
   shouldJupiterThunderKill,
   applyM4CarbineModifier,
+  isDreamMaster,
+  isOutwardThief,
   canImperialPickBribe,
   applySecretPassageTeleport,
   applyUranusPower,
@@ -491,8 +493,7 @@ export const InceptionCityGame = {
             const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
             // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果
             // 对照：cards-data.json dm_pluto_hell 世界观
-            const currentPlayer = G.players[G.currentPlayerID];
-            const isThief = currentPlayer?.faction === 'thief';
+            const isThief = isOutwardThief(G, G.currentPlayerID);
             // 盛夏·充盈是梦主本人的技能：背叛者虽属梦主阵营，没有梦主的技能
             const isMaster = G.currentPlayerID === G.dreamMasterID;
             const plutoOverride = isPlutoHellWorldActive(G) && isThief ? random.D6() : null;
@@ -963,8 +964,9 @@ export const InceptionCityGame = {
             if (!self || !target) return INVALID_MOVE;
             if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
             if (!self.hand.includes(cardId)) return INVALID_MOVE;
-            // 盗梦者不能对梦主使用（但梦主对盗梦者可）
-            if (self.faction === 'thief' && target.faction === 'master') {
+            // 盗梦者不能对梦主使用（但梦主对盗梦者可）；背叛者对外是盗梦者，同样不能对梦主使用
+            // 对照：docs/manual/04-action-cards.md 移形换影 解析
+            if (!isDreamMaster(G, ctx.currentPlayer) && isDreamMaster(G, targetPlayerID)) {
               return INVALID_MOVE;
             }
 
@@ -1205,7 +1207,8 @@ export const InceptionCityGame = {
             if (!isCardForPlayMove('playUnlock', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
-            if (player.faction !== 'thief') return INVALID_MOVE;
+            // 梦主不能使用效果①；背叛者对外是盗梦者，可以使用
+            if (isDreamMaster(G, ctx.currentPlayer)) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
             // 自己复活自己的当回合不能用效果①（效果②走 respondCancelUnlock，不受限）
             // 对照：docs/manual/04-action-cards.md 解封 效果①
@@ -1425,8 +1428,8 @@ export const InceptionCityGame = {
             if (!isCardForPlayMove('playPeek', cardId)) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
-            // 效果①仅盗梦者；梦主效果②通过独立 move 处理（F10 待实装）
-            if (player.faction !== 'thief') return INVALID_MOVE;
+            // 效果①仅盗梦者（背叛者对外是盗梦者）；梦主效果②通过独立 move 处理
+            if (isDreamMaster(G, ctx.currentPlayer)) return INVALID_MOVE;
             if (!player.hand.includes(cardId)) return INVALID_MOVE;
             if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
             const hasVault = G.vaults.some((v) => v.layer === targetLayer);
@@ -1536,7 +1539,7 @@ export const InceptionCityGame = {
             if (targetThiefID === ctx.currentPlayer) return INVALID_MOVE;
             const target = G.players[targetThiefID];
             if (!target || !target.isAlive) return INVALID_MOVE;
-            if (target.faction !== 'thief') return INVALID_MOVE;
+            if (!isOutwardThief(G, targetThiefID)) return INVALID_MOVE;
             const hasBribe = G.bribePool.some((b) => b.heldBy === targetThiefID);
             if (!hasBribe) return INVALID_MOVE;
 
@@ -1575,7 +1578,8 @@ export const InceptionCityGame = {
             const target = G.players[targetPlayerID];
             if (!target) return INVALID_MOVE;
             if (!target.isAlive) return INVALID_MOVE;
-            if (target.faction !== 'thief') return INVALID_MOVE;
+            // 一个盗梦者可以收到多张贿赂牌，背叛者对外是盗梦者，也能再收
+            if (!isOutwardThief(G, targetPlayerID)) return INVALID_MOVE;
 
             // 从 pool 随机抽 1 张
             const poolIdxs = G.bribePool
@@ -2813,12 +2817,8 @@ export const InceptionCityGame = {
       return { winner: 'thief' as Faction, reason: 'secret_vault_opened' };
     }
 
-    const aliveThieves = G.playerOrder.filter(
-      (id) => G.players[id]?.faction === 'thief' && G.players[id]?.isAlive,
-    );
-    if (aliveThieves.length === 0) {
-      return { winner: 'master' as Faction, reason: 'all_thieves_dead' };
-    }
+    // 盗梦者全部在迷失层不是终局：迷失层的玩家仍可在自己回合的出牌阶段弃 2 张牌复活自己
+    // 对照：docs/manual/03-game-flow.md 第 19–20 行（胜负只有「打开秘密金库」与「牌库抽完」两条）
 
     // 港口世界观：≥2 金库打开且秘密未开 → 梦主胜
     // 对照：cards-data.json dm_harbor 世界观
@@ -2923,7 +2923,7 @@ function applyNightmareEffect(
     let s = G;
     const thieves = [...ls.playersInLayer].filter((pid) => {
       const p = s.players[pid];
-      return p && p.faction === 'thief' && p.isAlive;
+      return p && isOutwardThief(s, pid) && p.isAlive;
     });
     for (const pid of thieves) {
       const roll = random.D6();
@@ -2986,7 +2986,7 @@ function applyNightmareEffect(
     let s = G;
     const layerThieves = [...ls.playersInLayer].filter((pid) => {
       const p = s.players[pid];
-      return p && p.faction === 'thief' && p.isAlive;
+      return p && isOutwardThief(s, pid) && p.isAlive;
     });
     for (const pid of layerThieves) {
       if (!bribed.has(pid)) continue;

@@ -588,10 +588,11 @@ describe('applyMercuryReverse 纯函数', () => {
       players: {
         ...s.players,
         pM: { ...s.players.pM!, characterId: 'dm_mercury_route' as CardID, currentLayer: 1 },
-        // p1 设为贿赂者（faction=master），与梦主同层
+        // p1 设为贿赂者（收到过贿赂牌、faction=master），与梦主同层
         p1: {
           ...s.players.p1!,
           faction: 'master' as const,
+          bribeReceived: 1,
           currentLayer: 1,
           hand: ['action_shoot' as CardID],
         },
@@ -630,9 +631,15 @@ describe('applyMercuryReverse 纯函数', () => {
     expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'p2')).toBeNull();
   });
 
-  it('出牌者不是贿赂者（faction=thief）→ null', () => {
+  it('出牌者没有贿赂牌 → null', () => {
     let s = setupMercuryReverse();
-    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, faction: 'thief' as const } } };
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, faction: 'thief' as const, bribeReceived: 0 },
+      },
+    };
     expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
   });
 
@@ -699,6 +706,7 @@ describe('playShoot 水星·逆流集成', () => {
         p1: {
           ...s.players.p1!,
           faction: 'master' as const,
+          bribeReceived: 1,
           currentLayer: 1,
           hand: ['action_shoot' as CardID],
         },
@@ -735,7 +743,13 @@ describe('playShoot 水星·逆流集成', () => {
   it('非贿赂者 SHOOT 梦主 → 正常结算', () => {
     let s = setupShootScenario();
     // p1 恢复为 thief 阵营
-    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, faction: 'thief' as const } } };
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, faction: 'thief' as const, bribeReceived: 0 },
+      },
+    };
     const r = callMove(s, 'playShoot', ['pM', 'action_shoot'], { currentPlayer: 'p1' });
     expectMoveOk(r);
     expect(r.deck.discardPile).toContain('action_shoot');
@@ -761,6 +775,7 @@ describe('playKick 水星·逆流集成', () => {
         p1: {
           ...s.players.p1!,
           faction: 'master' as const,
+          bribeReceived: 1,
           currentLayer: 1,
           hand: ['action_kick' as CardID],
         },

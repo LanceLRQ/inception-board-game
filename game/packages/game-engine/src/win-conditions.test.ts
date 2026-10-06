@@ -114,7 +114,7 @@ describe('endIf 胜负仲裁', () => {
     expect(endIf({ G: s })).toEqual({ winner: 'thief', reason: 'secret_vault_opened' });
   });
 
-  it('所有盗梦者死亡 → 梦主胜', () => {
+  it('所有盗梦者死亡 → 不是终局（迷失层的人还能复活自己）', () => {
     const s = makeState({
       players: {
         '0': {
@@ -125,7 +125,7 @@ describe('endIf 胜负仲裁', () => {
         '1': makeState().players['1']!,
       },
     });
-    expect(endIf({ G: s })).toEqual({ winner: 'master', reason: 'all_thieves_dead' });
+    expect(endIf({ G: s })).toBeUndefined();
   });
 
   it('牌库耗尽 + 秘密未开 → 梦主胜', () => {

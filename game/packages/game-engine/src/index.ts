@@ -79,7 +79,6 @@ export {
   sendToLimbo,
   killPlayer,
   KILL_HANDOVER_COUNT,
-  allThievesDead,
   getAlivePlayers,
   getAliveInLayer,
 } from './engine/death.js';

@@ -1,7 +1,7 @@
 // 自动行动判定测试：状态在真实对局建出的局面上改写，保证结构与引擎一致
 
 import { describe, it, expect } from 'vitest';
-import { InceptionCityGame } from '@icgame/game-engine';
+import { InceptionCityGame, sendToLimbo } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
 import { nextAutoAction } from './autoAction.js';
@@ -346,5 +346,39 @@ describe('nextAutoAction · 判定顺序', () => {
       },
     });
     expect(nextAutoAction(pending, NO_HUMAN)?.move).toBe('passResponse');
+  });
+});
+
+describe('nextAutoAction · 盗梦者全部在迷失层', () => {
+  /** 把所有盗梦者送进迷失层，回合交给第一个盗梦者的抽牌阶段 */
+  function allThievesInLimbo(): State {
+    const s = playingState(5, 'limbo-all');
+    let G = s.G;
+    const thieves = G.playerOrder.filter((id) => id !== G.dreamMasterID);
+    for (const id of thieves) G = sendToLimbo(G, id);
+    const first = thieves[0]!;
+    return {
+      ...s,
+      G: { ...G, currentPlayerID: first, turnPhase: 'draw' },
+      ctx: { ...s.ctx, currentPlayer: first, playOrderPos: s.ctx.playOrder.indexOf(first) },
+    };
+  }
+
+  it('迷失层玩家的回合一路推进到回合结束，每一步都被运行器接受，不返回 null', () => {
+    let s = allThievesInLimbo();
+    const owner = s.ctx.currentPlayer;
+    const seen: string[] = [];
+    for (let i = 0; i < 6 && s.ctx.currentPlayer === owner; i++) {
+      const action = nextAutoAction(s, NO_HUMAN);
+      expect(action, `第 ${i + 1} 步不应为 null`).not.toBeNull();
+      seen.push(action!.move);
+      const res = applyMove(game, s, action!);
+      expect(res.ok, `${action!.move} 应被接受`).toBe(true);
+      if (!res.ok) return;
+      s = res.state;
+    }
+    expect(s.ctx.currentPlayer).not.toBe(owner);
+    expect(s.ctx.gameover).toBeUndefined();
+    expect(seen[0]).toBe('doDraw');
   });
 });

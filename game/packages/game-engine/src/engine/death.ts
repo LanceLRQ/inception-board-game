@@ -156,13 +156,6 @@ export function killPlayer(
   };
 }
 
-/** 判断是否所有盗梦者都死亡（梦主获胜条件之一） */
-export function allThievesDead(state: SetupState): boolean {
-  const thieves = state.playerOrder.filter((id) => state.players[id]?.faction === 'thief');
-  if (thieves.length === 0) return false;
-  return thieves.every((id) => !state.players[id]?.isAlive);
-}
-
 /** 获取所有存活玩家 ID */
 export function getAlivePlayers(state: SetupState): string[] {
   return state.playerOrder.filter((id) => state.players[id]?.isAlive);

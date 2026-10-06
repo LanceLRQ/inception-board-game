@@ -510,7 +510,7 @@ export function applyFortressColdness(
   if (!master || !target) return state;
   if (master.characterId !== 'dm_fortress') return state;
   if (!target.isAlive) return state;
-  if (target.faction !== 'thief') return state;
+  if (!isOutwardThief(state, targetPlayerID)) return state;
 
   // 卡面没有「限一次」：每次移动到另一层梦境都可以触发
   let s = state;
@@ -620,7 +620,7 @@ export function applyApolloWorship(
   const target = state.players[targetID];
   if (!target || !target.isAlive) return null;
   // target 必须是盗梦者且拥有贿赂牌（bribeReceived > 0）
-  if (target.faction !== 'thief') return null;
+  if (!isOutwardThief(state, targetID)) return null;
   if (target.bribeReceived <= 0) return null;
   if (target.hand.length === 0) return null;
 
@@ -1211,7 +1211,7 @@ export function applyBlackSwanTour(
   for (const recvId of Object.keys(distribution)) {
     if (recvId === selfID) return null;
     const recv = state.players[recvId];
-    if (!recv || !recv.isAlive || recv.faction !== 'thief') return null;
+    if (!recv || !recv.isAlive || !isOutwardThief(state, recvId)) return null;
   }
 
   let s = markSkillUsed(state, selfID, BLACK_SWAN_SKILL_ID);
@@ -1724,6 +1724,23 @@ export function findMasterID(state: SetupState): string | null {
   return id && state.players[id] ? id : null;
 }
 
+/**
+ * 是不是梦主本人。背叛者的 faction 虽已转为 master，但他不是梦主；
+ * 梦主是谁是公开信息，守卫与效果凡是「梦主专属」都以此为准。
+ */
+export function isDreamMaster(state: SetupState, playerID: string): boolean {
+  return !!state.players[playerID] && state.dreamMasterID === playerID;
+}
+
+/**
+ * 对外是不是盗梦者：存在且不是梦主本人。背叛者的身份对其他人保密、对外仍是盗梦者，
+ * 所以凡是「对盗梦者合法 / 对盗梦者生效 / 只有盗梦者能做」的判断都以此为准，不读真实阵营。
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者（43 行）
+ */
+export function isOutwardThief(state: SetupState, playerID: string): boolean {
+  return !!state.players[playerID] && state.dreamMasterID !== playerID;
+}
+
 /** 找当前梦主角色 ID */
 export function getMasterCharacterID(state: SetupState): CardID | null {
   const mid = findMasterID(state);
@@ -1750,7 +1767,7 @@ export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupSta
   // 收集存活盗梦者（按 playerOrder 排序）
   const aliveThieves = state.playerOrder.filter((pid) => {
     const p = state.players[pid];
-    return p && p.faction === 'thief' && p.isAlive;
+    return p && isOutwardThief(state, pid) && p.isAlive;
   });
   if (aliveThieves.length === 0) return state;
 
@@ -2051,7 +2068,7 @@ export function applySaturnDecree(
 export function canSaturnFreeMove(state: SetupState, playerID: string): boolean {
   if (getMasterCharacterID(state) !== 'dm_saturn_territory') return false;
   const p = state.players[playerID];
-  if (!p || p.faction !== 'thief' || !p.isAlive) return false;
+  if (!p || !isOutwardThief(state, playerID) || !p.isAlive) return false;
   return p.bribeReceived > 0;
 }
 
@@ -2078,7 +2095,7 @@ export function canImperialPickBribe(
   if (!master || master.characterId !== 'dm_imperial_city') return false;
   if (!master.isAlive) return false;
   const target = state.players[targetID];
-  if (!target || !target.isAlive || target.faction !== 'thief') return false;
+  if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return false;
   const pool = state.bribePool;
   if (poolIndex < 0 || poolIndex >= pool.length) return false;
   return pool[poolIndex]!.status === 'inPool';
@@ -2103,7 +2120,7 @@ export function applySecretPassageTeleport(
   if (!master || master.characterId !== 'dm_secret_passage') return null;
   if (!master.isAlive) return null;
   const target = state.players[targetID];
-  if (!target || !target.isAlive || target.faction !== 'thief') return null;
+  if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return null;
   if (transitCardId !== 'action_dream_transit') return null;
   if (!master.hand.includes(transitCardId)) return null;
   if (
@@ -2144,7 +2161,7 @@ export function applyUranusPower(
   if (!master || master.characterId !== 'dm_uranus_firmament') return null;
   if (!master.isAlive) return null;
   const target = state.players[targetID];
-  if (!target || !target.isAlive || target.faction !== 'thief') return null;
+  if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return null;
   // 必须移动到不同层
   if (target.currentLayer === targetLayer) return null;
   // 不能送迷失层
@@ -2193,7 +2210,7 @@ export function applyPlutoBurning(
   // 对照：docs/manual/06-dream-master.md 冥王星·地狱 详述
   const preTargets = state.playerOrder.filter((pid) => {
     const p = state.players[pid];
-    return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;
+    return p && p.isAlive && isOutwardThief(state, pid) && p.hand.length < PLUTO_DRAW_THRESHOLD;
   });
   if (preTargets.length === 0) return null;
 
@@ -2204,7 +2221,7 @@ export function applyPlutoBurning(
   // 所有手牌<2 的存活盗梦者抽 2（再次快照防止中途状态漂移）
   const targets = s.playerOrder.filter((pid) => {
     const p = s.players[pid];
-    return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;
+    return p && p.isAlive && isOutwardThief(s, pid) && p.hand.length < PLUTO_DRAW_THRESHOLD;
   });
   for (const pid of targets) {
     s = drawCards(s, pid, PLUTO_DRAW_AMOUNT);
@@ -2267,7 +2284,7 @@ export function endDrawPhase(state: SetupState): SetupState {
   if (!isPlutoHellWorldActive(s)) return s;
   const playerID = s.currentPlayerID;
   const p = s.players[playerID];
-  if (!p || !p.isAlive || p.faction !== 'thief') return s;
+  if (!p || !p.isAlive || !isOutwardThief(s, playerID)) return s;
   if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return s;
   return {
     ...s,
@@ -2292,7 +2309,7 @@ export function applyPlutoHellLostCheck(state: SetupState, playerID: string): Se
     players: { ...state.players, [playerID]: { ...p, skillUsedThisTurn: rest } },
   };
   if (!isPlutoHellWorldActive(cleared)) return cleared;
-  if (!p.isAlive || p.faction !== 'thief' || p.currentLayer === 0) return cleared;
+  if (!p.isAlive || !isOutwardThief(cleared, playerID) || p.currentLayer === 0) return cleared;
   return sendToLimbo(cleared, playerID);
 }
 
@@ -2344,7 +2361,7 @@ export function isUranusFirmamentWorldActive(state: SetupState): boolean {
 export function applyUranusFirmamentMoveDiscard(state: SetupState, playerID: string): SetupState {
   if (!isUranusFirmamentWorldActive(state)) return state;
   const p = state.players[playerID];
-  if (!p || p.faction !== 'thief') return state;
+  if (!p || !isOutwardThief(state, playerID)) return state;
   // 梦主未派发贿赂为 0 → 弃 2，否则弃 1
   const inPool = state.bribePool.filter((b) => b.status === 'inPool').length;
   const discardCount = inPool === 0 ? 2 : 1;
@@ -2553,8 +2570,8 @@ export function applyVenusDouble(
   }
 
   // N = 非死亡盗梦者数
-  const aliveThievesCount = Object.values(state.players).filter(
-    (p) => p.faction === 'thief' && p.isAlive,
+  const aliveThievesCount = Object.entries(state.players).filter(
+    ([id, p]) => isOutwardThief(state, id) && p.isAlive,
   ).length;
   if (aliveThievesCount <= 0) return null;
 
@@ -2615,8 +2632,10 @@ export function applyMercuryReverse(
   const cardPlayer = state.players[cardPlayerID];
   if (!cardPlayer || !cardPlayer.isAlive) return null;
 
-  // 出牌者是贿赂者（faction 已转为 master 但不是梦主本人）
-  if (cardPlayer.faction !== 'master') return null;
+  // 出牌者是另一位拥有贿赂牌的盗梦者：收到过贿赂牌即算（不论成败，张数公开），
+  // 不读真实阵营，背叛者与持有失败贿赂牌的盗梦者一视同仁
+  // 对照：docs/manual/06-dream-master.md 水星·航路 逆流
+  if (!isOutwardThief(state, cardPlayerID) || cardPlayer.bribeReceived <= 0) return null;
 
   // 同层
   if (cardPlayer.currentLayer !== master.currentLayer) return null;
@@ -2687,7 +2706,7 @@ export function applyImperialCityWorldShoot(
   if (!shooter || !target) return null;
   if (!shooter.isAlive || !target.isAlive) return null;
   if (shooterID === targetID) return null;
-  if (target.faction !== 'thief') return null;
+  if (!isOutwardThief(state, targetID)) return null;
   if (target.bribeReceived > 0) return null;
   // 发起者必须有未用掉的机会
   const charges = shooter.imperialShootCharges ?? 0;

@@ -237,7 +237,7 @@ function rotateToNextPlayer(state: SetupState): SetupState {
     }
   }
   // 没有活玩家：结束
-  return { ...state, turnPhase: 'turnEnd', winner: 'master', winReason: 'all_thieves_dead' };
+  return { ...state, turnPhase: 'turnEnd', winner: 'master', winReason: 'no_alive_players' };
 }
 
 // === 批量跑 ===

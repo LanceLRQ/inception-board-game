@@ -112,8 +112,8 @@ describe('背叛者排在梦主前面时认梦主', () => {
   it('Midsummer fullness skill goes to the dream master, not the betrayer', () => {
     const betrayer = run(betrayerFirst('bt', 'draw'), 'doDraw', []);
     expect(betrayer.ok).toBe(true);
-    // 背叛者没有盛夏·充盈：只抽基础 2 张（原手牌 1 张）
-    if (betrayer.ok) expect(betrayer.state.G.players['bt']!.hand).toHaveLength(1 + 2);
+    // 背叛者没有盛夏·充盈；对外他是盗梦者，与普通盗梦者一样吃世界观的 +1：基础 2 + 1（原手牌 1 张）
+    if (betrayer.ok) expect(betrayer.state.G.players['bt']!.hand).toHaveLength(1 + 2 + 1);
 
     const master = run(betrayerFirst('pM', 'draw'), 'doDraw', []);
     expect(master.ok).toBe(true);

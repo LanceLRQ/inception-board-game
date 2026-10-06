@@ -7,7 +7,6 @@ import {
   canAct,
   killPlayer,
   sendToLimbo,
-  allThievesDead,
   getAlivePlayers,
   getAliveInLayer,
 } from './death.js';
@@ -150,17 +149,7 @@ describe('Death & Lost Layer', () => {
     });
   });
 
-  describe('win condition helpers', () => {
-    it('allThievesDead false when at least one alive', () => {
-      expect(allThievesDead(makeState())).toBe(false);
-    });
-    it('allThievesDead true when all thieves dead', () => {
-      let s = makeState();
-      s = killPlayer(s, 'P1', 'P4');
-      s = killPlayer(s, 'P2', 'P4');
-      s = killPlayer(s, 'P3', 'P4');
-      expect(allThievesDead(s)).toBe(true);
-    });
+  describe('alive-player helpers', () => {
     it('getAlivePlayers excludes dead', () => {
       const s = makeState();
       const dead = killPlayer(s, 'P1', 'P2');

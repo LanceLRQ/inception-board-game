@@ -25,7 +25,7 @@ export const mercuryReverse: AbilityDefinition = {
   canActivate(state: SetupState, ctx: AbilityContext) {
     const player = state.players[ctx.invokerID];
     if (!player) return { ok: false, reason: 'invalid_player' };
-    if (player.faction !== 'master') return { ok: false, reason: 'not_master' };
+    if (ctx.invokerID !== state.dreamMasterID) return { ok: false, reason: 'not_master' };
     // 完整条件（同层 + 贿赂持有者用牌）依赖响应窗口，此处仅 stub
     return { ok: false, reason: 'not_implemented' };
   },

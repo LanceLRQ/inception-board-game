@@ -164,7 +164,7 @@ describe('胜利条件优先级仲裁', () => {
     expect(result?.reason).toBe('neptune_coin_opened');
   });
 
-  it('all_thieves_dead 优先于港口 / 海王星', () => {
+  it('盗梦者全部死亡不算终局：港口两个金库已开仍判梦主胜（港口原因）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const coinIdxs = s.vaults
       .map((v, i) => (v.contentType === 'coin' ? i : -1))
@@ -181,7 +181,7 @@ describe('胜利条件优先级仲裁', () => {
     };
     const result = ENDIF({ G: s });
     expect(result?.winner).toBe('master');
-    expect(result?.reason).toBe('all_thieves_dead');
+    expect(result?.reason).toBe('harbor_two_vaults');
   });
 
   it('正常对局：无胜利条件 → undefined', () => {
@@ -370,7 +370,7 @@ describe('冥王星·地狱世界观（doDraw + onEnd 联动）', () => {
 // 聚焦子集：胜利条件更多边界 / 雷霆层差闭包 / 冥王星手牌边界 / 多梦主联动
 // ============================================================================
 describe('胜利优先级更多边界', () => {
-  it('秘密金库已开 + all_thieves_dead → thief 仍胜（秘密优先级最高）', () => {
+  it('秘密金库已开 + 盗梦者全部死亡 → thief 仍胜（秘密优先级最高）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const secretIdx = s.vaults.findIndex((v) => v.contentType === 'secret');
     s = setVaultOpened(s, secretIdx, 'p1');
