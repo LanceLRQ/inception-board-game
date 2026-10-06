@@ -2,7 +2,7 @@ import { CopyrightNotice } from '../../components/CopyrightNotice';
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-background p-4 text-foreground">
+    <div className="min-h-dvh bg-background p-4 text-foreground">
       <h1 className="mb-4 text-2xl font-bold">关于</h1>
       <p className="text-dim">盗梦都市（Inception City Online）是一款爱好者复刻的在线多人桌游。</p>
 

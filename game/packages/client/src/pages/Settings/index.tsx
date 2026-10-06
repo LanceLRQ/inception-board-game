@@ -7,7 +7,7 @@ import { AccountSection } from './AccountSection';
 export default function Settings() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-background p-4 text-foreground">
+    <div className="min-h-dvh bg-background p-4 text-foreground">
       <h1 className="mb-6 text-2xl font-bold">{t('settings.title')}</h1>
 
       <AccountSection />

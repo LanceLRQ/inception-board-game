@@ -58,9 +58,3 @@ export const seatEnter: Variants = {
   hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 };
-
-/** 行动轴 Slot 从左侧滑入 */
-export const railSlotEnter: Variants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.25, ease: 'easeOut' } },
-};

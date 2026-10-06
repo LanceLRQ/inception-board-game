@@ -59,7 +59,7 @@ export function RemoteMatchRuntime({
   if (source.error && shouldShowHandshakeError(source.error, source.view)) {
     return (
       <div
-        className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"
+        className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"
         data-testid="remote-runtime"
       >
         <p className="text-sm text-destructive" data-testid="remote-error">
@@ -83,7 +83,7 @@ export function RemoteMatchRuntime({
       <StorageBanner visible={source.storageDegraded && reconnect.status === 'healthy'} />
       {source.view === null ? (
         <div
-          className="flex min-h-screen items-center justify-center text-sm text-muted-foreground"
+          className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground"
           data-testid="remote-connecting"
         >
           {t('match.connecting', { defaultValue: '正在连接' })}

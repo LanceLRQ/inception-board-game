@@ -56,7 +56,7 @@ export function ErrorFallback({
   return (
     <div
       role="alert"
-      className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground"
+      className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground"
       data-testid="error-fallback"
     >
       <TriangleAlert className="h-10 w-10 text-destructive" aria-hidden />

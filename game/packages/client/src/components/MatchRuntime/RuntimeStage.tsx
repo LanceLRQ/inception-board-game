@@ -3,18 +3,15 @@
 // 职责：展示玩家围坐/行动轴 + 中央桌面（金库/心锁/焦点层），
 //      只做视觉和长按详情，不承担出牌/选目标等业务交互（这些仍由 MatchRuntime 的 Dialog 群处理）
 //
-// 断点：
-//   ≥1024px (PC) → TableStage 围坐椭圆 + 中央 CenterPanel
-//   <1024px (移动) → TurnOrderRail 星穹轴 + 中央 CenterPanel
+// 只在 ≥1024px 的经典布局里渲染（TableStage 围坐椭圆 + 中央 CenterPanel）；
+// 移动端由 MobileLayout 自己的行动轴与层塔承担。
 //
 // 选目标：MatchRuntime 已使用 TargetPlayerPickerDialog 弹层完成（符合主人"弹层选目标"要求），
-//        本组件上的 Seat/Slot 只做查看详情（长按/双击）
+//        本组件上的 Seat 只做查看详情（长按/双击）
 
 import { useMemo, useState } from 'react';
 import { cn } from '../../lib/utils.js';
-import { useMediaQuery } from '../../hooks/useMediaQuery.js';
 import { TableStage } from '../../pages/Game/Table/TableStage.js';
-import { TurnOrderRail } from '../../pages/Game/Track/TurnOrderRail.js';
 import { CenterPanel } from '../../pages/Game/shared/CenterPanel.js';
 import { CardDetailModal } from '../CardDetailModal/index.js';
 import { adaptViewToStage } from './viewAdapter.js';
@@ -33,7 +30,6 @@ export interface RuntimeStageProps {
 
 export function RuntimeStage({ G, ctx, humanPlayerID, seats, className }: RuntimeStageProps) {
   const [detailCard, setDetailCard] = useState<CardID | null>(null);
-  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const seatMarkers = useMemo(() => (seats ? markersBySeat(seats) : undefined), [seats]);
 
   const state = adaptViewToStage({ G, ctx, humanPlayerID });
@@ -52,21 +48,12 @@ export function RuntimeStage({ G, ctx, humanPlayerID, seats, className }: Runtim
 
   return (
     <div className={cn('relative', className)} data-testid="runtime-stage">
-      {isDesktop ? (
-        <TableStage
-          state={state}
-          onOpenCharacterDetail={handleOpenDetail}
-          seatMarkers={seatMarkers}
-          centerSlot={<CenterPanel state={state} focusLayer={focusLayer} />}
-        />
-      ) : (
-        <div className="flex overflow-hidden rounded-2xl border border-border bg-card/40">
-          <TurnOrderRail state={state} onOpenDetail={handleOpenDetail} seatMarkers={seatMarkers} />
-          <div className="flex-1 p-3">
-            <CenterPanel state={state} focusLayer={focusLayer} />
-          </div>
-        </div>
-      )}
+      <TableStage
+        state={state}
+        onOpenCharacterDetail={handleOpenDetail}
+        seatMarkers={seatMarkers}
+        centerSlot={<CenterPanel state={state} focusLayer={focusLayer} />}
+      />
 
       <CardDetailModal
         cardId={detailCard}

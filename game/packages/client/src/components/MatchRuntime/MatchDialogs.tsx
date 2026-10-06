@@ -23,9 +23,11 @@ import type { MatchController } from './controllerTypes';
 
 interface MatchDialogsProps {
   readonly controller: MatchController;
+  /** 不弹解封响应弹窗：布局自己用内联的响应条承载这个窗口（移动布局） */
+  readonly skipUnlockResponse?: boolean;
 }
 
-export function MatchDialogs({ controller }: MatchDialogsProps) {
+export function MatchDialogs({ controller, skipUnlockResponse = false }: MatchDialogsProps) {
   const { t } = useTranslation();
   const { view, viewerSeat, viewerLayer, dreamMasterID, makeMove, nicknameOf } = controller;
   const { play, gravity, chess, graft } = controller;
@@ -46,14 +48,16 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         dreamMasterID={dreamMasterID}
         makeMove={makeMove}
       />
-      <UnlockResponseDialog
-        G={view}
-        viewerPlayerID={viewerSeat}
-        nicknameOf={nicknameOf}
-        makeMove={makeMove}
-        autoPass={controller.kind === 'local'}
-        deadlineAt={controller.turn.deadlineAt}
-      />
+      {!skipUnlockResponse && (
+        <UnlockResponseDialog
+          G={view}
+          viewerPlayerID={viewerSeat}
+          nicknameOf={nicknameOf}
+          makeMove={makeMove}
+          autoPass={controller.kind === 'local'}
+          deadlineAt={controller.turn.deadlineAt}
+        />
+      )}
       <MasterPeekBribeDialog
         G={view}
         viewerPlayerID={viewerSeat}
@@ -176,9 +180,11 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
       />
 
       {/* 长按/双击/右键手牌 或 点击玩家头像 → 卡牌详情预览（双面角色支持翻面） */}
+      {/* 金库牌正面已公开，但背面属游戏机密：金库详情不允许翻面 */}
       <CardDetailModal
         cardId={controller.preview.cardId}
         onClose={() => controller.preview.close()}
+        disableFlip={controller.preview.cardId?.startsWith('vault_') ?? false}
       />
     </>
   );

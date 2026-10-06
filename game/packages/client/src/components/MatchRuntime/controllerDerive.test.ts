@@ -14,8 +14,10 @@ import {
   classifyShoot,
   decreeApplicable,
   decreeCardsIn,
+  commitPlanFor,
   deriveHandItems,
   deriveOutcome,
+  discardCardsFor,
   dreamTransitPending,
   effectiveDiscardSelection,
   effectivePendingPlay,
@@ -159,23 +161,38 @@ describe('deriveHandItems', () => {
     expect(items.filter((it) => it.pending).map((it) => it.card)).toEqual(['action_kick']);
   });
 
-  it('弃牌阶段已选的牌标 selected，其余不标', () => {
+  it('弃牌阶段已选位置的牌标 selected，其余不标', () => {
+    const kickAt = hand.indexOf('action_kick');
+    expect(kickAt).toBeGreaterThanOrEqual(0);
     const items = deriveHandItems(hand, {
       turnPhase: 'discard',
       isMyTurn: true,
       winner: null,
       overHand: 1,
-      selectedDiscard: ['action_kick'],
+      selectedDiscard: [kickAt],
       pendingCard: undefined,
     });
     expect(items.every((it) => it.mode === 'discard')).toBe(true);
-    expect(items.filter((it) => it.selected).map((it) => it.card)).toEqual(['action_kick']);
+    expect(items.filter((it) => it.selected).map((it) => it.index)).toEqual([kickAt]);
+  });
+
+  it('手里有两张同名牌时，两张可以同时被选中', () => {
+    const twin = ['action_shoot', 'action_shoot', 'action_unlock'];
+    const items = deriveHandItems(twin, {
+      turnPhase: 'discard',
+      isMyTurn: true,
+      winner: null,
+      overHand: 2,
+      selectedDiscard: [0, 1],
+      pendingCard: undefined,
+    });
+    expect(items.map((it) => it.selected)).toEqual([true, true, false]);
   });
 
   it('不在弃牌模式时，选中记录不生效', () => {
     const items = deriveHandItems(hand, {
       ...ACTION_TURN,
-      selectedDiscard: ['action_kick'],
+      selectedDiscard: [0],
       pendingCard: null,
     });
     expect(items.some((it) => it.selected)).toBe(false);
@@ -183,33 +200,79 @@ describe('deriveHandItems', () => {
 });
 
 describe('effectiveDiscardSelection', () => {
-  const hand = ['a', 'b', 'c'];
-
-  it('只保留仍在手牌里的选择', () => {
-    expect(effectiveDiscardSelection(['a', 'z'], hand, 'discard', true)).toEqual(['a']);
+  it('只保留仍在手牌范围内的位置，并去重', () => {
+    expect(effectiveDiscardSelection([0, 2, 5, 2], 3, 'discard', true)).toEqual([0, 2]);
   });
 
   it('不在弃牌阶段或不是我的回合时清空', () => {
-    expect(effectiveDiscardSelection(['a'], hand, 'action', true)).toEqual([]);
-    expect(effectiveDiscardSelection(['a'], hand, 'discard', false)).toEqual([]);
+    expect(effectiveDiscardSelection([0], 3, 'action', true)).toEqual([]);
+    expect(effectiveDiscardSelection([0], 3, 'discard', false)).toEqual([]);
   });
 });
 
 describe('toggleDiscardSelection', () => {
   it('未选则加入，已选则取消', () => {
-    expect(toggleDiscardSelection([], 'a', 2)).toEqual(['a']);
-    expect(toggleDiscardSelection(['a', 'b'], 'a', 2)).toEqual(['b']);
+    expect(toggleDiscardSelection([], 0, 2)).toEqual([0]);
+    expect(toggleDiscardSelection([0, 1], 0, 2)).toEqual([1]);
   });
 
   it('已选满需弃数量时不再加入，且原样返回', () => {
-    const prev = ['a', 'b'];
-    expect(toggleDiscardSelection(prev, 'c', 2)).toBe(prev);
+    const prev = [0, 1];
+    expect(toggleDiscardSelection(prev, 2, 2)).toBe(prev);
   });
 
   it('不修改传入的数组', () => {
-    const prev = ['a', 'b'];
-    toggleDiscardSelection(prev, 'a', 2);
-    expect(prev).toEqual(['a', 'b']);
+    const prev = [0, 1];
+    toggleDiscardSelection(prev, 0, 2);
+    expect(prev).toEqual([0, 1]);
+  });
+
+  it('同名牌按位置各算一张：先后点两张同名牌，两张都留在选择里', () => {
+    const hand = ['action_shoot', 'action_shoot', 'action_unlock'];
+    let picked = toggleDiscardSelection([], 0, 2);
+    picked = toggleDiscardSelection(picked, 1, 2);
+    expect(picked).toEqual([0, 1]);
+    expect(discardCardsFor(hand, picked)).toEqual(['action_shoot', 'action_shoot']);
+  });
+});
+
+describe('discardCardsFor', () => {
+  it('按选中位置换成卡牌 ID，顺序与位置顺序一致', () => {
+    expect(discardCardsFor(['a', 'b', 'c'], [2, 0])).toEqual(['c', 'a']);
+  });
+
+  it('越界的位置被忽略', () => {
+    expect(discardCardsFor(['a'], [0, 3])).toEqual(['a']);
+  });
+});
+
+describe('commitPlanFor', () => {
+  it('无目标的牌直接出', () => {
+    const plan = commitPlanFor('action_unlock');
+    expect(plan).toEqual({
+      kind: 'direct',
+      pending: expect.objectContaining({ card: 'action_unlock', move: 'playUnlock' }),
+    });
+  });
+
+  it('需要目标的牌进入选目标流程', () => {
+    expect(commitPlanFor('action_shoot')).toEqual({
+      kind: 'target',
+      pending: expect.objectContaining({ move: 'playShoot', needsTarget: 'player' }),
+    });
+    expect(commitPlanFor('action_dream_transit')).toEqual({
+      kind: 'target',
+      pending: expect.objectContaining({ needsTarget: 'layer' }),
+    });
+  });
+
+  it('穿梭剂 SHOOT 与万有引力走各自的选择器', () => {
+    expect(commitPlanFor('action_shoot_dream_transit')).toEqual({ kind: 'dreamTransit' });
+    expect(commitPlanFor('action_gravity')).toEqual({ kind: 'gravity' });
+  });
+
+  it('不能出的牌没有计划', () => {
+    expect(commitPlanFor('action_death_decree_3')).toBeNull();
   });
 });
 

@@ -9,7 +9,7 @@ export default function Landing() {
   const [showModal, setShowModal] = useState<boolean>(() => !hasAcknowledgedCopyright());
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-between bg-background py-8 text-foreground">
+    <div className="flex min-h-dvh flex-col items-center justify-between bg-background py-8 text-foreground">
       <div className="flex flex-1 flex-col items-center justify-center">
         <h1 className="mb-2 text-4xl font-bold">盗梦都市</h1>
         <p className="mb-8 text-dim">Inception City Online</p>

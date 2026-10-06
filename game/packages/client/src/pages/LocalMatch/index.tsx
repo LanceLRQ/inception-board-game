@@ -23,7 +23,7 @@ export default function LocalMatch() {
   // === 游戏未开始：人数选择界面 ===
   if (!started) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-6 text-foreground">
         <h1 className="mb-6 text-2xl font-bold">
           <Users className="mr-2 inline-block h-6 w-6" />
           {t('localMatch.title', { defaultValue: '人机对战' })}

@@ -15,7 +15,7 @@ const Tutorial = lazy(() => import('./pages/Tutorial'));
 
 function PageLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-dim">
+    <div className="flex min-h-dvh items-center justify-center bg-background text-dim">
       加载中...
     </div>
   );

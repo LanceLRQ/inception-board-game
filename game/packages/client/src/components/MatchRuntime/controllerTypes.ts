@@ -95,8 +95,8 @@ export interface HandModel {
   readonly overflow: number;
   /** 弃牌阶段且轮到本人且超出上限：必须选牌弃掉 */
   readonly mustDiscard: boolean;
-  /** 点一张手牌：弃牌阶段切换选中，行动阶段进入出牌流程 */
-  readonly tap: (card: string) => void;
+  /** 点第 index 张手牌：弃牌阶段切换选中（按位置，同名牌各算一张），行动阶段进入出牌流程 */
+  readonly tap: (index: number) => void;
 }
 
 export interface StageModel {
@@ -119,7 +119,13 @@ export interface DecreeModel {
 export interface PlayModel {
   /** 当前有效的出牌意图；牌不在手牌或不在行动阶段时为 null */
   readonly pending: PendingPlay | null;
+  /** 选中一张牌并进入出牌流程（经典布局的一步出牌） */
   readonly start: (card: string) => void;
+  /**
+   * 确认打出一张牌（两步出牌的第二步）：无目标的牌直接发 move，
+   * 需要目标的牌进入选目标流程（之后与 start 相同）；牌此刻不能打则无操作。
+   */
+  readonly commit: (card: string) => void;
   readonly confirmNoTarget: () => Promise<void>;
   readonly confirmTargetPlayer: (targetPlayerID: string) => Promise<void>;
   readonly confirmTargetLayer: (targetLayer: number) => Promise<void>;

@@ -378,5 +378,128 @@
       "toLobby": "去大厅",
       "offlineNote": "当前是离线模式，账号只保存在这个浏览器里，没有恢复码，也不能重新生成。"
     }
+  },
+  "mobile": {
+    "top": {
+      "round": "回合",
+      "deck": "牌库 {{n}}",
+      "deckAria": "牌库剩余 {{n}} 张"
+    },
+    "layerName": {
+      "0": "迷失层",
+      "1": "第一层",
+      "2": "第二层",
+      "3": "第三层",
+      "4": "第四层"
+    },
+    "chips": {
+      "aria": "梦境层",
+      "lockValue": "心锁 {{n}}",
+      "vaultOpened": "金库已开",
+      "focus": "焦点",
+      "chip": "第 {{layer}} 层，心锁 {{lock}}"
+    },
+    "rail": {
+      "aria": "行动顺序",
+      "me": "我",
+      "lost": "迷失",
+      "hand": "手{{n}}",
+      "handAria": "手牌 {{n}} 张",
+      "current": "当前行动",
+      "master": "梦主",
+      "seeDetail": "查看 {{name}} 的角色",
+      "hidden": "身份未翻开",
+      "layerAria": "在第 {{layer}} 层"
+    },
+    "tower": {
+      "aria": "梦境层塔",
+      "focusTag": "焦点",
+      "herePlayer": "你在此层",
+      "unlocking": "正在解封",
+      "vaultClosed": "金库未开",
+      "vaultOpened": "金库已开 · {{content}}",
+      "vaultContent": {
+        "secret": "秘密",
+        "coin": "金币",
+        "empty": "空",
+        "hidden": "内容未知"
+      },
+      "vaultMasterKnows": "金库内容 · {{content}}",
+      "openVault": "查看金库",
+      "nightmareReady": "梦魇待命",
+      "nightmareRevealed": "梦魇已揭示",
+      "nightmareNamed": "梦魇 · {{name}}",
+      "lostHere": "迷失者在此 · 可弃手牌复活",
+      "lostEmpty": "无人迷失",
+      "heartLock": "心锁 {{n}}",
+      "noteUnlock": "{{name}} 在此层打出【解封】· 响应窗口开启中",
+      "noteOccupants": "此层 {{n}} 人",
+      "noteEmpty": "此层无人"
+    },
+    "activity": {
+      "aria": "最新动态",
+      "unlockWindow": "{{name}} 打出【解封】→ 第 {{layer}} 层 · 等待 {{waiting}} 人响应",
+      "shootResponse": "{{shooter}} 射击 {{target}} · 等待应答",
+      "awaitingMine": "等待你的应答，到时间后由系统代为处理",
+      "awaitingOthers": "等待其他玩家应答",
+      "lastPlayedShoot": "{{name}} 打出【{{card}}】· 掷出 {{roll}}",
+      "lastPlayed": "{{name}} 打出【{{card}}】"
+    },
+    "response": {
+      "aria": "解封响应",
+      "title": "{{name}} 解封第 {{layer}} 层",
+      "countdown": "{{seconds}}s 后自动放弃 · 可打出【解封】取消",
+      "noTimer": "可打出【解封】取消 · 否则解封生效",
+      "noCard": "手中无【解封】，只能放弃",
+      "play": "打出解封",
+      "pass": "放弃"
+    },
+    "dock": {
+      "grip": "展开或收起手牌",
+      "wait": "等待",
+      "skill": "技能",
+      "skillAria": "使用角色技能",
+      "skillReady": "技能「{{name}}」待命",
+      "skillIdle": "技能未就绪",
+      "lostLayer": "迷失层",
+      "layerStatus": "第 {{layer}} 层",
+      "hand": "手牌",
+      "noHand": "没有手牌",
+      "commit": "打出",
+      "hint": "点一张牌读信息，长按 2 秒看大图",
+      "discardInfo": "弃牌阶段 · 已选 {{selected}}/{{required}} · 点牌选择要弃的牌",
+      "category": {
+        "attack": "攻击",
+        "unlock": "解封",
+        "support": "辅助"
+      },
+      "target": {
+        "none": "无需目标",
+        "player": "需选择目标玩家",
+        "layer": "需选择目标层",
+        "choice": "打出后选择结算方式或目标",
+        "decree": "随 SHOOT 一起打出"
+      },
+      "verdict": {
+        "ok": "现在可以打出",
+        "notMyTurn": "现在不能打：还没轮到你",
+        "notActionPhase": "现在不能打：当前不是出牌阶段",
+        "gameOver": "对局已结束",
+        "discardPhase": "弃牌阶段：点牌选择要弃的牌",
+        "noUi": "现在不能直接打出"
+      },
+      "blocked": "此刻打不出",
+      "selected": "已选",
+      "selectedDiscard": "已选弃牌",
+      "skillSheet": "角色技能",
+      "skillSheetDesc": "选择要发动的技能"
+    },
+    "outcome": {
+      "aria": "对局结果"
+    },
+    "preload": {
+      "aria": "卡图加载进度",
+      "label": "卡图 {{loaded}}/{{total}}"
+    }
   }
 }

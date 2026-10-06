@@ -2,7 +2,7 @@
 // 守护：BGIO 回合机制（ctx.currentPlayer ↔ G.currentPlayerID 对齐）与 Bot 自动推进
 
 import type { Page } from '@playwright/test';
-import { test, expect, waitForAppReady } from './fixtures/index.js';
+import { test, expect, pickCardsToDiscard, waitForAppReady } from './fixtures/index.js';
 
 /** 座位标识的前缀：宽屏是围坐布局的座位，窄屏是行动轴上的格子（断点 1024px） */
 function seatPrefix(page: Page): string {
@@ -87,18 +87,8 @@ test.describe('人机对战 LocalMatch', () => {
       const required = Number(/\/\s*(\d+)/.exec(label)?.[1]);
       expect(required).toBeGreaterThan(0);
 
-      // 手牌里可能有同名的牌，界面按牌 ID 选择，同名牌再点一次会取消选中，所以只挑不重名的
-      const cards = page.getByTestId('human-hand').locator('[data-testid^="card-"]');
-      const count = await cards.count();
-      const seenTitles = new Set<string>();
-      let picked = 0;
-      for (let i = 0; i < count && picked < required; i++) {
-        const title = (await cards.nth(i).getAttribute('title')) ?? `#${i}`;
-        if (seenTitles.has(title)) continue;
-        seenTitles.add(title);
-        await cards.nth(i).click();
-        picked += 1;
-      }
+      // 弃牌选择按手牌位置记录，同名牌也能同时选中
+      const picked = await pickCardsToDiscard(page, required);
       expect(picked).toBe(required);
       await expect(confirmDiscard).toBeEnabled();
       await confirmDiscard.click();

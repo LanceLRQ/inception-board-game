@@ -2,12 +2,9 @@
 // 对照：docs/manual/04-action-cards.md §解封 效果②
 // 复用 UnlockResponseBanner/logic.ts
 
-import { useEffect, useState } from 'react';
 import { KeyRound, AlertTriangle, Clock } from 'lucide-react';
 import type { MatchView } from '@icgame/game-engine';
-import { computeUnlockResponseState } from '../UnlockResponseBanner/logic.js';
-import { remainingSeconds, useSecondClock } from '../MatchRuntime/deadline';
-import { startAutoPass } from './autoPass';
+import { useUnlockResponse } from './useUnlockResponse';
 import {
   Dialog,
   DialogBody,
@@ -36,40 +33,14 @@ export function UnlockResponseDialog({
   autoPass = true,
   deadlineAt = null,
 }: UnlockResponseDialogProps) {
-  const { visible, unlockerID, layer, canCancel, remainingResponders, timeoutMs } =
-    computeUnlockResponseState(G, viewerPlayerID);
-
-  const windowKey = visible ? `${unlockerID ?? '?'}/${layer ?? '?'}` : null;
-  const [countdown, setCountdown] = useState<{ key: string; startAt: number; now: number } | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (!visible || !windowKey || !autoPass) return;
-    const startAt = Date.now();
-    const tick = () => setCountdown({ key: windowKey, startAt, now: Date.now() });
-    const id = setInterval(tick, 500);
-    queueMicrotask(tick);
-    return () => clearInterval(id);
-  }, [visible, windowKey, autoPass]);
-
-  useEffect(() => {
-    const stop = startAutoPass({
-      active: visible && windowKey !== null,
-      autoPass,
-      timeoutMs,
-      makeMove,
-    });
-    return stop ?? undefined;
-  }, [visible, windowKey, autoPass, timeoutMs, makeMove]);
-
-  const serverClock = useSecondClock(!autoPass && visible);
-
-  const elapsed = countdown && countdown.key === windowKey ? countdown.now - countdown.startAt : 0;
-  const remainingMs = Math.max(0, timeoutMs - elapsed);
-  const remainingSec = autoPass
-    ? Math.ceil(remainingMs / 1000)
-    : remainingSeconds(deadlineAt, serverClock);
+  const { state, remainingSec } = useUnlockResponse({
+    G,
+    viewerPlayerID,
+    makeMove,
+    autoPass,
+    deadlineAt,
+  });
+  const { visible, unlockerID, layer, canCancel, remainingResponders } = state;
   const unlockerName = unlockerID ? (nicknameOf?.(unlockerID) ?? unlockerID) : '玩家';
 
   return (

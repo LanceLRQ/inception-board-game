@@ -1,4 +1,4 @@
-// 将对局视图 G 与流程信息 ctx 适配为 StageState 结构，供对局舞台（TableStage / TurnOrderRail）使用
+// 将对局视图 G 与流程信息 ctx 适配为 StageState 结构，供对局舞台（TableStage / 移动布局的行动轴与层塔）使用
 //
 // 注意：这是纯展示层适配，不影响 MatchRuntime 的真实交互（pendingPlay / Dialog 群等）
 

@@ -22,10 +22,12 @@ import {
   buildPlayerRows,
   buildPlayerViews,
   classifyShoot,
+  commitPlanFor,
   decreeApplicable,
   decreeCardsIn,
   deriveHandItems,
   deriveOutcome,
+  discardCardsFor,
   dreamTransitPending,
   effectiveDiscardSelection,
   effectivePendingPlay,
@@ -140,12 +142,17 @@ export function useMatchController(source: MatchSource): MatchController {
   // 人类弃牌交互：超过手牌上限（5）时必须选择要弃的牌
   const humanHand = useMemo(() => (humanPlayer?.hand as string[]) ?? [], [humanPlayer]);
   const overHand = overflowCount(humanHand.length);
-  const [selectedDiscard, setSelectedDiscard] = useState<string[]>([]);
+  // 弃牌选择按手牌位置记录（手里有同名牌时各算一张）；带上回合号，跨回合的残留自动失效
+  const [discardPick, setDiscardPick] = useState<{ turn: number; picked: readonly number[] }>({
+    turn: -1,
+    picked: [],
+  });
+  const currentDiscardPick = discardPick.turn === turnNumber ? discardPick.picked : [];
 
-  // 仅保留仍在手牌 + 当前确实在 discard 阶段的选中，避免 stale 残留
+  // 仅保留仍在手牌范围内 + 当前确实在 discard 阶段的选中，避免 stale 残留
   const effectiveSelected = effectiveDiscardSelection(
-    selectedDiscard,
-    humanHand,
+    currentDiscardPick,
+    humanHand.length,
     turnPhase,
     isMyTurn,
   );
@@ -348,10 +355,17 @@ export function useMatchController(source: MatchSource): MatchController {
   }, [effectiveGraftPick, makeMove]);
 
   const toggleDiscard = useCallback(
-    (card: string) => {
-      setSelectedDiscard((prev) => toggleDiscardSelection(prev, card, overHand));
+    (index: number) => {
+      setDiscardPick((prev) => ({
+        turn: turnNumber,
+        picked: toggleDiscardSelection(
+          prev.turn === turnNumber ? prev.picked : [],
+          index,
+          overHand,
+        ),
+      }));
     },
-    [overHand],
+    [overHand, turnNumber],
   );
 
   const handModeInput = { turnPhase, isMyTurn, winner, overHand };
@@ -360,11 +374,30 @@ export function useMatchController(source: MatchSource): MatchController {
     selectedDiscard: effectiveSelected,
     pendingCard: effectivePending?.card,
   });
-  const tapHandCard = (card: string) => {
+  const tapHandCard = (index: number) => {
+    const card = humanHand[index];
+    if (card === undefined) return;
     const mode = handCardMode(card, handModeInput);
-    if (mode === 'discard') toggleDiscard(card);
+    if (mode === 'discard') toggleDiscard(index);
     else if (mode === 'play') startPlay(card);
   };
+
+  // 确认打出一张牌：无目标直接发 move；需要目标 / 穿梭剂 / 万有引力与一步出牌相同，进入各自的选择流程
+  const commitPlay = useCallback(
+    (card: string) => {
+      const input = { turnPhase, isMyTurn, winner, overHand };
+      if (!humanHand.includes(card) || handCardMode(card, input) !== 'play') return;
+      const plan = commitPlanFor(card);
+      if (!plan) return;
+      if (plan.kind === 'direct') {
+        cancelPlay();
+        void makeMove(plan.pending.move, buildPlayArgs(plan.pending));
+        return;
+      }
+      startPlay(card);
+    },
+    [humanHand, turnPhase, isMyTurn, winner, overHand, makeMove, cancelPlay, startPlay],
+  );
 
   const self: SelfInfo | null =
     humanPlayer && mySeat !== null
@@ -448,6 +481,7 @@ export function useMatchController(source: MatchSource): MatchController {
     play: {
       pending: effectivePending,
       start: startPlay,
+      commit: commitPlay,
       confirmNoTarget: confirmPlayNoTarget,
       confirmTargetPlayer: confirmPlayTargetPlayer,
       confirmTargetLayer: confirmPlayTargetLayer,
@@ -482,8 +516,8 @@ export function useMatchController(source: MatchSource): MatchController {
       endAction: () => void makeMove('endActionPhase'),
       skipDiscard: () => void makeMove('skipDiscard'),
       confirmDiscard: () => {
-        void makeMove('doDiscard', [effectiveSelected]);
-        setSelectedDiscard([]);
+        void makeMove('doDiscard', [discardCardsFor(humanHand, effectiveSelected)]);
+        setDiscardPick({ turn: -1, picked: [] });
       },
       discardSelected: effectiveSelected.length,
       discardRequired: overHand,

@@ -3,6 +3,7 @@
 //
 // Variants：
 //   - 'footer'：一行紧凑（Landing 底部、Game 结算页小字）
+//   - 'line'：更小的单行弱化文字（占满视口的移动对局布局，放在手牌坞最底部）
 //   - 'full'：完整多段（About 关于页）
 //   - 'modal'：教学前弹窗（含"我已阅读"按钮）
 
@@ -19,7 +20,7 @@ import { Button } from '../ui/button';
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export interface CopyrightNoticeProps {
-  readonly variant: 'footer' | 'full';
+  readonly variant: 'footer' | 'full' | 'line';
   readonly className?: string;
 }
 
@@ -35,6 +36,21 @@ export function CopyrightNotice({ variant, className }: CopyrightNoticeProps) {
       >
         <p>{shortLine}</p>
       </div>
+    );
+  }
+
+  if (variant === 'line') {
+    return (
+      <p
+        className={cn(
+          'truncate text-center text-[9px] leading-none tracking-[.03em] text-faint',
+          className,
+        )}
+        role="contentinfo"
+        data-testid="copyright-line"
+      >
+        {shortLine}
+      </p>
     );
   }
 

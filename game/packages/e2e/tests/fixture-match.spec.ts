@@ -1,7 +1,13 @@
 // 固定场景对局 E2E：调试路由（/game/:matchId 不带 online / friend）渲染的是真实对局界面，
 // 状态来自确定的固定场景。三个调试入口各打开一次。
 
-import { test, expect, waitForAppReady } from './fixtures/index.js';
+import {
+  test,
+  expect,
+  isNarrowViewport,
+  selectAndPlayCard,
+  waitForAppReady,
+} from './fixtures/index.js';
 
 const SCENES: Array<{ name: string; url: string }> = [
   { name: '缺省（盗梦者视角）', url: '/game/debug' },
@@ -23,13 +29,45 @@ for (const scene of SCENES) {
   });
 }
 
-test('固定场景 pending=1 弹出解封响应窗口，缺省场景没有', async ({ page }) => {
+test('固定场景 pending=1 出现解封响应入口，缺省场景没有（宽屏弹窗，窄屏响应条）', async ({
+  page,
+}) => {
+  // 宽屏用弹窗承载，窄屏用手牌坞上方的响应条，两种入口互斥
+  const narrow = isNarrowViewport(page);
+  const dialog = page.getByTestId('unlock-response-dialog');
+  const bar = page.getByTestId('unlock-response-bar');
+
   await page.goto('/game/debug');
   await waitForAppReady(page);
   await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByTestId('unlock-response-dialog')).toHaveCount(0);
+  await expect(dialog).toHaveCount(0);
+  await expect(bar).toHaveCount(0);
 
   await page.goto('/game/debug?pending=1');
   await waitForAppReady(page);
-  await expect(page.getByTestId('unlock-response-dialog')).toBeVisible({ timeout: 10_000 });
+  if (narrow) {
+    await expect(bar).toBeVisible({ timeout: 10_000 });
+    await expect(dialog).toHaveCount(0);
+  } else {
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await expect(bar).toHaveCount(0);
+  }
+});
+
+test('固定场景：选一张需要目标的牌并打出，两种布局都会弹出选目标弹窗', async ({ page }) => {
+  await page.goto('/game/debug');
+  await waitForAppReady(page);
+  await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+
+  // SHOOT 需要选目标玩家；按牌名找到它在手牌里的位置
+  const shoot = page
+    .getByTestId('human-hand')
+    .locator('[data-testid^="card-"][title="SHOOT"]')
+    .first();
+  const testId = await shoot.getAttribute('data-testid');
+  const index = Number(testId?.replace('card-', ''));
+  expect(Number.isInteger(index)).toBe(true);
+
+  await selectAndPlayCard(page, index);
+  await expect(page.getByTestId('target-player-picker-dialog')).toBeVisible({ timeout: 5_000 });
 });

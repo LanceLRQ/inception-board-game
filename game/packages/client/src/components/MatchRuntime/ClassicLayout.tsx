@@ -88,7 +88,7 @@ export function ClassicLayout({ controller, topRight, onRestart, children }: Cla
   const otherTurn = t(turn.otherTurn.key, turn.otherTurn.params);
 
   return (
-    <div className="min-h-screen bg-background p-4 text-foreground" data-testid="local-runtime">
+    <div className="min-h-dvh bg-background p-4 text-foreground" data-testid="local-runtime">
       {/* 卡图预载进度条（对局启动时后台拉取；完成后 800ms 淡出） */}
       {preload && preload.total > 0 && (
         <div
@@ -312,7 +312,7 @@ export function ClassicLayout({ controller, topRight, onRestart, children }: Cla
                         e.preventDefault();
                         controller.preview.open(card);
                       }}
-                      onClick={() => hand.tap(card)}
+                      onClick={() => hand.tap(i)}
                       className={cn(
                         'relative flex h-[108px] w-[76px] flex-col items-center justify-end overflow-hidden rounded-md border-2 transition-all',
                         selected && 'border-destructive ring-2 ring-destructive/40',

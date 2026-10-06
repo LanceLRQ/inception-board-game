@@ -131,16 +131,12 @@ async function actOnce(page: Page): Promise<boolean> {
     return true;
   }
   if (await confirm.isVisible()) {
-    // 按钮文案形如「确认弃牌（0/N）」，N 为必须弃掉的张数；同名牌按牌 ID 选择，只挑不重名的
+    // 按钮文案形如「确认弃牌（0/N）」，N 为必须弃掉的张数；弃牌选择按手牌位置记录，同名牌也能同时选中
     const required = Number(/\/\s*(\d+)/.exec((await confirm.textContent()) ?? '')?.[1]);
     const cards = page.getByTestId('human-hand').locator('[data-testid^="card-"]');
     const count = await cards.count();
-    const seen = new Set<string>();
     let picked = 0;
     for (let i = 0; i < count && picked < required; i++) {
-      const title = (await cards.nth(i).getAttribute('title')) ?? `#${i}`;
-      if (seen.has(title)) continue;
-      seen.add(title);
       await cards.nth(i).click({ timeout: 1_500 });
       picked += 1;
     }

@@ -71,19 +71,28 @@ export function handCardMode(card: string, input: HandModeInput): HandCardMode {
   return isActionPlayable ? 'play' : 'idle';
 }
 
-/** 只保留仍在手牌里、且此刻确实处于本人弃牌阶段的弃牌选择，避免残留 */
+/**
+ * 弃牌选择按手牌位置记录（同名牌各算一张）。
+ * 只保留仍在手牌范围内、且此刻确实处于本人弃牌阶段的位置，去重，避免残留。
+ */
 export function effectiveDiscardSelection(
-  selected: readonly string[],
-  hand: readonly string[],
+  selected: readonly number[],
+  handSize: number,
   turnPhase: string,
   isMyTurn: boolean,
-): string[] {
-  return turnPhase === 'discard' && isMyTurn ? selected.filter((c) => hand.includes(c)) : [];
+): number[] {
+  if (turnPhase !== 'discard' || !isMyTurn) return [];
+  return [...new Set(selected)].filter((i) => Number.isInteger(i) && i >= 0 && i < handSize);
+}
+
+/** 把选中的手牌位置换成发给对局的卡牌 ID 列表；越界的位置忽略 */
+export function discardCardsFor(hand: readonly string[], selected: readonly number[]): string[] {
+  return selected.flatMap((i) => (i >= 0 && i < hand.length ? [hand[i]!] : []));
 }
 
 export interface HandItemsInput extends HandModeInput {
-  /** 已生效的弃牌选择（见 effectiveDiscardSelection） */
-  readonly selectedDiscard: readonly string[];
+  /** 已生效的弃牌选择：手牌位置（见 effectiveDiscardSelection） */
+  readonly selectedDiscard: readonly number[];
   /** 当前有效出牌意图对应的牌 */
   readonly pendingCard: string | null | undefined;
 }
@@ -98,22 +107,22 @@ export function deriveHandItems(hand: readonly string[], input: HandItemsInput):
       name: getCardName(card),
       imageUrl: getCardImageUrl(card),
       mode,
-      selected: mode === 'discard' && input.selectedDiscard.includes(card),
+      selected: mode === 'discard' && input.selectedDiscard.includes(index),
       pending: input.pendingCard === card,
     };
   });
 }
 
-/** 切换弃牌选择：已选则取消，未选则加入；不能超过需要弃的数量（超过时原样返回 prev） */
-export function toggleDiscardSelection(prev: string[], card: string, overHand: number): string[] {
-  const idx = prev.indexOf(card);
-  if (idx >= 0) {
-    const next = [...prev];
-    next.splice(idx, 1);
-    return next;
-  }
+/** 切换弃牌选择（按手牌位置）：已选则取消，未选则加入；不能超过需要弃的数量（超过时原样返回 prev） */
+export function toggleDiscardSelection(
+  prev: readonly number[],
+  index: number,
+  overHand: number,
+): readonly number[] {
+  const at = prev.indexOf(index);
+  if (at >= 0) return prev.filter((_, i) => i !== at);
   if (prev.length >= overHand) return prev; // 不能超过要弃数量
-  return [...prev, card];
+  return [...prev, index];
 }
 
 /** 最多选两个的切换：已选则取消；已有两个时丢掉最早的、保留最后 2 个（棋局易位、嫁接共用） */
@@ -149,6 +158,25 @@ export function pendingPlayFor(card: string): PendingPlay | null {
     needsTarget: action.needsTarget,
     argOrder: action.argOrder,
   };
+}
+
+/** 「打出」一张牌之后要走的流程 */
+export type CommitPlan =
+  | { readonly kind: 'direct'; readonly pending: PendingPlay }
+  | { readonly kind: 'target'; readonly pending: PendingPlay }
+  | { readonly kind: 'dreamTransit' }
+  | { readonly kind: 'gravity' };
+
+/**
+ * 确认打出一张牌：无目标的牌直接发 move，需要目标的牌进入选目标流程，
+ * 梦境穿梭剂与万有引力各自进入专属选择器；这张牌不能在行动阶段打出则返回 null。
+ */
+export function commitPlanFor(card: string): CommitPlan | null {
+  if (card === 'action_shoot_dream_transit') return { kind: 'dreamTransit' };
+  if (card === 'action_gravity') return { kind: 'gravity' };
+  const pending = pendingPlayFor(card);
+  if (!pending) return null;
+  return pending.needsTarget === 'none' ? { kind: 'direct', pending } : { kind: 'target', pending };
 }
 
 /** 梦境穿梭剂选定模式后的出牌意图 */

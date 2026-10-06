@@ -6,7 +6,6 @@
 import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { CopyrightNotice } from '../../components/CopyrightNotice/index.js';
 import { FixtureMatchRuntime } from '../../components/FixtureMatchRuntime/index.js';
 import { LocalMatchRuntime } from '../../components/LocalMatchRuntime/index.js';
 import { RemoteMatchRuntime } from '../../components/RemoteMatchRuntime/index.js';
@@ -43,31 +42,21 @@ export default function Game() {
 
   if (resolved.mode === 'local') {
     return (
-      <>
-        <LocalMatchRuntime
-          playerCount={resolved.players}
-          matchId={matchId}
-          topRight={roomCode && <RoomCodeBadge code={roomCode} />}
-          onRestart={() => navigate('/lobby')}
-        />
-        <div className="fixed inset-x-0 bottom-0 z-10 pb-safe">
-          <CopyrightNotice variant="footer" className="bg-background/70 py-1 backdrop-blur-sm" />
-        </div>
-      </>
+      <LocalMatchRuntime
+        playerCount={resolved.players}
+        matchId={matchId}
+        topRight={roomCode && <RoomCodeBadge code={roomCode} />}
+        onRestart={() => navigate('/lobby')}
+      />
     );
   }
 
   // 固定场景（?as=master / ?pending=1 调试用）
   return (
-    <>
-      <FixtureMatchRuntime
-        scenario={resolveFixtureScenario(search)}
-        onRestart={() => navigate('/lobby')}
-      />
-      <div className="fixed inset-x-0 bottom-0 z-10 pb-safe">
-        <CopyrightNotice variant="footer" className="bg-background/70 py-1 backdrop-blur-sm" />
-      </div>
-    </>
+    <FixtureMatchRuntime
+      scenario={resolveFixtureScenario(search)}
+      onRestart={() => navigate('/lobby')}
+    />
   );
 }
 
@@ -104,19 +93,14 @@ function OnlineMatch({
   );
 
   return (
-    <>
-      <RemoteMatchRuntime
-        url={realtimeUrl()}
-        token={token}
-        matchID={matchID}
-        topRight={roomCode && <RoomCodeBadge code={roomCode} />}
-        onExit={onExit}
-        onSettled={handleSettled}
-      />
-      <div className="fixed inset-x-0 bottom-0 z-10 pb-safe">
-        <CopyrightNotice variant="footer" className="bg-background/70 py-1 backdrop-blur-sm" />
-      </div>
-    </>
+    <RemoteMatchRuntime
+      url={realtimeUrl()}
+      token={token}
+      matchID={matchID}
+      topRight={roomCode && <RoomCodeBadge code={roomCode} />}
+      onExit={onExit}
+      onSettled={handleSettled}
+    />
   );
 }
 
@@ -124,7 +108,7 @@ function OnlineUnavailable({ onBack }: { onBack: () => void }) {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"
+      className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"
       data-testid="online-unavailable"
     >
       <p className="text-sm">

@@ -189,6 +189,23 @@
 }
 
 /*
+ * 安全区工具类：刘海 / 圆角 / Home 指示条让出的边距（需要 viewport-fit=cover）。
+ * 与其它内边距叠加时请用 calc(... + env(safe-area-inset-*, 0px))，这里只提供单独使用的版本。
+ */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/*
  * prefers-reduced-motion: 尊重用户系统级动效偏好
  * - 将所有 animation/transition 压缩到 1ms（近似瞬时但保留状态切换）
  * - framer-motion 侧通过 <MotionConfig reducedMotion="user"> 配合

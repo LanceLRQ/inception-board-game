@@ -31,7 +31,7 @@ export default function Tutorial() {
   // 完成后展示结算
   if (isCompleted(progress)) {
     return (
-      <div className="min-h-screen bg-background p-6 text-foreground flex flex-col items-center justify-center">
+      <div className="min-h-dvh bg-background p-6 text-foreground flex flex-col items-center justify-center">
         <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold">
           <PartyPopper className="h-6 w-6" /> 教学完成
         </h1>
@@ -61,7 +61,7 @@ export default function Tutorial() {
   if (!step) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       {/* 第 3 处版权展示：教学前 */}
       <CopyrightNotice variant="footer" className="p-4" />
       <TutorialOverlay

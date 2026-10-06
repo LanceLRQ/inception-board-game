@@ -161,7 +161,7 @@ export default function Room() {
 
   if (!isInitialized || !isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-dim">
+      <div className="flex min-h-dvh items-center justify-center bg-background text-dim">
         {t('common.loading')}
       </div>
     );
@@ -169,7 +169,7 @@ export default function Room() {
 
   if (!room) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-6 text-foreground">
         <div className="mb-4 text-dim">{t('common.loading')}</div>
         {error && <div className="text-destructive">{error}</div>}
       </div>
@@ -179,7 +179,7 @@ export default function Room() {
   const emptySeats = Math.max(0, room.maxPlayers - room.players.length);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col gap-4 bg-background p-6 text-foreground">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-background p-6 text-foreground">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">{t('room.title', { code: room.code })}</h1>
         <Button

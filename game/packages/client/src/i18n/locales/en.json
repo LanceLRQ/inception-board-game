@@ -428,5 +428,128 @@
       "toLobby": "Go to lobby",
       "offlineNote": "Offline mode: the account lives only in this browser, has no recovery code and cannot be regenerated."
     }
+  },
+  "mobile": {
+    "top": {
+      "round": "Turn",
+      "deck": "Deck {{n}}",
+      "deckAria": "{{n}} cards left in the deck"
+    },
+    "layerName": {
+      "0": "Lost layer",
+      "1": "Layer 1",
+      "2": "Layer 2",
+      "3": "Layer 3",
+      "4": "Layer 4"
+    },
+    "chips": {
+      "aria": "Dream layers",
+      "lockValue": "Heart lock {{n}}",
+      "vaultOpened": "Vault opened",
+      "focus": "Focus",
+      "chip": "Layer {{layer}}, heart lock {{lock}}"
+    },
+    "rail": {
+      "aria": "Turn order",
+      "me": "Me",
+      "lost": "LOST",
+      "hand": "{{n}} cards",
+      "handAria": "{{n}} cards in hand",
+      "current": "Acting now",
+      "master": "Master",
+      "seeDetail": "View {{name}}'s character",
+      "hidden": "Identity hidden",
+      "layerAria": "On layer {{layer}}"
+    },
+    "tower": {
+      "aria": "Dream layer tower",
+      "focusTag": "FOCUS",
+      "herePlayer": "You are here",
+      "unlocking": "Unlocking",
+      "vaultClosed": "Vault closed",
+      "vaultOpened": "Vault opened · {{content}}",
+      "vaultContent": {
+        "secret": "Secret",
+        "coin": "Coin",
+        "empty": "Empty",
+        "hidden": "Unknown"
+      },
+      "vaultMasterKnows": "Vault content · {{content}}",
+      "openVault": "View vault",
+      "nightmareReady": "Nightmare ready",
+      "nightmareRevealed": "Nightmare revealed",
+      "nightmareNamed": "Nightmare · {{name}}",
+      "lostHere": "Lost players here · discard cards to revive",
+      "lostEmpty": "Nobody lost",
+      "heartLock": "Heart lock {{n}}",
+      "noteUnlock": "{{name}} played Unlock on this layer · response window open",
+      "noteOccupants": "{{n}} here",
+      "noteEmpty": "Nobody here"
+    },
+    "activity": {
+      "aria": "Latest activity",
+      "unlockWindow": "{{name}} played Unlock on layer {{layer}} · waiting for {{waiting}}",
+      "shootResponse": "{{shooter}} shot {{target}} · waiting for a response",
+      "awaitingMine": "Waiting for your response; the system acts for you when time runs out",
+      "awaitingOthers": "Waiting for other players",
+      "lastPlayedShoot": "{{name}} played {{card}} · rolled {{roll}}",
+      "lastPlayed": "{{name}} played {{card}}"
+    },
+    "response": {
+      "aria": "Unlock response",
+      "title": "{{name}} unlocks layer {{layer}}",
+      "countdown": "Auto-pass in {{seconds}}s · play Unlock to cancel",
+      "noTimer": "Play Unlock to cancel, otherwise it resolves",
+      "noCard": "No Unlock in hand, you can only pass",
+      "play": "Play Unlock",
+      "pass": "Pass"
+    },
+    "dock": {
+      "grip": "Expand or collapse hand",
+      "wait": "Waiting",
+      "skill": "Skill",
+      "skillAria": "Use character skill",
+      "skillReady": "Skill \"{{name}}\" ready",
+      "skillIdle": "Skill not ready",
+      "lostLayer": "Lost layer",
+      "layerStatus": "Layer {{layer}}",
+      "hand": "Hand",
+      "noHand": "No cards in hand",
+      "commit": "Play",
+      "hint": "Tap a card to read it, hold 2s for the full card",
+      "discardInfo": "Discard phase · {{selected}}/{{required}} chosen · tap cards to discard",
+      "category": {
+        "attack": "Attack",
+        "unlock": "Unlock",
+        "support": "Support"
+      },
+      "target": {
+        "none": "No target",
+        "player": "Pick a target player",
+        "layer": "Pick a target layer",
+        "choice": "Pick a mode or targets after playing",
+        "decree": "Played together with SHOOT"
+      },
+      "verdict": {
+        "ok": "You can play it now",
+        "notMyTurn": "Can't play: not your turn",
+        "notActionPhase": "Can't play: not the action phase",
+        "gameOver": "The match is over",
+        "discardPhase": "Discard phase: tap cards to discard",
+        "noUi": "Can't be played directly right now"
+      },
+      "blocked": "Can't play now",
+      "selected": "Selected",
+      "selectedDiscard": "Chosen to discard",
+      "skillSheet": "Character skill",
+      "skillSheetDesc": "Choose a skill to use"
+    },
+    "outcome": {
+      "aria": "Match result"
+    },
+    "preload": {
+      "aria": "Card art loading",
+      "label": "Art {{loaded}}/{{total}}"
+    }
   }
 }
