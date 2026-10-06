@@ -61,7 +61,9 @@ describe('主题表', () => {
     expect(noir.tokens.bg).toBe('#0A0D13');
     expect(noir.tokens.acc).toBe('#C9A35F');
     expect(noir.tokens.line2).toBe('rgba(233,228,214,.22)');
-    expect(noir.tokens.serif).toBe("'Noto Serif SC','Songti SC','STSong',serif");
+    expect(noir.tokens.serif).toBe(
+      "'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif",
+    );
   });
 
   it('默认主题与存储键', () => {

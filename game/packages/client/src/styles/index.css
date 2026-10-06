@@ -1,7 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import '@fontsource-variable/geist';
+/* 自托管字体：中文字体按字符集分片，浏览器只下载用到的分片 */
+@import '@fontsource-variable/noto-sans-sc';
+@import '@fontsource-variable/noto-serif-sc';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
 /*
  ---break---
  */
@@ -102,8 +106,8 @@
   --ms-blood: #A8443A;
   --ms-ok: #7FA97F;
   --ms-grade: #C9A35F;
-  --ms-serif: 'Noto Serif SC','Songti SC','STSong',serif;
-  --ms-sans: 'Noto Sans SC','PingFang SC',sans-serif;
+  --ms-serif: 'Noto Serif SC Variable','Noto Serif SC','Songti SC','STSong',serif;
+  --ms-sans: 'Noto Sans SC Variable','Noto Sans SC','PingFang SC',sans-serif;
   --ms-mono: 'IBM Plex Mono','SF Mono',monospace;
 }
 

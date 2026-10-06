@@ -51,11 +51,12 @@ export default defineConfig({
         // 离线人机模式：缓存 app shell + 静态资源
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            // 字体分片有两百多个文件，不进预缓存：用到哪片缓存哪片
+            urlPattern: /\.woff2?$/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'google-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheName: 'font-cache',
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 365 },
             },
           },
           {
@@ -67,7 +68,7 @@ export default defineConfig({
             },
           },
         ],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
       },
       devOptions: { enabled: false },
     }),
