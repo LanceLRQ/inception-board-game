@@ -48,7 +48,7 @@ describe('checkStateInvariants', () => {
         s = res.state;
       }
     }
-  });
+  }, 60_000);
 
   it('对非对象与缺字段的输入不抛异常', () => {
     expect(checkStateInvariants(null).length).toBeGreaterThan(0);

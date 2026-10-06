@@ -125,6 +125,24 @@ describe('containsBannedWord', () => {
     expect(containsBannedWord('潜行者·α')).toBe(false);
   });
 
+  it('does not flag ordinary names that merely contain a short banned fragment', () => {
+    for (const name of ['曹操', '体操队长', 'modern', 'Badminton', 'ecosystemX', 'Nomod']) {
+      expect(containsBannedWord(name), name).toBe(false);
+    }
+  });
+
+  it('flags impersonation words when they stand as a word of their own', () => {
+    for (const name of ['mod', 'MOD_01', 'AdminBot', 'the admin', 'System-9', 'x.mod.x']) {
+      expect(containsBannedWord(name), name).toBe(true);
+    }
+  });
+
+  it('flags profanity anywhere in the name', () => {
+    for (const name of ['xxfuckxx', 'SHITlord', '我操了', '操你大爷', '大傻逼']) {
+      expect(containsBannedWord(name), name).toBe(true);
+    }
+  });
+
   it('uses custom ban list when provided', () => {
     expect(containsBannedWord('BadName', ['BadName'])).toBe(true);
     expect(containsBannedWord('BadName', ['other'])).toBe(false);

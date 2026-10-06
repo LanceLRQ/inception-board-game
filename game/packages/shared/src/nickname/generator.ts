@@ -1,5 +1,5 @@
 // Bot 昵称生成器
-// 对照：docs/_internal/TASKS.md NicknameGenerator（阵营池 + 难度扩展池 + 加权后缀 + 防撞 + UGC 过滤 + 🤖 徽章）
+// 阵营池 + 难度扩展池 + 加权后缀 + 防撞 + UGC 过滤 + 🤖 徽章
 //
 // 设计要点：
 //   - 纯函数 + 可注入 rand / existing set，便于单测
@@ -49,8 +49,23 @@ export const DEFAULT_UGC_BAN_WORDS: readonly string[] = [
   'fuck',
   'shit',
   '傻逼',
-  '操',
+  // 单字「操」会误伤「曹操」「体操」等正常昵称，只收常见的脏话搭配
+  '操你',
+  '我操',
+  '操蛋',
 ];
+
+/**
+ * 只在「独立成词」时才算命中的词：它们是冒充官方身份的英文词，
+ * 按子串匹配会误伤 modern、badminton、ecosystem 这类正常昵称。
+ */
+export const WHOLE_WORD_BAN_WORDS: ReadonlySet<string> = new Set(['admin', 'system', 'mod']);
+
+/** 把名字里的英文字母切成词：按非字母与大小写交界切分（AdminBot → admin、bot） */
+function latinWords(name: string): Set<string> {
+  const words = name.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+/g) ?? [];
+  return new Set(words.map((w) => w.toLowerCase()));
+}
 
 // === 纯函数 ===
 
@@ -92,9 +107,11 @@ export function containsBannedWord(
   banList: readonly string[] = DEFAULT_UGC_BAN_WORDS,
 ): boolean {
   const lower = name.toLowerCase();
+  const words = latinWords(name);
   for (const w of banList) {
     if (!w) continue;
-    if (lower.includes(w.toLowerCase())) return true;
+    const banned = w.toLowerCase();
+    if (WHOLE_WORD_BAN_WORDS.has(banned) ? words.has(banned) : lower.includes(banned)) return true;
   }
   return false;
 }
