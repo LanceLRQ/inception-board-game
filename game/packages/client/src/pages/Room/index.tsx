@@ -1,86 +1,75 @@
 // Room · 房间等待页
-// 房主：可补 AI、开始游戏；非房主：等待开始；轮询每 3s 刷新房间状态。
+// 房主：可补 AI、开始游戏；非房主：等待开始。
+// 房间变化由服务端推送（见 useRoomSync），推送不可用时退回低频轮询。
 // 开始后：真实后端 → 全体进入同一局联机对局；本地模拟 → 本地人机对局。
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { Bot, Copy, LogOut, Play, Users } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bot, LogOut, Play, Users } from 'lucide-react';
 import { MATCH_MIN_PLAYERS } from '@icgame/shared';
-import { ApiRequestError } from '../../lib/api';
-import { isMockMode, roomApi, type RoomState } from '../../lib/roomApi';
+import { isMockMode, roomApi } from '../../lib/roomApi';
+import { joinOrAttach, requestErrorMessage, roomKeys } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useIdentityStore } from '../../stores/useIdentityStore';
+import { RoomCodeShare } from '../../components/RoomCodeShare';
 import { isRoomMember, resolveGameRedirect, startGate } from './roomLogic';
+import { useRoomSync } from './useRoomSync';
 import { Button } from '@/components/ui/button';
-
-const POLL_INTERVAL_MS = 3_000;
 
 export default function Room() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { code } = useParams<{ code: string }>();
+  const queryClient = useQueryClient();
+  const { code: rawCode } = useParams<{ code: string }>();
+  const code = (rawCode ?? '').toUpperCase();
   const { isAuthenticated, isInitialized, playerId, nickname } = useAuth();
   const avatarSeed = useIdentityStore((s) => s.avatarSeed);
 
-  const [room, setRoom] = useState<RoomState | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  // 进入页面时加入一次房间。已在房间里的人刷新页面可能因「游戏已开始」等原因加入失败，
-  // 此时若查得到房间且本人在成员里，就按已加入处理。
-  const joinRoom = useCallback(async () => {
-    if (!code || !playerId) return;
-    try {
-      const next = await roomApi.joinRoom(code, {
-        playerId,
+  // 进入页面时加入一次房间（已在房间里的人刷新页面时按已加入处理）；加入成功后房间数据写进查询缓存
+  const join = useMutation({
+    mutationKey: ['room', 'join', code],
+    mutationFn: () =>
+      joinOrAttach(code, {
+        playerId: playerId ?? '',
         nickname,
         avatarSeed: String(avatarSeed),
-      });
-      setRoom(next);
-      setError(null);
-    } catch (e) {
-      try {
-        const existing = await roomApi.getRoom(code);
-        if (existing.players.some((p) => p.playerId === playerId)) {
-          setRoom(existing);
-          setError(null);
-          return;
-        }
-      } catch {
-        /* 查询也失败时报告加入时的错误 */
-      }
-      const msg = e instanceof ApiRequestError ? e.message : String(e);
-      setError(msg);
-    }
-  }, [code, playerId, nickname, avatarSeed]);
-
-  // 房间详情靠轮询（只读查询，不再借加入接口刷新）
-  const pollRoom = useCallback(async () => {
-    if (!code) return;
-    try {
-      const next = await roomApi.getRoom(code);
-      // 只读查询对任何登录用户都成功；本人不在成员里说明没加入成功，保留加入时的错误
-      if (!isRoomMember(next, playerId)) return;
-      setRoom(next);
-      setError(null);
-    } catch (e) {
-      // 轮询失败只显示错误，保留已有的房间信息；下一次轮询成功后自动恢复
-      const msg = e instanceof ApiRequestError ? e.message : String(e);
-      setError(msg);
-    }
-  }, [code, playerId]);
-
+      }),
+    onSuccess: (next) => {
+      logger.flow('room', 'joined', { code, players: next.players.length });
+      queryClient.setQueryData(roomKeys.detail(code), next);
+    },
+  });
+  const { mutate: joinMutate } = join;
+  const joinedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!isInitialized || !isAuthenticated || !code) return;
-    // 轮询外部（服务端）房间状态；setState 由回调内部触发是合理模式
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void joinRoom();
-    const timer = setInterval(() => void pollRoom(), POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [isInitialized, isAuthenticated, code, joinRoom, pollRoom]);
+    if (!isInitialized || !isAuthenticated || !code || !playerId) return;
+    // 同一个房间只加入一次（严格模式下 effect 会跑两遍）
+    if (joinedFor.current === code) return;
+    joinedFor.current = code;
+    joinMutate();
+  }, [isInitialized, isAuthenticated, code, playerId, joinMutate]);
+
+  const sync = useRoomSync({
+    code,
+    enabled: join.isSuccess,
+    onRemoved: () => navigate('/lobby', { replace: true }),
+  });
+  const room = sync.room;
+
+  // 曾经在成员里、后来不在了（被移出）：回大厅
+  const wasMember = useRef(false);
+  useEffect(() => {
+    if (!room) return;
+    if (isRoomMember(room, playerId)) {
+      wasMember.current = true;
+    } else if (wasMember.current) {
+      logger.flow('room', 'no longer a member, back to lobby', { code });
+      navigate('/lobby', { replace: true });
+    }
+  }, [room, playerId, code, navigate]);
 
   // status 变为 playing 时跳 Game：真实后端进入联机对局，本地模拟保持原行为
   useEffect(() => {
@@ -91,26 +80,20 @@ export default function Room() {
   const isOwner = !!room && !!playerId && room.ownerPlayerId === playerId;
   const { canStart, missing: missingPlayers } = startGate(room);
 
-  const handleFillAI = useCallback(async () => {
-    if (!code) return;
-    setBusy(true);
-    try {
-      const next = await roomApi.fillAI(code);
+  const fillAi = useMutation({
+    mutationKey: ['room', 'fillAi', code],
+    mutationFn: () => roomApi.fillAI(code),
+    onSuccess: (next) => {
       logger.flow('room', 'fillAI ok', { code, players: next.players.length });
-      setRoom(next);
-    } catch (e) {
-      const msg = e instanceof ApiRequestError ? e.message : String(e);
-      setError(msg);
-    } finally {
-      setBusy(false);
-    }
-  }, [code]);
+      queryClient.setQueryData(roomKeys.detail(code), next);
+    },
+  });
 
-  const handleStart = useCallback(async () => {
-    if (!code || !room) return;
-    setBusy(true);
-    try {
-      const res = await roomApi.startGame(code);
+  const start = useMutation({
+    mutationKey: ['room', 'start', code],
+    mutationFn: () => roomApi.startGame(code),
+    onSuccess: (res) => {
+      if (!room) return;
       logger.flow('room', 'startGame ok', {
         matchId: res.matchId,
         online: res.online,
@@ -124,33 +107,22 @@ export default function Room() {
             code: room.code,
           });
       navigate(`/game/${res.matchId}?${params.toString()}`, { replace: true });
-    } catch (e) {
-      const msg = e instanceof ApiRequestError ? e.message : String(e);
-      logger.error('room', 'startGame failed', e);
-      setError(msg);
-      setBusy(false);
-    }
-  }, [code, navigate, room]);
+    },
+  });
 
-  const handleLeave = useCallback(async () => {
-    if (!code || !playerId) return;
-    try {
-      await roomApi.leaveRoom(code, playerId);
-    } finally {
+  const leave = useMutation({
+    mutationKey: ['room', 'leave', code],
+    mutationFn: () => roomApi.leaveRoom(code, playerId ?? ''),
+    onSettled: () => {
+      logger.flow('room', 'leave', { code });
+      queryClient.removeQueries({ queryKey: roomKeys.detail(code) });
       navigate('/lobby');
-    }
-  }, [code, playerId, navigate]);
+    },
+  });
 
-  const handleCopy = useCallback(async () => {
-    if (!code) return;
-    try {
-      await navigator.clipboard?.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  }, [code]);
+  const busy = fillAi.isPending || start.isPending;
+  const failure = join.error ?? fillAi.error ?? start.error ?? sync.error;
+  const error = failure ? requestErrorMessage(failure) : null;
 
   // 未认证时跳回 Lobby（放到 effect 里避免渲染中 setState 警告）
   useEffect(() => {
@@ -185,7 +157,8 @@ export default function Room() {
         <Button
           type="button"
           variant="outline"
-          onClick={handleLeave}
+          onClick={() => leave.mutate()}
+          disabled={leave.isPending}
           className="h-8 border-line-strong px-3"
           data-testid="room-leave"
         >
@@ -194,16 +167,7 @@ export default function Room() {
         </Button>
       </div>
 
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="flex items-center justify-center gap-2 rounded-md border border-line-strong bg-panel px-4 py-3 font-mono text-2xl uppercase tracking-widest hover:bg-foreground/10"
-        data-testid="room-copy"
-      >
-        {room.code}
-        <Copy size={18} />
-        {copied && <span className="ml-2 text-sm text-ok">{t('room.copied')}</span>}
-      </button>
+      <RoomCodeShare code={room.code} />
 
       <div className="flex items-center gap-2 text-sm text-dim">
         <Users size={16} />
@@ -251,7 +215,7 @@ export default function Room() {
             <Button
               type="button"
               variant="outline"
-              onClick={handleFillAI}
+              onClick={() => fillAi.mutate()}
               disabled={busy}
               className="h-10 gap-2 border-primary/50 bg-primary/20 px-4 font-bold text-foreground hover:bg-primary/30"
               data-testid="room-fill-ai"
@@ -262,7 +226,7 @@ export default function Room() {
           )}
           <Button
             type="button"
-            onClick={handleStart}
+            onClick={() => start.mutate()}
             disabled={busy || !canStart}
             className="h-11 gap-2 px-4 font-bold"
             data-testid="room-start"

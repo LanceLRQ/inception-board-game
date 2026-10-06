@@ -14,6 +14,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect, isMobileProject, waitForAppReady } from './fixtures/index.js';
 import { auditTouchTargets } from './fixtures/responsive.js';
+import { seedSave, validMeta } from './fixtures/localSave.js';
+import { ROOM_CODE, mockRoomSession } from './fixtures/roomSession.js';
 
 // eslint-disable-next-line no-empty-pattern -- Playwright 要求第一个参数是解构形式，这里只需要 testInfo
 test.beforeEach(({}, testInfo) => {
@@ -77,6 +79,24 @@ test.describe('触控目标 · 390×844', () => {
       await expectTouchClean(page, name);
     });
   }
+
+  test('页面：房间页（分享区，二维码展开）', async ({ page }) => {
+    await mockRoomSession(page);
+    await openPage(page, `/room/${ROOM_CODE}`);
+    await expect(page.getByTestId('room-share')).toBeVisible({ timeout: 10_000 });
+    await expectTouchClean(page, '房间页分享区');
+    await page.getByTestId('room-qr-toggle').click();
+    await expect(page.getByTestId('room-qr')).toBeVisible();
+    await expectTouchClean(page, '房间页分享区（二维码展开）');
+  });
+
+  test('页面：本地对局的「继续上一局」提示', async ({ page }) => {
+    await openPage(page, '/local');
+    await seedSave(page, validMeta({ playerCount: 5, turn: 3 }));
+    await page.reload();
+    await expect(page.getByTestId('local-resume-prompt')).toBeVisible({ timeout: 10_000 });
+    await expectTouchClean(page, '继续上一局提示');
+  });
 
   for (const [name, url] of SCENES) {
     test(`对局：${name}`, async ({ page }) => {

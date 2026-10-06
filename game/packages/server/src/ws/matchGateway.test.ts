@@ -20,6 +20,7 @@ import {
   authorizeHandshake,
   handleMatchMessage,
   seatInfos,
+  remainingMs,
   snapshotFor,
   stateMessage,
   stepMessage,
@@ -237,6 +238,15 @@ describe('state and step messages', () => {
     const snap = snapshotFor(room, '0', []);
     expect(snap.view).toEqual(viewMatch(InceptionCityGame, room.current(), '0'));
     expect(snap.deadlineAt).toBe(room.deadlineAt());
+  });
+
+  it('快照里带距截止的剩余毫秒，与服务端时钟的绝对值无关', async () => {
+    const h = await makeMatch();
+    const room = h.svc.get('room-1')!;
+    const snap = snapshotFor(room, '0', []);
+    const at = room.deadlineAt();
+    if (at === null) expect(snap.deadlineInMs).toBeNull();
+    else expect(snap.deadlineInMs).toBe(Math.max(0, at - room.now()));
   });
 
   it('stepMessage gives every seat its own view and events, with no secrets leaking', async () => {
@@ -556,5 +566,22 @@ describe('handleMatchMessage icg:resume', () => {
     const spy = vi.spyOn(h.svc, 'seatsChanged');
     await handleMatchMessage({ type: 'icg:resume' }, ctx, depsFor(h));
     expect(spy).toHaveBeenCalledWith('room-1');
+  });
+});
+
+describe('remainingMs', () => {
+  it('没有截止时间为 null', () => {
+    expect(remainingMs(null, 1_000)).toBeNull();
+  });
+
+  it('剩余毫秒 = 截止 - 当前，已过期取 0', () => {
+    expect(remainingMs(10_000, 4_000)).toBe(6_000);
+    expect(remainingMs(10_000, 10_000)).toBe(0);
+    expect(remainingMs(10_000, 99_000)).toBe(0);
+  });
+
+  it('剩余毫秒不受时钟绝对值影响：同样的差值，不同的时钟起点结果相同', () => {
+    expect(remainingMs(1_700_000_030_000, 1_700_000_000_000)).toBe(30_000);
+    expect(remainingMs(30_000, 0)).toBe(30_000);
   });
 });

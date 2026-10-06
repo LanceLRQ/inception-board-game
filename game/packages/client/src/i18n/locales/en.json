@@ -54,7 +54,18 @@
     "empty": "Empty Seat",
     "needPlayers": "{{n}} more player(s) needed to start (minimum {{min}})",
     "currentPlayers": "{{current}} / {{max}}",
-    "notOwner": "Waiting for host to start"
+    "notOwner": "Waiting for host to start",
+    "linkLabel": "Invite link",
+    "copyLink": "Copy Link",
+    "linkCopied": "Link copied",
+    "copySelected": "Couldn't copy automatically. The link is selected; copy it manually.",
+    "copyFailed": "Copy failed. Please note down the room code.",
+    "shareNative": "Share",
+    "shareTitle": "Join my Inception City friend room",
+    "shareText": "Room code {{code}}. Open the link to join.",
+    "showQr": "QR Code",
+    "hideQr": "Hide QR Code",
+    "qrLabel": "QR code of the invite link for room {{code}}"
   },
   "game": {
     "yourTurn": "Your Turn",
@@ -120,7 +131,12 @@
     "bribeReceived": "Bribes received: {{n}}",
     "thiefWins": "Thieves Win!",
     "masterWins": "Dream Master Wins!",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "resumeTitle": "Unfinished match found",
+    "resumeSummary": "{{count}} players · turn {{turn}} · saved {{time}}",
+    "resumeContinue": "Continue last match",
+    "resumeNew": "Start a new match",
+    "resumeFailed": "The saved match could not be restored. A new match has been started."
   },
   "settings": {
     "title": "Settings",

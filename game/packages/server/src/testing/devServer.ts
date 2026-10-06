@@ -87,7 +87,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     heartbeatRedis: redis,
     rateGuard: new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
     timing: opts.timing ?? devTimingFromEnv(process.env),
-    // 内存服务没有 Redis，所以不挂基于 Redis 的 HTTP 限流（房间页每 3 秒轮询一次，生产环境靠额度配置承接）
+    // 内存服务没有 Redis，所以不挂基于 Redis 的 HTTP 限流
     httpRateLimit: async (_ctx, next) => {
       await next();
     },

@@ -33,8 +33,14 @@ export interface MatchSnapshotForViewer {
   seat: string | null;
   seats: SeatInfo[];
   view: MatchViewState;
-  /** 截止时间（毫秒时间戳）；没有计时时为 null */
+  /** 截止时间（服务端时钟的毫秒时间戳）；没有计时时为 null。受本机时钟偏差影响，客户端倒计时优先用 deadlineInMs */
   deadlineAt: number | null;
+  /**
+   * 发出这条消息时距截止还剩多少毫秒（不小于 0）；没有计时时为 null。
+   * 客户端以收到时刻为起点、用单调时钟倒数，不依赖本机与服务端的绝对时间差。
+   * 旧版服务端不带这个字段，客户端遇到时退回用 deadlineAt。
+   */
+  deadlineInMs?: number | null;
 }
 
 /** 服务端 → 客户端 */

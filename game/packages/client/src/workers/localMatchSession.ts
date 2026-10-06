@@ -9,6 +9,7 @@ import type { SetupState } from '@icgame/game-engine/setup';
 import {
   applyMove,
   createMatch,
+  matchFromSnapshot,
   type GameDef,
   type MatchState,
   type MoveOutcome,
@@ -58,6 +59,16 @@ export interface LocalMatchSessionOptions {
   humanPlayerID?: string;
   /** 当前时刻（毫秒）；测试用，默认 Date.now */
   now?: () => number;
+  /** 从存档恢复的状态；给了就沿用它，不再新建对局（playerCount 与 seed 此时不起作用） */
+  restoredState?: MatchState<SetupState>;
+}
+
+/**
+ * 校验并迁移存档里的引擎状态；不是合法快照时抛错。
+ * 存档的引擎状态结构版本是否匹配由存档层先行检查，这里再经引擎自带的迁移与形状校验兜一道。
+ */
+export function restoreMatchState(raw: unknown): MatchState<SetupState> {
+  return matchFromSnapshot<SetupState>(raw, game);
 }
 
 /** 把运行器的拒绝结果整理成一行说明 */
@@ -89,11 +100,34 @@ export class LocalMatchSession {
   constructor(options: LocalMatchSessionOptions) {
     this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
     this.now = options.now ?? Date.now;
-    this.state = createMatch(game, {
-      numPlayers: options.playerCount,
-      setupData: { rngSeed: options.seed },
-      seed: options.seed,
-    });
+    this.state =
+      options.restoredState ??
+      createMatch(game, {
+        numPlayers: options.playerCount,
+        setupData: { rngSeed: options.seed },
+        seed: options.seed,
+      });
+  }
+
+  /** 从存档里读出的原始状态恢复一局；状态不合法或没有真人座位时抛错 */
+  static fromSnapshot(
+    raw: unknown,
+    options: Omit<LocalMatchSessionOptions, 'restoredState'>,
+  ): LocalMatchSession {
+    const restoredState = restoreMatchState(raw);
+    const human = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
+    if (!restoredState.ctx.playOrder.includes(human)) {
+      throw new Error(`存档里没有真人座位 ${human}`);
+    }
+    return new LocalMatchSession({ ...options, restoredState });
+  }
+
+  /**
+   * 完整状态的快照，含随机种子与牌库顺序：只能写进本机存档，绝不能交给界面线程。
+   * 界面线程要的视图用 view()。
+   */
+  snapshot(): MatchState<SetupState> {
+    return this.state;
   }
 
   /** 真人座位的视图；完整状态只留在会话内部，供 Bot 决策与 move 使用 */

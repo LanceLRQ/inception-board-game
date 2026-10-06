@@ -32,7 +32,6 @@
     "comlink": "^4.4.2",
     "framer-motion": "^12.38.0",
     "i18next": "^26.0.5",
-    "idb-keyval": "^6.2.2",
     "lucide-react": "^1.8.0",
     "lxgw-wenkai-screen-webfont": "^1.7.0",
     "react": "^19.3.0",

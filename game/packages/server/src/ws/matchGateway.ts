@@ -68,7 +68,7 @@ export async function authorizeHandshake(
   return { ok: true, playerID: payload.playerId, matchID, nickname: payload.nickname, seat };
 }
 
-type RoomView = Pick<MatchRoom, 'matchID' | 'current' | 'deadlineAt' | 'seats'>;
+type RoomView = Pick<MatchRoom, 'matchID' | 'current' | 'deadlineAt' | 'seats' | 'now'>;
 
 export interface SeatStatusSource {
   isConnected(seat: string): boolean;
@@ -93,10 +93,16 @@ export function seatInfos(room: Pick<MatchRoom, 'seats'>, status: SeatStatusSour
   });
 }
 
+/** 距截止还剩多少毫秒；客户端据此倒数，不必信任本机与服务端的时钟差 */
+export function remainingMs(deadlineAt: number | null, now: number): number | null {
+  return deadlineAt === null ? null : Math.max(0, deadlineAt - now);
+}
+
 function buildSnapshot(
   matchID: string,
   state: ReturnType<MatchRoom['current']>,
   deadlineAt: number | null,
+  now: number,
   seat: string,
   seats: SeatInfo[],
 ): MatchSnapshotForViewer {
@@ -106,6 +112,7 @@ function buildSnapshot(
     seats,
     view: viewMatch(InceptionCityGame, state, seat),
     deadlineAt,
+    deadlineInMs: remainingMs(deadlineAt, now),
   };
 }
 
@@ -115,7 +122,7 @@ export function snapshotFor(
   seat: string,
   seats: SeatInfo[],
 ): MatchSnapshotForViewer {
-  return buildSnapshot(room.matchID, room.current(), room.deadlineAt(), seat, seats);
+  return buildSnapshot(room.matchID, room.current(), room.deadlineAt(), room.now(), seat, seats);
 }
 
 export function stateMessage(
@@ -128,7 +135,7 @@ export function stateMessage(
 
 /** 一步完成后发给某个座位的消息：视图与事件都来自这一步的输出，保证版本一致 */
 export function stepMessage(
-  room: Pick<MatchRoom, 'matchID'>,
+  room: Pick<MatchRoom, 'matchID' | 'now'>,
   output: StepOutput,
   seat: string,
   seats: SeatInfo[],
@@ -136,7 +143,7 @@ export function stepMessage(
   return {
     type: 'icg:step',
     events: eventsFor(output.events, seat),
-    ...buildSnapshot(room.matchID, output.state, output.deadlineAt, seat, seats),
+    ...buildSnapshot(room.matchID, output.state, output.deadlineAt, room.now(), seat, seats),
   };
 }
 

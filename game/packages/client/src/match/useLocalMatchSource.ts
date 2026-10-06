@@ -1,6 +1,6 @@
 // 本地人机对局来源：Worker 的创建、定时取状态与发 move 都收在这里
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Comlink from 'comlink';
 import type { MatchViewState, SeatInfo } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
@@ -121,6 +121,12 @@ export interface UseLocalMatchSourceOptions {
   matchId?: string;
   /** 递增后丢弃当前对局，重新建一局 */
   restartKey?: number;
+  /** 把这局存档到本机（/local 页开；好友房的本地模式不开） */
+  persist?: boolean;
+  /** 优先从存档恢复这局；存档不可用时开新局并回调 onResumeFallback */
+  resume?: boolean;
+  /** 要求恢复但存档不可用，已开了新局 */
+  onResumeFallback?: () => void;
 }
 
 /** 起一个本机 Worker 跑人机对局，返回对局来源 */
@@ -128,8 +134,15 @@ export function useLocalMatchSource({
   playerCount,
   matchId,
   restartKey = 0,
+  persist = false,
+  resume = false,
+  onResumeFallback,
 }: UseLocalMatchSourceOptions): MatchSource {
   const [source, setSource] = useState<MatchSource | null>(null);
+  const fallbackRef = useRef(onResumeFallback);
+  useEffect(() => {
+    fallbackRef.current = onResumeFallback;
+  }, [onResumeFallback]);
 
   useEffect(() => {
     const worker = new Worker(new URL('../workers/localMatch.worker.ts', import.meta.url), {
@@ -140,8 +153,14 @@ export function useLocalMatchSource({
     const off = controller.subscribe(() => setSource(controller.getSnapshot()));
 
     void api
-      .createLocalMatch(playerCount, matchId)
-      .then(() => controller.refresh())
+      .createLocalMatch(playerCount, matchId, { persist, resume })
+      .then((result) => {
+        if (result.fellBack) {
+          logger.warn('game', 'saved match unavailable, started a new one');
+          fallbackRef.current?.();
+        }
+        return controller.refresh();
+      })
       .catch((e) => {
         logger.error('game', 'createLocalMatch failed', e);
         controller.fail((e as Error).message);
@@ -153,7 +172,7 @@ export function useLocalMatchSource({
       off();
       worker.terminate();
     };
-  }, [playerCount, matchId, restartKey]);
+  }, [playerCount, matchId, restartKey, persist, resume]);
 
   return source ?? IDLE_SOURCE;
 }

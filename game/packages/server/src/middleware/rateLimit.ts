@@ -5,7 +5,7 @@ import { createRedisClient } from '../infra/redis.js';
 import { AppError } from '../infra/errors.js';
 import { logger } from '../infra/logger.js';
 
-/** 同一来源地址每分钟的默认请求额度；同一出口下 10 人等待页轮询约 200 次 / 分钟 */
+/** 同一来源地址每分钟的默认请求额度；房间等待页靠推送刷新，推送不可用时才每 15 秒轮询 */
 export const DEFAULT_HTTP_RATE_LIMIT_PER_MINUTE = 300;
 
 /** 读取每分钟额度（环境变量 HTTP_RATE_LIMIT_PER_MINUTE）；缺省或非法时用默认值 */

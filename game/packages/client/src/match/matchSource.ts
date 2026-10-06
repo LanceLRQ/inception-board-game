@@ -23,7 +23,10 @@ export interface MatchSource {
   readonly seat: string | null;
   /** 座位表；本地来源按视图里的玩家生成（除本人外都是 Bot） */
   readonly seats: readonly SeatInfo[];
-  /** 当前等待的截止时间（毫秒时间戳）；本地来源恒为 null */
+  /**
+   * 当前等待的截止点，单位是本机单调时钟（performance.now 的刻度），不是日历时间，
+   * 与 lib/deadlineClock 的 remainingSeconds 配合使用；本地来源恒为 null
+   */
   readonly deadlineAt: number | null;
   readonly connection: ConnectionState;
   /** 服务端暂时无法保存进度、正在重试；本地来源恒为 false */

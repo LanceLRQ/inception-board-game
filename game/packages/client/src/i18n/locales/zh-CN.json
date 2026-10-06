@@ -54,7 +54,18 @@
     "empty": "空座位",
     "needPlayers": "还差 {{n}} 名玩家才能开始（至少 {{min}} 人）",
     "currentPlayers": "{{current}} / {{max}}",
-    "notOwner": "等待房主开始游戏"
+    "notOwner": "等待房主开始游戏",
+    "linkLabel": "邀请链接",
+    "copyLink": "复制链接",
+    "linkCopied": "链接已复制",
+    "copySelected": "无法自动复制，链接已选中，请手动复制",
+    "copyFailed": "复制失败，请手动记下房间码",
+    "shareNative": "分享",
+    "shareTitle": "邀请你加入盗梦都市好友房",
+    "shareText": "房间码 {{code}}，点开链接加入对局",
+    "showQr": "二维码",
+    "hideQr": "收起二维码",
+    "qrLabel": "房间 {{code}} 的邀请链接二维码"
   },
   "game": {
     "yourTurn": "你的回合",
@@ -120,7 +131,12 @@
     "bribeReceived": "已收贿赂：{{n}}",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "resumeTitle": "发现未完成的对局",
+    "resumeSummary": "{{count}} 人局 · 第 {{turn}} 回合 · 保存于 {{time}}",
+    "resumeContinue": "继续上一局",
+    "resumeNew": "开新局",
+    "resumeFailed": "上一局的存档无法恢复，已为你开始新局"
   },
   "settings": {
     "title": "设置",

@@ -8,6 +8,7 @@ import {
   LocalMatchSession,
   MAX_CONSECUTIVE_REJECTS,
   buildMatchSeed,
+  restoreMatchState,
 } from './localMatchSession.js';
 
 // 只替换 nextAutoAction，其余导出保持真实实现；override 为 null 时走真实判定
@@ -353,5 +354,53 @@ describe('LocalMatchSession · 真人白羊的宽限期', () => {
     expect(session.step().waiting).toBeUndefined();
     patchState(session, { pendingAriesChoice: null });
     expect(session.step().waiting).toBeUndefined();
+  });
+});
+
+describe('LocalMatchSession · 存档与恢复', () => {
+  it('快照经 JSON 往返后恢复，视图与原会话一致，并能继续走下去', () => {
+    const original = makeSession(5, 'save-1');
+    runUntilIdle(original);
+    original.humanMove('doDraw', []);
+    const beforeView = original.view();
+
+    const raw = JSON.parse(JSON.stringify(original.snapshot())) as unknown;
+    const restored = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'ignored-on-restore',
+      restoredState: restoreMatchState(raw),
+    });
+    expect(restored.view()).toEqual(beforeView);
+
+    // 两边继续走相同的步骤，结果相同（随机状态随快照一起恢复）
+    runUntilIdle(original);
+    runUntilIdle(restored);
+    original.humanMove('endActionPhase', []);
+    restored.humanMove('endActionPhase', []);
+    runUntilIdle(original);
+    runUntilIdle(restored);
+    expect(restored.view()).toEqual(original.view());
+  });
+
+  it('快照含完整状态，但会话的 view() 仍然只给按座位裁剪的视图', () => {
+    const session = makeSession(4, 'save-2');
+    runUntilIdle(session);
+    expect(JSON.stringify(session.snapshot())).toContain('rngState');
+    expect(JSON.stringify(session.view())).not.toContain('rngState');
+  });
+
+  it('恢复的状态不是合法快照时抛错', () => {
+    expect(() => restoreMatchState('oops')).toThrow();
+    expect(() => restoreMatchState({ G: {} })).toThrow();
+    expect(() => restoreMatchState(null)).toThrow();
+  });
+
+  it('恢复的状态里没有真人座位时抛错', () => {
+    const state = JSON.parse(JSON.stringify(makeSession(4, 'save-3').snapshot())) as {
+      ctx: { playOrder: string[]; currentPlayer: string };
+    };
+    state.ctx.playOrder = state.ctx.playOrder.filter((p) => p !== HUMAN);
+    state.ctx.currentPlayer = state.ctx.playOrder[0]!;
+    expect(() => LocalMatchSession.fromSnapshot(state, { playerCount: 4, seed: 'x' })).toThrow();
   });
 });

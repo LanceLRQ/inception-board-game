@@ -3,6 +3,8 @@ import { lazy, Suspense } from 'react';
 import App from './App';
 import { RouteErrorFallback } from './components/ErrorBoundary';
 
+import Invite from './pages/Invite';
+
 const Landing = lazy(() => import('./pages/Landing'));
 const Lobby = lazy(() => import('./pages/Lobby'));
 const Room = lazy(() => import('./pages/Room'));
@@ -50,6 +52,10 @@ export const router = createBrowserRouter([
             <Room />
           </Suspense>
         ),
+      },
+      {
+        path: '/invite/:code',
+        element: <Invite />,
       },
       {
         path: '/game/:matchId',

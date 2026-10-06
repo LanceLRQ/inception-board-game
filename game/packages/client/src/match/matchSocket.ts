@@ -3,11 +3,13 @@
 import {
   MATCH_PROTOCOL_VERSION,
   type MatchEvent,
+  type MatchSnapshotForViewer,
   type MatchViewState,
   type SeatInfo,
   type ServerMatchMessage,
 } from '@icgame/game-engine';
 import { logger } from '@/lib/logger';
+import { toLocalDeadline } from '@/lib/deadlineClock';
 import type { ConnectionState, MoveOutcome } from './matchSource';
 
 /** 连接所需的最小 socket 接口；socket.io-client 的 Socket 可直接赋给它 */
@@ -36,7 +38,10 @@ export interface MatchSocketOptions {
   ) => SocketLike;
   /** move 结果的等待上限，默认 10000 毫秒 */
   moveTimeoutMs?: number;
+  /** 单调时钟（毫秒），倒计时的起点；默认 performance.now */
   now?: () => number;
+  /** 日历时间（毫秒）；只在旧版服务端不带剩余毫秒时用，默认 Date.now */
+  wallNow?: () => number;
   newIntentId?: () => string;
 }
 
@@ -44,6 +49,7 @@ export interface MatchSocketSnapshot {
   view: MatchViewState | null;
   seat: string | null;
   seats: readonly SeatInfo[];
+  /** 截止点，单位是本机单调时钟（performance.now 的刻度），不是日历时间；没有计时为 null */
   deadlineAt: number | null;
   connection: ConnectionState;
   /** 服务端暂时无法保存进度（正在重试）；恢复或断线后为 false */
@@ -251,7 +257,7 @@ export class MatchSocket {
       this.update({
         seat: msg.seat,
         seats: msg.seats,
-        deadlineAt: msg.deadlineAt,
+        deadlineAt: this.localDeadline(msg),
         connection: 'connected',
       });
       return;
@@ -260,7 +266,7 @@ export class MatchSocket {
       view: msg.view,
       seat: msg.seat,
       seats: msg.seats,
-      deadlineAt: msg.deadlineAt,
+      deadlineAt: this.localDeadline(msg),
       connection: 'connected',
     });
   }
@@ -280,9 +286,16 @@ export class MatchSocket {
       view: msg.view,
       seat: msg.seat,
       seats: msg.seats,
-      deadlineAt: msg.deadlineAt,
+      deadlineAt: this.localDeadline(msg),
     });
     this.deliverEvents(msg.events, stateID);
+  }
+
+  /** 服务端消息里的截止信息 → 本机单调时钟上的截止点 */
+  private localDeadline(msg: MatchSnapshotForViewer): number | null {
+    const mono = this.options.now ?? (() => performance.now());
+    const wall = this.options.wallNow ?? (() => Date.now());
+    return toLocalDeadline(msg.deadlineAt, msg.deadlineInMs, mono(), wall());
   }
 
   private onSeats(msg: ServerMatchMessage): void {

@@ -30,8 +30,10 @@ COPY packages/client ./packages/client
 # Vite 构建时的运行期 API base（通过构建参数注入）
 ARG VITE_API_URL="/api"
 ARG VITE_WS_URL="/ws"
+ARG VITE_PUBLIC_BASE_URL=""
 ENV VITE_API_URL=$VITE_API_URL \
-    VITE_WS_URL=$VITE_WS_URL
+    VITE_WS_URL=$VITE_WS_URL \
+    VITE_PUBLIC_BASE_URL=$VITE_PUBLIC_BASE_URL
 RUN cd packages/client && pnpm build
 
 # === Stage 3: nginx 托管 ===

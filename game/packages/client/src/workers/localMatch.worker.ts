@@ -3,15 +3,46 @@
 // 所有判断都在 LocalMatchSession 里；这里只负责 Comlink 外壳、自动循环的定时调度与日志。
 
 import * as Comlink from 'comlink';
+import { CURRENT_SCHEMA_VERSION } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
 import { LOCAL_HUMAN_SEAT } from './localSeat.js';
-import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS, buildMatchSeed } from './localMatchSession.js';
+import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS } from './localMatchSession.js';
+import {
+  createMatchPersistence,
+  startLocalMatch,
+  type MatchPersistence,
+  type PersistenceLog,
+} from './localMatchPersistence.js';
+import {
+  NO_LOCAL_SAVES,
+  openLocalMatchSaves,
+  type LocalMatchSaves,
+} from '../lib/localMatchSave.js';
 
 /** 真人 move 的结果 */
 export type LocalMoveResult = { ok: true } | { ok: false; reason: RejectReason };
 
+/** 建局选项 */
+export interface CreateLocalMatchOptions {
+  /** 把这局存档到本机（/local 页开；好友房的本地模式不开） */
+  persist?: boolean;
+  /** 优先从存档恢复；存档不可用时开新局 */
+  resume?: boolean;
+}
+
+export interface CreateLocalMatchResult {
+  /** 这局是从存档恢复的 */
+  resumed: boolean;
+  /** 要求恢复但存档不可用，已丢弃并开了新局 */
+  fellBack: boolean;
+}
+
 export interface LocalMatchWorker {
-  createLocalMatch: (playerCount: number, matchID?: string) => Promise<void>;
+  createLocalMatch: (
+    playerCount: number,
+    matchID?: string,
+    options?: CreateLocalMatchOptions,
+  ) => Promise<CreateLocalMatchResult>;
   getState: () => Promise<unknown>;
   /** 会话尚未建立时返回 null；被拒时 reason 是运行器的拒绝码 */
   makeMove: (move: string, args: unknown[]) => Promise<LocalMoveResult | null>;
@@ -57,7 +88,28 @@ function logError(msg: string, ctx?: unknown): void {
   else console.error(`[game/move] ${msg}`);
 }
 
+/** 存档相关的日志；等级约定同上（INFO 为流程点位，WARN 为存档被丢弃或写入失败） */
+const saveLog: PersistenceLog = {
+  flow(msg, ctx) {
+    if (ctx !== undefined) console.info(`[game/save] ${msg}`, ctx);
+    else console.info(`[game/save] ${msg}`);
+  },
+  warn(msg, ctx) {
+    if (ctx !== undefined) console.warn(`[game/save] ${msg}`, ctx);
+    else console.warn(`[game/save] ${msg}`);
+  },
+};
+
+let savesPromise: Promise<LocalMatchSaves> | null = null;
+/** 第一次需要存档时才打开 IndexedDB；打不开就降级为不存档 */
+function getSaves(): Promise<LocalMatchSaves> {
+  savesPromise ??= openLocalMatchSaves({ engineSchema: CURRENT_SCHEMA_VERSION });
+  return savesPromise;
+}
+
 let session: LocalMatchSession | null = null;
+/** 当前这局的落盘器；不存档时为 null */
+let persistence: MatchPersistence | null = null;
 /** 每次建局递增；定时回调发现代数变了就说明属于已被替换的旧对局 */
 let generation = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -70,6 +122,12 @@ function clearTimer(): void {
     clearTimeout(timer);
     timer = null;
   }
+}
+
+/** 状态往前走了一步：落盘（终局时清除存档） */
+function persistChange(current: LocalMatchSession): void {
+  const gen = generation;
+  persistence?.onChange(current, () => gen === generation && session === current);
 }
 
 /** 回合切换与终局的流程打点 */
@@ -126,6 +184,7 @@ function runAutoStep(current: LocalMatchSession): void {
 
   const { action } = result;
   if (result.ok) {
+    persistChange(current);
     logMove(`auto(${action.playerID})`, action.move, { args: action.args, why: action.why });
     logAI(`auto ${action.playerID} → ${action.move}`, action.why);
   } else {
@@ -147,20 +206,41 @@ function runAutoStep(current: LocalMatchSession): void {
 }
 
 const workerApi: LocalMatchWorker = {
-  async createLocalMatch(playerCount: number, matchID?: string) {
+  async createLocalMatch(playerCount: number, matchID?: string, options?: CreateLocalMatchOptions) {
     generation += 1;
+    const myGeneration = generation;
     clearTimer();
     loggedTurn = null;
     gameoverLogged = false;
+    // 建局期间（要等存档读完）界面看到的是「还没就绪」
+    session = null;
+    persistence = null;
 
-    const seed = buildMatchSeed(matchID, Date.now());
-    logFlow('createLocalMatch', { playerCount, matchID, seed });
-    session = new LocalMatchSession({
-      playerCount,
-      seed,
-      humanPlayerID: HUMAN_PLAYER_ID,
+    const persist = options?.persist === true;
+    const resume = options?.resume === true;
+    const saves = persist || resume ? await getSaves() : NO_LOCAL_SAVES;
+    const started = await startLocalMatch(
+      { playerCount, matchID, persist, resume },
+      saves,
+      saveLog,
+    );
+    // 等存档期间又来了一次建局：以后来的为准，这一次作废
+    if (myGeneration !== generation) return { resumed: false, fellBack: false };
+
+    session = started.session;
+    persistence = persist
+      ? createMatchPersistence(saves, started.session.view().ctx.numPlayers, saveLog)
+      : null;
+    logFlow('createLocalMatch', {
+      playerCount: started.session.view().ctx.numPlayers,
+      matchID,
+      resumed: started.resumed,
+      fellBack: started.fellBack,
+      persist,
     });
+    logFlowChanges(started.session);
     scheduleNext();
+    return { resumed: started.resumed, fellBack: started.fellBack };
   },
 
   async getState() {
@@ -173,6 +253,7 @@ const workerApi: LocalMatchWorker = {
     if (result.ok) {
       logMove(`human(${HUMAN_PLAYER_ID})`, move, { args });
       logFlowChanges(session);
+      persistChange(session);
       // 状态变了才需要重新启动自动循环；被拒的 move 不改变状态
       scheduleNext();
       return { ok: true };

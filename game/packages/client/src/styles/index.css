@@ -347,3 +347,12 @@
   transition-duration: 1ms !important;
   scroll-behavior: auto !important;
 }
+
+/*
+ * 二维码画布：扫码器要「深色码点 + 浅色底」，不随主题变化，所以这里用固定的两种颜色。
+ * 码点用 currentColor 画，颜色取自这里的 color。
+ */
+.qr-frame {
+  background: #fff;
+  color: #111;
+}

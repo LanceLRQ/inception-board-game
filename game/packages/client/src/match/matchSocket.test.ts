@@ -7,6 +7,7 @@ import {
   type MatchViewState,
   type SeatInfo,
 } from '@icgame/game-engine';
+import { remainingSeconds } from '@/lib/deadlineClock';
 import { MatchSocket, type SocketLike } from './matchSocket';
 
 type Handler = (...args: unknown[]) => void;
@@ -79,7 +80,8 @@ function snapshotMsg(type: 'icg:state' | 'icg:step', stateID: number, extra: obj
     seat: '0',
     seats: SEATS,
     view: view(stateID),
-    deadlineAt: 5000,
+    deadlineAt: 1_700_000_005_000,
+    deadlineInMs: 5000,
     ...extra,
   };
 }
@@ -123,6 +125,101 @@ describe('MatchSocket', () => {
     socket.fire('connect');
     socket.fire('icg:state', snapshotMsg('icg:state', stateID));
   }
+
+  describe('倒计时的截止点', () => {
+    /** 单调时钟与日历时间都可调的连接 */
+    function withClocks(mono: { t: number }, wall: { t: number }): MatchSocket {
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => mono.t,
+        wallNow: () => wall.t,
+      });
+      m.connect();
+      sock.connected = true;
+      sock.fire('icg:state', snapshotMsg('icg:state', 1, { deadlineInMs: 30_000 }));
+      sockets.set(m, sock);
+      return m;
+    }
+    const sockets = new Map<MatchSocket, FakeSocket>();
+
+    it('截止点 = 收到时刻的单调时钟 + 服务端给的剩余毫秒', () => {
+      const m = withClocks({ t: 12_345 }, { t: 1_700_000_000_000 });
+      expect(m.getSnapshot().deadlineAt).toBe(12_345 + 30_000);
+      m.close();
+    });
+
+    it.each([
+      ['本机时钟拨快 10 分钟', 10 * 60_000],
+      ['本机时钟拨慢 10 分钟', -10 * 60_000],
+    ])('%s：倒计时不受影响', (_name, skew) => {
+      const mono = { t: 1_000 };
+      const wall = { t: 1_700_000_000_000 + skew };
+      const m = withClocks(mono, wall);
+      const deadline = m.getSnapshot().deadlineAt;
+      expect(remainingSeconds(deadline, mono.t)).toBe(30);
+      mono.t += 12_000; // 过了 12 秒（日历时间被乱改也不影响单调时钟）
+      wall.t -= 3_600_000;
+      expect(remainingSeconds(deadline, mono.t)).toBe(18);
+      mono.t += 20_000;
+      expect(remainingSeconds(deadline, mono.t)).toBe(0);
+      m.close();
+    });
+
+    it('下一条消息带来新的剩余毫秒时，以新消息为准', () => {
+      const mono = { t: 0 };
+      const m = withClocks(mono, { t: 0 });
+      mono.t = 10_000;
+      sockets
+        .get(m)!
+        .fire('icg:step', snapshotMsg('icg:step', 2, { events: [], deadlineInMs: 45_000 }));
+      expect(m.getSnapshot().deadlineAt).toBe(55_000);
+      m.close();
+    });
+
+    it('旧版服务端不带剩余毫秒时退回用日历时间换算', () => {
+      const mono = { t: 2_000 };
+      const wall = { t: 1_700_000_000_000 };
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => mono.t,
+        wallNow: () => wall.t,
+      });
+      m.connect();
+      sock.connected = true;
+      const legacy = snapshotMsg('icg:state', 1, { deadlineAt: 1_700_000_007_000 }) as Record<
+        string,
+        unknown
+      >;
+      delete legacy.deadlineInMs;
+      sock.fire('icg:state', legacy);
+      expect(m.getSnapshot().deadlineAt).toBe(2_000 + 7_000);
+      m.close();
+    });
+
+    it('没有计时时截止点为 null', () => {
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => 0,
+      });
+      m.connect();
+      sock.connected = true;
+      sock.fire('icg:state', snapshotMsg('icg:state', 1, { deadlineAt: null, deadlineInMs: null }));
+      expect(m.getSnapshot().deadlineAt).toBeNull();
+      m.close();
+    });
+  });
 
   it('connect 带上路径与握手参数并进入 connecting', () => {
     ms.connect();

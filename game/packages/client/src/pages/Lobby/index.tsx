@@ -3,11 +3,13 @@
 
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
 import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi } from '../../lib/roomApi';
+import { requestErrorMessage } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { readOnlineMatch } from '../../lib/onlineMatchMemo';
 import { useAuth } from '../../hooks/useAuth';
@@ -98,47 +100,56 @@ export default function Lobby() {
     }
   }, [restoreInput, recoverIdentity, t]);
 
-  const handleCreateRoom = useCallback(async () => {
-    if (!playerId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await roomApi.createRoom(
-        { playerId, nickname, avatarSeed: String(avatarSeed) },
-        { maxPlayers },
-      );
-      logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers });
+  // 建房与加入房间是写操作：用 mutation 承载，成功后进入房间页
+  const createRoomMutation = useMutation({
+    mutationKey: ['lobby', 'createRoom'],
+    mutationFn: (size: number) =>
+      roomApi.createRoom(
+        { playerId: playerId ?? '', nickname, avatarSeed: String(avatarSeed) },
+        {
+          maxPlayers: size,
+        },
+      ),
+    onSuccess: (res, size) => {
+      logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers: size });
       navigate(`/room/${res.code}`);
-    } catch (e) {
-      const msg = e instanceof ApiRequestError ? e.message : String(e);
-      logger.error('lobby', 'createRoom failed', e);
-      setError(t('lobby.errorGeneric', { message: msg }));
-    } finally {
-      setLoading(false);
-    }
-  }, [playerId, nickname, avatarSeed, maxPlayers, navigate, t]);
+    },
+    onError: (e) => setError(t('lobby.errorGeneric', { message: requestErrorMessage(e) })),
+  });
 
-  const handleJoinRoom = useCallback(async () => {
-    const code = joinCode.trim().toUpperCase();
-    if (!/^[A-Z0-9]{6}$/.test(code)) {
+  const joinRoomMutation = useMutation({
+    mutationKey: ['lobby', 'joinRoom'],
+    mutationFn: (roomCode: string) =>
+      roomApi.joinRoom(roomCode, {
+        playerId: playerId ?? '',
+        nickname,
+        avatarSeed: String(avatarSeed),
+      }),
+    onSuccess: (_room, roomCode) => {
+      logger.flow('lobby', 'joinRoom ok', { code: roomCode });
+      navigate(`/room/${roomCode}`);
+    },
+    onError: (e) => setError(t('lobby.errorGeneric', { message: requestErrorMessage(e) })),
+  });
+
+  const roomBusy = createRoomMutation.isPending || joinRoomMutation.isPending;
+
+  const handleCreateRoom = useCallback(() => {
+    if (!playerId) return;
+    setError(null);
+    createRoomMutation.mutate(maxPlayers);
+  }, [playerId, maxPlayers, createRoomMutation]);
+
+  const handleJoinRoom = useCallback(() => {
+    const roomCode = joinCode.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(roomCode)) {
       setError(t('lobby.codeInvalid'));
       return;
     }
     if (!playerId) return;
-    setLoading(true);
     setError(null);
-    try {
-      await roomApi.joinRoom(code, { playerId, nickname, avatarSeed: String(avatarSeed) });
-      logger.flow('lobby', 'joinRoom ok', { code });
-      navigate(`/room/${code}`);
-    } catch (e) {
-      const msg = e instanceof ApiRequestError ? e.message : String(e);
-      logger.warn('lobby', 'joinRoom failed', e);
-      setError(t('lobby.errorGeneric', { message: msg }));
-    } finally {
-      setLoading(false);
-    }
-  }, [joinCode, playerId, nickname, avatarSeed, navigate, t]);
+    joinRoomMutation.mutate(roomCode);
+  }, [joinCode, playerId, joinRoomMutation, t]);
 
   const handleResume = useCallback(() => {
     if (!resumable) return;
@@ -301,7 +312,7 @@ export default function Lobby() {
         <Button
           type="button"
           onClick={handleCreateRoom}
-          disabled={loading}
+          disabled={loading || roomBusy}
           className="h-10 w-full px-4 font-bold"
           data-testid="lobby-create"
         >
@@ -330,7 +341,7 @@ export default function Lobby() {
           type="button"
           variant="outline"
           onClick={handleJoinRoom}
-          disabled={loading || joinCode.length !== 6}
+          disabled={loading || roomBusy || joinCode.length !== 6}
           className="h-10 w-full border-line-strong px-4 font-bold"
           data-testid="lobby-join"
         >

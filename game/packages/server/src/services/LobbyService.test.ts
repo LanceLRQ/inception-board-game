@@ -53,7 +53,7 @@ vi.mock('../infra/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
 
-import { LobbyService } from './LobbyService.js';
+import { LobbyService, toRoomPayload } from './LobbyService.js';
 
 function makePlayer(id: string, nickname?: string) {
   return {
@@ -530,6 +530,75 @@ describe('LobbyService', () => {
       prismaMock.player.findUnique.mockResolvedValueOnce(makePlayer('P3'));
       const updated = await service.joinRoom(room.code, 'P3');
       expect(updated.players.find((p) => p.playerId === 'P3')!.seat).toBe(1);
+    });
+  });
+
+  describe('房间变化通知', () => {
+    it('加入、补 Bot、离开、踢人、开始游戏保存之后各通知一次；创建与读取不通知', async () => {
+      const changes: RoomState[] = [];
+      const svc = new LobbyService({
+        matches,
+        onRoomChange: (room) => changes.push(structuredClone(room)),
+      });
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await svc.createRoom('P1', { maxPlayers: 6 });
+      await svc.getRoom(room.code);
+      expect(changes).toHaveLength(0);
+
+      prismaMock.player.findUnique.mockResolvedValueOnce(makePlayer('P2'));
+      await svc.joinRoom(room.code, 'P2');
+      expect(changes).toHaveLength(1);
+      expect(changes[0]!.players.map((p) => p.playerId)).toEqual(['P1', 'P2']);
+
+      await svc.fillAI(room.code, 'P1', 3);
+      expect(changes).toHaveLength(2);
+      expect(changes[1]!.players).toHaveLength(5);
+
+      await svc.kickPlayer(room.code, 'P1', 'P2');
+      expect(changes).toHaveLength(3);
+
+      await svc.startGame(room.code, 'P1');
+      expect(changes).toHaveLength(4);
+      expect(changes[3]).toMatchObject({ status: 'playing', matchId: room.id });
+
+      await svc.leaveRoom(room.code, 'P1');
+      expect(changes).toHaveLength(5);
+    });
+
+    it('监听函数抛错不影响请求本身', async () => {
+      const svc = new LobbyService({
+        matches,
+        onRoomChange: () => {
+          throw new Error('boom');
+        },
+      });
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await svc.createRoom('P1');
+      prismaMock.player.findUnique.mockResolvedValueOnce(makePlayer('P2'));
+      const joined = await svc.joinRoom(room.code, 'P2');
+      expect(joined.players).toHaveLength(2);
+    });
+
+    it('toRoomPayload 只含房间公开信息', () => {
+      const payload = toRoomPayload({
+        id: 'r',
+        code: 'ABC234',
+        ownerPlayerId: 'P1',
+        maxPlayers: 6,
+        ruleVariant: 'classic',
+        exCardsEnabled: true,
+        expansionEnabled: true,
+        status: 'waiting',
+        players: [
+          { playerId: 'P1', nickname: 'A', avatarSeed: 's', seat: 0, isBot: false, joinedAt: 1 },
+        ],
+        createdAt: 1,
+        expiresAt: 2,
+      });
+      expect(Object.keys(payload).sort()).toEqual(
+        ['code', 'id', 'maxPlayers', 'ownerPlayerId', 'players', 'ruleVariant', 'status'].sort(),
+      );
+      expect(payload.matchId).toBeUndefined();
     });
   });
 });
