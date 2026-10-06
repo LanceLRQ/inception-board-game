@@ -71,6 +71,9 @@ export {
 
 // 聊天预设短语
 export {
+  CHAT_BUBBLE_VISIBLE_MS,
+  CHAT_COOLDOWN_MS,
+  CHAT_HISTORY_LIMIT,
   CHAT_PRESETS,
   findChatPreset,
   isValidChatPresetId,

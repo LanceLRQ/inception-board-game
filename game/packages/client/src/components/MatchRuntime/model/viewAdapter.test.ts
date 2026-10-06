@@ -67,6 +67,29 @@ describe('adaptViewToStage', () => {
     ).toBeNull();
   });
 
+  it('头像种子取自座位表；没有座位表或座位表里没有种子时按座位与昵称推导', () => {
+    const withSeats = adaptViewToStage({
+      G: sampleG,
+      ctx: sampleCtx,
+      humanPlayerID: '0',
+      seats: [
+        {
+          seat: '0',
+          nickname: '我',
+          isBot: false,
+          connected: true,
+          takenOver: false,
+          avatarSeed: '777',
+        },
+        { seat: '1', nickname: 'AI 1', isBot: true, connected: true, takenOver: false },
+      ],
+    })!;
+    expect(withSeats.players['0']!.avatarSeed).toBe('777');
+    expect(withSeats.players['1']!.avatarSeed).toBe('seat-1-AI 1');
+    const bare = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
+    expect(bare.players['0']!.avatarSeed).toBe('seat-0-我');
+  });
+
   it('人类（viewer）hand 保留真实卡 id 数组', () => {
     const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.players['0']!.hand).toEqual(['action_shoot', 'action_unlock']);

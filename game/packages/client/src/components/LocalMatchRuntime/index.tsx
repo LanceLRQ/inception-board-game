@@ -13,6 +13,12 @@ interface LocalMatchRuntimeProps {
   readonly topRight?: React.ReactNode;
   /** 结束/重开回调；未传则显示内置"再来一局"按钮 */
   readonly onRestart?: () => void;
+  /** 把这局存档到本机，刷新后可以继续（/local 页开） */
+  readonly persist?: boolean;
+  /** 从存档恢复这局 */
+  readonly resume?: boolean;
+  /** 要求恢复但存档不可用，已开了新局 */
+  readonly onResumeFallback?: () => void;
 }
 
 export function LocalMatchRuntime({
@@ -20,9 +26,19 @@ export function LocalMatchRuntime({
   matchId,
   topRight,
   onRestart,
+  persist,
+  resume,
+  onResumeFallback,
 }: LocalMatchRuntimeProps) {
   const [restartKey, setRestartKey] = useState(0);
-  const source = useLocalMatchSource({ playerCount, matchId, restartKey });
+  const source = useLocalMatchSource({
+    playerCount,
+    matchId,
+    restartKey,
+    persist,
+    resume,
+    onResumeFallback,
+  });
 
   const handleRestart = useCallback(() => {
     if (onRestart) onRestart();

@@ -43,8 +43,23 @@ describe('buildSeats', () => {
       player({ seat: 0 }),
       player({ seat: 1, isBot: true, playerId: 'bot-abc' }),
     ]);
-    expect(seats[1]).toEqual({ seat: '1', playerId: null, nickname: 'N1', isBot: true });
+    expect(seats[1]).toEqual({
+      seat: '1',
+      playerId: null,
+      nickname: 'N1',
+      isBot: true,
+      avatarSeed: 's',
+    });
     expect(seats[0]!.isBot).toBe(false);
+  });
+
+  it('座位带上房间成员的头像种子，超过 64 个字符时截断，没有种子就不带', () => {
+    const seats = buildSeats([
+      player({ seat: 0, avatarSeed: 'a'.repeat(80) }),
+      player({ seat: 1, avatarSeed: '' }),
+    ]);
+    expect(seats[0]!.avatarSeed).toHaveLength(64);
+    expect(seats[1]).not.toHaveProperty('avatarSeed');
   });
 
   it('昵称超过 50 个字符时截断，空昵称回落为默认名', () => {

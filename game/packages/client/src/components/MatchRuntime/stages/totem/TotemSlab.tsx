@@ -12,6 +12,7 @@ import { CardArt } from '../../../CardArt';
 import { Die } from '../../../Die';
 import type { BoardLayer, BoardNightmare, BoardVault } from '../../model/boardModel';
 import { TotemPenrose } from './TotemPenrose';
+import { PixelAvatar } from '../../../PixelAvatar';
 
 interface TotemSlabProps {
   readonly row: BoardLayer;
@@ -188,6 +189,7 @@ export function TotemSlab({ row, focus, onFocus, onOpenCard }: TotemSlabProps) {
                 data-self={o.isSelf || undefined}
                 className="totem-occ flex max-w-44 items-center gap-1 text-[11px]"
               >
+                <PixelAvatar seed={o.avatarSeed} size={14} rounded={false} />
                 {o.isMaster && <Crown className="size-3 shrink-0 text-acc-bright" aria-hidden />}
                 <span className="truncate">
                   {o.isSelf ? t('seat.me') : o.name}

@@ -11,6 +11,7 @@ import { CardArt } from '../../../CardArt';
 import { Die } from '../../../Die';
 import type { BoardLayer, BoardNightmare, BoardVault } from '../../model/boardModel';
 import { SLAB_CONTENT_INSET, slabGeometry, slabKindOf } from './drafting';
+import { PixelAvatar } from '../../../PixelAvatar';
 
 interface BlueprintPlaneProps {
   readonly row: BoardLayer;
@@ -200,6 +201,7 @@ export function BlueprintPlane({ row, focus, onFocus, onOpenCard }: BlueprintPla
                 data-self={o.isSelf || undefined}
                 className="blueprint-occ flex max-w-44 items-center gap-1 text-[11px]"
               >
+                <PixelAvatar seed={o.avatarSeed} size={14} rounded={false} />
                 {o.isMaster && <Crown className="size-3 shrink-0 text-acc-bright" aria-hidden />}
                 <span className="truncate">
                   {o.isSelf ? t('seat.me') : o.name}

@@ -54,7 +54,18 @@
     "empty": "空座位",
     "needPlayers": "还差 {{n}} 名玩家才能开始（至少 {{min}} 人）",
     "currentPlayers": "{{current}} / {{max}}",
-    "notOwner": "等待房主开始游戏"
+    "notOwner": "等待房主开始游戏",
+    "linkLabel": "邀请链接",
+    "copyLink": "复制链接",
+    "linkCopied": "链接已复制",
+    "copySelected": "无法自动复制，链接已选中，请手动复制",
+    "copyFailed": "复制失败，请手动记下房间码",
+    "shareNative": "分享",
+    "shareTitle": "邀请你加入盗梦都市好友房",
+    "shareText": "房间码 {{code}}，点开链接加入对局",
+    "showQr": "二维码",
+    "hideQr": "收起二维码",
+    "qrLabel": "房间 {{code}} 的邀请链接二维码"
   },
   "game": {
     "yourTurn": "你的回合",
@@ -120,7 +131,12 @@
     "bribeReceived": "已收贿赂：{{n}}",
     "thiefWins": "盗梦者获胜！",
     "masterWins": "梦主获胜！",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "resumeTitle": "发现未完成的对局",
+    "resumeSummary": "{{count}} 人局 · 第 {{turn}} 回合 · 保存于 {{time}}",
+    "resumeContinue": "继续上一局",
+    "resumeNew": "开新局",
+    "resumeFailed": "上一局的存档无法恢复，已为你开始新局"
   },
   "settings": {
     "title": "设置",
@@ -184,17 +200,54 @@
     }
   },
   "avatar": {
+    "current": "当前头像",
     "roll": "摇骰换头像",
-    "rolls": "已摇骰 {{count}} 次",
-    "save": "保存",
-    "saving": "保存中...",
-    "undo": "撤销"
+    "reroll": "换一个",
+    "saving": "保存中…",
+    "saveFailed": "没能保存头像，请稍后再试"
   },
   "chat": {
-    "toggle": "聊天",
-    "panel_title": "预设短语",
-    "no_presets": "当前分类无可用短语",
-    "cooldown": "冷却中...{{seconds}}s"
+    "toggle": "短语",
+    "cooldown": "冷却中...{{seconds}}s",
+    "title": "预设短语",
+    "desc": "选一条短语发给同局的所有人",
+    "recent": "最近消息（{{n}}）",
+    "recentEmpty": "还没有人说话",
+    "categories": "短语分类",
+    "category": {
+      "greeting": "问候",
+      "tactic": "战术",
+      "emotion": "情绪",
+      "feedback": "反馈"
+    },
+    "greet": {
+      "hi": "大家好！",
+      "ready": "我准备好了",
+      "welcome": "欢迎来到梦境",
+      "gl": "祝玩得开心！"
+    },
+    "tactic": {
+      "push": "我们推进！",
+      "retreat": "先撤退",
+      "focus": "集火这一层",
+      "wait": "等我一回合",
+      "trap": "小心陷阱",
+      "signal": "注意梦主"
+    },
+    "emotion": {
+      "wow": "哇！",
+      "oops": "我失误了",
+      "lucky": "运气真好",
+      "gg": "GG 打得漂亮",
+      "sigh": "哎呀...",
+      "laugh": "哈哈哈"
+    },
+    "feedback": {
+      "thanks": "谢谢！",
+      "sorry": "抱歉",
+      "nicemove": "这步真妙",
+      "bye": "辛苦大家！"
+    }
   },
   "copyright": {
     "short": "本项目为爱好者非商业复刻，原版版权归发行商所有。",
@@ -206,8 +259,8 @@
   },
   "loading": {
     "title": "正在准备梦境...",
-    "waiting": "等待资源清单...",
-    "failed": "{{count}} 张卡图加载失败，将使用占位"
+    "failed": "{{count}} 张卡图没能加载，将显示文字占位",
+    "progress": "已加载 {{loaded}} / {{total}}"
   },
   "match": {
     "reject": {
@@ -246,12 +299,32 @@
   },
   "report": {
     "button": "举报",
-    "button_aria": "举报玩家",
+    "button_aria": "举报 {{name}}",
     "dialog_title": "举报玩家",
     "target_label": "举报目标：{{name}}",
-    "description_label": "详细描述（可选，最多 500 字）",
+    "description_label": "补充说明（可选，最多 {{max}} 字）",
     "submit": "提交举报",
-    "submitting": "提交中..."
+    "submitting": "提交中...",
+    "reported": "已举报",
+    "section": "举报玩家",
+    "reason_label": "举报理由",
+    "reason": {
+      "cheating": "作弊行为",
+      "afk": "挂机 / 弃局",
+      "abusive": "言语不当",
+      "other": "其他原因"
+    },
+    "close": "关闭",
+    "done": "已收到你的举报，谢谢。",
+    "error": {
+      "duplicate": "这局你已经举报过这位玩家了。",
+      "forbidden": "只有这局的玩家才能举报。",
+      "not_found": "找不到这局对局的记录，暂时无法举报。",
+      "invalid": "这条举报无法受理，请换个对象或理由。",
+      "rate_limited": "操作太频繁，请稍后再试。",
+      "network": "网络不稳，举报没有送达，请重试。",
+      "unknown": "举报失败，请稍后再试。"
+    }
   },
   "tutorial": {
     "step_count": "第 {{current}} / {{total}} 步",
@@ -815,5 +888,17 @@
   },
   "die": {
     "combat": "战斗骰 {{n}}"
+  },
+  "cardArt": {
+    "category": {
+      "thief": "盗梦者",
+      "dream-master": "梦主",
+      "action": "行动牌",
+      "nightmare": "梦魇",
+      "vault": "金库",
+      "bribe": "贿赂",
+      "dream": "梦境",
+      "other": "卡牌"
+    }
   }
 }

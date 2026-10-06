@@ -1,4 +1,5 @@
 // WebSocket 消息类型：对局消息来自引擎包，这里补上心跳、聊天与通知类消息
+// 聊天只传预设短语的 id（message 字段），不接受任意文本
 
 import type { ClientMatchMessage, ServerMatchMessage } from '@icgame/game-engine';
 

@@ -68,6 +68,41 @@ export interface LobbyDeps {
   redis?: LobbyRedis;
   prisma?: LobbyPrisma;
   matches?: Pick<MatchService, 'createFromRoom' | 'discardMatch' | 'isRunning'>;
+  /** 房间内容变了（成员增减、补 Bot、开始游戏）并已保存之后调用；它抛错不影响请求 */
+  onRoomChange?: (room: RoomState) => void;
+}
+
+/** 房间推送给成员的内容：只含房间本身的公开信息，没有任何对局内的隐藏信息 */
+export interface RoomPayload {
+  id: string;
+  code: string;
+  ownerPlayerId: string;
+  maxPlayers: number;
+  ruleVariant: string;
+  status: RoomState['status'];
+  matchId?: string;
+  players: RoomPlayer[];
+}
+
+/** 房间状态 → 推送内容 */
+export function toRoomPayload(room: RoomState): RoomPayload {
+  return {
+    id: room.id,
+    code: room.code,
+    ownerPlayerId: room.ownerPlayerId,
+    maxPlayers: room.maxPlayers,
+    ruleVariant: room.ruleVariant,
+    status: room.status,
+    ...(room.matchId !== undefined ? { matchId: room.matchId } : {}),
+    players: room.players.map((p) => ({
+      playerId: p.playerId,
+      nickname: p.nickname,
+      avatarSeed: p.avatarSeed,
+      seat: p.seat,
+      isBot: p.isBot,
+      joinedAt: p.joinedAt,
+    })),
+  };
 }
 
 export class LobbyService {
@@ -76,11 +111,13 @@ export class LobbyService {
   private readonly matches:
     | Pick<MatchService, 'createFromRoom' | 'discardMatch' | 'isRunning'>
     | undefined;
+  private readonly onRoomChange: ((room: RoomState) => void) | undefined;
 
   constructor(deps: LobbyDeps = {}) {
     this.redis = deps.redis ?? createRedisClient();
     this.prisma = deps.prisma ?? defaultPrisma;
     this.matches = deps.matches;
+    this.onRoomChange = deps.onRoomChange;
   }
 
   private generateRoomCode(): string {
@@ -296,5 +333,10 @@ export class LobbyService {
 
   private async saveRoom(room: RoomState): Promise<void> {
     await this.redis.setex(RedisKeys.roomState(room.code), RedisTTL.ROOM_TTL, JSON.stringify(room));
+    try {
+      this.onRoomChange?.(room);
+    } catch (err) {
+      logger.warn({ err, code: room.code }, 'room change listener failed');
+    }
   }
 }

@@ -51,6 +51,19 @@ export default defineConfig({
         // 离线人机模式：缓存 app shell + 静态资源
         runtimeCaching: [
           {
+            // 卡图（约 100 张、十几 MB）不进预缓存：用到哪张缓存哪张，下次（含离线）直接取缓存。
+            // 必须排在通用图片规则之前：Workbox 取第一条匹配的规则
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/cards/') && /\.webp$/i.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'card-art-cache',
+              // 全部卡图 + 背面不到 120 张；留出余量，超出时淘汰最久没用的
+              expiration: { maxEntries: 160, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
             // 字体分片有两百多个文件，不进预缓存：用到哪片缓存哪片
             urlPattern: /\.woff2?$/i,
             handler: 'CacheFirst',
@@ -79,7 +92,8 @@ export default defineConfig({
         ],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
         // 「庄周梦蝶」的楷体样式（按字符集分片的 @font-face 声明）只在用到这个主题时才取，不进预缓存
-        globIgnores: ['**/lxgwwenkai*.css'],
+        // 卡图也不进预缓存（见上面的运行时缓存规则）
+        globIgnores: ['**/lxgwwenkai*.css', 'cards/**'],
       },
       devOptions: { enabled: false },
     }),

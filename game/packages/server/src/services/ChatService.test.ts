@@ -250,4 +250,21 @@ describe('ChatService', () => {
       expect(r.ok).toBe(true);
     });
   });
+
+  describe('memory', () => {
+    it('冷却记录过多时顺手清掉已过冷却期的', () => {
+      for (let i = 0; i < 1_100; i++) {
+        chat.send({
+          matchID: `m${i}`,
+          senderID: '1',
+          senderFaction: 'thief',
+          presetId: 'greet_hi',
+        });
+      }
+      now += 10_000;
+      chat.send({ matchID: 'fresh', senderID: '1', senderFaction: 'thief', presetId: 'greet_hi' });
+      const size = (chat as unknown as { lastSentAt: Map<string, number> }).lastSentAt.size;
+      expect(size).toBeLessThan(10);
+    });
+  });
 });

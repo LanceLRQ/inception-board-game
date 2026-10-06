@@ -58,6 +58,19 @@ export async function waitForAppReady(page: Page): Promise<void> {
 }
 
 /**
+ * 等对局界面的素材预加载（进对局前那一段）取完：取得慢时会有一层加载界面盖在对局上，
+ * 用鼠标 / 触摸做底层手势（按下、拖动）的用例要先等它退场，否则手势会落在加载界面上。
+ * 用元素定位器的点击与断言自带可点击性等待，不需要这个。
+ */
+export async function waitForAssetsReady(page: Page): Promise<void> {
+  await expect(page.locator('[data-testid="local-runtime"][data-assets-ready="true"]')).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
+}
+
+/**
  * 收集 test 执行期间页面层的 console errors（可选显式使用）
  */
 export function createConsoleErrorRecorder(page: Page): { errors: string[] } {

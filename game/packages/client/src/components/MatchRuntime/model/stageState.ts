@@ -6,7 +6,8 @@ import type { CardID } from '@icgame/shared';
 export interface StagePlayer {
   id: string;
   nickname: string;
-  avatarSeed: number;
+  /** 像素头像种子：取自座位表（公开信息），没有时按座位与昵称推导 */
+  avatarSeed: string;
   faction: 'thief' | 'master';
   characterId: CardID | '';
   isRevealed: boolean;

@@ -1,15 +1,16 @@
 // AssetPreloader - 三阶段预加载
 //
-// 纯函数策略 + 可注入 fetch，便于单测。
+// 纯函数策略 + 可注入 fetch，便于单测。目录（哪张图属于哪一档）由 cardCatalog 给出，这里只管怎么取。
 // 三阶段：
-//   - critical：启动阻塞（卡背 + 骰子索引），<100KB
-//   - match-entry：进入对局前（本局所需角色 / 行动牌 / 金库 / 梦魇）
-//   - idle：requestIdleCallback 空闲加载（图鉴全量）
+//   - critical：进站就取，界面必需的小图（通用背面、金库牌面），不阻塞页面
+//   - match-entry：进入对局前取，显示真实进度（牌种全集 + 本人视图里可见的牌与角色）
+//   - idle：空闲时低并发地取其余的图，用得到时也会按需加载
 //
 // 降级：
-//   - navigator.connection.saveData === true → 跳过 match-entry 自动预加载
-//   - manifest 加载失败 → 启动继续但卡图走惰性 <img loading="lazy">
-//   - 单项失败 → 记 failed[]，由 CardArt 降级为文字占位
+//   - 数据节省模式（saveData）或慢网（2g）：跳过空闲阶段，进对局前只取视图里已经出现的牌
+//   - 单项失败或超时 → 记 failed[]，不阻塞进入对局，由 CardArt 显示卡名文字与类别色块
+//
+// 只取公开的牌种全集或本人视图里可见的牌：不按别人的手牌或未翻开的身份取图（见 cardCatalog）。
 
 export type AssetTier = 'critical' | 'match-entry' | 'idle';
 
@@ -49,7 +50,8 @@ export interface PreloadBatchOptions {
 export interface PreloaderDeps {
   readonly fetch: typeof fetch;
   readonly now?: () => number;
-  readonly saveData?: () => boolean;
+  /** 当前是否处于受限网络（数据节省模式或慢网）；缺省按浏览器的 navigator.connection 判断 */
+  readonly constrained?: () => boolean;
 }
 
 // === 纯函数 ===
@@ -106,11 +108,21 @@ export function advanceProgress(
   };
 }
 
-/** 弱网判定：saveData === true → 跳过 match-entry */
-export function shouldSkipMatchEntry(saveDataFn?: () => boolean): boolean {
-  if (!saveDataFn) return false;
+/** 受限网络：数据节省模式开着，或有效网络类型是 2g / slow-2g */
+export function isConstrainedConnection(
+  conn: { saveData?: boolean; effectiveType?: string } | undefined,
+): boolean {
+  if (!conn) return false;
+  return conn.saveData === true || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g';
+}
+
+/** 读取浏览器当前的网络状况；读不到（不支持 / 抛错）当作不受限 */
+export function browserConnectionConstrained(): boolean {
   try {
-    return saveDataFn() === true;
+    const nav = globalThis.navigator as
+      | (Navigator & { connection?: { saveData?: boolean; effectiveType?: string } })
+      | undefined;
+    return isConstrainedConnection(nav?.connection);
   } catch {
     return false;
   }
@@ -123,14 +135,19 @@ export class AssetPreloader {
   private readonly loaded = new Set<string>();
   private readonly inflight = new Map<string, Promise<boolean>>();
   private readonly fetchImpl: typeof fetch;
-  private readonly saveDataFn: (() => boolean) | undefined;
+  private readonly constrainedFn: () => boolean;
 
   constructor(deps?: Partial<PreloaderDeps>) {
-    this.fetchImpl = deps?.fetch ?? (typeof fetch !== 'undefined' ? fetch : throwNoFetch);
-    this.saveDataFn = deps?.saveData;
+    // 默认用全局 fetch，必须包一层：把 window.fetch 存成实例属性再调用，this 会指向实例，浏览器抛 Illegal invocation
+    this.fetchImpl =
+      deps?.fetch ??
+      (typeof fetch !== 'undefined'
+        ? (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init)
+        : throwNoFetch);
+    this.constrainedFn = deps?.constrained ?? browserConnectionConstrained;
   }
 
-  /** 显式注入 manifest（测试用），跳过 fetch */
+  /** 注入图片目录（见 cardCatalog 的 buildCardCatalog） */
   setManifest(manifest: AssetManifest): void {
     this.manifest = manifest;
   }
@@ -140,37 +157,37 @@ export class AssetPreloader {
     return this.loaded;
   }
 
-  /** 拉取 /cards/manifest.json；失败返回 null（调用方决定如何降级） */
-  async loadManifest(url = '/cards/manifest.json'): Promise<AssetManifest | null> {
+  /** 此刻是否处于受限网络 */
+  get constrained(): boolean {
     try {
-      const res = await this.fetchImpl(url, { cache: 'force-cache' });
-      if (!res.ok) return null;
-      const data = (await res.json()) as AssetManifest;
-      this.manifest = data;
-      return data;
+      return this.constrainedFn() === true;
     } catch {
-      return null;
+      return false;
     }
   }
 
-  /** Tier-1：启动阻塞；未加载 manifest 时返回 0 个 */
+  /** Tier-1：进站就取；没有目录时返回 0 个 */
   async preloadCritical(onProgress?: (p: PreloadProgress) => void): Promise<PreloadProgress> {
     const entries = this.manifest ? filterByTier(this.manifest.entries, 'critical') : [];
-    return this.preloadBatch(entries, 'critical', { concurrency: 4, timeoutMs: 5000, onProgress });
+    const pending = entries.filter((e) => !this.loaded.has(e.id));
+    return this.preloadBatch(pending, 'critical', { concurrency: 4, timeoutMs: 5000, onProgress });
   }
 
-  /** Tier-2：进入对局前；saveData 时跳过（返回零进度） */
+  /**
+   * Tier-2：进入对局前。要取的是「牌种全集（match-entry 档）」加上调用方给的 id（本人视图里可见的牌与角色）；
+   * 受限网络下只取调用方给的 id，不取全集。
+   */
   async preloadMatchEntry(
     cardIds: readonly string[],
     onProgress?: (p: PreloadProgress) => void,
     signal?: AbortSignal,
   ): Promise<PreloadProgress> {
-    if (shouldSkipMatchEntry(this.saveDataFn)) {
-      const empty = makeInitialProgress('match-entry', []);
-      onProgress?.(empty);
-      return empty;
-    }
-    const entries = this.manifest ? filterByIds(this.manifest.entries, cardIds) : [];
+    const wanted = new Set(cardIds);
+    const entries = this.manifest
+      ? this.manifest.entries.filter(
+          (e) => wanted.has(e.id) || (!this.constrained && e.tier === 'match-entry'),
+        )
+      : [];
     const pending = entries.filter((e) => !this.loaded.has(e.id));
     const opts: PreloadBatchOptions = {
       concurrency: 6,
@@ -182,42 +199,38 @@ export class AssetPreloader {
   }
 
   /**
-   * Tier-3：空闲时分批；浏览器无 requestIdleCallback 时直接返回。
-   * 不返回 Promise（fire-and-forget）。
+   * Tier-3：浏览器空闲时低并发地取其余的图。受限网络下跳过（返回 null）。
+   * 没有 requestIdleCallback 的环境用短延时代替。
    */
-  preloadIdle(): void {
-    if (typeof window === 'undefined') return;
-    if (!this.manifest) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- requestIdleCallback 全局
-    const ric = (window as any).requestIdleCallback as
-      | ((cb: (deadline: IdleDeadline) => void) => number)
-      | undefined;
-    if (!ric) return;
-
-    const idleList = this.manifest.entries.filter(
+  async preloadIdle(
+    onProgress?: (p: PreloadProgress) => void,
+    signal?: AbortSignal,
+  ): Promise<PreloadProgress | null> {
+    if (!this.manifest || this.constrained) return null;
+    const pending = this.manifest.entries.filter(
       (e) => e.tier === 'idle' && !this.loaded.has(e.id),
     );
-    const batcher = (deadline: IdleDeadline): void => {
-      while (deadline.timeRemaining() > 5 && idleList.length > 0) {
-        const entry = idleList.shift();
-        if (entry) void this.preloadOne(entry);
-      }
-      if (idleList.length > 0) ric(batcher);
-    };
-    ric(batcher);
+    if (pending.length === 0) return null;
+    await waitForIdle(signal);
+    if (signal?.aborted || this.constrained) return null;
+    return this.preloadBatch(pending, 'idle', {
+      concurrency: IDLE_CONCURRENCY,
+      timeoutMs: 15_000,
+      ...(onProgress ? { onProgress } : {}),
+      ...(signal ? { signal } : {}),
+    });
   }
 
-  /** 单条预加载（幂等 + inflight 去重） */
+  /** 单条预加载（幂等 + inflight 去重）；响应体读完才算加载成功 */
   async preloadOne(entry: AssetManifestEntry, timeoutMs = 10_000): Promise<boolean> {
     if (this.loaded.has(entry.id)) return true;
     const existing = this.inflight.get(entry.id);
     if (existing) return existing;
 
     const p = this.fetchWithTimeout(entry.url, timeoutMs)
-      .then((res) => {
-        if (!res || !res.ok) return false;
-        this.loaded.add(entry.id);
-        return true;
+      .then((ok) => {
+        if (ok) this.loaded.add(entry.id);
+        return ok;
       })
       .catch(() => false);
     this.inflight.set(entry.id, p);
@@ -228,7 +241,7 @@ export class AssetPreloader {
     }
   }
 
-  /** 批量预加载（p-limit 并发控制 + progress 回调） */
+  /** 批量预加载（并发控制 + progress 回调）；单张失败只记入 failed，不影响其余 */
   async preloadBatch(
     entries: readonly AssetManifestEntry[],
     tier: AssetTier,
@@ -258,29 +271,42 @@ export class AssetPreloader {
     return progress;
   }
 
-  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response | null> {
+  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<boolean> {
+    const ctrl = typeof AbortController === 'undefined' ? null : new AbortController();
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
     try {
-      if (typeof AbortController === 'undefined') {
-        const res = await this.fetchImpl(url, { cache: 'force-cache' });
-        return res;
-      }
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      try {
-        const res = await this.fetchImpl(url, { cache: 'force-cache', signal: ctrl.signal });
-        return res;
-      } finally {
-        clearTimeout(t);
-      }
+      const res = await this.fetchImpl(url, {
+        cache: 'force-cache',
+        ...(ctrl ? { signal: ctrl.signal } : {}),
+      });
+      if (!res.ok) return false;
+      // 读完响应体：只有真正下载完（并进了 HTTP 缓存 / Service Worker 缓存），进度才算数
+      await res.arrayBuffer();
+      return true;
     } catch {
-      return null;
+      return false;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
   }
+}
+
+/** 空闲阶段的并发数：低到不会和对局里的请求抢带宽 */
+const IDLE_CONCURRENCY = 2;
+const IDLE_FALLBACK_DELAY_MS = 300;
+
+/** 等到浏览器空闲（或被取消）；没有 requestIdleCallback 时延时一小段 */
+function waitForIdle(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const ric = (
+      globalThis as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }
+    ).requestIdleCallback;
+    if (typeof ric === 'function') ric(() => resolve(), { timeout: 3000 });
+    else setTimeout(resolve, IDLE_FALLBACK_DELAY_MS);
+  });
 }
 
 function throwNoFetch(): never {
   throw new Error('AssetPreloader: no fetch available (node?). Inject via deps.');
 }
-
-// 默认单例
-export const assetPreloader = new AssetPreloader();

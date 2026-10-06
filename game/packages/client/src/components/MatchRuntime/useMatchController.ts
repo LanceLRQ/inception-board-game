@@ -6,16 +6,19 @@ import { useTranslation } from 'react-i18next';
 import type { MatchView } from '@icgame/game-engine';
 import { logger } from '../../lib/logger';
 import { getCardName } from '../../lib/cards';
-import { preloadAllCardImages } from '../../lib/cardImages';
 import type { ActiveSkillDescriptor } from '../../lib/activeSkills';
 import type { MatchSource } from '../../match/matchSource';
 import { toast } from '@/lib/toast';
 import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
 import { awaitingNotice } from './awaitingNotice';
 import { useAwaitedResponse } from './response/useAwaitedResponse';
+import { useMatchAssets } from './useMatchAssets';
+import { reportTargets } from './reportTargets';
+import { useMatchChat } from './useMatchChat';
 import { remainingSeconds, useSecondClock } from './deadline';
 import { otherTurnLabel } from './turnLabel';
 import {
+  adaptPlayForCharacter,
   activeSkillTargetIds,
   buildActiveSkillContext,
   chessAvailable,
@@ -50,7 +53,6 @@ import type {
   MatchController,
   MatchMakeMove,
   PendingPlay,
-  PreloadProgress,
   SelfInfo,
   SkillPanelModel,
 } from './controllerTypes';
@@ -65,28 +67,13 @@ export function useMatchController(source: MatchSource): MatchController {
   const viewerSeat = mySeat ?? '';
   // 长按 / 双击预览的卡牌 ID
   const [previewCard, setPreviewCard] = useState<string | null>(null);
-  // 卡图预载进度
-  const [preloadProgress, setPreloadProgress] = useState<PreloadProgress | null>(null);
-
-  // 挂载：打点 + 后台预加载所有卡图（不阻塞对局）· 浏览器 HTTP cache 接管后续 <img> 秒出
   const sourceKind = source.kind;
   useEffect(() => {
     logger.flow('game', 'runtime mount', { kind: sourceKind });
-    void preloadAllCardImages({
-      onProgress: (loaded, total, failed) => {
-        setPreloadProgress({ loaded, total, failed: failed.length });
-        if (loaded === total) {
-          logger.flow('game/assets', 'card images preloaded', {
-            loaded,
-            total,
-            failed: failed.length,
-          });
-          // 完成 800ms 后清空 state，进度条淡出
-          setTimeout(() => setPreloadProgress(null), 800);
-        }
-      },
-    });
   }, [sourceKind]);
+
+  // 素材预加载：进对局前取牌种全集与本人视图里可见的牌，之后空闲时再取其余
+  const assets = useMatchAssets(gameState ? (gameState.G as MatchView) : undefined, mySeat);
 
   const sourceMakeMove = source.makeMove;
   // 包一层：被拒时提示并留日志；自动发出的 move（silent）被拒不提示
@@ -282,7 +269,10 @@ export function useMatchController(source: MatchSource): MatchController {
   }, [G, players, lastPlayedCard]);
 
   // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
-  const effectivePending = effectivePendingPlay(pendingPlay, turnPhase, isMyTurn, humanHand);
+  const effectivePending = adaptPlayForCharacter(
+    effectivePendingPlay(pendingPlay, turnPhase, isMyTurn, humanHand),
+    humanCharacterId,
+  );
 
   const startPlay = useCallback(
     (card: string) => {
@@ -479,6 +469,15 @@ export function useMatchController(source: MatchSource): MatchController {
 
   const canConfirmDiscard = effectiveSelected.length === overHand;
 
+  const chat = useMatchChat(source.chat, mySeat !== null && mySeat === dreamMasterID);
+  const sourceReport = source.report;
+  const sourceSeats = source.seats;
+  const report = useMemo(() => {
+    if (sourceReport === null) return null;
+    const targets = reportTargets(sourceSeats, mySeat);
+    return targets.length === 0 ? null : { targets, submit: sourceReport.submit };
+  }, [sourceReport, sourceSeats, mySeat]);
+
   return {
     ready: gameState !== null,
     error,
@@ -486,7 +485,9 @@ export function useMatchController(source: MatchSource): MatchController {
     isRemote,
     winner,
     winReason,
-    preload: preloadProgress,
+    preload: assets.background,
+    entryAssets: assets.entry,
+    assetsReady: assets.entryDone,
 
     view: G,
     viewerSeat,
@@ -612,6 +613,8 @@ export function useMatchController(source: MatchSource): MatchController {
     response,
     shootDice: { roll: shootDiceRoll, onComplete: handleDiceComplete },
 
+    chat,
+    report,
     skillPanel,
     preview: { cardId: previewCard, open: openPreview, close: closePreview },
   };

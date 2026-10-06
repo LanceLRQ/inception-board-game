@@ -5,7 +5,9 @@ import { getCardImageUrl } from '../../../lib/cardImages';
 import { getCharacterSkillSummary } from '../../../lib/cards';
 import { CardArt } from '../../CardArt';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
+import type { ChatEntry } from '../../../match/chat';
 import type { SelfInfo } from '../controllerTypes';
+import { ChatBubble } from '../shared/ChatBubble';
 import type { SeatMarker } from '../seatMarkers';
 
 interface DockSelfProps {
@@ -16,6 +18,8 @@ interface DockSelfProps {
   /** 弃牌阶段需要弃的张数；不用弃为 0 */
   readonly mustDiscard: number;
   readonly markers: readonly SeatMarker[];
+  /** 本人此刻还在显示的短语气泡 */
+  readonly bubble?: ChatEntry | undefined;
   readonly onPreview: (characterId: string) => void;
 }
 
@@ -25,6 +29,7 @@ export function DockSelf({
   skillName,
   mustDiscard,
   markers,
+  bubble,
   onPreview,
 }: DockSelfProps) {
   const { t } = useTranslation();
@@ -35,10 +40,16 @@ export function DockSelf({
 
   return (
     <div
-      className="ms-dock-self flex shrink-0 items-center gap-3 pr-4"
+      className="ms-dock-self relative flex shrink-0 items-center gap-3 pr-4"
       style={{ width: 'clamp(196px, calc(16vw / var(--ms-scale, 1)), 264px)' }}
       data-testid="dock-self"
     >
+      <ChatBubble
+        entry={bubble}
+        seatId={self.seat}
+        side="bottom"
+        className="absolute -top-1 left-1 -translate-y-full"
+      />
       <button
         type="button"
         disabled={!self.characterId}

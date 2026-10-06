@@ -79,6 +79,12 @@ function isNetworkDown(err: unknown): boolean {
   return true;
 }
 
+function saveMockAvatar(avatarSeed: string): string {
+  const me = loadMockIdentity();
+  if (me) saveMockIdentity({ ...me, avatarSeed });
+  return avatarSeed;
+}
+
 async function mockInit(nickname: string): Promise<InitResponse> {
   const playerId = randomId();
   const me: MeResponse = {
@@ -161,6 +167,14 @@ export const identityApi = {
   async recoveryStatus(): Promise<RecoveryStatus> {
     if (fallbackToMock) throw offlineError();
     return api.get<RecoveryStatus>('/identity/recovery-code');
+  },
+
+  /** 保存新的像素头像种子；返回服务端实际保存的值。离线模拟身份只改本机保存的资料 */
+  async updateAvatar(avatarSeed: string): Promise<string> {
+    if (fallbackToMock) return saveMockAvatar(avatarSeed);
+    const res = await api.patch<{ avatarSeed: string }>('/identity/me', { avatarSeed });
+    logger.flow('identity', 'avatar updated');
+    return res.avatarSeed;
   },
 
   async me(): Promise<MeResponse> {

@@ -6,6 +6,13 @@
 //   - availableFactions: all / thief / master（控制可发送阵营）
 //   - category 用于面板 Tab 分组
 
+/** 同一座位两次发言的最短间隔（服务端按它限流，客户端按它显示冷却） */
+export const CHAT_COOLDOWN_MS = 3_000;
+/** 客户端保留的最近消息条数 */
+export const CHAT_HISTORY_LIMIT = 30;
+/** 座位旁的气泡显示多久 */
+export const CHAT_BUBBLE_VISIBLE_MS = 5_000;
+
 export type ChatPresetCategory = 'greeting' | 'tactic' | 'emotion' | 'feedback';
 export type ChatPresetFaction = 'all' | 'thief' | 'master';
 
@@ -19,7 +26,7 @@ export interface ChatPresetPhrase {
   readonly displayOrder: number;
 }
 
-/** MVP 固定 20 条预设短语。后续可迁移到 DB 表运营维护。 */
+/** 固定 20 条预设短语；id 稳定，客户端与服务端都以这份常量为准，不查数据库 */
 export const CHAT_PRESETS: readonly ChatPresetPhrase[] = [
   // --- 问候 ---
   {

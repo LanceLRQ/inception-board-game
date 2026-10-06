@@ -2,7 +2,13 @@
 // 场景用调试路由的固定场景，状态确定、操作不推进状态。
 
 import type { Page } from '@playwright/test';
-import { test, expect, isNarrowViewport, waitForAppReady } from './fixtures/index.js';
+import {
+  test,
+  expect,
+  isNarrowViewport,
+  waitForAppReady,
+  waitForAssetsReady,
+} from './fixtures/index.js';
 
 test.beforeEach(({ page }) => {
   test.skip(!isNarrowViewport(page), '移动布局只在窄屏下运行');
@@ -13,6 +19,7 @@ async function openScene(page: Page, url: string): Promise<void> {
   await waitForAppReady(page);
   await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('hand-dock')).toBeVisible();
+  await waitForAssetsReady(page);
 }
 
 /** 页面没有横向滚动 */

@@ -7,6 +7,7 @@ import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { healthRouter } from './api/health.js';
 import { createIdentityRouter, type IdentityPrisma } from './api/identity.js';
 import { createRoomsRouter } from './api/rooms.js';
+import { createInviteRouter, inviteConfigFromEnv, type InviteConfig } from './api/invite.js';
 import { LobbyService } from './services/LobbyService.js';
 import { playersRouter } from './api/players.js';
 import { createMatchesRouter } from './api/matches.js';
@@ -43,6 +44,8 @@ export interface AppDeps {
   reports?: ReportsRouterDeps | null;
   /** 允许跨域访问的页面源；不给时不处理跨域 */
   corsOrigin?: string | string[];
+  /** 邀请链接与分享卡片的配置；不给时读环境变量 PUBLIC_BASE_URL / INVITE_IMAGE_PATH */
+  invite?: InviteConfig;
   /** 位于反向代理之后时开启：来源地址取 X-Forwarded-For。后端端口直接暴露公网时不要开启 */
   trustProxy?: boolean;
 }
@@ -81,9 +84,18 @@ export function createApp(deps: AppDeps = {}): Koa {
   app.use(identityRouter.routes());
   app.use(identityRouter.allowedMethods());
 
-  const roomsRouter = createRoomsRouter(deps.lobby ?? new LobbyService());
+  const lobby = deps.lobby ?? new LobbyService();
+  const roomsRouter = createRoomsRouter(lobby);
   app.use(roomsRouter.routes());
   app.use(roomsRouter.allowedMethods());
+
+  // 房间邀请链接：预览抓取器得到分享卡片，浏览器跳转到房间页
+  const inviteRouter = createInviteRouter({
+    lobby,
+    config: deps.invite ?? inviteConfigFromEnv(process.env),
+  });
+  app.use(inviteRouter.routes());
+  app.use(inviteRouter.allowedMethods());
 
   app.use(playersRouter.routes());
   app.use(playersRouter.allowedMethods());

@@ -15,6 +15,14 @@ function stageOf(id: 'thief' | 'master') {
   return state;
 }
 
+describe('buildSeatViews · 头像', () => {
+  it('每个座位带着自己的头像种子，且各不相同', () => {
+    const slots = buildSeatViews(stageOf('thief'), undefined);
+    expect(slots.every((s) => s.avatarSeed.length > 0)).toBe(true);
+    expect(new Set(slots.map((s) => s.avatarSeed)).size).toBe(slots.length);
+  });
+});
+
 describe('buildSeatViews', () => {
   it('盗梦者视角：梦主排首位，每个玩家一格', () => {
     const state = stageOf('thief');

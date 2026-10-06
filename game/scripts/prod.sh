@@ -287,6 +287,7 @@ build_images() {
         docker build \
           --build-arg "VITE_API_URL=${VITE_API_URL:-/api}" \
           --build-arg "VITE_WS_URL=${VITE_WS_URL:-/ws}" \
+          --build-arg "VITE_PUBLIC_BASE_URL=${VITE_PUBLIC_BASE_URL:-}" \
           -t "$(local_image "$name")" \
           -f "$PROJECT_ROOT/deploy/prod/client/Dockerfile" \
           "$PROJECT_ROOT";;

@@ -38,7 +38,7 @@ load_env_file() {
 
 load_env_file
 # VITE_* 是生产镜像的前端构建参数（同域反代的 /api、/ws）；开发时前端直连 localhost:3001，不能带上它们
-unset VITE_API_URL VITE_WS_URL
+unset VITE_API_URL VITE_WS_URL VITE_PUBLIC_BASE_URL
 
 DEV_REDIS_PASSWORD="${DEV_REDIS_PASSWORD:-icgame_dev_only}"
 

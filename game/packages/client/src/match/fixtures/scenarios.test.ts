@@ -54,10 +54,36 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('pending=toString')).toBe('thief');
   });
 
+  it('character=sudger 进入本人是意念判官的场景；梦主视角、响应窗口与待应答参数优先', () => {
+    expect(idOf('character=sudger')).toBe('thief-sudger');
+    expect(idOf('character=sudger&as=master')).toBe('master');
+    expect(idOf('character=sudger&pending=1')).toBe('thief-pending');
+    expect(idOf('character=sudger&pending=virgo')).toBe('thief-pending-virgo');
+    expect(idOf('character=sudger&discard=1')).toBe('thief-discard');
+    expect(idOf('character=other')).toBe('thief');
+  });
+
   it('as=master&chess=1 进入梦主是棋局的场景；pending=1 优先，没有 as=master 时 chess 无效', () => {
     expect(idOf('as=master&chess=1')).toBe('master-chess');
     expect(idOf('as=master&chess=1&pending=1')).toBe('master-pending');
     expect(idOf('chess=1')).toBe('thief');
+  });
+
+  it('chat=1 与 outcome 参数只加走查开关，不改变局面', () => {
+    expect(resolveFixtureScenario(q('chat=1')).extras).toEqual({ chat: true });
+    expect(resolveFixtureScenario(q('outcome=1')).extras).toEqual({ outcome: 'ok' });
+    expect(resolveFixtureScenario(q('outcome=duplicate')).extras).toEqual({ outcome: 'duplicate' });
+    expect(resolveFixtureScenario(q('outcome=failed&chat=1')).extras).toEqual({
+      chat: true,
+      outcome: 'failed',
+    });
+    expect(idOf('as=master&chat=1&outcome=1')).toBe('master');
+  });
+
+  it('没有走查开关、或取值无法识别时没有 extras', () => {
+    expect(resolveFixtureScenario(q('')).extras).toBeUndefined();
+    expect(resolveFixtureScenario(q('chat=0&outcome=ok')).extras).toBeUndefined();
+    expect(resolveFixtureScenario(q('outcome=constructor')).extras).toBeUndefined();
   });
 
   it('无法识别的取值按缺省处理', () => {

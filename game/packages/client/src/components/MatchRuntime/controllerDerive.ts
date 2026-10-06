@@ -1,6 +1,7 @@
 // 对局界面控制层的纯推导：不依赖 React，输入是按座位裁剪过的视图，输出是界面要用的数据与参数。
 // useMatchController 只负责把这些函数接到状态与回调上。
 
+import { isShootClassCard } from '@icgame/game-engine';
 import type { MatchView, MatchViewState, PlayerView, RunnerCtx } from '@icgame/game-engine';
 import { actionMoveFor, getCardName } from '../../lib/cards';
 import { getCardImageUrl } from '../../lib/cardImages';
@@ -199,6 +200,7 @@ const SHOOT_MOVES: readonly string[] = [
   'playShootKing',
   'playShootArmor',
   'playShootBurst',
+  'playShootSudger',
 ];
 
 /** 是否是 SHOOT 系列 move（末位可附死亡宣言） */
@@ -212,6 +214,37 @@ export function isShootPlay(pending: PendingPlay): boolean {
     isShootMove(pending.move) ||
     (pending.dreamMode === 'shoot' && pending.move === 'playShootDreamTransit')
   );
+}
+
+/** 意念判官的角色 id */
+export const SUDGER_CHARACTER_ID = 'thief_sudger_of_mind';
+
+/**
+ * 角色技能改变出牌方式时，把出牌意图换成该角色要走的 move。
+ * 意念判官【定罪】：使用 SHOOT 类牌时，目标改为掷 2 颗骰子，由判官选 1 颗做结果（docs/manual/05-dream-thieves.md）。
+ * 说明书没有「可以」二字，是使用 SHOOT 类牌时一律改为这样结算，所以判官打出 SHOOT 类牌
+ * 一律改走 playShootSudger（目标、牌、死亡宣言的参数顺序与普通 SHOOT 相同），选骰由随后的应答界面承担。
+ * 梦境穿梭剂只有选了 SHOOT 模式才算 SHOOT 类，穿梭模式不受影响。
+ */
+export function adaptPlayForCharacter(
+  pending: PendingPlay | null,
+  characterId: string,
+): PendingPlay | null {
+  if (!pending || characterId !== SUDGER_CHARACTER_ID) return pending;
+  // SHOOT 类牌以引擎的判定为准；其余牌仍走原来的 move
+  if (!isShootClassCard(pending.card)) return pending;
+  if (pending.dreamMode === 'shoot' && pending.move === 'playShootDreamTransit') {
+    return {
+      card: pending.card,
+      move: 'playShootSudger',
+      needsTarget: 'player',
+      argOrder: 'target_first',
+    };
+  }
+  if (isShootMove(pending.move) && pending.move !== 'playShootSudger') {
+    return { ...pending, move: 'playShootSudger' };
+  }
+  return pending;
 }
 
 /** 手牌里的死亡宣言 */

@@ -21,31 +21,48 @@ import type { CardID } from '@icgame/shared';
 
 const PUBLIC_PREFIX = '/cards/';
 
+/** 卡图在 public/cards 下的分类目录；与素材目录的分类一致 */
+export type CardImageCategory =
+  | 'thief'
+  | 'dream-master'
+  | 'action'
+  | 'bribe'
+  | 'dream'
+  | 'nightmare'
+  | 'vault'
+  | 'other';
+
 interface ImageEntry {
   readonly front: string;
   readonly back?: string;
+  readonly category: CardImageCategory;
 }
 
 function buildImageMap(): ReadonlyMap<string, ImageEntry> {
   const map = new Map<string, ImageEntry>();
-  const all = [
-    ...THIEF_CHARACTERS,
-    ...MASTER_CHARACTERS,
-    ...ACTION_CARDS,
-    ...NIGHTMARE_CARDS,
-    ...DREAM_CARDS,
-    ...VAULT_CARDS,
-    ...BRIBE_CARDS,
+  const groups: ReadonlyArray<[CardImageCategory, ReadonlyArray<object>]> = [
+    ['thief', THIEF_CHARACTERS],
+    ['dream-master', MASTER_CHARACTERS],
+    ['action', ACTION_CARDS],
+    ['nightmare', NIGHTMARE_CARDS],
+    ['dream', DREAM_CARDS],
+    ['vault', VAULT_CARDS],
+    ['bribe', BRIBE_CARDS],
   ];
-  for (const card of all) {
-    const front = (card as { imagePath?: string }).imagePath;
-    if (!card.id || !front) continue;
-    const backRaw = (card as { backImagePath?: string }).backImagePath;
-    const entry: ImageEntry = {
-      front: PUBLIC_PREFIX + encodeURI(front),
-      ...(backRaw ? { back: PUBLIC_PREFIX + encodeURI(backRaw) } : {}),
-    };
-    map.set(card.id, entry);
+  for (const [category, cards] of groups) {
+    for (const card of cards as ReadonlyArray<{
+      id?: string;
+      imagePath?: string;
+      backImagePath?: string;
+    }>) {
+      const front = card.imagePath;
+      if (!card.id || !front) continue;
+      map.set(card.id, {
+        front: PUBLIC_PREFIX + encodeURI(front),
+        ...(card.backImagePath ? { back: PUBLIC_PREFIX + encodeURI(card.backImagePath) } : {}),
+        category,
+      });
+    }
   }
   return map;
 }
@@ -97,78 +114,44 @@ export function getCardImageCount(): number {
   return IMAGE_MAP.size;
 }
 
-/** 遍历所有登记的卡图 URL（front + back + 通用背面） */
-export function getAllCardImageUrls(): string[] {
-  const urls: string[] = [];
-  for (const entry of IMAGE_MAP.values()) {
-    urls.push(entry.front);
-    if (entry.back) urls.push(entry.back);
-  }
-  urls.push(GENERIC_BACK_IMAGES.thief, GENERIC_BACK_IMAGES.master);
-  return urls;
+/** 卡图目录中的一项：卡牌 id、分类与正面图地址；双面卡另给背面图 */
+export interface CardImageRecord {
+  readonly id: string;
+  readonly category: CardImageCategory;
+  readonly url: string;
+  readonly backUrl?: string;
 }
 
-/**
- * 最小版 AssetPreloader。
- * 后台并发创建 Image() 实例触发浏览器下载；不阻塞调用方。
- * 单次调用后浏览器 HTTP cache 会接管，后续 <img> 渲染秒出。
- *
- * @param opts.concurrency 并发上限（默认 8，避免打爆 dev server）
- * @param opts.onProgress 每加载完成一张回调（可选）
- * @returns 返回一个 Promise，所有图加载结束（成功或失败）时 resolve，
- *          并提供失败 URL 列表供诊断；已在加载中的后续调用复用结果。
- */
-export async function preloadAllCardImages(
-  opts: {
-    readonly concurrency?: number;
-    readonly onProgress?: (loaded: number, total: number, failed: readonly string[]) => void;
-  } = {},
-): Promise<{ loaded: number; failed: string[] }> {
-  if (preloadPromise) return preloadPromise;
-  const concurrency = Math.max(1, opts.concurrency ?? 8);
-  const onProgress = opts.onProgress;
-  const all = getAllCardImageUrls();
-  const total = all.length;
-  let loaded = 0;
-  const failed: string[] = [];
-  let cursor = 0;
-
-  const loadOne = (url: string): Promise<void> =>
-    new Promise((resolve) => {
-      if (typeof Image === 'undefined') {
-        resolve(); // SSR / 测试环境兜底
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        loaded++;
-        onProgress?.(loaded, total, failed);
-        resolve();
-      };
-      img.onerror = () => {
-        failed.push(url);
-        loaded++;
-        onProgress?.(loaded, total, failed);
-        resolve();
-      };
-      img.src = url;
-    });
-
-  const runner = async (): Promise<void> => {
-    while (true) {
-      const i = cursor++;
-      if (i >= total) return;
-      await loadOne(all[i]!);
-    }
-  };
-
-  preloadPromise = (async () => {
-    const workers = Array.from({ length: Math.min(concurrency, total) }, () => runner());
-    await Promise.all(workers);
-    return { loaded, failed };
-  })();
-
-  return preloadPromise;
+/** 全部已登记的卡图（不含通用背面）；顺序稳定 */
+export function getCardImageCatalog(): CardImageRecord[] {
+  return [...IMAGE_MAP].map(([id, e]) => ({
+    id,
+    category: e.category,
+    url: e.front,
+    ...(e.back ? { backUrl: e.back } : {}),
+  }));
 }
 
-let preloadPromise: Promise<{ loaded: number; failed: string[] }> | null = null;
+/** 卡图地址反查：卡牌 id 与分类；不是已登记的卡图返回 null（通用背面、占位等） */
+const URL_INDEX: ReadonlyMap<string, { id: string; category: CardImageCategory }> = new Map(
+  [...IMAGE_MAP].flatMap(([id, e]) => {
+    const rows: Array<[string, { id: string; category: CardImageCategory }]> = [
+      [e.front, { id, category: e.category }],
+    ];
+    if (e.back) rows.push([e.back, { id, category: e.category }]);
+    return rows;
+  }),
+);
+
+export function lookupCardImageUrl(
+  url: string | undefined,
+): { id: string; category: CardImageCategory } | null {
+  return (url && URL_INDEX.get(url)) || null;
+}
+
+/** 从图片地址里读出分类目录（/cards/<分类>/...）；通用背面等未登记的地址也能得到分类 */
+export function categoryOfImageUrl(url: string | undefined): CardImageCategory | null {
+  if (!url) return null;
+  const hit = /\/cards\/(thief|dream-master|action|bribe|dream|nightmare|vault|other)\//.exec(url);
+  return (hit?.[1] as CardImageCategory | undefined) ?? null;
+}

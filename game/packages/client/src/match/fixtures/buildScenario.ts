@@ -173,6 +173,8 @@ interface ResponseSpec {
 }
 
 const RESPONSE_SPECS: Partial<Record<FixtureScenarioId, ResponseSpec>> = {
+  // 本人是意念判官，行动阶段轮到自己、手里有 SHOOT：走查【定罪】的发动入口
+  'thief-sudger': { viewerCharacter: 'thief_sudger_of_mind', turnOwner: 'viewer' },
   // 对方打出 SHOOT：本人是双鱼，可以【游离】
   'thief-pending-shoot': { viewerCharacter: 'thief_pisces', turnOwner: 'other' },
   // 对方是恐怖分子，打出 SHOOT：本人要选择是否弃牌

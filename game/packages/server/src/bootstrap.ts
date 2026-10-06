@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net';
 import type Koa from 'koa';
 import type { Middleware } from 'koa';
 import { createApp } from './app.js';
+import type { InviteConfig } from './api/invite.js';
 import type { IdentityPrisma } from './api/identity.js';
 import type { ReportsRouterDeps } from './api/reports.js';
 import { logger } from './infra/logger.js';
@@ -32,6 +33,7 @@ import { ConnectionRegistry } from './ws/connectionRegistry.js';
 import { SocketGateway } from './ws/gateway.js';
 import { HeartbeatManager, type HeartbeatRedis } from './ws/heartbeat.js';
 import { WSMessageRouter } from './ws/messageRouter.js';
+import { RoomGateway } from './ws/roomGateway.js';
 
 export interface RealtimeDeps {
   store: MatchStore;
@@ -62,12 +64,16 @@ export interface RealtimeDeps {
   httpRateLimit?: Middleware;
   /** 位于反向代理之后：HTTP 来源地址取 X-Forwarded-For；默认关闭 */
   trustProxy?: boolean;
+  /** 邀请链接与分享卡片的配置；默认取环境变量 */
+  invite?: InviteConfig;
 }
 
 export interface Realtime {
   app: Koa;
   httpServer: HttpServer;
   gateway: SocketGateway;
+  /** 房间等待页的推送网关 */
+  rooms: RoomGateway;
   matches: MatchService;
   lobby: LobbyService;
   bot: BotManager;
@@ -120,10 +126,16 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
   });
   gateway.bindMatches(matches);
 
+  // 房间推送网关：握手时按房间码查房间，房间变化时推给成员；大厅服务在它之后才建好，所以都用闭包转调
+  const rooms = new RoomGateway({
+    bans,
+    getRoom: (code) => lobby.getRoom(code),
+  });
   const lobby = new LobbyService({
     redis: deps.lobbyRedis,
     prisma: deps.lobbyPrisma,
     matches,
+    onRoomChange: (room) => rooms.publish(room),
   });
   const app = createApp({
     lobby,
@@ -136,14 +148,16 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     ...(deps.reports !== undefined ? { reports: deps.reports } : {}),
     corsOrigin: deps.ws?.corsOrigin,
     trustProxy: deps.trustProxy,
+    ...(deps.invite !== undefined ? { invite: deps.invite } : {}),
   });
   const httpServer = createServer(app.callback());
-  gateway.attach(httpServer);
+  rooms.attach(gateway.attach(httpServer));
 
   return {
     app,
     httpServer,
     gateway,
+    rooms,
     matches,
     lobby,
     bot,
@@ -160,6 +174,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     async stop() {
       bot.stop();
       matches.shutdown();
+      rooms.detach();
       gateway.detach();
       try {
         if (httpServer.listening) {

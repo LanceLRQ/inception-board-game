@@ -1,12 +1,16 @@
 // 本地人机对局来源：Worker 的创建、定时取状态与发 move 都收在这里
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Comlink from 'comlink';
 import type { MatchViewState, SeatInfo } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
 import type { LocalMatchWorker } from '../workers/localMatch.worker';
 import { LOCAL_HUMAN_SEAT } from '../workers/localSeat';
 import { logger } from '../lib/logger';
+import { withSelfAvatar } from '../lib/avatarSeed';
+import { effectiveAvatarSeed } from '../hooks/useAvatar';
+import { useIdentityStore } from '../stores/useIdentityStore';
+import { NO_CHAT } from './chat';
 import type { ConnectionState, MatchSource, MoveOutcome } from './matchSource';
 
 /** 取状态的间隔（毫秒） */
@@ -93,6 +97,8 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       storageDegraded: false,
       error,
       selfTakenOver: false,
+      chat: NO_CHAT,
+      report: null,
       makeMove,
       resume: () => {},
     };
@@ -121,6 +127,12 @@ export interface UseLocalMatchSourceOptions {
   matchId?: string;
   /** 递增后丢弃当前对局，重新建一局 */
   restartKey?: number;
+  /** 把这局存档到本机（/local 页开；好友房的本地模式不开） */
+  persist?: boolean;
+  /** 优先从存档恢复这局；存档不可用时开新局并回调 onResumeFallback */
+  resume?: boolean;
+  /** 要求恢复但存档不可用，已开了新局 */
+  onResumeFallback?: () => void;
 }
 
 /** 起一个本机 Worker 跑人机对局，返回对局来源 */
@@ -128,8 +140,15 @@ export function useLocalMatchSource({
   playerCount,
   matchId,
   restartKey = 0,
+  persist = false,
+  resume = false,
+  onResumeFallback,
 }: UseLocalMatchSourceOptions): MatchSource {
   const [source, setSource] = useState<MatchSource | null>(null);
+  const fallbackRef = useRef(onResumeFallback);
+  useEffect(() => {
+    fallbackRef.current = onResumeFallback;
+  }, [onResumeFallback]);
 
   useEffect(() => {
     const worker = new Worker(new URL('../workers/localMatch.worker.ts', import.meta.url), {
@@ -140,8 +159,14 @@ export function useLocalMatchSource({
     const off = controller.subscribe(() => setSource(controller.getSnapshot()));
 
     void api
-      .createLocalMatch(playerCount, matchId)
-      .then(() => controller.refresh())
+      .createLocalMatch(playerCount, matchId, { persist, resume })
+      .then((result) => {
+        if (result.fellBack) {
+          logger.warn('game', 'saved match unavailable, started a new one');
+          fallbackRef.current?.();
+        }
+        return controller.refresh();
+      })
       .catch((e) => {
         logger.error('game', 'createLocalMatch failed', e);
         controller.fail((e as Error).message);
@@ -153,9 +178,17 @@ export function useLocalMatchSource({
       off();
       worker.terminate();
     };
-  }, [playerCount, matchId, restartKey]);
+  }, [playerCount, matchId, restartKey, persist, resume]);
 
-  return source ?? IDLE_SOURCE;
+  // 本地来源的座位表没有账号信息：本人座位用身份里的头像，其余座位由界面按座位推导
+  const identityAvatar = useIdentityStore((s) =>
+    effectiveAvatarSeed(s.avatarSeed, s.playerId, s.nickname),
+  );
+  const current = source ?? IDLE_SOURCE;
+  return useMemo(() => {
+    const seats = withSelfAvatar(current.seats, current.seat, identityAvatar);
+    return seats === current.seats ? current : { ...current, seats };
+  }, [current, identityAvatar]);
 }
 
 /** 首次渲染、Worker 还没建好时的占位来源 */
@@ -169,6 +202,8 @@ const IDLE_SOURCE: MatchSource = {
   storageDegraded: false,
   error: null,
   selfTakenOver: false,
+  chat: NO_CHAT,
+  report: null,
   makeMove: async () => ({ ok: false, code: 'not_ready' }),
   resume: () => {},
 };

@@ -14,6 +14,8 @@ export const FIXTURE_SCENARIO_IDS = [
   'thief-pending',
   'master-pending',
   'thief-discard',
+  'thief-sudger',
+  'thief-sudger',
   'thief-pending-shoot',
   'thief-pending-terrorist',
   'thief-pending-libra-split',
@@ -31,10 +33,23 @@ export const FIXTURE_MIN_PLAYERS = MATCH_MIN_PLAYERS;
 export const FIXTURE_MAX_PLAYERS = MATCH_MAX_PLAYERS;
 export const FIXTURE_DEFAULT_PLAYERS = 6;
 
-/** 一个固定场景：视角与局面（id）加上人数 */
+/** 举报在固定场景里的结果：成功、重复举报、网络失败 */
+export const FIXTURE_REPORT_RESULTS = ['ok', 'duplicate', 'failed'] as const;
+export type FixtureReportResult = (typeof FIXTURE_REPORT_RESULTS)[number];
+
+/** 固定场景上叠加的、与局面无关的功能走查开关 */
+export interface FixtureExtras {
+  /** 打开预设短语通道并注入几条示例消息 */
+  readonly chat?: boolean;
+  /** 对局已结束（盗梦者胜），所有对手按真人对待，可走查局后举报；值是举报接口的结果 */
+  readonly outcome?: FixtureReportResult;
+}
+
+/** 一个固定场景：视角与局面（id）加上人数，以及可选的功能走查开关 */
 export interface FixtureScenarioSpec {
   readonly id: FixtureScenarioId;
   readonly players: number;
+  readonly extras?: FixtureExtras;
 }
 
 /** ?pending= 的取值（不含 1）与场景的对应：轮到本人应答的各种待决状态 */
@@ -62,9 +77,14 @@ export function parseFixturePlayers(raw: string | null): number {
  *   ?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries
  *                盗梦者视角，轮到本人应答对应的待决状态：被 SHOOT 时的双鱼·游离 / 恐怖分子·狂热、
  *                天秤分牌 / 天秤挑一份、意念判官选骰、处女·完美、白羊·星尘（梦魇为回音萦绕）；不与 as=master 叠加
+ *   ?character=sudger  盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的发动入口）；
+ *                      梦主视角、响应窗口与待应答参数优先，忽略它
  *   ?chess=1     与 as=master 叠加：梦主是「棋局」，行动阶段会自动弹出易位弹窗
  *   ?discard=1   盗梦者处于弃牌阶段，手牌超出上限（梦主视角与响应窗口参数优先，忽略它）
  *   ?players=N   人数 4–10（缺省 6），方便走查座位环在不同人数下的排布
+ *   ?chat=1      打开预设短语通道，并注入几条示例消息（固定场景本没有连接，发出的短语只在本机回显）
+ *   ?outcome=1   对局已结束，所有对手按真人对待，可走查局后举报；
+ *                ?outcome=duplicate / failed 让举报接口返回「已举报过」/ 网络失败
  */
 export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureScenarioSpec {
   const master = searchParams.get('as') === 'master';
@@ -76,6 +96,7 @@ export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureSc
       ? PENDING_RESPONSE_SCENARIOS[pendingParam as keyof typeof PENDING_RESPONSE_SCENARIOS]
       : null;
   const chess = searchParams.get('chess') === '1';
+  const sudger = searchParams.get('character') === 'sudger';
   const id: FixtureScenarioId = master
     ? pending
       ? 'master-pending'
@@ -84,6 +105,22 @@ export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureSc
         : 'master'
     : pending
       ? 'thief-pending'
-      : (response ?? (discard ? 'thief-discard' : 'thief'));
-  return { id, players: parseFixturePlayers(searchParams.get('players')) };
+      : (response ?? (discard ? 'thief-discard' : sudger ? 'thief-sudger' : 'thief'));
+  const extras = resolveFixtureExtras(searchParams);
+  return {
+    id,
+    players: parseFixturePlayers(searchParams.get('players')),
+    ...(extras ? { extras } : {}),
+  };
+}
+
+function resolveFixtureExtras(searchParams: URLSearchParams): FixtureExtras | null {
+  const chat = searchParams.get('chat') === '1';
+  const outcomeParam = searchParams.get('outcome');
+  const outcome: FixtureReportResult | null =
+    outcomeParam === '1'
+      ? 'ok'
+      : (FIXTURE_REPORT_RESULTS.find((r) => r === outcomeParam && r !== 'ok') ?? null);
+  if (!chat && outcome === null) return null;
+  return { ...(chat ? { chat } : {}), ...(outcome !== null ? { outcome } : {}) };
 }

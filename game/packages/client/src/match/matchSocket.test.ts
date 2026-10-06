@@ -7,6 +7,7 @@ import {
   type MatchViewState,
   type SeatInfo,
 } from '@icgame/game-engine';
+import { remainingSeconds } from '@/lib/deadlineClock';
 import { MatchSocket, type SocketLike } from './matchSocket';
 
 type Handler = (...args: unknown[]) => void;
@@ -79,7 +80,8 @@ function snapshotMsg(type: 'icg:state' | 'icg:step', stateID: number, extra: obj
     seat: '0',
     seats: SEATS,
     view: view(stateID),
-    deadlineAt: 5000,
+    deadlineAt: 1_700_000_005_000,
+    deadlineInMs: 5000,
     ...extra,
   };
 }
@@ -123,6 +125,101 @@ describe('MatchSocket', () => {
     socket.fire('connect');
     socket.fire('icg:state', snapshotMsg('icg:state', stateID));
   }
+
+  describe('倒计时的截止点', () => {
+    /** 单调时钟与日历时间都可调的连接 */
+    function withClocks(mono: { t: number }, wall: { t: number }): MatchSocket {
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => mono.t,
+        wallNow: () => wall.t,
+      });
+      m.connect();
+      sock.connected = true;
+      sock.fire('icg:state', snapshotMsg('icg:state', 1, { deadlineInMs: 30_000 }));
+      sockets.set(m, sock);
+      return m;
+    }
+    const sockets = new Map<MatchSocket, FakeSocket>();
+
+    it('截止点 = 收到时刻的单调时钟 + 服务端给的剩余毫秒', () => {
+      const m = withClocks({ t: 12_345 }, { t: 1_700_000_000_000 });
+      expect(m.getSnapshot().deadlineAt).toBe(12_345 + 30_000);
+      m.close();
+    });
+
+    it.each([
+      ['本机时钟拨快 10 分钟', 10 * 60_000],
+      ['本机时钟拨慢 10 分钟', -10 * 60_000],
+    ])('%s：倒计时不受影响', (_name, skew) => {
+      const mono = { t: 1_000 };
+      const wall = { t: 1_700_000_000_000 + skew };
+      const m = withClocks(mono, wall);
+      const deadline = m.getSnapshot().deadlineAt;
+      expect(remainingSeconds(deadline, mono.t)).toBe(30);
+      mono.t += 12_000; // 过了 12 秒（日历时间被乱改也不影响单调时钟）
+      wall.t -= 3_600_000;
+      expect(remainingSeconds(deadline, mono.t)).toBe(18);
+      mono.t += 20_000;
+      expect(remainingSeconds(deadline, mono.t)).toBe(0);
+      m.close();
+    });
+
+    it('下一条消息带来新的剩余毫秒时，以新消息为准', () => {
+      const mono = { t: 0 };
+      const m = withClocks(mono, { t: 0 });
+      mono.t = 10_000;
+      sockets
+        .get(m)!
+        .fire('icg:step', snapshotMsg('icg:step', 2, { events: [], deadlineInMs: 45_000 }));
+      expect(m.getSnapshot().deadlineAt).toBe(55_000);
+      m.close();
+    });
+
+    it('旧版服务端不带剩余毫秒时退回用日历时间换算', () => {
+      const mono = { t: 2_000 };
+      const wall = { t: 1_700_000_000_000 };
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => mono.t,
+        wallNow: () => wall.t,
+      });
+      m.connect();
+      sock.connected = true;
+      const legacy = snapshotMsg('icg:state', 1, { deadlineAt: 1_700_000_007_000 }) as Record<
+        string,
+        unknown
+      >;
+      delete legacy.deadlineInMs;
+      sock.fire('icg:state', legacy);
+      expect(m.getSnapshot().deadlineAt).toBe(2_000 + 7_000);
+      m.close();
+    });
+
+    it('没有计时时截止点为 null', () => {
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => 0,
+      });
+      m.connect();
+      sock.connected = true;
+      sock.fire('icg:state', snapshotMsg('icg:state', 1, { deadlineAt: null, deadlineInMs: null }));
+      expect(m.getSnapshot().deadlineAt).toBeNull();
+      m.close();
+    });
+  });
 
   it('connect 带上路径与握手参数并进入 connecting', () => {
     ms.connect();
@@ -309,6 +406,79 @@ describe('MatchSocket', () => {
     expect(ms.getSnapshot().seats[0]!.takenOver).toBe(true);
     socket.fire('icg:seats', { type: 'icg:seats', matchID: 'm1', seats: SEATS });
     expect(ms.getSnapshot().seats[0]!.takenOver).toBe(false);
+  });
+
+  describe('预设短语', () => {
+    const chatMsg = (sender: string, phraseId: string) => ({
+      type: 'icg:chatMessage',
+      matchID: 'm1',
+      message: { sender, text: '服务端附带的文案', phraseId, sentAt: 1_700_000_000_000 },
+    });
+
+    it('收到的短语进入快照，带发送座位与本机单调时钟的收到时刻', () => {
+      let t = 500;
+      const sock = new FakeSocket();
+      const m = new MatchSocket({
+        url: 'http://srv',
+        token: 'tok',
+        matchID: 'm1',
+        createSocket: () => sock,
+        now: () => t,
+      });
+      m.connect();
+      sock.connected = true;
+      sock.fire('icg:state', snapshotMsg('icg:state', 1));
+      sock.fire('icg:chatMessage', chatMsg('1', 'greet_hi'));
+      t = 900;
+      sock.fire('icg:chatMessage', chatMsg('0', 'emotion_gg'));
+      expect(m.getSnapshot().chat).toEqual([
+        { id: 1, seat: '1', presetId: 'greet_hi', at: 500 },
+        { id: 2, seat: '0', presetId: 'emotion_gg', at: 900 },
+      ]);
+      m.close();
+    });
+
+    it('不在预设里的短语、畸形消息一律忽略（界面不会出现任意文本）', () => {
+      ready();
+      socket.fire('icg:chatMessage', chatMsg('1', '大家好，加我'));
+      socket.fire('icg:chatMessage', { message: null });
+      socket.fire('icg:chatMessage', 'x');
+      expect(ms.getSnapshot().chat).toEqual([]);
+    });
+
+    it('历史只留最近 30 条', () => {
+      ready();
+      for (let i = 0; i < 35; i++) socket.fire('icg:chatMessage', chatMsg('1', 'greet_hi'));
+      const chat = ms.getSnapshot().chat;
+      expect(chat).toHaveLength(30);
+      expect(chat[0]!.id).toBe(6);
+    });
+
+    it('sendChat 发出只带短语 id 的 icg:chatBroadcast', () => {
+      ready();
+      expect(ms.sendChat('greet_hi')).toBe(true);
+      expect(socket.sent('icg:chatBroadcast')).toEqual([
+        { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' },
+      ]);
+    });
+
+    it('sendChat 拒发：不在预设里的 id、没连上、已关闭', () => {
+      ms.connect();
+      expect(ms.sendChat('greet_hi')).toBe(false);
+      socket.connected = true;
+      socket.fire('icg:state', snapshotMsg('icg:state', 1));
+      expect(ms.sendChat('随便写点什么')).toBe(false);
+      ms.close();
+      expect(ms.sendChat('greet_hi')).toBe(false);
+      expect(socket.sent('icg:chatBroadcast')).toEqual([]);
+    });
+
+    it('close 之后不再收短语', () => {
+      ready();
+      ms.close();
+      socket.fire('icg:chatMessage', chatMsg('1', 'greet_hi'));
+      expect(ms.getSnapshot().chat).toEqual([]);
+    });
   });
 
   it('requestSync 只发一次 icg:sync', () => {

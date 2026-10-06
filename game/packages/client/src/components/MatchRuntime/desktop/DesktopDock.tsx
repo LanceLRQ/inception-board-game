@@ -75,6 +75,7 @@ export function DesktopDock({ controller }: DesktopDockProps) {
             skillName={skillName}
             mustDiscard={turn.phase === 'discard' && hand.mustDiscard ? hand.overflow : 0}
             markers={selfMarkers}
+            bubble={controller.chat.bubbles.get(self.seat)}
             onPreview={preview.open}
           />
         )}

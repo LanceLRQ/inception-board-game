@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   getCardImageUrl,
   getCardImageCount,
-  getAllCardImageUrls,
   getCardBackImageUrl,
   hasCardBackImage,
-  preloadAllCardImages,
+  getCardImageCatalog,
+  categoryOfImageUrl,
+  lookupCardImageUrl,
+  GENERIC_BACK_IMAGES,
 } from './cardImages.js';
 
 describe('cardImages', () => {
@@ -60,44 +62,40 @@ describe('cardImages', () => {
     });
   });
 
-  describe('getAllCardImageUrls', () => {
-    it('includes generic back images (thief + master)', () => {
-      const urls = getAllCardImageUrls().map(decodeURI);
-      expect(urls.some((u) => u.includes('盗梦者_背面'))).toBe(true);
-      expect(urls.some((u) => u.includes('梦主_背面'))).toBe(true);
+  describe('getCardImageCatalog', () => {
+    it('每张已登记的卡一条，带分类，图片地址与 getCardImageUrl 一致', () => {
+      const catalog = getCardImageCatalog();
+      expect(catalog.length).toBe(getCardImageCount());
+      for (const rec of catalog) expect(rec.url).toBe(getCardImageUrl(rec.id));
+      const categories = new Set(catalog.map((c) => c.category));
+      for (const c of ['thief', 'dream-master', 'action', 'nightmare', 'vault', 'bribe']) {
+        expect(categories.has(c as never)).toBe(true);
+      }
     });
 
-    it('contains front urls for all registered cards', () => {
-      const urls = getAllCardImageUrls();
-      // >= count + 2（含双面卡背 + 2 通用背面）
-      expect(urls.length).toBeGreaterThanOrEqual(getCardImageCount() + 2);
-    });
-
-    it('all URLs start with /cards/', () => {
-      for (const url of getAllCardImageUrls()) {
-        expect(url.startsWith('/cards/')).toBe(true);
+    it('分类与地址里的目录一致', () => {
+      for (const rec of getCardImageCatalog()) {
+        expect(categoryOfImageUrl(rec.url)).toBe(rec.category);
       }
     });
   });
 
-  describe('preloadAllCardImages', () => {
-    it('resolves with loaded/failed stats in SSR-safe fallback (no Image ctor)', async () => {
-      // jsdom 提供 Image；stub 让 onload 同步触发
-      const OriginalImage = globalThis.Image;
-      class FakeImage {
-        onload: (() => void) | null = null;
-        onerror: (() => void) | null = null;
-        set src(_v: string) {
-          // 下一 tick 触发 onload
-          queueMicrotask(() => this.onload?.());
-        }
-      }
-      // @ts-expect-error stub for test
-      globalThis.Image = FakeImage;
-      const result = await preloadAllCardImages({ concurrency: 4 });
-      expect(result.loaded).toBeGreaterThan(0);
-      expect(Array.isArray(result.failed)).toBe(true);
-      globalThis.Image = OriginalImage;
+  describe('lookupCardImageUrl / categoryOfImageUrl', () => {
+    it('登记过的图能反查到卡牌 id', () => {
+      const url = getCardImageUrl('action_shoot');
+      expect(lookupCardImageUrl(url)).toEqual({ id: 'action_shoot', category: 'action' });
+    });
+
+    it('通用背面没有卡牌 id，但能读出分类', () => {
+      expect(lookupCardImageUrl(GENERIC_BACK_IMAGES.thief)).toBeNull();
+      expect(categoryOfImageUrl(GENERIC_BACK_IMAGES.thief)).toBe('thief');
+      expect(categoryOfImageUrl(GENERIC_BACK_IMAGES.master)).toBe('dream-master');
+    });
+
+    it('不是卡图地址时得到 null', () => {
+      expect(lookupCardImageUrl(undefined)).toBeNull();
+      expect(categoryOfImageUrl('/pwa-192x192.png')).toBeNull();
+      expect(categoryOfImageUrl(undefined)).toBeNull();
     });
   });
 });

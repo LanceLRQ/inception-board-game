@@ -14,6 +14,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect, isMobileProject, waitForAppReady } from './fixtures/index.js';
 import { auditTouchTargets } from './fixtures/responsive.js';
+import { seedSave, validMeta } from './fixtures/localSave.js';
+import { ROOM_CODE, mockRoomSession } from './fixtures/roomSession.js';
 
 // eslint-disable-next-line no-empty-pattern -- Playwright 要求第一个参数是解构形式，这里只需要 testInfo
 test.beforeEach(({}, testInfo) => {
@@ -66,6 +68,9 @@ const SCENES = [
   ['应答：处女·完美', '/game/debug?pending=virgo'],
   ['应答：白羊·星尘', '/game/debug?pending=aries'],
   ['棋局易位弹窗', '/game/debug?as=master&chess=1'],
+  ['短语入口与座位气泡', '/game/debug?chat=1'],
+  ['意念判官的出牌', '/game/debug?character=sudger'],
+  ['结算：局后举报区', '/game/debug?outcome=1'],
 ] as const;
 
 test.describe('触控目标 · 390×844', () => {
@@ -77,6 +82,31 @@ test.describe('触控目标 · 390×844', () => {
       await expectTouchClean(page, name);
     });
   }
+
+  test('页面：房间页（分享区，二维码展开）', async ({ page }) => {
+    await mockRoomSession(page);
+    await openPage(page, `/room/${ROOM_CODE}`);
+    await expect(page.getByTestId('room-share')).toBeVisible({ timeout: 10_000 });
+    await expectTouchClean(page, '房间页分享区');
+    await page.getByTestId('room-qr-toggle').click();
+    await expect(page.getByTestId('room-qr')).toBeVisible();
+    await expectTouchClean(page, '房间页分享区（二维码展开）');
+  });
+
+  test('页面：设置页账号区的头像「换一个」', async ({ page }) => {
+    await mockRoomSession(page);
+    await openPage(page, '/settings');
+    await expect(page.getByTestId('settings-avatar-roll')).toBeVisible({ timeout: 10_000 });
+    await expectTouchClean(page, '设置页头像');
+  });
+
+  test('页面：本地对局的「继续上一局」提示', async ({ page }) => {
+    await openPage(page, '/local');
+    await seedSave(page, validMeta({ playerCount: 5, turn: 3 }));
+    await page.reload();
+    await expect(page.getByTestId('local-resume-prompt')).toBeVisible({ timeout: 10_000 });
+    await expectTouchClean(page, '继续上一局提示');
+  });
 
   for (const [name, url] of SCENES) {
     test(`对局：${name}`, async ({ page }) => {
@@ -125,6 +155,28 @@ test.describe('触控目标 · 390×844', () => {
     await page.getByTestId('awaited-action-activate').click();
     await expect(page.getByTestId('awaited-sheet')).toBeVisible();
     await expectTouchClean(page, '回音萦绕弹窗');
+  });
+
+  test('对局：预设短语抽屉（分类标签、短语按钮、最近消息展开）', async ({ page }) => {
+    await openScene(page, '/game/debug?chat=1');
+    await page.getByTestId('dock-chat').click();
+    await expect(page.getByTestId('chat-sheet')).toBeVisible();
+    await page.getByTestId('chat-recent-toggle').click();
+    await expect(page.getByTestId('chat-recent')).toBeVisible();
+    await expectTouchClean(page, '短语抽屉');
+    await page.getByTestId('chat-tab-tactic').click();
+    await expectTouchClean(page, '短语抽屉（战术分类）');
+  });
+
+  test('对局：举报弹窗（选理由、填说明、提交结果）', async ({ page }) => {
+    await openScene(page, '/game/debug?outcome=1');
+    await page.getByTestId('report-button-1').click();
+    await expect(page.getByTestId('report-dialog')).toBeVisible();
+    await expectTouchClean(page, '举报弹窗');
+    await page.getByTestId('report-reason-afk').check();
+    await page.getByTestId('report-submit').click();
+    await expect(page.getByTestId('report-result')).toBeVisible();
+    await expectTouchClean(page, '举报弹窗（结果）');
   });
 
   test('对局：弃牌阶段选牌后', async ({ page }) => {

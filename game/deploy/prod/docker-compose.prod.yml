@@ -61,6 +61,9 @@ services:
       OPERATOR_TOKEN: ${OPERATOR_TOKEN:-}
       OPERATOR_ID: ${OPERATOR_ID:-}
       WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-*}
+      # 邀请链接分享卡片：站点对外地址（留空则取请求里的 Host）与缩略图路径
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      INVITE_IMAGE_PATH: ${INVITE_IMAGE_PATH:-/pwa-512x512.png}
       # api 前面是 nginx，限流按 X-Forwarded-For 的真实来源地址计数；后端端口直接暴露公网时不要开启
       TRUST_PROXY: ${TRUST_PROXY:-1}
       HTTP_RATE_LIMIT_PER_MINUTE: ${HTTP_RATE_LIMIT_PER_MINUTE:-300}

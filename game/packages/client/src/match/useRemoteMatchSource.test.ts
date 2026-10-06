@@ -19,6 +19,7 @@ function snap(patch: Partial<MatchSocketSnapshot> = {}): MatchSocketSnapshot {
     connection: 'connected',
     storageDegraded: false,
     fatal: null,
+    chat: [],
     ...patch,
   };
 }
@@ -33,6 +34,28 @@ describe('toMatchSource', () => {
     expect(source.deadlineAt).toBe(123);
     expect(source.connection).toBe('connected');
     expect(source.error).toBeNull();
+  });
+
+  it('聊天通道：消息来自快照，send 转发给 sendChat，联机来源可用', () => {
+    const sendChat = vi.fn().mockReturnValue(true);
+    const messages = [{ id: 1, seat: '0', presetId: 'greet_hi', at: 1 }];
+    const source = toMatchSource(snap({ chat: messages }), vi.fn(), vi.fn(), sendChat);
+    expect(source.chat.available).toBe(true);
+    expect(source.chat.messages).toBe(messages);
+    expect(source.chat.send('greet_hi')).toBe(true);
+    expect(sendChat).toHaveBeenCalledWith('greet_hi');
+  });
+
+  it('聊天通道：没连上时不可用', () => {
+    expect(
+      toMatchSource(snap({ connection: 'reconnecting' }), vi.fn(), vi.fn()).chat.available,
+    ).toBe(false);
+  });
+
+  it('举报通道原样带过来；不给就是 null', () => {
+    const report = { submit: vi.fn() };
+    expect(toMatchSource(snap(), vi.fn(), vi.fn(), vi.fn(), report).report).toBe(report);
+    expect(toMatchSource(snap(), vi.fn(), vi.fn()).report).toBeNull();
   });
 
   it('storageDegraded 原样带过来', () => {

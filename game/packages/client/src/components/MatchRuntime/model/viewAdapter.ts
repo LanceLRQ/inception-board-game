@@ -2,8 +2,9 @@
 //
 // 注意：这是纯展示层适配，不影响 MatchRuntime 的真实交互（pendingPlay / Dialog 群等）
 
-import type { MatchView, RunnerCtx } from '@icgame/game-engine';
+import type { MatchView, RunnerCtx, SeatInfo } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
+import { avatarSeedOf } from '../../../lib/avatarSeed';
 import type { StageState, StagePlayer, StageLayer, StageVault } from './stageState.js';
 
 export interface AdaptViewToStageOpts {
@@ -13,6 +14,8 @@ export interface AdaptViewToStageOpts {
   humanPlayerID: string;
   /** 房间 ID */
   matchId?: string;
+  /** 座位表：头像种子从这里取（公开信息）；不给时按座位与昵称推导 */
+  seats?: readonly SeatInfo[];
 }
 
 /**
@@ -20,7 +23,8 @@ export interface AdaptViewToStageOpts {
  * 入参已经是按座位裁剪过的视图：他人手牌为 null、只有张数，牌库只有张数。这里只做结构对齐。
  */
 export function adaptViewToStage(opts: AdaptViewToStageOpts): StageState | null {
-  const { G, ctx, humanPlayerID, matchId = 'local-match' } = opts;
+  const { G, ctx, humanPlayerID, matchId = 'local-match', seats } = opts;
+  const seatInfoById = new Map((seats ?? []).map((s) => [s.seat, s]));
   const rawPlayers = G.players;
   if (!rawPlayers) return null;
 
@@ -34,7 +38,10 @@ export function adaptViewToStage(opts: AdaptViewToStageOpts): StageState | null 
     players[id] = {
       id,
       nickname: p.nickname ?? id,
-      avatarSeed: 0,
+      avatarSeed: avatarSeedOf(
+        seatInfoById.get(id) ?? { seat: id, nickname: p.nickname ?? id },
+        id,
+      ),
       faction: p.faction === 'master' ? 'master' : 'thief',
       characterId: p.characterId ?? '',
       isRevealed: !!p.isRevealed,

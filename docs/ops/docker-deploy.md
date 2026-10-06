@@ -90,7 +90,9 @@ cd inception-board-game/game
 | `POSTGRES_DB` / `POSTGRES_USER` | 可选 | 数据库名与用户，默认 `icgame` |
 | `WS_CORS_ORIGIN` | 建议改 | 允许访问后端的页面来源，接口请求与联机实时连接共用；生产填前端域名（如 `https://ico.example.com`），开发用 `*` |
 | `TRUST_PROXY` | 可选 | 默认 `1`（后端前面是 nginx）：接口限流按 `X-Forwarded-For` 的真实来源地址计数。如果自行把后端端口改为对外开放，不要开启，否则来源地址可被伪造 |
-| `HTTP_RATE_LIMIT_PER_MINUTE` | 可选 | 接口限流：同一来源地址每分钟的请求额度，默认 300（同一出口下 10 人的等待页轮询约 200 次 / 分钟） |
+| `HTTP_RATE_LIMIT_PER_MINUTE` | 可选 | 接口限流：同一来源地址每分钟的请求额度，默认 300。房间等待页靠服务端推送刷新，推送不可用时才每 15 秒轮询一次 |
+| `PUBLIC_BASE_URL` | 建议填 | 站点对外地址（协议 + 域名，如 `https://ico.example.com`，不带路径）。房间邀请链接 `/invite/房间码` 对聊天软件的预览抓取器返回分享卡片，卡片里的链接与缩略图地址按它拼；留空则取请求里的 Host（经 nginx 时取 `X-Forwarded-Host`） |
+| `INVITE_IMAGE_PATH` | 可选 | 分享卡片的缩略图：站点根下的路径或完整地址，默认 `/pwa-512x512.png`（前端自带的应用图标） |
 | `REDIS_COMMAND_TIMEOUT_MS` | 可选 | Redis 单条命令的超时（毫秒），默认 5000；留空即默认，非法值也回落默认。连接半开时命令超时后按失败处理，不会一直挂住 |
 | `CLIENT_PORT` | 可选 | 前端对外端口，默认 80（对所有网卡开放）；如被占用改为 8080 |
 | `API_PORT` | 可选 | 后端在宿主机上的端口，默认 3001；只绑定本机（`127.0.0.1`），用于本机探活与排查。局域网和公网用户通过前端端口访问，由 nginx 转发到后端。Postgres 与 Redis 不映射宿主机端口 |
@@ -102,6 +104,7 @@ cd inception-board-game/game
 | `IMAGE_REGISTRY` | 可选 | 镜像仓库地址；留空表示只在本机构建使用，`push` / `pull` / `registry-login` 不可用 |
 | `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` | 可选 | 镜像仓库账号 |
 | `VITE_API_URL` | 可选 | 前端构建参数：浏览器访问后端接口的地址。默认 `/api`（同域，由 nginx 反代）；前后端分域部署时填完整地址，如 `https://api.example.com` |
+| `VITE_PUBLIC_BASE_URL` | 可选 | 前端构建参数：房间页「分享」给别人的邀请链接所用的站点地址（协议 + 域名）；留空则用用户当前访问的域名 |
 | `VITE_WS_URL` | 可选 | 前端构建参数：联机对局实时连接的地址。默认 `/ws`，此时与 `VITE_API_URL` 同源（同域部署即当前页面的域名）；单独部署实时服务时填完整地址 |
 | `DEV_POSTGRES_PORT` / `DEV_REDIS_PORT` | 可选 | 开发环境容器在本机的端口，默认 15432 / 16379 |
 | `DEV_POSTGRES_PASSWORD` / `DEV_REDIS_PASSWORD` | 可选 | 开发环境容器的密码（仅限本机开发），默认 `icgame_dev_only` |
@@ -259,6 +262,17 @@ cp .env.example .env              # 开发用的变量保持默认即可
 2. 默认 `/api` 和 `/ws` 走 nginx 反代，已在 `deploy/prod/client/nginx.conf` 配置好
 3. 如自定义域名，在前端构建前设置 `VITE_API_URL=https://api.example.com`
 4. 这两个变量在构建前端镜像时写入产物，修改后需要重新构建 `client` 镜像（`./scripts/prod.sh build client`）才生效
+
+### 邀请链接贴到聊天软件里没有标题和缩略图
+
+房间页分享的链接形如 `https://你的域名/invite/房间码`。聊天软件的预览抓取器不执行页面脚本，所以这条链接必须由后端处理：
+对抓取器返回带标题、描述和缩略图的分享卡片，对普通浏览器跳转到房间页。
+
+1. 默认的 `deploy/prod/client/nginx.conf` 已把 `/invite/` 反代到后端；自行配置前端入口时需要加上同样的一段，并带上 `X-Forwarded-Proto` / `X-Forwarded-Host`
+2. 建议填写 `.env` 里的 `PUBLIC_BASE_URL`（站点对外地址）；不填时卡片里的链接按请求头里的 Host 拼出
+3. 卡片只含通用标题、描述和房间码，不含房间成员的昵称；房间不存在或已过期时给不带房间码的通用卡片
+4. 没有后端接住的部署（纯静态托管）里，`/invite/房间码` 会落到前端的同名路由，浏览器仍能跳进房间页，只是没有分享卡片
+5. 聊天软件会缓存预览，改了配置后要换个链接或等缓存过期才能看到新卡片
 
 ### 端口冲突（80 / 3001）
 

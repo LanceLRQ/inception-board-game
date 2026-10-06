@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Layers, Play, Skull } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { CardArt } from '../../CardArt';
+import { PixelAvatar } from '../../PixelAvatar';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
 import type { SeatView } from '../model/seatModel';
 import type { PlannedSeat, SeatDensity } from './seatPlan';
@@ -27,6 +28,9 @@ const ART_SIZE: Record<SeatDensity, { thief: [number, number]; master: [number, 
   mid: { thief: [64, 86], master: [96, 64] },
   compact: { thief: [40, 54], master: [72, 48] },
 };
+
+/** 已翻露的座位在卡面角上叠一个小头像的边长；未翻露的座位用头像填满卡面槽 */
+const BADGE_SIZE: Record<SeatDensity, number> = { grand: 30, full: 26, mid: 20, compact: 16 };
 
 export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: SeatPlateProps) {
   const { t } = useTranslation();
@@ -61,7 +65,22 @@ export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: 
       className="ms-card relative block shrink-0 overflow-hidden disabled:cursor-default"
       style={{ width: artW, height: artH }}
     >
-      <CardArt src={seat.imageUrl} className="size-full" />
+      {seat.characterId ? (
+        <>
+          <CardArt src={seat.imageUrl} className="size-full" />
+          <PixelAvatar
+            seed={seat.avatarSeed}
+            size={BADGE_SIZE[density]}
+            rounded={false}
+            className="absolute bottom-0.5 right-0.5"
+          />
+        </>
+      ) : (
+        // 未翻露：卡面槽里显示玩家的像素头像（不是角色信息，不泄露身份）
+        <span className="grid size-full place-items-center bg-panel-2">
+          <PixelAvatar seed={seat.avatarSeed} size={Math.min(artW, artH) - 10} />
+        </span>
+      )}
       {!compact && !seat.isMaster && (
         <span className="ms-seat-revtag absolute bottom-1 left-1">
           {seat.characterId ? t('desktop.seat.revealed') : t('desktop.seat.unrevealed')}

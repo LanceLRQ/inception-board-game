@@ -25,6 +25,16 @@ function stageOf(id: 'thief' | 'master') {
   return { sc, G, state };
 }
 
+describe('buildBoardLayers · 占位者头像', () => {
+  it('每个占位者带头像种子，与座位上的一致', () => {
+    const { state, G } = stageOf('thief');
+    const rows = buildBoardLayers(state, G.layers, G.pendingUnlock, nameOf);
+    const occupants = rows.flatMap((r) => r.occupants);
+    expect(occupants.length).toBeGreaterThan(0);
+    for (const o of occupants) expect(o.avatarSeed).toBe(state.players[o.id]!.avatarSeed);
+  });
+});
+
 describe('buildBoardLayers', () => {
   it('从第 4 层到迷失层共 5 行，顺序固定', () => {
     const { state, G } = stageOf('thief');

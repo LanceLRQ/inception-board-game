@@ -260,6 +260,43 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
     expect(bannerA.trim().length).toBeGreaterThan(0);
     expect(bannerA.trim()).toBe(bannerB.trim());
 
+    // 局后举报：每方只能举报对方这位真人（Bot 座位没有举报入口），提交后按钮锁定
+    for (const [me, other] of [
+      [a, seatB],
+      [b, seatA],
+    ] as const) {
+      await expect(me.page.getByTestId('outcome-report')).toBeVisible();
+      await expect(me.page.locator('[data-testid^="report-row-"]')).toHaveCount(1);
+      await expect(me.page.getByTestId(`report-button-${other}`)).toBeEnabled();
+    }
+    await a.page.getByTestId(`report-button-${seatB}`).click();
+    await a.page.getByTestId('report-reason-afk').check();
+    await a.page.getByTestId('report-description').fill('端到端用例：挂机');
+    await a.page.getByTestId('report-submit').click();
+    await expect(a.page.getByTestId('report-result')).toHaveAttribute('data-result', 'ok');
+    await a.page.getByTestId('report-close').click();
+    await expect(a.page.getByTestId(`report-button-${seatB}`)).toBeDisabled();
+    // 同一局再举报同一个人：服务端按唯一约束回 409（直接打接口，界面按钮已经锁住了）
+    const token = await a.page.evaluate(() => localStorage.getItem('icgame-token'));
+    const matchID = /\/game\/([^/?]+)/.exec(a.page.url())![1]!;
+    const dup = await a.page.request.post(
+      `${process.env.E2E_API_URL ?? 'http://localhost:3101'}/matches/${matchID}/report`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { targetSeat: Number(seatB), reason: 'afk' },
+      },
+    );
+    expect(dup.status()).toBe(409);
+    // 举报自己与 Bot 座位被拒绝
+    const self = await a.page.request.post(
+      `${process.env.E2E_API_URL ?? 'http://localhost:3101'}/matches/${matchID}/report`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { targetSeat: Number(seatA), reason: 'afk' },
+      },
+    );
+    expect(self.status()).toBe(400);
+
     // 真人的操作确实被服务端接受（超时代发也能打完一局，所以单看胜负不能说明点击生效）
     for (const p of [a, b]) {
       expect(p.clicks, `${p.name} 应至少成功点击过一次操作按钮`).toBeGreaterThan(0);

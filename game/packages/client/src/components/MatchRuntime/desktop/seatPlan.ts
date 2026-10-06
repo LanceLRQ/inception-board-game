@@ -158,3 +158,29 @@ export function planSeats(input: PlanInput): SeatPlan {
 export function seatsOverlap(a: PlannedSeat, b: PlannedSeat): boolean {
   return Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.5 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 - 0.5;
 }
+
+/** 座位旁气泡与座位牌的间距 / 气泡至少要有的宽度（放不下就换到另一侧） */
+const BUBBLE_GAP = 8;
+const BUBBLE_MIN_ROOM = 150;
+
+export interface BubbleSpot {
+  /** 气泡尖角的方向：left = 气泡在座位牌右侧、尖角朝左；right = 气泡在座位牌左侧、尖角朝右 */
+  readonly side: 'left' | 'right';
+  /** 气泡定位点：side 为 left 时是气泡左上角，side 为 right 时是气泡右上角（舞台坐标，像素） */
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * 座位气泡放在座位牌朝向舞台中央的一侧：左列的座位气泡在右边，右列的在左边，
+ * 同一列上下相邻的座位气泡不会叠在一起；梦主在上居中，优先放右侧，右侧放不下才放左侧。
+ */
+export function bubbleSpot(seat: PlannedSeat, stageW: number): BubbleSpot {
+  const y = seat.y - seat.h / 2 + (seat.h <= 80 ? 6 : 10);
+  const rightX = seat.x + seat.w / 2 + BUBBLE_GAP;
+  const leftX = seat.x - seat.w / 2 - BUBBLE_GAP;
+  const preferRight =
+    seat.role === 'left' || (seat.role === 'master' && stageW - rightX >= BUBBLE_MIN_ROOM);
+  if (preferRight && stageW - rightX >= BUBBLE_MIN_ROOM) return { side: 'left', x: rightX, y };
+  return { side: 'right', x: leftX, y };
+}

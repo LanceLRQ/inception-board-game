@@ -19,12 +19,15 @@ import { identityApi, isOfflineIdentity, type RecoveryStatus } from '../../lib/i
 import { rotateErrorKey } from '../../lib/recoveryCode';
 import { logger } from '../../lib/logger';
 import { useIdentityStore } from '../../stores/useIdentityStore';
+import { useAvatar } from '../../hooks/useAvatar';
+import { AvatarPicker } from '../../components/AvatarPicker';
 
 export function AccountSection() {
   const { t } = useTranslation();
   const playerId = useIdentityStore((s) => s.playerId);
   const token = useIdentityStore((s) => s.token);
   const nickname = useIdentityStore((s) => s.nickname);
+  const avatar = useAvatar();
 
   const signedIn = !!playerId && !!token;
   const offline = signedIn && isOfflineIdentity(token);
@@ -105,6 +108,13 @@ export function AccountSection() {
         </div>
       ) : (
         <div className="flex flex-col gap-3 text-sm">
+          <AvatarPicker
+            seed={avatar.seed}
+            onRoll={avatar.roll}
+            rolling={avatar.rolling}
+            failed={avatar.failed}
+            testId="settings-avatar"
+          />
           <div className="flex items-center justify-between gap-3">
             <span>{t('recovery.account.nickname')}</span>
             <span className="font-medium" data-testid="settings-nickname">

@@ -25,7 +25,12 @@ export function useBoardModel(controller: MatchController): BoardModelHandle {
   const state = useMemo(
     () =>
       stage
-        ? adaptViewToStage({ G: stage.G, ctx: stage.ctx, humanPlayerID: stage.humanPlayerID })
+        ? adaptViewToStage({
+            G: stage.G,
+            ctx: stage.ctx,
+            humanPlayerID: stage.humanPlayerID,
+            seats: stage.seats,
+          })
         : null,
     [stage],
   );

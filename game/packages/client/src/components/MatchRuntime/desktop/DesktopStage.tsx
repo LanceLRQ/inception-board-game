@@ -73,6 +73,8 @@ export function DesktopStage({ controller, state, board, onFocusLayer }: Desktop
             seats={seatMap}
             worldViews={worldViewNames(view)}
             onOpenDetail={preview.open}
+            bubbles={controller.chat.bubbles}
+            stageWidth={size.w}
           />
           <div
             className="ms-center absolute z-[5] transition-[top,height] duration-300"

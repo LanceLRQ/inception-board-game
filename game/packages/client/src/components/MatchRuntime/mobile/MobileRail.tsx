@@ -6,6 +6,8 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play } from 'lucide-react';
+import { CardArt } from '../../CardArt';
+import { PixelAvatar } from '../../PixelAvatar';
 import { cn } from '../../../lib/utils';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
 import type { SeatView } from '../model/seatModel';
@@ -67,8 +69,21 @@ function RailSlot({
           slot.isViewer && 'outline outline-1 outline-offset-2 outline-acc [outline-style:dashed]',
         )}
       >
-        {slot.imageUrl && (
-          <img src={slot.imageUrl} alt="" draggable={false} className="size-full object-cover" />
+        {slot.characterId ? (
+          <>
+            <CardArt src={slot.imageUrl} className="size-full" />
+            <PixelAvatar
+              seed={slot.avatarSeed}
+              size={16}
+              rounded={false}
+              className="absolute bottom-0 right-0"
+            />
+          </>
+        ) : (
+          // 未翻露：显示玩家的像素头像，不显示阵营背面
+          <span className="grid size-full place-items-center bg-panel-2">
+            <PixelAvatar seed={slot.avatarSeed} size={36} />
+          </span>
         )}
         {slot.isLost && (
           <span className="absolute left-0 top-0 border border-line-strong bg-background px-[3px] py-0.5 font-mono text-[7px] leading-none tracking-[.1em] text-dim">

@@ -22,6 +22,8 @@ export interface RoomSeat {
   playerId: string | null;
   nickname: string;
   isBot: boolean;
+  /** 像素头像种子：建局时取自房间成员，公开信息 */
+  avatarSeed?: string;
 }
 
 export interface StepOutput {
@@ -193,6 +195,11 @@ export class MatchRoom {
 
   deadlineAt(): number | null {
     return this.deadline;
+  }
+
+  /** 当前时刻（毫秒），与截止时间同一个时钟；计算「距截止还剩多久」时用 */
+  now(): number {
+    return this.deps.timers.now();
   }
 
   /** 快照存储此刻是否可用（供新连接建立时补发提示） */

@@ -3,6 +3,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { Ban, Check } from 'lucide-react';
+import { CardArt } from '../../CardArt';
 import { cn } from '../../../lib/utils';
 import { useCardPressDetail } from '../../../hooks/useCardPressDetail';
 import type { HandCardItem } from '../controllerTypes';
@@ -85,15 +86,7 @@ export function MobileHandCard({
       >
         <i className={cn('absolute inset-x-0 top-0 z-[2] h-[3px]', CATEGORY_BAR[category])} />
         {item.imageUrl && (
-          <img
-            src={item.imageUrl}
-            alt=""
-            draggable={false}
-            className="size-full object-cover"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
-          />
+          <CardArt src={item.imageUrl} fallback={item.name} className="size-full" />
         )}
         {item.selected && (
           <span className="absolute right-0.5 top-1 z-[3] flex size-4 items-center justify-center rounded-full bg-acc text-background">

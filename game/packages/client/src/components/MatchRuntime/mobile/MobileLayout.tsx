@@ -21,6 +21,7 @@ import { MobileDock } from './MobileDock';
 import { MobileLayerChips } from './MobileLayerChips';
 import { MobileNotices } from './MobileNotices';
 import { MobileRail } from './MobileRail';
+import { RailBubbles } from './RailBubbles';
 import { MobileTopBar } from './MobileTopBar';
 import { MobileTower } from './MobileTower';
 import { buildLayerChips } from '../model/boardModel';
@@ -52,6 +53,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
     <div
       className="relative isolate mx-auto flex h-dvh w-full touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground tablet:max-w-[960px]"
       data-testid="local-runtime"
+      data-assets-ready={controller.assetsReady}
       data-layout="mobile"
       data-mode={mode}
       data-tint-layer={tintLayerAttr(focusLayer)}
@@ -81,6 +83,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
             />
             <div className="flex min-h-0 flex-1" data-testid="runtime-stage">
               <MobileRail slots={slots} onOpenDetail={controller.preview.open} />
+              <RailBubbles bubbles={controller.chat.bubbles} />
               <MobileTower
                 board={board}
                 dockOpen={dockOpen && !compact}
@@ -114,6 +117,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
           winReason={controller.winReason}
           isRemote={controller.isRemote}
           onRestart={onRestart}
+          report={controller.report}
         />
       )}
     </div>

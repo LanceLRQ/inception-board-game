@@ -1,80 +1,56 @@
-// ReportButton - 举报按钮（配合 ReportDialog 弹窗）
-// 举报入口
+// ReportButton - 举报某位玩家的入口：点开 ReportDialog，提交成功或服务端判为重复后不再允许再点
 
 import { Flag } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ReportDialog, type ReportReason } from './ReportDialog';
+import type { ReportOutcome, ReportReason } from '../../lib/reportApi';
 import { cn } from '../../lib/utils';
+import { ReportDialog } from './ReportDialog';
 
 export interface ReportButtonProps {
-  /** 被举报的玩家 ID */
-  readonly targetPlayerId: string;
-  /** 被举报玩家昵称（展示用） */
-  readonly targetNickname?: string;
-  /** 对局 ID */
-  readonly matchID: string;
-  /** 提交回调：由上层处理 API 调用 */
-  readonly onSubmit: (input: {
-    matchID: string;
-    targetPlayerId: string;
-    reason: ReportReason;
-    description?: string;
-  }) => Promise<void> | void;
+  /** 被举报玩家的座位号，用来区分各行的测试标识 */
+  readonly seat: string;
+  readonly targetNickname: string;
+  /** 提交举报；由上层决定调哪个接口 */
+  readonly onSubmit: (reason: ReportReason, description?: string) => Promise<ReportOutcome>;
   readonly className?: string;
-  readonly disabled?: boolean;
 }
 
-export function ReportButton({
-  targetPlayerId,
-  targetNickname,
-  matchID,
-  onSubmit,
-  className,
-  disabled,
-}: ReportButtonProps) {
+export function ReportButton({ seat, targetNickname, onSubmit, className }: ReportButtonProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [reported, setReported] = useState(false);
 
-  const handleSubmit = useCallback(
-    async (reason: ReportReason, description?: string) => {
-      const payload: {
-        matchID: string;
-        targetPlayerId: string;
-        reason: ReportReason;
-        description?: string;
-      } = { matchID, targetPlayerId, reason };
-      if (description) payload.description = description;
-      await onSubmit(payload);
-      setOpen(false);
-    },
-    [matchID, targetPlayerId, onSubmit],
-  );
+  const handleSubmit = async (reason: ReportReason, description?: string) => {
+    const outcome = await onSubmit(reason, description);
+    if (outcome.ok || outcome.code === 'duplicate') setReported(true);
+    return outcome;
+  };
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        disabled={disabled}
+        disabled={reported}
+        aria-label={t('report.button_aria', { name: targetNickname })}
+        data-testid={`report-button-${seat}`}
+        data-reported={reported || undefined}
         className={cn(
-          'inline-flex items-center gap-1 rounded-full border border-blood/40 px-2 py-0.5 text-xs text-destructive transition-colors hover:bg-blood/10 active:scale-95',
-          disabled && 'opacity-50 cursor-not-allowed',
+          'inline-flex min-h-11 min-w-11 shrink-0 touch-manipulation items-center justify-center gap-1 border border-blood/50 px-2.5 text-xs text-blood active:translate-y-px disabled:border-line disabled:text-faint',
           className,
         )}
-        aria-label={t('report.button_aria', { defaultValue: '举报玩家' })}
       >
-        <Flag className="h-3.5 w-3.5" aria-hidden />
-        {t('report.button', { defaultValue: '举报' })}
+        <Flag className="size-3.5" aria-hidden />
+        {reported ? t('report.reported') : t('report.button')}
       </button>
-
-      {open ? (
+      {open && (
         <ReportDialog
-          targetNickname={targetNickname ?? targetPlayerId}
+          targetNickname={targetNickname}
           onSubmit={handleSubmit}
-          onCancel={() => setOpen(false)}
+          onClose={() => setOpen(false)}
         />
-      ) : null}
+      )}
     </>
   );
 }

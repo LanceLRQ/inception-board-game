@@ -11,6 +11,8 @@ import { computeRailSlots } from './turnOrder';
 export interface SeatView {
   readonly id: string;
   readonly nickname: string;
+  /** 像素头像种子（公开信息） */
+  readonly avatarSeed: string;
   readonly isViewer: boolean;
   readonly isMaster: boolean;
   readonly isCurrent: boolean;
@@ -51,6 +53,7 @@ export function buildSeatViews(
       {
         id: slot.id,
         nickname: p.nickname,
+        avatarSeed: p.avatarSeed,
         isViewer: slot.isViewer,
         isMaster: slot.isMaster,
         isCurrent: slot.isCurrent,

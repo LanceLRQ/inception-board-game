@@ -1,6 +1,7 @@
 // 根 layout - 挂主题 effect + Framer Motion 全局 reduced-motion 配置 + 跳转主内容链接
 // + 全局 Toaster（toast 事件通知）
 
+import { useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { MotionConfig } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -8,11 +9,18 @@ import { useThemeEffect } from './hooks/useThemeEffect';
 import { motionConfigMode } from './theme/effects';
 import { useEffectsStore } from './stores/useEffectsStore';
 import { Toaster } from './components/ui/toaster';
+import { cardAssets } from './lib/cardAssets';
+import { isPlaceholderMode } from './lib/assetsMode';
 
 export default function App() {
   useThemeEffect();
   const motionPref = useEffectsStore((s) => s.prefs.motion);
   const { t } = useTranslation();
+
+  // 进站只取界面必需的小图（通用背面、金库牌面）；其余卡图等进了对局再按阶段取
+  useEffect(() => {
+    if (!isPlaceholderMode()) void cardAssets.preloadCritical();
+  }, []);
 
   return (
     <MotionConfig reducedMotion={motionConfigMode(motionPref)}>
