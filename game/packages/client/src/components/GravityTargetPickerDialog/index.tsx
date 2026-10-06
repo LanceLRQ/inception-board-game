@@ -50,7 +50,7 @@ export function GravityTargetPickerDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Orbit className="h-4 w-4 text-violet-500" aria-hidden />
+            <Orbit className="h-4 w-4 text-acc-bright" aria-hidden />
             万有引力 · 选 1-2 名玩家
           </span>
         </DialogTitle>
@@ -70,8 +70,8 @@ export function GravityTargetPickerDialog({
                   className={cn(
                     'rounded-full border px-2.5 py-0.5 text-[11px]',
                     picked
-                      ? 'border-violet-400 bg-violet-500/30 text-violet-400'
-                      : 'border-border bg-card hover:border-violet-400/60',
+                      ? 'border-acc bg-acc/30 text-acc-bright'
+                      : 'border-border bg-card hover:border-acc/60',
                   )}
                   data-testid={`grav-target-${opt.id}`}
                 >
@@ -93,7 +93,7 @@ export function GravityTargetPickerDialog({
           type="button"
           disabled={selected.length < 1 || selected.length > 2}
           onClick={onConfirm}
-          className="rounded-md bg-violet-500 px-3 py-1.5 text-xs font-medium text-black hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-acc-bright disabled:cursor-not-allowed disabled:opacity-50"
           data-testid="gravity-confirm"
         >
           确认打出

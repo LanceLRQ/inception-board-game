@@ -31,7 +31,7 @@ export function MasterNightmareDecisionDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
+            <AlertTriangle className="h-4 w-4 text-acc-bright" aria-hidden />
             梦魇决策
           </span>
         </DialogTitle>

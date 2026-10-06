@@ -17,17 +17,17 @@ const KIND_ICON = {
 } satisfies Record<ToastKind, typeof Info>;
 
 const KIND_COLOR: Record<ToastKind, string> = {
-  info: 'border-sky-500/40 bg-sky-500/10 text-sky-900 dark:text-sky-100',
-  success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100',
-  warn: 'border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100',
-  error: 'border-rose-500/40 bg-rose-500/10 text-rose-900 dark:text-rose-100',
+  info: 'border-lock/40 bg-lock/10 text-foreground',
+  success: 'border-ok/40 bg-ok/10 text-foreground',
+  warn: 'border-acc/40 bg-acc/10 text-foreground',
+  error: 'border-blood/40 bg-blood/10 text-foreground',
 };
 
 const KIND_ICON_COLOR: Record<ToastKind, string> = {
-  info: 'text-sky-500',
-  success: 'text-emerald-500',
-  warn: 'text-amber-500',
-  error: 'text-rose-500',
+  info: 'text-lock',
+  success: 'text-ok',
+  warn: 'text-acc-bright',
+  error: 'text-destructive',
 };
 
 function ToastCard({ entry }: { entry: ToastEntry }) {

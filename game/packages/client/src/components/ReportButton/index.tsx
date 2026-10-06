@@ -57,7 +57,7 @@ export function ReportButton({
         onClick={() => setOpen(true)}
         disabled={disabled}
         className={cn(
-          'inline-flex items-center gap-1 rounded-full border border-red-500/40 px-2 py-0.5 text-xs text-red-500 transition-colors hover:bg-red-500/10 active:scale-95',
+          'inline-flex items-center gap-1 rounded-full border border-blood/40 px-2 py-0.5 text-xs text-destructive transition-colors hover:bg-blood/10 active:scale-95',
           disabled && 'opacity-50 cursor-not-allowed',
           className,
         )}

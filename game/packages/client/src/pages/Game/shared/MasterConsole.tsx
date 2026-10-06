@@ -27,7 +27,7 @@ export function MasterConsole({
   return (
     <aside
       className={cn(
-        'flex flex-col gap-3 rounded-2xl border-2 border-red-500/30 bg-gradient-to-b from-red-950/40 to-slate-950/60 p-4 shadow-lg',
+        'flex flex-col gap-3 rounded-2xl border-2 border-blood/30 bg-gradient-to-b from-blood/20 to-background/60 p-4 shadow-lg',
         layout === 'pc-sidebar' && 'w-[300px] shrink-0',
         layout === 'mobile-drawer' && 'w-full',
         className,
@@ -36,40 +36,40 @@ export function MasterConsole({
       data-layout={layout}
       aria-label="梦主控制台"
     >
-      <div className="flex items-center gap-2 border-b border-red-500/30 pb-2">
-        <Sparkles className="h-4 w-4 text-red-400" aria-hidden />
-        <h3 className="text-sm font-semibold text-red-300">梦主控制台</h3>
+      <div className="flex items-center gap-2 border-b border-blood/30 pb-2">
+        <Sparkles className="h-4 w-4 text-destructive" aria-hidden />
+        <h3 className="text-sm font-semibold text-destructive">梦主控制台</h3>
       </div>
 
       {/* 世界观 */}
       <section>
-        <div className="mb-1 flex items-center gap-1 text-xs text-red-300">
+        <div className="mb-1 flex items-center gap-1 text-xs text-destructive">
           <ScrollText className="h-3 w-3" aria-hidden />
           激活的世界观
         </div>
-        <div className="rounded border border-red-500/20 bg-slate-900/60 p-2 text-[11px] text-muted-foreground">
+        <div className="rounded border border-blood/20 bg-panel/60 p-2 text-[11px] text-muted-foreground">
           （后续接入真实世界观卡牌效果）
         </div>
       </section>
 
       {/* 梦魇 */}
       <section>
-        <div className="mb-1 flex items-center gap-1 text-xs text-red-300">
+        <div className="mb-1 flex items-center gap-1 text-xs text-destructive">
           <Sparkles className="h-3 w-3" aria-hidden />
           梦魇库存 <span className="text-[10px] text-muted-foreground">0 / 6</span>
         </div>
-        <div className="rounded border border-red-500/20 bg-slate-900/60 p-2 text-[11px] text-muted-foreground">
+        <div className="rounded border border-blood/20 bg-panel/60 p-2 text-[11px] text-muted-foreground">
           （后续接入 6 张梦魇牌触发界面）
         </div>
       </section>
 
       {/* 贿赂池 */}
       <section>
-        <div className="mb-1 flex items-center gap-1 text-xs text-red-300">
+        <div className="mb-1 flex items-center gap-1 text-xs text-destructive">
           <Coins className="h-3 w-3" aria-hidden />
           贿赂池
         </div>
-        <div className="rounded border border-red-500/20 bg-slate-900/60 p-2 text-[11px] text-muted-foreground">
+        <div className="rounded border border-blood/20 bg-panel/60 p-2 text-[11px] text-muted-foreground">
           （后续接入贿赂系统）
         </div>
       </section>

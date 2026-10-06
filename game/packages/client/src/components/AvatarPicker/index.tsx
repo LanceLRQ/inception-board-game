@@ -95,7 +95,7 @@ export function AvatarPicker({
             className={cn(
               'rounded-full px-4 py-2 text-sm transition-colors',
               hasChanged && !saving
-                ? 'bg-green-600 text-white hover:bg-green-500 active:scale-95'
+                ? 'bg-ok text-background hover:bg-ok/90 active:scale-95'
                 : 'bg-muted text-muted-foreground cursor-not-allowed opacity-60',
             )}
           >

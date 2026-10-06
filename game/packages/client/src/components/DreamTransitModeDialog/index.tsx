@@ -32,7 +32,7 @@ export function DreamTransitModeDialog({ open, onChoose, onCancel }: DreamTransi
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Shuffle className="h-4 w-4 text-indigo-500" aria-hidden />
+            <Shuffle className="h-4 w-4 text-acc-bright" aria-hidden />
             SHOOT·梦境穿梭剂：选择结算方式
           </span>
         </DialogTitle>
@@ -45,7 +45,7 @@ export function DreamTransitModeDialog({ open, onChoose, onCancel }: DreamTransi
           <button
             type="button"
             onClick={() => onChoose('shoot')}
-            className="min-w-[120px] rounded-md border border-indigo-500 bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
+            className="min-w-[120px] rounded-md border border-acc bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-acc-bright"
             data-testid="dream-mode-shoot"
           >
             以 SHOOT 结算
@@ -53,7 +53,7 @@ export function DreamTransitModeDialog({ open, onChoose, onCancel }: DreamTransi
           <button
             type="button"
             onClick={() => onChoose('transit')}
-            className="min-w-[120px] rounded-md border border-indigo-400 bg-indigo-400 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            className="min-w-[120px] rounded-md border border-acc bg-acc-soft px-4 py-2 text-sm font-medium text-acc-bright hover:bg-acc/30"
             data-testid="dream-mode-transit"
           >
             以 穿梭剂 结算

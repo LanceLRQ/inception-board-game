@@ -639,7 +639,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
           className="mb-4 rounded-lg bg-card p-6 text-center shadow-md"
           data-testid="winner-banner"
         >
-          <Trophy className="mx-auto mb-2 h-8 w-8 text-yellow-500" />
+          <Trophy className="mx-auto mb-2 h-8 w-8 text-acc-bright" />
           <h2 className="text-xl font-bold">
             {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')}
           </h2>
@@ -724,7 +724,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
             {typeof humanPlayer.bribeReceived === 'number' &&
               (humanPlayer.bribeReceived as number) > 0 && (
                 <span
-                  className="rounded bg-purple-500/20 px-1.5 py-0.5 text-purple-300"
+                  className="rounded bg-acc-soft px-1.5 py-0.5 text-acc-bright"
                   data-testid="human-bribe-received"
                 >
                   {t('localMatch.bribeReceived', { n: humanPlayer.bribeReceived })}
@@ -734,7 +734,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
           {Array.isArray(humanPlayer.hand) && (
             <>
               {turnPhase === 'discard' && overHand > 0 && isMyTurn && (
-                <div className="mt-2 text-xs text-amber-500">
+                <div className="mt-2 text-xs text-acc-bright">
                   {t('localMatch.mustDiscard', { n: overHand })}
                 </div>
               )}
@@ -806,7 +806,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
                           }}
                         />
                       )}
-                      <span className="relative z-10 w-full bg-black/70 px-1 py-0.5 text-center text-[10px] leading-tight text-white">
+                      <span className="relative z-10 w-full bg-background/80 px-1 py-0.5 text-center text-[10px] leading-tight text-foreground">
                         {getCardName(card)}
                       </span>
                     </button>
@@ -915,7 +915,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
           )}
           {turnPhase === 'action' && !effectivePending && overHand > 0 && (
             <div
-              className="w-full rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+              className="w-full rounded-md border border-acc/40 bg-acc/10 px-3 py-2 text-xs text-acc-bright"
               data-testid="action-hand-overflow-warning"
             >
               {t('localMatch.endActionHandWarn', {
@@ -1140,8 +1140,8 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
                   className={cn(
                     'rounded-full border px-2 py-0.5',
                     decreePick === c
-                      ? 'border-amber-400 bg-amber-500/30 text-amber-400'
-                      : 'border-border bg-card hover:border-amber-400/60',
+                      ? 'border-acc bg-acc/30 text-acc-bright'
+                      : 'border-border bg-card hover:border-acc/60',
                   )}
                   data-testid={`decree-${c}`}
                 >

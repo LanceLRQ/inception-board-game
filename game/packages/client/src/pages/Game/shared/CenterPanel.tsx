@@ -41,7 +41,7 @@ function VaultCell({
 }) {
   if (!vault) {
     return (
-      <div className="flex h-[68px] w-12 items-center justify-center rounded border border-dashed border-slate-700 text-[9px] text-muted-foreground">
+      <div className="flex h-[68px] w-12 items-center justify-center rounded border border-dashed border-line-strong text-[9px] text-muted-foreground">
         无金库
       </div>
     );
@@ -90,8 +90,8 @@ export function CenterPanel({
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 rounded-2xl border-2 border-indigo-500/40',
-        'bg-gradient-to-br from-indigo-900/60 to-slate-900/80 p-3 shadow-xl',
+        'flex flex-col gap-2 rounded-2xl border-2 border-line-strong',
+        'bg-gradient-to-br from-panel-2 to-panel/80 p-3 shadow-xl',
         className,
       )}
       data-testid="center-panel"
@@ -110,8 +110,8 @@ export function CenterPanel({
                 'flex items-center gap-3 rounded-lg border px-2 py-1.5',
                 'lg:flex-1 lg:flex-col lg:items-center lg:gap-2 lg:py-2',
                 isFocus
-                  ? 'border-yellow-400/60 bg-yellow-400/5 shadow-[0_0_8px_rgba(250,204,21,0.25)]'
-                  : 'border-indigo-500/20 bg-slate-900/40',
+                  ? 'border-acc/60 bg-acc/5 shadow-md shadow-acc/25'
+                  : 'border-line bg-panel/40',
               )}
               data-testid={`layer-row-${layerNum}`}
               data-focus={isFocus || undefined}
@@ -137,7 +137,7 @@ export function CenterPanel({
                     const clamped = Math.max(0, Math.min(hl, 6));
                     return clamped === 0 ? (
                       <div
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-semibold text-blue-500/40 ring-1 ring-blue-500/20"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-lock/10 text-xs font-semibold text-lock/40 ring-1 ring-lock/20"
                         aria-hidden="true"
                       >
                         0
@@ -153,7 +153,7 @@ export function CenterPanel({
                   })()}
                 </div>
                 {layerState?.nightmareRevealed && (
-                  <span className="text-[9px] text-red-400">⚠ 梦魇已揭露</span>
+                  <span className="text-[9px] text-destructive">⚠ 梦魇已揭露</span>
                 )}
               </div>
             </div>
@@ -162,7 +162,7 @@ export function CenterPanel({
       </div>
 
       {/* 底部：弃牌堆 + 可用牌堆 */}
-      <div className="mt-1 flex items-stretch justify-around gap-3 border-t border-indigo-500/20 pt-2">
+      <div className="mt-1 flex items-stretch justify-around gap-3 border-t border-line pt-2">
         {/* 用过的牌（弃牌堆）—— 点击打开历史弹层 */}
         <button
           type="button"
@@ -176,7 +176,7 @@ export function CenterPanel({
         >
           <div className="relative">
             {state.discardPile.length === 0 ? (
-              <div className="flex h-[68px] w-12 items-center justify-center rounded border border-dashed border-slate-700 text-[9px] text-muted-foreground">
+              <div className="flex h-[68px] w-12 items-center justify-center rounded border border-dashed border-line-strong text-[9px] text-muted-foreground">
                 空
               </div>
             ) : (
@@ -189,7 +189,7 @@ export function CenterPanel({
               />
             )}
             {state.discardPile.length > 0 && (
-              <span className="absolute -right-1 -top-1 rounded-full bg-slate-800 px-1 text-[9px] text-slate-200 shadow">
+              <span className="absolute -right-1 -top-1 rounded-full bg-panel px-1 text-[9px] text-foreground shadow">
                 {state.discardPile.length}
               </span>
             )}
@@ -218,7 +218,7 @@ export function CenterPanel({
               orientation="portrait"
               disableDetail
             />
-            <span className="absolute -right-1 -top-1 rounded-full bg-indigo-600 px-1 text-[9px] text-indigo-50 shadow">
+            <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[9px] text-primary-foreground shadow">
               {state.deckCount}
             </span>
           </div>
@@ -231,12 +231,12 @@ export function CenterPanel({
       {/* 弃牌历史弹层：最后打出的在最顶 */}
       {showDiscard && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"
           onClick={() => setShowDiscard(false)}
           data-testid="discard-history-overlay"
         >
           <div
-            className="relative mx-4 max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl border border-indigo-500/30 bg-slate-900 p-4 shadow-2xl"
+            className="relative mx-4 max-h-[70vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line-strong bg-panel p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -246,7 +246,7 @@ export function CenterPanel({
               <button
                 type="button"
                 onClick={() => setShowDiscard(false)}
-                className="rounded-full p-1 text-muted-foreground hover:bg-slate-700 hover:text-foreground"
+                className="rounded-full p-1 text-muted-foreground hover:bg-panel-2 hover:text-foreground"
                 aria-label="关闭"
               >
                 ✕
@@ -259,7 +259,7 @@ export function CenterPanel({
                 {discardList.map((cardId, i) => (
                   <div
                     key={`${cardId}-${i}`}
-                    className="flex items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 px-2 py-1.5"
+                    className="flex items-center gap-3 rounded-lg border border-line-strong bg-panel/50 px-2 py-1.5"
                   >
                     <GameCard
                       cardId={cardId}

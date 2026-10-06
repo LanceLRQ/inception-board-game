@@ -23,8 +23,8 @@ export interface MasterBribeInspectDialogProps {
 type BribeKind = 'deal' | 'fail' | null;
 
 function bribeIcon(kind: BribeKind) {
-  if (kind === 'deal') return <Handshake className="h-4 w-4 text-rose-500" />;
-  if (kind === 'fail') return <ShieldX className="h-4 w-4 text-slate-500" />;
+  if (kind === 'deal') return <Handshake className="h-4 w-4 text-destructive" />;
+  if (kind === 'fail') return <ShieldX className="h-4 w-4 text-faint" />;
   return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
 }
 
@@ -46,7 +46,7 @@ export function MasterBribeInspectDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Eye className="h-4 w-4 text-rose-500" aria-hidden />
+            <Eye className="h-4 w-4 text-destructive" aria-hidden />
             查看盗梦者 {targetThiefID ?? '?'} 的全部贿赂牌
           </span>
         </DialogTitle>
@@ -73,7 +73,7 @@ export function MasterBribeInspectDialog({
         <button
           type="button"
           onClick={() => void makeMove('peekerAcknowledge', [])}
-          className="rounded-md border border-rose-500 bg-rose-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-600"
+          className="rounded-md border border-blood bg-blood px-3 py-1.5 text-xs font-medium text-foreground hover:bg-blood/90"
           data-testid="master-bribe-inspect-ack"
         >
           已确认

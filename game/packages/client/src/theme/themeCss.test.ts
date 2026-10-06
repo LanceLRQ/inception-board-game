@@ -32,7 +32,7 @@ function declarations(body: string): Map<string, string> {
 
 describe('主题表与样式表一致', () => {
   for (const id of THEME_IDS) {
-    it(`[data-theme='${id}'] 的 17 个令牌与主题表一致`, () => {
+    it(`[data-theme='${id}'] 的 18 个令牌与主题表一致`, () => {
       const bodies = ruleBodies(`[data-theme='${id}']`);
       expect(bodies.length).toBeGreaterThan(0);
       const decls = declarations(bodies.join(';'));

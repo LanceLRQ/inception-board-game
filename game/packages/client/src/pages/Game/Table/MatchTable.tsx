@@ -90,12 +90,12 @@ export function MatchTable({ state, onDispatch }: MatchTableProps) {
         className={cn(
           'flex items-center justify-between border-b px-4 py-2 text-sm',
           isMaster
-            ? 'border-red-500/40 bg-gradient-to-r from-red-900/40 to-card'
+            ? 'border-blood/40 bg-gradient-to-r from-blood/20 to-card'
             : 'border-border bg-card',
         )}
       >
         <div className="flex flex-col">
-          <span className={cn('text-xs', isMaster ? 'text-red-300' : 'text-muted-foreground')}>
+          <span className={cn('text-xs', isMaster ? 'text-destructive' : 'text-muted-foreground')}>
             {isMaster ? '梦主视角' : '盗梦者视角'} · 第 {state.turnNumber} 回合
           </span>
           <span className="font-semibold text-foreground">
@@ -107,7 +107,7 @@ export function MatchTable({ state, onDispatch }: MatchTableProps) {
         <span
           className={cn(
             'rounded-full px-3 py-1 text-xs font-medium',
-            isMaster ? 'bg-red-500/20 text-red-300' : 'bg-primary/10 text-primary',
+            isMaster ? 'bg-blood/20 text-destructive' : 'bg-primary/10 text-primary',
           )}
           aria-label={`阶段 ${state.turnPhase}`}
         >
@@ -191,7 +191,7 @@ export function MatchTable({ state, onDispatch }: MatchTableProps) {
                         targetLayer: l,
                       })
                     }
-                    className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
+                    className="rounded-md border border-blood/40 bg-blood/10 px-2 py-1 text-xs text-destructive hover:bg-blood/20"
                   >
                     移至 L{l}
                   </button>

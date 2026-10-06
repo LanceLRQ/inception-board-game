@@ -7,20 +7,20 @@ export default function Landing() {
   const [showModal, setShowModal] = useState<boolean>(() => !hasAcknowledgedCopyright());
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-between bg-bg-primary py-8 text-white">
+    <div className="flex min-h-screen flex-col items-center justify-between bg-background py-8 text-foreground">
       <div className="flex flex-1 flex-col items-center justify-center">
         <h1 className="mb-2 text-4xl font-bold">盗梦都市</h1>
-        <p className="mb-8 text-gray-400">Inception City Online</p>
+        <p className="mb-8 text-dim">Inception City Online</p>
         <div className="flex gap-4">
           <a
             href="/local"
-            className="rounded-lg bg-accent px-6 py-3 font-bold text-white hover:bg-accent-hover"
+            className="rounded-lg bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-acc-bright"
           >
             单机练习
           </a>
           <a
             href="/lobby"
-            className="rounded-lg border border-white/20 px-6 py-3 font-bold text-white hover:bg-white/10"
+            className="rounded-lg border border-line-strong px-6 py-3 font-bold text-foreground hover:bg-foreground/10"
           >
             多人房间
           </a>

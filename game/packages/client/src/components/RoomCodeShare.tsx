@@ -21,19 +21,19 @@ export function RoomCodeShare({ code }: RoomCodeShareProps) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl bg-bg-card p-4">
-      <span className="text-sm text-text-secondary">{t('room.share')}</span>
-      <span className="font-mono text-3xl font-bold tracking-[0.3em] text-white">{code}</span>
+    <div className="flex flex-col items-center gap-3 rounded-xl bg-panel-2 p-4">
+      <span className="text-sm text-dim">{t('room.share')}</span>
+      <span className="font-mono text-3xl font-bold tracking-[0.3em] text-foreground">{code}</span>
       <div className="flex gap-2">
         <button
           onClick={copyLink}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white hover:bg-accent-hover"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-acc-bright"
         >
           复制链接
         </button>
         <button
           onClick={shareNative}
-          className="rounded-lg border border-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/10"
+          className="rounded-lg border border-line-strong px-4 py-2 text-sm font-bold text-foreground hover:bg-foreground/10"
         >
           分享
         </button>

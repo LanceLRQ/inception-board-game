@@ -17,7 +17,7 @@ export function StorageBanner({ visible }: StorageBannerProps) {
       role="status"
       aria-live="polite"
       data-testid="storage-banner"
-      className="fixed top-0 inset-x-0 z-50 flex items-center gap-2 bg-orange-500/95 px-4 py-2 text-sm font-medium text-white"
+      className="fixed top-0 inset-x-0 z-50 flex items-center gap-2 bg-primary/95 px-4 py-2 text-sm font-medium text-primary-foreground"
     >
       <CloudOff className="h-4 w-4 shrink-0" aria-hidden />
       <span>

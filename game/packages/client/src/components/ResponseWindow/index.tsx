@@ -94,14 +94,14 @@ export function ResponseWindow({
           animate="visible"
           exit="exit"
         >
-          <div className="rounded-xl border border-yellow-500/50 bg-yellow-950/90 p-4 shadow-lg backdrop-blur-sm">
+          <div className="rounded-xl border border-acc/50 bg-panel/95 p-4 shadow-lg backdrop-blur-sm">
             {/* 标题行 */}
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-yellow-200">{label}</span>
+              <span className="text-sm font-medium text-acc-bright">{label}</span>
               <span
                 className={cn(
                   'font-mono text-lg font-bold',
-                  remaining <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-300',
+                  remaining <= 5 ? 'text-destructive animate-pulse' : 'text-acc-bright',
                 )}
               >
                 {remaining}s
@@ -109,9 +109,9 @@ export function ResponseWindow({
             </div>
 
             {/* 进度条 */}
-            <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-yellow-900/50">
+            <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-panel-2">
               <motion.div
-                className="h-full rounded-full bg-yellow-400"
+                className="h-full rounded-full bg-acc"
                 initial={{ width: '100%' }}
                 animate={{ width: `${(remaining / timeout) * 100}%` }}
                 transition={{ duration: 0.5 }}
@@ -124,20 +124,20 @@ export function ResponseWindow({
                 <button
                   type="button"
                   onClick={onRespond}
-                  className="flex-1 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-medium text-black hover:bg-yellow-400 transition-colors"
+                  className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-acc-bright transition-colors"
                 >
                   响应（出牌）
                 </button>
                 <button
                   type="button"
                   onClick={onPass}
-                  className="flex-1 rounded-lg border border-yellow-500/30 px-4 py-2 text-sm font-medium text-yellow-200 hover:bg-yellow-900/50 transition-colors"
+                  className="flex-1 rounded-lg border border-acc/30 px-4 py-2 text-sm font-medium text-acc-bright hover:bg-acc-soft transition-colors"
                 >
                   放弃
                 </button>
               </div>
             ) : (
-              <p className="text-center text-sm text-yellow-300/70">等待其他玩家响应...</p>
+              <p className="text-center text-sm text-acc-bright/70">等待其他玩家响应...</p>
             )}
           </div>
         </motion.div>

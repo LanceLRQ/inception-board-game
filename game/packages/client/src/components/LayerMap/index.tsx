@@ -119,7 +119,7 @@ function LayerRow({
         L{layer.layer}
       </div>
       <div className="flex items-center gap-1 text-muted-foreground">
-        <Heart className="h-3 w-3 text-rose-400" />
+        <Heart className="h-3 w-3 text-destructive" />
         <span>{layer.heartLockValue}</span>
       </div>
       {/* 未开金库：卡背缩略图（叠加数量徽标） */}
@@ -276,7 +276,7 @@ function PlayerBadge({
       )}
     >
       {isMaster ? (
-        <Crown className="h-2.5 w-2.5 text-amber-400" />
+        <Crown className="h-2.5 w-2.5 text-acc-bright" />
       ) : (
         <User className="h-2.5 w-2.5" />
       )}

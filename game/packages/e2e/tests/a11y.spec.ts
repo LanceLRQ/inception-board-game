@@ -105,13 +105,13 @@ test.describe('无障碍 A11y', () => {
     await context.close();
   });
 
-  test('主题切换按钮有 aria-label', async ({ page }) => {
+  test('主题单选组有 aria-label，选项带选中态', async ({ page }) => {
     await page.goto('/settings');
     await waitForAppReady(page);
 
-    const toggle = page.getByRole('button', { name: /切换主题|theme|Theme/i }).first();
-    const ariaLabel = await toggle.getAttribute('aria-label');
-    expect(ariaLabel).toBeTruthy();
+    const group = page.getByRole('radiogroup').first();
+    expect(await group.getAttribute('aria-label')).toBeTruthy();
+    await expect(group.getByRole('radio', { checked: true })).toHaveCount(1);
   });
 
   test('Landing 页无 pageerror 且 lang 属性已设置', async ({ page }) => {

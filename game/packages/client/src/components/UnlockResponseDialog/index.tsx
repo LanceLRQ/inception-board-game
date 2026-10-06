@@ -77,7 +77,7 @@ export function UnlockResponseDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-sky-500" aria-hidden />
+            <KeyRound className="h-4 w-4 text-lock" aria-hidden />
             {unlockerName} 解封第 {layer ?? '?'} 层 —— 是否使用【解封】抵消？
           </span>
         </DialogTitle>
@@ -86,7 +86,7 @@ export function UnlockResponseDialog({
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <div className="flex items-center gap-2 rounded bg-sky-500/10 px-2 py-1 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+        <div className="flex items-center gap-2 rounded bg-lock/10 px-2 py-1 text-[11px] font-medium text-lock">
           <Clock className="h-3 w-3" />
           <span>
             {remainingSec === null ? '到期自动跳过' : `倒计时 ${remainingSec}s，到期自动跳过`}
@@ -111,7 +111,7 @@ export function UnlockResponseDialog({
           type="button"
           disabled={!canCancel}
           onClick={() => void makeMove('respondCancelUnlock', [])}
-          className="rounded-md border border-sky-500 bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+          className="rounded-md border border-lock bg-lock px-3 py-1.5 text-xs font-medium text-background hover:bg-lock/90 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
         >
           使用【解封】抵消
         </button>

@@ -36,9 +36,9 @@ export function TableStage({
       className={cn(
         'relative mx-auto w-full max-w-5xl',
         'aspect-[16/10]', // 椭圆舞台的基础长宽比
-        'rounded-[3rem] border-2 border-indigo-800/40',
-        'bg-gradient-to-br from-indigo-950/60 via-slate-950 to-slate-900',
-        'shadow-[inset_0_0_40px_rgba(79,70,229,0.15)]',
+        'rounded-[3rem] border-2 border-line-strong',
+        'bg-gradient-to-br from-panel-2 via-background to-panel',
+        'shadow-inner',
         className,
       )}
       data-testid="table-stage"

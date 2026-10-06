@@ -49,7 +49,7 @@ export function ChessTransposeDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <ArrowLeftRight className="h-4 w-4 text-amber-500" aria-hidden />
+            <ArrowLeftRight className="h-4 w-4 text-acc-bright" aria-hidden />
             棋局·易位 · 选择 2 个金库交换
           </span>
         </DialogTitle>
@@ -70,8 +70,8 @@ export function ChessTransposeDialog({
                   v.isOpened
                     ? 'border-muted bg-muted text-muted-foreground opacity-50'
                     : picked
-                      ? 'border-amber-400 bg-amber-500/30 text-amber-400'
-                      : 'border-border bg-card hover:border-amber-400/60',
+                      ? 'border-acc bg-acc/30 text-acc-bright'
+                      : 'border-border bg-card hover:border-acc/60',
                 )}
                 data-testid={`vault-${idx}`}
               >
@@ -93,7 +93,7 @@ export function ChessTransposeDialog({
           type="button"
           disabled={pickedIndices.length !== 2}
           onClick={onConfirm}
-          className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-medium text-black hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-acc-bright disabled:cursor-not-allowed disabled:opacity-50"
           data-testid="chess-confirm"
         >
           确认交换

@@ -85,11 +85,11 @@ export function MatchTrack({ state, onDispatch }: MatchTrackProps) {
         className={cn(
           'flex items-center justify-between border-b px-3 py-1.5 text-xs',
           isMaster
-            ? 'border-red-500/40 bg-gradient-to-r from-red-900/40 to-card'
+            ? 'border-blood/40 bg-gradient-to-r from-blood/20 to-card'
             : 'border-border bg-card',
         )}
       >
-        <span className={isMaster ? 'text-red-300' : 'text-muted-foreground'}>
+        <span className={isMaster ? 'text-destructive' : 'text-muted-foreground'}>
           第 {state.turnNumber} 回合
         </span>
         <span className="font-semibold text-foreground">
@@ -100,7 +100,7 @@ export function MatchTrack({ state, onDispatch }: MatchTrackProps) {
         <span
           className={cn(
             'rounded-full px-2 py-0.5 text-[10px]',
-            isMaster ? 'bg-red-500/20 text-red-300' : 'bg-primary/10 text-primary',
+            isMaster ? 'bg-blood/20 text-destructive' : 'bg-primary/10 text-primary',
           )}
         >
           {state.turnPhase}

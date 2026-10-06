@@ -75,7 +75,7 @@ export function ShootDiceOverlay({ roll, color = 'red', onComplete }: ShootDiceO
     <AnimatePresence>
       {visible && (
         <motion.div
-          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/40"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

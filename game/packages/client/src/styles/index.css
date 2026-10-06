@@ -19,14 +19,6 @@
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
-
-  --color-bg-primary: #1a1a2e;
-  --color-bg-secondary: #16213e;
-  --color-bg-card: #0f3460;
-  --color-accent: #e94560;
-  --color-accent-hover: #ff6b81;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #a0aec0;
 }
 /*
  ---break---
@@ -47,6 +39,7 @@
   --color-acc-soft: var(--ms-accsoft);
   --color-lock: var(--ms-lock);
   --color-blood: var(--ms-blood);
+  --color-ok: var(--ms-ok);
   --color-grade: var(--ms-grade);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -107,6 +100,7 @@
   --ms-accsoft: rgba(201,163,95,.13);
   --ms-lock: #6FA8DC;
   --ms-blood: #A8443A;
+  --ms-ok: #7FA97F;
   --ms-grade: #C9A35F;
   --ms-serif: 'Noto Serif SC','Songti SC','STSong',serif;
   --ms-sans: 'Noto Sans SC','PingFang SC',sans-serif;

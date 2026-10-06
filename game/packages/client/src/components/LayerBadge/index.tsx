@@ -15,14 +15,14 @@ const SIZE_MAP = {
   lg: 'h-10 w-10 text-sm',
 } as const;
 
-/** 按层数返回对应的紫色梯度 class（L0 迷失层特殊处理） */
+/** 按层数返回对应的层级色梯度 class：越深的层填充越浓（L0 迷失层特殊处理） */
 function layerColorClass(layer: number): string {
-  if (layer === 0) return 'border-slate-500 bg-slate-700 text-slate-200';
+  if (layer === 0) return 'border-line-strong bg-panel-2 text-foreground';
   const palette = [
-    'border-purple-700 bg-purple-900/60 text-purple-100', // L1 占位
-    'border-purple-600 bg-purple-800/60 text-purple-100', // L2
-    'border-fuchsia-500 bg-fuchsia-700/60 text-fuchsia-100', // L3
-    'border-pink-500 bg-pink-700/60 text-pink-100', // L4
+    'border-grade/40 bg-grade/10 text-foreground', // L1 占位
+    'border-grade/60 bg-grade/20 text-foreground', // L2
+    'border-grade/80 bg-grade/35 text-foreground', // L3
+    'border-grade bg-grade/50 text-foreground', // L4
   ];
   return palette[(layer - 1) % palette.length] ?? palette[0]!;
 }

@@ -12,7 +12,7 @@ import {
 } from './themes';
 
 describe('主题表', () => {
-  it('令牌名为 17 个且顺序固定', () => {
+  it('令牌名为 18 个且顺序固定', () => {
     expect(TOKEN_NAMES).toEqual([
       'bg',
       'panel',
@@ -27,6 +27,7 @@ describe('主题表', () => {
       'accsoft',
       'lock',
       'blood',
+      'ok',
       'grade',
       'serif',
       'sans',
@@ -39,7 +40,7 @@ describe('主题表', () => {
     expect(tokenVar('accsoft')).toBe('--ms-accsoft');
   });
 
-  it('每个主题都带齐 17 个非空令牌，且 id / 明暗 / 主题色合法', () => {
+  it('每个主题都带齐 18 个非空令牌，且 id / 明暗 / 主题色合法', () => {
     for (const id of THEME_IDS) {
       const theme = THEMES[id];
       expect(theme.id).toBe(id);

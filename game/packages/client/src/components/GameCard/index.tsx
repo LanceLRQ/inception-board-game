@@ -95,7 +95,7 @@ export function GameCard({
         'transition-shadow duration-200',
         SIZE_MAP[size][orientation],
         selected
-          ? 'border-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.5)] scale-105'
+          ? 'border-acc shadow-lg shadow-acc/50 scale-105'
           : playable
             ? 'border-border hover:border-primary/60 hover:shadow-md'
             : 'border-border/40 opacity-50 cursor-not-allowed',
@@ -126,13 +126,13 @@ export function GameCard({
           className="h-full w-full object-cover"
         />
       ) : isBack ? (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-800 to-indigo-950">
-          <span className="text-indigo-400/60 text-lg font-bold">ICO</span>
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-panel-2 to-background">
+          <span className="text-acc/60 text-lg font-bold">ICO</span>
         </div>
       ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 p-1">
+        <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-panel-2 to-panel p-1">
           <span
-            className={cn('text-center font-medium text-slate-200 leading-tight', SIZE_TEXT[size])}
+            className={cn('text-center font-medium text-foreground leading-tight', SIZE_TEXT[size])}
           >
             {cardId!.replace(/^action_/, '').replace(/_/g, ' ')}
           </span>

@@ -91,7 +91,7 @@ export function CopyrightModal({ open, onAcknowledge }: CopyrightModalProps) {
       role="dialog"
       aria-modal="true"
       aria-label={t('copyright.modal_title', { defaultValue: '版权与使用声明' })}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
     >
       <div className="max-w-lg rounded-2xl bg-card p-6 shadow-2xl">
         <h2 className="mb-3 text-lg font-bold text-foreground">

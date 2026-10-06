@@ -84,21 +84,21 @@ export function PlayerSeat({
             <SeatStatusBadges markers={markers} seatId={player.id} size="sm" />
           )}
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-100">
+        <span className="inline-flex items-center gap-1 rounded-full bg-panel/80 px-2 py-0.5 text-[10px] text-foreground">
           <span aria-hidden>🂠</span>
           <span className="tabular-nums">{player.handCount}</span>
         </span>
         <span
           className={cn(
             'max-w-[80px] truncate text-[11px] font-medium',
-            seat.isMaster ? 'text-red-300' : 'text-foreground',
+            seat.isMaster ? 'text-destructive' : 'text-foreground',
           )}
         >
           {player.nickname}
           {player.isRevealed && !seat.isMaster && (
-            <span className="ml-1 text-[9px] text-yellow-400">已翻</span>
+            <span className="ml-1 text-[9px] text-acc-bright">已翻</span>
           )}
-          {!player.isAlive && <span className="ml-1 text-[9px] text-red-400">💀</span>}
+          {!player.isAlive && <span className="ml-1 text-[9px] text-destructive">💀</span>}
         </span>
       </div>
     </motion.div>

@@ -45,7 +45,7 @@ export function GraftResolverDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <GitBranch className="h-4 w-4 text-emerald-500" aria-hidden />
+            <GitBranch className="h-4 w-4 text-ok" aria-hidden />
             嫁接 · 选 2 张手牌放回牌库顶
           </span>
         </DialogTitle>
@@ -64,8 +64,8 @@ export function GraftResolverDialog({
                 className={cn(
                   'rounded-full border px-2.5 py-0.5 text-[11px]',
                   isPicked
-                    ? 'border-emerald-400 bg-emerald-500/30 text-emerald-400'
-                    : 'border-border bg-card hover:border-emerald-400/60',
+                    ? 'border-ok bg-ok/30 text-ok'
+                    : 'border-border bg-card hover:border-ok/60',
                 )}
                 data-testid={`graft-card-${idx}`}
               >
@@ -90,7 +90,7 @@ export function GraftResolverDialog({
           type="button"
           disabled={picked.length !== 2}
           onClick={onConfirm}
-          className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-medium text-black hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-ok px-3 py-1.5 text-xs font-medium text-background hover:bg-ok/90 disabled:cursor-not-allowed disabled:opacity-50"
           data-testid="graft-confirm"
         >
           确认放回

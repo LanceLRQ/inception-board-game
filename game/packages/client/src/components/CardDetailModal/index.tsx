@@ -59,7 +59,7 @@ function ModalContent({
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -80,7 +80,7 @@ function ModalContent({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-2 top-2 z-20 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
+          className="absolute right-2 top-2 z-20 rounded-full bg-background/80 p-1.5 text-foreground hover:bg-background/80"
           aria-label="关闭"
           data-testid="card-detail-close"
         >
@@ -103,7 +103,7 @@ function ModalContent({
         )}
 
         {/* 卡图（翻面动画） */}
-        <div className="flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 p-4">
+        <div className="flex items-center justify-center bg-gradient-to-br from-panel-2 to-background p-4">
           <AnimatePresence mode="wait">
             <motion.div
               key={showBack ? 'back' : 'front'}
@@ -124,7 +124,7 @@ function ModalContent({
                   }}
                 />
               ) : (
-                <div className="flex h-60 w-full items-center justify-center rounded-md bg-slate-700 text-slate-300">
+                <div className="flex h-60 w-full items-center justify-center rounded-md bg-panel-2 text-dim">
                   <span className="text-sm">{displayName || cardId}</span>
                 </div>
               )}

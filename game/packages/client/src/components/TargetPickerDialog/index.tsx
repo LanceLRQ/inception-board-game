@@ -118,8 +118,8 @@ export function TargetPickerDialog({
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <LayerBadge layer={c.currentLayer} size="sm" />
-                    {!c.isAlive && <span className="text-red-400">💀</span>}
-                    {c.isRevealed && <span className="text-yellow-400">已翻</span>}
+                    {!c.isAlive && <span className="text-destructive">💀</span>}
+                    {c.isRevealed && <span className="text-acc-bright">已翻</span>}
                   </div>
                 </button>
               );

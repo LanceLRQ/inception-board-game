@@ -21,8 +21,8 @@ export interface PeekerVaultRevealDialogProps {
 }
 
 function vaultIcon(contentType: string) {
-  if (contentType === 'secret') return <KeyRound className="h-4 w-4 text-red-500" />;
-  if (contentType === 'coin') return <Coins className="h-4 w-4 text-amber-500" />;
+  if (contentType === 'secret') return <KeyRound className="h-4 w-4 text-destructive" />;
+  if (contentType === 'coin') return <Coins className="h-4 w-4 text-acc-bright" />;
   if (contentType === 'empty') return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
   return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
 }
@@ -47,7 +47,7 @@ export function PeekerVaultRevealDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Eye className="h-4 w-4 text-emerald-500" aria-hidden />第 {layer ?? '?'} 层金库内容
+            <Eye className="h-4 w-4 text-ok" aria-hidden />第 {layer ?? '?'} 层金库内容
           </span>
         </DialogTitle>
         <DialogDescription>
@@ -78,7 +78,7 @@ export function PeekerVaultRevealDialog({
         <button
           type="button"
           onClick={() => void makeMove('peekerAcknowledge', [])}
-          className="rounded-md border border-emerald-500 bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+          className="rounded-md border border-ok bg-ok px-3 py-1.5 text-xs font-medium text-background hover:bg-ok/90"
           data-testid="peeker-vault-reveal-ack"
         >
           已确认

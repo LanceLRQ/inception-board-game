@@ -160,7 +160,7 @@ export default function Room() {
 
   if (!isInitialized || !isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg-primary text-text-secondary">
+      <div className="flex min-h-screen items-center justify-center bg-background text-dim">
         {t('common.loading')}
       </div>
     );
@@ -168,9 +168,9 @@ export default function Room() {
 
   if (!room) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-bg-primary p-6 text-white">
-        <div className="mb-4 text-text-secondary">{t('common.loading')}</div>
-        {error && <div className="text-red-400">{error}</div>}
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground">
+        <div className="mb-4 text-dim">{t('common.loading')}</div>
+        {error && <div className="text-destructive">{error}</div>}
       </div>
     );
   }
@@ -178,13 +178,13 @@ export default function Room() {
   const emptySeats = Math.max(0, room.maxPlayers - room.players.length);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col gap-4 bg-bg-primary p-6 text-white">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col gap-4 bg-background p-6 text-foreground">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">{t('room.title', { code: room.code })}</h1>
         <button
           type="button"
           onClick={handleLeave}
-          className="flex items-center gap-1 rounded-md border border-white/20 px-3 py-1.5 text-sm text-white hover:bg-white/10"
+          className="flex items-center gap-1 rounded-md border border-line-strong px-3 py-1.5 text-sm text-foreground hover:bg-foreground/10"
           data-testid="room-leave"
         >
           <LogOut size={14} />
@@ -195,15 +195,15 @@ export default function Room() {
       <button
         type="button"
         onClick={handleCopy}
-        className="flex items-center justify-center gap-2 rounded-md border border-white/20 bg-bg-secondary px-4 py-3 font-mono text-2xl uppercase tracking-widest hover:bg-white/10"
+        className="flex items-center justify-center gap-2 rounded-md border border-line-strong bg-panel px-4 py-3 font-mono text-2xl uppercase tracking-widest hover:bg-foreground/10"
         data-testid="room-copy"
       >
         {room.code}
         <Copy size={18} />
-        {copied && <span className="ml-2 text-sm text-green-400">{t('room.copied')}</span>}
+        {copied && <span className="ml-2 text-sm text-ok">{t('room.copied')}</span>}
       </button>
 
-      <div className="flex items-center gap-2 text-sm text-gray-300">
+      <div className="flex items-center gap-2 text-sm text-dim">
         <Users size={16} />
         <span data-testid="room-count">
           {t('room.currentPlayers', { current: room.players.length, max: room.maxPlayers })}
@@ -214,13 +214,15 @@ export default function Room() {
         {room.players.map((p) => (
           <li
             key={p.playerId}
-            className="flex items-center justify-between rounded-md border border-white/10 bg-bg-secondary px-3 py-2"
+            className="flex items-center justify-between rounded-md border border-line bg-panel px-3 py-2"
           >
             <div className="flex items-center gap-2">
               {p.isBot && <Bot size={14} className="text-primary" />}
               <span>{p.nickname}</span>
               {p.playerId === playerId && (
-                <span className="rounded bg-accent/30 px-1.5 py-0.5 text-xs">{t('room.you')}</span>
+                <span className="rounded bg-panel-2 px-1.5 py-0.5 text-xs text-foreground">
+                  {t('room.you')}
+                </span>
               )}
               {p.playerId === room.ownerPlayerId && (
                 <span className="rounded bg-primary/30 px-1.5 py-0.5 text-xs">
@@ -228,13 +230,13 @@ export default function Room() {
                 </span>
               )}
             </div>
-            <span className="text-xs text-gray-400">{t('room.seat', { n: p.seat + 1 })}</span>
+            <span className="text-xs text-dim">{t('room.seat', { n: p.seat + 1 })}</span>
           </li>
         ))}
         {Array.from({ length: emptySeats }).map((_, i) => (
           <li
             key={`empty-${i}`}
-            className="rounded-md border border-dashed border-white/10 px-3 py-2 text-center text-xs text-gray-500"
+            className="rounded-md border border-dashed border-line px-3 py-2 text-center text-xs text-faint"
           >
             {t('room.empty')}
           </li>
@@ -248,7 +250,7 @@ export default function Room() {
               type="button"
               onClick={handleFillAI}
               disabled={busy}
-              className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-2 font-bold text-white disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-2 font-bold text-foreground disabled:opacity-50"
               data-testid="room-fill-ai"
             >
               <Bot size={16} />
@@ -259,26 +261,26 @@ export default function Room() {
             type="button"
             onClick={handleStart}
             disabled={busy || !canStart}
-            className="flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-3 font-bold text-white disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 font-bold text-primary-foreground hover:bg-acc-bright disabled:opacity-50"
             data-testid="room-start"
           >
             <Play size={16} />
             {t('room.start')}
           </button>
           {!canStart && (
-            <p className="text-center text-xs text-gray-400">
+            <p className="text-center text-xs text-dim">
               {t('room.needPlayers', { n: MIN_PLAYERS })}
             </p>
           )}
         </div>
       ) : (
-        <div className="rounded-md border border-white/10 p-3 text-center text-sm text-gray-300">
+        <div className="rounded-md border border-line p-3 text-center text-sm text-dim">
           {t('room.notOwner')}
         </div>
       )}
 
       {error && (
-        <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-200" role="alert">
+        <div className="rounded-md bg-blood/20 p-3 text-sm text-destructive" role="alert">
           {error}
         </div>
       )}

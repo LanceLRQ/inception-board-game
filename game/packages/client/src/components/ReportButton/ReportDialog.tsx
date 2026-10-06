@@ -45,7 +45,7 @@ export function ReportDialog({ targetNickname, onSubmit, onCancel }: ReportDialo
       role="dialog"
       aria-modal="true"
       aria-label={t('report.dialog_title', { defaultValue: '举报玩家' })}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
     >
       <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-2xl">
         <h2 className="mb-2 text-lg font-bold text-foreground">
@@ -65,7 +65,7 @@ export function ReportDialog({ targetNickname, onSubmit, onCancel }: ReportDialo
               className={cn(
                 'flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors',
                 reason === r.id
-                  ? 'border-red-500 bg-red-500/10'
+                  ? 'border-blood bg-blood/10'
                   : 'hover:bg-accent hover:text-accent-foreground',
               )}
             >
@@ -75,7 +75,7 @@ export function ReportDialog({ targetNickname, onSubmit, onCancel }: ReportDialo
                 value={r.id}
                 checked={reason === r.id}
                 onChange={() => setReason(r.id)}
-                className="accent-red-500"
+                className="accent-blood"
               />
               <span>{t(r.labelKey, { defaultValue: r.defaultLabel })}</span>
             </label>
@@ -111,7 +111,7 @@ export function ReportDialog({ targetNickname, onSubmit, onCancel }: ReportDialo
             className={cn(
               'rounded-full px-4 py-2 text-sm transition-colors',
               reason && !submitting
-                ? 'bg-red-500 text-white hover:bg-red-500/90'
+                ? 'bg-blood text-foreground hover:bg-blood/90'
                 : 'bg-muted text-muted-foreground cursor-not-allowed',
             )}
           >

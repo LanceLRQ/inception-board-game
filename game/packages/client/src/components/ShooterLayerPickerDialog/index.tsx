@@ -36,7 +36,7 @@ export function ShooterLayerPickerDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Crosshair className="h-4 w-4 text-orange-500" aria-hidden />
+            <Crosshair className="h-4 w-4 text-acc-bright" aria-hidden />
             {cardName} 命中 —— 把 {targetName} 推去哪一相邻层？
           </span>
         </DialogTitle>
@@ -50,7 +50,7 @@ export function ShooterLayerPickerDialog({
               type="button"
               onClick={() => void makeMove('resolveShootMove', [l])}
               data-testid={`shooter-layer-pick-${l}`}
-              className="min-w-[72px] rounded-md border border-orange-500 bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+              className="min-w-[72px] rounded-md border border-acc bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-acc-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc"
             >
               L{l}
             </button>

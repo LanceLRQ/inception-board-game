@@ -38,7 +38,7 @@ export function MasterPeekBribeDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Coins className="h-4 w-4 text-amber-500" aria-hidden />
+            <Coins className="h-4 w-4 text-acc-bright" aria-hidden />
             {peekerName} 窥视第 {layer ?? '?'} 层 —— 是否派发 1 张贿赂牌？
           </span>
         </DialogTitle>
@@ -63,7 +63,7 @@ export function MasterPeekBribeDialog({
         <button
           type="button"
           onClick={() => void makeMove('masterPeekBribeDecision', [true])}
-          className="rounded-md border border-amber-500 bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600"
+          className="rounded-md border border-acc bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-acc-bright"
           data-testid="master-peek-bribe-deal"
         >
           派发贿赂

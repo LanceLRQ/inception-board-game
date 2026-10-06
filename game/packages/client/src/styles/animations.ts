@@ -38,16 +38,16 @@ export const cardFlip: Variants = {
 };
 
 /**
- * 当前行动玩家的脉冲光（金色）
+ * 当前行动玩家的脉冲光（强调色）
  * 用于 PlayerSeat / RailSlot / ActionDock 外框
  */
 export const activeTurnPulse: Variants = {
-  idle: { boxShadow: '0 0 0 0 rgba(250, 204, 21, 0)' },
+  idle: { boxShadow: '0 0 0 0 color-mix(in srgb, var(--ms-acc) 0%, transparent)' },
   active: {
     boxShadow: [
-      '0 0 0 0 rgba(250, 204, 21, 0)',
-      '0 0 0 6px rgba(250, 204, 21, 0.4)',
-      '0 0 0 0 rgba(250, 204, 21, 0)',
+      '0 0 0 0 color-mix(in srgb, var(--ms-acc) 0%, transparent)',
+      '0 0 0 6px color-mix(in srgb, var(--ms-acc) 40%, transparent)',
+      '0 0 0 0 color-mix(in srgb, var(--ms-acc) 0%, transparent)',
     ],
     transition: { duration: 1.8, repeat: Infinity, ease: 'easeInOut' },
   },

@@ -142,7 +142,7 @@ export default function Lobby() {
 
   if (!isInitialized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg-primary text-text-secondary">
+      <div className="flex min-h-screen items-center justify-center bg-background text-dim">
         {t('lobby.loading')}
       </div>
     );
@@ -160,15 +160,15 @@ export default function Lobby() {
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 bg-bg-primary p-6 text-white">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 bg-background p-6 text-foreground">
         <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
-        <label className="block text-sm text-gray-300" htmlFor="lobby-nickname">
+        <label className="block text-sm text-dim" htmlFor="lobby-nickname">
           {t('lobby.nicknameLabel')}
         </label>
         <input
           id="lobby-nickname"
           type="text"
-          className="rounded-md border border-white/20 bg-bg-secondary px-3 py-2 text-white"
+          className="rounded-md border border-line-strong bg-panel px-3 py-2 text-foreground"
           placeholder={t('lobby.nicknamePlaceholder')}
           value={inputNickname}
           onChange={(e) => setInputNickname(e.target.value)}
@@ -176,7 +176,7 @@ export default function Lobby() {
           autoFocus
         />
         {error && (
-          <div className="text-sm text-red-400" role="alert">
+          <div className="text-sm text-destructive" role="alert">
             {error}
           </div>
         )}
@@ -184,18 +184,18 @@ export default function Lobby() {
           type="button"
           onClick={handleInitIdentity}
           disabled={loading || inputNickname.trim().length < 2}
-          className="flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 font-bold text-white disabled:opacity-50"
+          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-acc-bright disabled:opacity-50"
         >
           {t('lobby.continue')}
           <ArrowRight size={16} />
         </button>
 
-        <div className="mt-4 border-t border-white/10 pt-4">
+        <div className="mt-4 border-t border-line pt-4">
           <button
             type="button"
             onClick={() => setRestoreOpen((v) => !v)}
             aria-expanded={restoreOpen}
-            className="flex items-center gap-2 text-sm text-gray-300 underline-offset-4 hover:underline"
+            className="flex items-center gap-2 text-sm text-dim underline-offset-4 hover:underline"
             data-testid="lobby-restore-toggle"
           >
             <KeyRound size={14} />
@@ -203,13 +203,13 @@ export default function Lobby() {
           </button>
           {restoreOpen && (
             <div className="mt-3 flex flex-col gap-2">
-              <label className="text-sm text-gray-300" htmlFor="lobby-restore-code">
+              <label className="text-sm text-dim" htmlFor="lobby-restore-code">
                 {t('recovery.restore.label')}
               </label>
               <input
                 id="lobby-restore-code"
                 type="text"
-                className="rounded-md border border-white/20 bg-bg-secondary px-3 py-2 font-mono text-lg uppercase tracking-widest text-white"
+                className="rounded-md border border-line-strong bg-panel px-3 py-2 font-mono text-lg uppercase tracking-widest text-foreground"
                 placeholder={t('recovery.restore.placeholder')}
                 value={restoreInput}
                 onChange={(e) => setRestoreInput(formatRecoveryCodeInput(e.target.value))}
@@ -219,10 +219,10 @@ export default function Lobby() {
                 spellCheck={false}
                 data-testid="lobby-restore-input"
               />
-              <p className="text-xs text-gray-400">{t('recovery.restore.hint')}</p>
+              <p className="text-xs text-dim">{t('recovery.restore.hint')}</p>
               {restoreError && (
                 <div
-                  className="text-sm text-red-400"
+                  className="text-sm text-destructive"
                   role="alert"
                   data-testid="lobby-restore-error"
                 >
@@ -233,7 +233,7 @@ export default function Lobby() {
                 type="button"
                 onClick={handleRestore}
                 disabled={loading || !isRecoveryCodeComplete(restoreInput)}
-                className="rounded-md border border-white/20 px-4 py-2 font-bold text-white disabled:opacity-50"
+                className="rounded-md border border-line-strong px-4 py-2 font-bold text-foreground disabled:opacity-50"
                 data-testid="lobby-restore-submit"
               >
                 {t('recovery.restore.submit')}
@@ -247,10 +247,10 @@ export default function Lobby() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col gap-6 bg-bg-primary p-6 text-white">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col gap-6 bg-background p-6 text-foreground">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
-        <span className="text-sm text-gray-400" data-testid="lobby-nickname">
+        <span className="text-sm text-dim" data-testid="lobby-nickname">
           {nickname}
         </span>
       </div>
@@ -259,7 +259,7 @@ export default function Lobby() {
         <button
           type="button"
           onClick={handleResume}
-          className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-3 font-bold text-white"
+          className="flex items-center justify-center gap-2 rounded-md border border-primary/50 bg-primary/20 px-4 py-3 font-bold text-foreground"
           data-testid="resume-online-match"
         >
           <RotateCcw size={16} />
@@ -267,17 +267,17 @@ export default function Lobby() {
         </button>
       )}
 
-      <section className="rounded-lg border border-white/10 bg-bg-secondary p-4">
+      <section className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
           <Plus size={18} />
           {t('lobby.createRoom')}
         </h2>
-        <label className="mb-2 block text-sm text-gray-300" htmlFor="lobby-maxPlayers">
+        <label className="mb-2 block text-sm text-dim" htmlFor="lobby-maxPlayers">
           {t('lobby.maxPlayers')}
         </label>
         <select
           id="lobby-maxPlayers"
-          className="mb-3 w-full rounded-md border border-white/20 bg-bg-primary px-3 py-2 text-white"
+          className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 text-foreground"
           value={maxPlayers}
           onChange={(e) => setMaxPlayers(Number(e.target.value))}
         >
@@ -291,25 +291,25 @@ export default function Lobby() {
           type="button"
           onClick={handleCreateRoom}
           disabled={loading}
-          className="w-full rounded-md bg-accent px-4 py-2 font-bold text-white disabled:opacity-50"
+          className="w-full rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-acc-bright disabled:opacity-50"
           data-testid="lobby-create"
         >
           {t('lobby.createRoom')}
         </button>
       </section>
 
-      <section className="rounded-lg border border-white/10 bg-bg-secondary p-4">
+      <section className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
           <DoorOpen size={18} />
           {t('lobby.joinRoom')}
         </h2>
-        <label className="mb-2 block text-sm text-gray-300" htmlFor="lobby-joinCode">
+        <label className="mb-2 block text-sm text-dim" htmlFor="lobby-joinCode">
           {t('lobby.codeHint')}
         </label>
         <input
           id="lobby-joinCode"
           type="text"
-          className="mb-3 w-full rounded-md border border-white/20 bg-bg-primary px-3 py-2 font-mono text-lg uppercase tracking-widest text-white"
+          className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 font-mono text-lg uppercase tracking-widest text-foreground"
           placeholder="ABC123"
           value={joinCode}
           onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
@@ -319,7 +319,7 @@ export default function Lobby() {
           type="button"
           onClick={handleJoinRoom}
           disabled={loading || joinCode.length !== 6}
-          className="w-full rounded-md border border-white/20 px-4 py-2 font-bold text-white disabled:opacity-50"
+          className="w-full rounded-md border border-line-strong px-4 py-2 font-bold text-foreground disabled:opacity-50"
           data-testid="lobby-join"
         >
           {t('lobby.joinRoom')}
@@ -327,7 +327,7 @@ export default function Lobby() {
       </section>
 
       {error && (
-        <div className="rounded-md bg-red-500/20 p-3 text-sm text-red-200" role="alert">
+        <div className="rounded-md bg-blood/20 p-3 text-sm text-destructive" role="alert">
           {error}
         </div>
       )}

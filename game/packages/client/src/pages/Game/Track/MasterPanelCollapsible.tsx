@@ -29,15 +29,15 @@ export function MasterPanelCollapsible({
         type="button"
         onClick={() => setExpanded(true)}
         className={cn(
-          'flex h-14 w-full items-center justify-between gap-2 border-b border-red-500/30',
-          'bg-gradient-to-r from-red-950/40 to-slate-950/60 px-3 text-xs text-red-200',
+          'flex h-14 w-full items-center justify-between gap-2 border-b border-blood/30',
+          'bg-gradient-to-r from-blood/20 to-background/60 px-3 text-xs text-destructive',
           className,
         )}
         data-testid="master-panel-collapsed"
         aria-label="展开梦主专区"
       >
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] text-red-300">
+          <span className="rounded-full bg-blood/20 px-2 py-0.5 text-[10px] text-destructive">
             梦主
           </span>
           <span>世界观：待加载</span>
@@ -49,7 +49,7 @@ export function MasterPanelCollapsible({
       <AnimatePresence>
         {expanded && (
           <motion.div
-            className="fixed inset-0 z-40 bg-black/70 p-3"
+            className="fixed inset-0 z-40 bg-background/80 p-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -70,7 +70,7 @@ export function MasterPanelCollapsible({
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="absolute right-2 top-2 z-10 rounded-full bg-black/60 p-1.5 text-white"
+                className="absolute right-2 top-2 z-10 rounded-full bg-background/80 p-1.5 text-foreground"
                 aria-label="收起"
               >
                 <X className="h-4 w-4" />

@@ -47,7 +47,7 @@ export function GravityPoolPickerDialog({
       <DialogHeader>
         <DialogTitle>
           <span className="inline-flex items-center gap-2">
-            <Orbit className="h-4 w-4 text-violet-500" aria-hidden />
+            <Orbit className="h-4 w-4 text-acc-bright" aria-hidden />
             万有引力 · 轮流挑选 · {pickerLabel}
           </span>
         </DialogTitle>
@@ -60,7 +60,7 @@ export function GravityPoolPickerDialog({
               key={`grav-pool-${idx}-${c}`}
               type="button"
               onClick={() => onPick(c)}
-              className="rounded-full border border-violet-400/60 bg-card px-2.5 py-0.5 text-[11px] hover:bg-violet-500/10"
+              className="rounded-full border border-acc/60 bg-card px-2.5 py-0.5 text-[11px] hover:bg-acc-soft"
               data-testid={`grav-pool-${idx}`}
             >
               {cardNameOf?.(c) ?? c}

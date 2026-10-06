@@ -103,7 +103,7 @@ export function TurnOrderRail({ state, onOpenDetail, seatMarkers, className }: T
               className={cn(
                 'max-w-[56px] truncate text-[9px]',
                 slot.isMaster
-                  ? 'text-red-300'
+                  ? 'text-destructive'
                   : slot.isViewer
                     ? 'text-primary font-semibold'
                     : 'text-foreground',

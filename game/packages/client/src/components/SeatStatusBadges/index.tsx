@@ -27,8 +27,8 @@ export const MARKER_ICON: Record<SeatMarker, LucideIcon> = {
 export const MARKER_COLOR_CLASS: Record<SeatMarker, string> = {
   bot: 'text-muted-foreground',
   offline: 'text-destructive',
-  taken_over: 'text-amber-500',
-  idle_takeover: 'text-amber-500',
+  taken_over: 'text-acc-bright',
+  idle_takeover: 'text-acc-bright',
 };
 
 const SIZE_CLASS = {

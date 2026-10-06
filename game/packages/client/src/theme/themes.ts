@@ -1,4 +1,4 @@
-// 主题表：主题 id、明暗属性与 17 个语义令牌的取值
+// 主题表：主题 id、明暗属性与 18 个语义令牌的取值
 //
 // 样式表（src/styles/index.css）里的 `[data-theme='<id>']` 规则块与这里逐字一致，
 // 由 themeCss.test.ts 保证；首屏脚本（bootScript.ts）也由这张表生成。
@@ -18,6 +18,7 @@ export const TOKEN_NAMES = [
   'accsoft',
   'lock',
   'blood',
+  'ok',
   'grade',
   'serif',
   'sans',
@@ -63,6 +64,7 @@ export const THEMES = {
       accsoft: 'rgba(201,163,95,.13)',
       lock: '#6FA8DC',
       blood: '#A8443A',
+      ok: '#7FA97F',
       grade: '#C9A35F',
       serif: "'Noto Serif SC','Songti SC','STSong',serif",
       sans: "'Noto Sans SC','PingFang SC',sans-serif",
