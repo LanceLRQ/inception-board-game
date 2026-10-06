@@ -81,6 +81,8 @@ export interface JsonBody {
   nextCursor: string | null;
   hasMore: boolean;
   viewerID: string | null;
+  complete: boolean;
+  gaps: Array<{ from: number; to: number }>;
   steps: unknown[];
   matchID: string;
   winner: string | null;

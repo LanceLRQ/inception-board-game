@@ -62,7 +62,11 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
       throw new AppError('VALIDATION_ERROR', 'invalid cursor');
     }
 
-    const { viewer, steps } = await loadFinishedMatch(archive, id!, ctx.state.player.playerId);
+    const { viewer, steps, complete, gaps } = await loadFinishedMatch(
+      archive,
+      id!,
+      ctx.state.player.playerId,
+    );
     const rest = after === undefined ? steps : steps.filter((s) => s.stateID > after);
     const page = rest.slice(0, limit);
     const hasMore = rest.length > limit;
@@ -72,6 +76,8 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
       data: page.map((s) => toStepView(s, viewer)),
       nextCursor: hasMore && last ? encodeCursor({ stateID: last.stateID }) : null,
       hasMore,
+      complete,
+      gaps,
     };
   });
 

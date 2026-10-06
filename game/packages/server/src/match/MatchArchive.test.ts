@@ -101,6 +101,7 @@ function makeStub() {
     matchEvent: {
       create: vi.fn(async (_arg: unknown) => ({})),
       findMany: vi.fn(async (_arg: unknown) => [] as unknown[]),
+      findFirst: vi.fn(async (_arg: unknown) => null as { moveCounter: number } | null),
     },
   };
   return stub;
@@ -314,5 +315,66 @@ describe('PrismaMatchArchive', () => {
         { seat: '1', playerId: null },
       ],
     });
+  });
+
+  it('recordGap：缺口写成 gap 行，moveCounter 取结束版本号；唯一键冲突视为已记录', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    await archive.recordGap('m1', 6, 8);
+    expect(stub.matchEvent.create).toHaveBeenCalledWith({
+      data: { matchId: 'm1', moveCounter: 8, eventKind: 'gap', payload: { from: 6, to: 8 } },
+    });
+    stub.matchEvent.create.mockRejectedValueOnce(
+      Object.assign(new Error('dup'), { code: 'P2002' }),
+    );
+    await expect(archive.recordGap('m1', 6, 8)).resolves.toBeUndefined();
+    stub.matchEvent.create.mockRejectedValueOnce(new Error('connection lost'));
+    await expect(archive.recordGap('m1', 6, 8)).rejects.toThrow('connection lost');
+  });
+
+  it('listGaps：只读 gap 行，按结束版本号升序，跳过格式不对的 payload', async () => {
+    const stub = makeStub();
+    stub.matchEvent.findMany.mockResolvedValueOnce([
+      { matchId: 'm1', moveCounter: 3, eventKind: 'gap', payload: { from: 2, to: 3 } },
+      { matchId: 'm1', moveCounter: 9, eventKind: 'gap', payload: 'bad' },
+      { matchId: 'm1', moveCounter: 12, eventKind: 'gap', payload: { from: 10, to: 12 } },
+    ]);
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    expect(await archive.listGaps('m1')).toEqual([
+      { from: 2, to: 3 },
+      { from: 10, to: 12 },
+    ]);
+    expect(stub.matchEvent.findMany).toHaveBeenCalledWith({
+      where: { matchId: 'm1', eventKind: 'gap' },
+      orderBy: { moveCounter: 'asc' },
+    });
+  });
+
+  it('lastStepID：取步骤行里最大的 moveCounter，没有步返回 0', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    expect(await archive.lastStepID('m1')).toBe(0);
+    expect(stub.matchEvent.findFirst).toHaveBeenCalledWith({
+      where: { matchId: 'm1', eventKind: 'step' },
+      orderBy: { moveCounter: 'desc' },
+      select: { moveCounter: true },
+    });
+    stub.matchEvent.findFirst.mockResolvedValueOnce({ moveCounter: 17 });
+    expect(await archive.lastStepID('m1')).toBe(17);
+  });
+});
+
+describe('InMemoryMatchArchive 缺口', () => {
+  it('recordGap 同一结束版本号只记一次；lastStepID 取最大步号，没有为 0', async () => {
+    const archive = new InMemoryMatchArchive();
+    expect(await archive.lastStepID('m1')).toBe(0);
+    await archive.recordGap('m1', 4, 6);
+    await archive.recordGap('m1', 4, 6);
+    await archive.recordGap('m1', 9, 9);
+    expect(await archive.listGaps('m1')).toEqual([
+      { from: 4, to: 6 },
+      { from: 9, to: 9 },
+    ]);
+    expect(await archive.listGaps('other')).toEqual([]);
   });
 });

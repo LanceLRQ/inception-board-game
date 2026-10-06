@@ -51,6 +51,56 @@ describe('buildRealtime', () => {
     await expect(fetch(`http://127.0.0.1:${port}/health`)).rejects.toThrow();
   });
 
+  it('stop 会等归档队列写完再返回：停机时落库的步数与快照版本一致', async () => {
+    class SlowArchive extends InMemoryMatchArchive {
+      override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        await super.appendStep(row);
+      }
+    }
+    const archive = new SlowArchive();
+    const store = new InMemoryMatchStore();
+    const rt = buildRealtime({
+      store,
+      archive,
+      lobbyRedis: { get: vi.fn(), setex: vi.fn(), set: vi.fn(), del: vi.fn(), exists: vi.fn() },
+      heartbeatRedis: { get: vi.fn(), setex: vi.fn(), del: vi.fn() } as never,
+      bot: new BotManager({ tickIntervalMs: 99_999 }),
+      timing: { botStepDelayMs: 1, pendingTimeoutMs: 5_000, turnTimeoutMs: 20_000 },
+      httpRateLimit: passThrough,
+    });
+    const room = {
+      id: 'room-flush',
+      code: 'ABCDEF',
+      ownerPlayerId: 'bot-0',
+      maxPlayers: 10,
+      ruleVariant: 'classic' as const,
+      exCardsEnabled: false,
+      expansionEnabled: false,
+      status: 'waiting' as const,
+      players: Array.from({ length: 4 }, (_, i) => ({
+        playerId: `bot-${i}`,
+        nickname: `AI${i}`,
+        avatarSeed: 's',
+        seat: i,
+        isBot: true,
+        joinedAt: 0,
+      })),
+      createdAt: 0,
+      expiresAt: 0,
+    };
+    await rt.matches.createFromRoom(room);
+    // 全 Bot 对局自己往前走；等到至少有几步在队列里
+    for (let i = 0; i < 100 && (rt.matches.get('room-flush')?.current().stateID ?? 0) < 4; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    await rt.stop();
+    const version = (await store.load('room-flush'))!.state.stateID;
+    expect(version).toBeGreaterThanOrEqual(4);
+    const rows = await archive.listSteps('room-flush');
+    expect(rows.map((r) => r.stateID)).toEqual(Array.from({ length: version }, (_, i) => i + 1));
+  });
+
   it('exposes a matches service bound to the gateway', () => {
     const rt = buildRealtime({
       store: new InMemoryMatchStore(),

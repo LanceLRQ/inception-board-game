@@ -19,6 +19,7 @@ import type { RoomState } from '../services/LobbyService.js';
 import type { MatchArchive } from './MatchArchive.js';
 import { MatchRoom, type RoomDeps, type RoomSeat, type StepOutput } from './MatchRoom.js';
 import type { MatchSnapshot, MatchStore } from './MatchStore.js';
+import { StepArchiver } from './StepArchiver.js';
 import { buildSeats, buildSetup } from './seats.js';
 import type { TimingConfig } from './scheduling.js';
 
@@ -56,8 +57,10 @@ export class MatchService {
   private readonly creating = new Set<string>();
   private readonly lingerTimers = new Set<unknown>();
   private readonly unsubscribe: Array<() => void> = [];
+  private readonly archiver: StepArchiver;
 
   constructor(private readonly deps: MatchServiceDeps) {
+    this.archiver = new StepArchiver(deps.archive, deps.timers);
     this.unsubscribe.push(
       deps.bot.onTakeover((matchID) => this.seatsChanged(matchID)),
       deps.bot.onAbandon((matchID) => this.seatsChanged(matchID)),
@@ -136,6 +139,7 @@ export class MatchService {
   private async teardown(matchID: string): Promise<void> {
     const room = this.rooms.get(matchID);
     this.rooms.delete(matchID);
+    this.archiver.discard(matchID);
     if (room) this.safely(matchID, 'room close', () => room.close());
     this.safely(matchID, 'bot dispose', () => this.deps.bot.disposeMatch(matchID));
     try {
@@ -196,6 +200,7 @@ export class MatchService {
       throw new Error('快照里没有座位表');
     }
     const state = matchFromSnapshot<SetupState>(snapshot.state, game);
+    if (!inPlace) await this.checkArchiveTail(matchID, state.stateID);
 
     if (state.ctx.gameover !== undefined) {
       logger.info({ matchID, stateID: state.stateID }, 'restored match already over');
@@ -210,6 +215,30 @@ export class MatchService {
       'match restored',
     );
     return 'mounted';
+  }
+
+  /**
+   * 进程启动恢复时核对归档：归档的最大步号落后于快照版本，说明上次退出时有几步还没写进归档，
+   * 它们已经无法补回，记一条缺口让回放接口如实告知。
+   * 原地重新加载时进程一直在运行，队列还在补写，不做这个判断。
+   */
+  private async checkArchiveTail(matchID: string, stateID: number): Promise<void> {
+    try {
+      const last = await this.deps.archive.lastStepID(matchID);
+      if (last < stateID) {
+        logger.error({ matchID, lastArchived: last, stateID }, 'archive is behind snapshot');
+        this.archiver.enqueueGap(matchID, last + 1, stateID);
+      }
+    } catch (err) {
+      logger.error({ matchID, err }, 'archive tail check failed');
+    }
+  }
+
+  /** 进程关停时调用：等归档队列写完（最多 timeoutMs），然后停掉重试；返回没写完的条数 */
+  async flushArchive(timeoutMs: number): Promise<number> {
+    const remaining = await this.archiver.flush(timeoutMs);
+    this.archiver.stop();
+    return remaining;
   }
 
   /**
@@ -261,20 +290,14 @@ export class MatchService {
       persist: (next, expectedStateID) =>
         deps.store.save(matchID, next, expectedStateID, deps.timers.now()),
       onStep: async (output) => {
-        try {
-          await deps.archive.appendStep({
-            matchID,
-            stateID: output.state.stateID,
-            request: output.request,
-            events: output.events,
-            at: new Date(deps.timers.now()),
-          });
-        } catch (err) {
-          logger.error(
-            { matchID, stateID: output.state.stateID, err },
-            'archive appendStep failed',
-          );
-        }
+        // 入队立即返回：归档在后台按序写、失败重试，不拖慢对局
+        this.archiver.enqueue({
+          matchID,
+          stateID: output.state.stateID,
+          request: output.request,
+          events: output.events,
+          at: new Date(deps.timers.now()),
+        });
         await deps.onStep(matchID, output);
       },
       onGameOver: (final): Promise<void> => this.finishMatch(matchID, final, seats, room),
@@ -309,6 +332,8 @@ export class MatchService {
   ): Promise<void> {
     const { deps } = this;
     let archived = true;
+    // 先等这一局的步骤全部落库，再写结束信息，避免出现「已结束但缺步」的归档
+    await this.archiver.drain(matchID);
     try {
       await deps.archive.recordFinish(matchID, final, seats);
     } catch (err) {

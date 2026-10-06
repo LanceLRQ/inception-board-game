@@ -48,6 +48,8 @@ export interface RealtimeDeps {
   timing?: TimingConfig;
   /** 默认真实的 setTimeout / clearTimeout / Date.now */
   timers?: RoomDeps['timers'];
+  /** 关停时等归档队列写完的最长时间；默认 5 秒 */
+  archiveFlushTimeoutMs?: number;
   /** 默认 new BotManager() */
   bot?: BotManager;
   ws?: { corsOrigin?: string | string[]; path?: string };
@@ -69,6 +71,8 @@ export interface Realtime {
   /** 停 Bot 定时器、关房间、断开网关、关 HTTP */
   stop(): Promise<void>;
 }
+
+const DEFAULT_ARCHIVE_FLUSH_TIMEOUT_MS = 5_000;
 
 const realTimers: RoomDeps['timers'] = {
   setTimeout: (cb, ms) => setTimeout(cb, ms),
@@ -156,6 +160,11 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
           httpServer.closeAllConnections();
         });
       }
+      // 房间都关了之后不会再有新的步；趁数据库连接还在，把队列里没写完的写掉
+      const unwritten = await matches.flushArchive(
+        deps.archiveFlushTimeoutMs ?? DEFAULT_ARCHIVE_FLUSH_TIMEOUT_MS,
+      );
+      if (unwritten > 0) logger.warn({ unwritten }, 'archive queue not fully written at shutdown');
     },
   };
 }

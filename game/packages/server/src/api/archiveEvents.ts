@@ -6,7 +6,7 @@
 import { eventsFor, type MatchEvent } from '@icgame/game-engine/runner';
 import { AppError } from '../infra/errors.js';
 import { extractBearerToken, verifyToken } from '../infra/jwt.js';
-import type { MatchArchive, StepRow } from '../match/MatchArchive.js';
+import type { MatchArchive, StepGap, StepRow } from '../match/MatchArchive.js';
 
 /** 返回给客户端的一步 */
 export interface StepView {
@@ -31,11 +31,24 @@ export function toStepView(row: StepRow, viewer: string | null): StepView {
   return { stateID: row.stateID, at: row.at, events: eventsFor(row.events, viewer) };
 }
 
+/**
+ * 记录是否完整：步号从 1 起连续、没有缺口记录。
+ * 没有任何步的已结束对局也不算完整（一局至少有一步，没有说明全丢了）。
+ */
+export function isComplete(steps: readonly StepRow[], gaps: readonly StepGap[]): boolean {
+  if (gaps.length > 0 || steps.length === 0) return false;
+  return steps.every((s, i) => s.stateID === i + 1);
+}
+
 export interface FinishedMatchSteps {
   /** 观察者的座位号；不是这局的真人座位成员则为 null（旁观者） */
   viewer: string | null;
   /** 全部步骤，未裁剪；调用方必须用 toStepView 输出 */
   steps: StepRow[];
+  /** 记录是否完整；为 false 时回放可能缺步 */
+  complete: boolean;
+  /** 已知缺失的步号区间（起止都包含） */
+  gaps: StepGap[];
 }
 
 /**
@@ -53,5 +66,6 @@ export async function loadFinishedMatch(
   const seat =
     accountId === null ? undefined : info.seats.find((s) => s.playerId === accountId)?.seat;
   const steps = await archive.listSteps(matchID);
-  return { viewer: seat ?? null, steps };
+  const gaps = await archive.listGaps(matchID);
+  return { viewer: seat ?? null, steps, complete: isComplete(steps, gaps), gaps };
 }

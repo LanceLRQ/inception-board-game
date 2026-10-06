@@ -1,6 +1,7 @@
 // 对局事件接口单测：登录后按座位裁剪，对局未结束不提供
 
 import { afterEach, describe, it, expect, vi } from 'vitest';
+import { InMemoryMatchArchive } from '../match/MatchArchive.js';
 import { createMatchesRouter } from './matches.js';
 import {
   ACCOUNT_OUTSIDER,
@@ -26,10 +27,10 @@ afterEach(async () => {
   server = null;
 });
 
-async function setup(): Promise<TestServer> {
+async function setup(archive?: InMemoryMatchArchive): Promise<TestServer> {
   server = await serveRouter(
     createMatchesRouter({
-      archive: await seedArchive(),
+      archive: archive ?? (await seedArchive()),
       loadMatch: async (id) => fixtureMatchMeta(id),
     }),
   );
@@ -118,5 +119,23 @@ describe('GET /matches/:id', () => {
       won: true,
       abandoned: false,
     });
+  });
+});
+
+describe('GET /matches/:id/events 记录完整性', () => {
+  it('完整时 complete=true；有缺口记录时 complete=false 并给出区间', async () => {
+    const token = tokenFor(ACCOUNT_SEAT1);
+    const s = await setup();
+    const ok = await s.get(`/matches/${FINISHED_ID}/events`, token);
+    expect(ok.json.complete).toBe(true);
+    expect(ok.json.gaps).toEqual([]);
+    await server?.close();
+
+    const archive = await seedArchive();
+    await archive.recordGap(FINISHED_ID, 6, 7);
+    const s2 = await setup(archive);
+    const gap = await s2.get(`/matches/${FINISHED_ID}/events`, token);
+    expect(gap.json.complete).toBe(false);
+    expect(gap.json.gaps).toEqual([{ from: 6, to: 7 }]);
   });
 });

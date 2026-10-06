@@ -319,26 +319,58 @@ describe('MatchService.seatOf', () => {
 });
 
 describe('MatchService 对局过程', () => {
-  it('每一步先写归档再调 onStep；归档失败只记 ERROR', async () => {
-    const h = makeHarness();
+  it('归档写入很慢时 onStep 照常下发，不被数据库挡住；写完后落库顺序正确', async () => {
+    const release: Array<() => void> = [];
+    const written: number[] = [];
+    class SlowArchive extends InMemoryMatchArchive {
+      override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {
+        await new Promise<void>((resolve) => release.push(resolve));
+        await super.appendStep(row);
+        written.push(row.stateID);
+      }
+    }
+    const archive = new SlowArchive();
+    const h = makeHarness({}, { archive });
     const id = await h.svc.createFromRoom(makeRoom(4));
-    const order: string[] = [];
-    const append = vi.spyOn(h.archive, 'appendStep').mockImplementation(async (row) => {
-      order.push(`archive:${row.stateID}`);
-    });
-    h.onStep.mockImplementation((_id, out) => {
-      order.push(`step:${out.state.stateID}`);
-    });
     await fireSteps(h, id, 3);
-    expect(order.slice(0, 4)).toEqual(['archive:1', 'step:1', 'archive:2', 'step:2']);
+    // 第一步的归档还卡着，后面的步骤仍在继续下发
+    expect(h.onStep.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(h.onStep.mock.calls[0]![0]).toBe(id);
+    expect(written).toEqual([]);
+    expect(release).toHaveLength(1);
 
-    append.mockRejectedValue(new Error('pg down'));
-    h.onStep.mockClear();
-    log.error.mockClear();
-    await fireSteps(h, id, 2);
-    expect(h.onStep.mock.calls.length).toBeGreaterThan(0);
+    while (written.length < 3) {
+      release.shift()?.();
+      await pump();
+    }
+    expect(written).toEqual([1, 2, 3]);
+  });
+
+  it('归档写入失败：退避重试后补写，不缺步，不阻塞 onStep', async () => {
+    const h = makeHarness();
+    let failures = 2;
+    const original = h.archive.appendStep.bind(h.archive);
+    vi.spyOn(h.archive, 'appendStep').mockImplementation(async (row) => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new Error('pg down');
+      }
+      await original(row);
+    });
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await fireSteps(h, id, 3);
+    expect(h.onStep.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(log.error).toHaveBeenCalled();
+    // 重试计时器与对局自己的排程共用假时钟，推到归档补齐为止
+    for (let i = 0; i < 200; i++) {
+      await pump();
+      const rows = await h.archive.listSteps(id);
+      if (rows.length >= h.onStep.mock.calls.length) break;
+      h.timers.fireNext();
+    }
+    const rows = await h.archive.listSteps(id);
+    expect(rows.map((r) => r.stateID)).toEqual(rows.map((_, i) => i + 1));
+    expect(rows.length).toBeGreaterThanOrEqual(3);
   });
 
   it('归档行带请求与完整事件，快照版本随之前进', async () => {
@@ -739,5 +771,88 @@ describe('种子保密', () => {
     // 种子只在存储快照里
     expect((await h.store.load(id))!.setup.seed).toBe(SEED);
     expect(h.archive.started.get(id)!.setup.seed).toBe(SEED);
+  });
+});
+
+describe('MatchService 归档完整性', () => {
+  it('对局结束时 recordFinish 在本局步骤全部落库之后才调用', async () => {
+    const events: string[] = [];
+    class OrderedArchive extends InMemoryMatchArchive {
+      override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {
+        // 让写入慢一拍，才能看出 recordFinish 是不是在等
+        await pump();
+        await super.appendStep(row);
+        events.push(`step:${row.stateID}`);
+      }
+      override async recordFinish(...args: Parameters<InMemoryMatchArchive['recordFinish']>) {
+        events.push('finish');
+        await super.recordFinish(...args);
+      }
+    }
+    const archive = new OrderedArchive();
+    const h = makeHarness({}, { archive });
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await drain(h, id, () => h.onGameOver.mock.calls.length > 0);
+    const finishAt = events.indexOf('finish');
+    expect(finishAt).toBeGreaterThan(0);
+    expect(events.slice(finishAt + 1)).toEqual([]);
+    const last = (await archive.listSteps(id)).length;
+    expect(events.filter((e) => e.startsWith('step:'))).toHaveLength(last);
+    expect(last).toBe(h.svc.get(id)!.current().stateID);
+  });
+
+  it('进程启动恢复时归档落后于快照：写入一条缺口，补上缺失的区间', async () => {
+    const first = makeHarness();
+    const id = await first.svc.createFromRoom(makeRoom(4));
+    // 打几步之后，只留前 1 步在归档里，其余算作退出时丢失
+    await fireSteps(first, id, 3);
+    first.svc.shutdown();
+    const snapshotVersion = (await first.store.load(id))!.state.stateID;
+
+    const lost = new InMemoryMatchArchive();
+    const kept = (await first.archive.listSteps(id)).slice(0, 1);
+    await lost.recordStart(makeTestSnapshot(id));
+    for (const row of kept) await lost.appendStep(row);
+    const second = makeHarness({}, { store: first.store, archive: lost });
+    await second.svc.restoreAll();
+    await second.svc.get(id)?.idle();
+    await pump();
+
+    expect(snapshotVersion).toBeGreaterThan(1);
+    expect(await lost.listGaps(id)).toEqual([{ from: 2, to: snapshotVersion }]);
+  });
+
+  it('归档与快照一致时恢复不写缺口', async () => {
+    const first = makeHarness();
+    const id = await first.svc.createFromRoom(makeRoom(4, [0]));
+    await fireSteps(first, id, 2);
+    await pump();
+    first.svc.shutdown();
+    const second = makeHarness({}, { store: first.store, archive: first.archive });
+    await second.svc.restoreAll();
+    await pump();
+    expect(await first.archive.listGaps(id)).toEqual([]);
+  });
+
+  it('flushArchive 等队列写完并返回未写完条数', async () => {
+    let failures = 1;
+    class FlakyArchive extends InMemoryMatchArchive {
+      override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {
+        if (failures > 0) {
+          failures -= 1;
+          throw new Error('pg down');
+        }
+        await super.appendStep(row);
+      }
+    }
+    const archive = new FlakyArchive();
+    const h = makeHarness({}, { archive });
+    const id = await h.svc.createFromRoom(makeRoom(4));
+    await fireSteps(h, id, 2);
+    h.svc.shutdown();
+    expect(await h.svc.flushArchive(5_000)).toBe(0);
+    const rows = await archive.listSteps(id);
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(rows.map((r) => r.stateID)).toEqual(rows.map((_, i) => i + 1));
   });
 });

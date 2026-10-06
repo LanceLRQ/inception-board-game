@@ -26,6 +26,12 @@ export interface MatchInfo {
   seats: Array<{ seat: string; playerId: string | null }>;
 }
 
+/** 归档里缺失的一段步骤（起止版本号都包含在内） */
+export interface StepGap {
+  from: number;
+  to: number;
+}
+
 export interface MatchArchive {
   /** 建局时：写对局元信息与各座位 */
   recordStart(snapshot: MatchSnapshot): Promise<void>;
@@ -36,6 +42,11 @@ export interface MatchArchive {
     seats: readonly RoomSeat[],
   ): Promise<void>;
   listSteps(matchID: string): Promise<StepRow[]>;
+  /** 记一段缺失的步骤；同一个 to 已记过视为已记录 */
+  recordGap(matchID: string, fromStateID: number, toStateID: number): Promise<void>;
+  listGaps(matchID: string): Promise<StepGap[]>;
+  /** 已归档的最大步号；没有步返回 0 */
+  lastStepID(matchID: string): Promise<number>;
   /** 对局不存在返回 null */
   matchInfo(matchID: string): Promise<MatchInfo | null>;
 }
@@ -45,6 +56,8 @@ export class InMemoryMatchArchive implements MatchArchive {
   readonly finished = new Map<string, MatchState<SetupState>>();
   private readonly steps = new Map<string, Map<number, StepRow>>();
   private readonly endedAt = new Map<string, Date>();
+  /** 缺口按 to 去重，与数据库实现的唯一约束一致 */
+  private readonly gaps = new Map<string, Map<number, StepGap>>();
 
   async recordStart(snapshot: MatchSnapshot): Promise<void> {
     this.started.set(snapshot.matchID, structuredClone(snapshot));
@@ -78,13 +91,31 @@ export class InMemoryMatchArchive implements MatchArchive {
     const rows = [...(this.steps.get(matchID)?.values() ?? [])];
     return structuredClone(rows.sort((a, b) => a.stateID - b.stateID));
   }
+
+  async recordGap(matchID: string, fromStateID: number, toStateID: number): Promise<void> {
+    const gaps = this.gaps.get(matchID) ?? new Map<number, StepGap>();
+    this.gaps.set(matchID, gaps);
+    if (!gaps.has(toStateID)) gaps.set(toStateID, { from: fromStateID, to: toStateID });
+  }
+
+  async listGaps(matchID: string): Promise<StepGap[]> {
+    return [...(this.gaps.get(matchID)?.values() ?? [])]
+      .map((g) => ({ ...g }))
+      .sort((a, b) => a.from - b.from);
+  }
+
+  async lastStepID(matchID: string): Promise<number> {
+    let max = 0;
+    for (const id of this.steps.get(matchID)?.keys() ?? []) max = Math.max(max, id);
+    return max;
+  }
 }
 
 /** PrismaMatchArchive 实际用到的最小接口，便于测试打桩 */
 export interface PrismaArchiveClient {
   match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique'>;
   matchPlayer: Pick<PrismaClient['matchPlayer'], 'createMany' | 'update' | 'findMany'>;
-  matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany'>;
+  matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany' | 'findFirst'>;
 }
 
 const PRISMA_UNIQUE_VIOLATION = 'P2002';
@@ -101,6 +132,12 @@ function isUniqueViolation(err: unknown): boolean {
 /** 种子只存摘要（64 位十六进制），原文不入库 */
 function seedDigest(seed: string): string {
   return createHash('sha256').update(seed).digest('hex');
+}
+
+function isGapPayload(p: unknown): p is StepGap {
+  if (typeof p !== 'object' || p === null) return false;
+  const o = p as { from?: unknown; to?: unknown };
+  return typeof o.from === 'number' && typeof o.to === 'number';
 }
 
 function isStepPayload(p: unknown): p is { request: MoveRequest; events: MatchEvent[] } {
@@ -216,6 +253,48 @@ export class PrismaMatchArchive implements MatchArchive {
       });
     }
     return out;
+  }
+
+  /**
+   * 缺口行与步骤行共用 match_events：event_kind = 'gap'，move_counter 取缺口的结束版本号。
+   * 缺口的结束步从未落库（被丢弃或在退出时丢失），所以不会与步骤行撞唯一约束；
+   * 同一个结束版本号重复记录撞上唯一约束，视为已记录。
+   */
+  async recordGap(matchID: string, fromStateID: number, toStateID: number): Promise<void> {
+    try {
+      await this.prisma.matchEvent.create({
+        data: {
+          matchId: matchID,
+          moveCounter: toStateID,
+          eventKind: 'gap',
+          payload: { from: fromStateID, to: toStateID },
+        },
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) return;
+      throw err;
+    }
+  }
+
+  async listGaps(matchID: string): Promise<StepGap[]> {
+    const rows = await this.prisma.matchEvent.findMany({
+      where: { matchId: matchID, eventKind: 'gap' },
+      orderBy: { moveCounter: 'asc' },
+    });
+    const out: StepGap[] = [];
+    for (const r of rows) {
+      if (isGapPayload(r.payload)) out.push({ from: r.payload.from, to: r.payload.to });
+    }
+    return out;
+  }
+
+  async lastStepID(matchID: string): Promise<number> {
+    const row = await this.prisma.matchEvent.findFirst({
+      where: { matchId: matchID, eventKind: 'step' },
+      orderBy: { moveCounter: 'desc' },
+      select: { moveCounter: true },
+    });
+    return row?.moveCounter ?? 0;
   }
 
   async matchInfo(matchID: string): Promise<MatchInfo | null> {

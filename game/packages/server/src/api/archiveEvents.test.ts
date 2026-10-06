@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { signToken } from '../infra/jwt.js';
 import { AppError } from '../infra/errors.js';
-import { loadFinishedMatch, optionalAccountId, toStepView } from './archiveEvents.js';
+import { isComplete, loadFinishedMatch, optionalAccountId, toStepView } from './archiveEvents.js';
 import {
   ACCOUNT_OUTSIDER,
   ACCOUNT_SEAT1,
@@ -54,5 +54,31 @@ describe('toStepView', () => {
     expect(Object.keys(view).sort()).toEqual(['at', 'events', 'stateID']);
     expect(JSON.stringify(view)).not.toContain(SEAT1_SECRET);
     expect(JSON.stringify(toStepView(steps[0]!, '1'))).toContain(SEAT1_SECRET);
+  });
+});
+
+describe('记录完整性', () => {
+  it('完整的归档：complete 为 true，gaps 为空', async () => {
+    const archive = await seedArchive();
+    const res = await loadFinishedMatch(archive, FINISHED_ID, null);
+    expect(res.complete).toBe(true);
+    expect(res.gaps).toEqual([]);
+  });
+
+  it('有缺口记录：complete 为 false，gaps 原样给出', async () => {
+    const archive = await seedArchive();
+    await archive.recordGap(FINISHED_ID, 6, 8);
+    const res = await loadFinishedMatch(archive, FINISHED_ID, null);
+    expect(res.complete).toBe(false);
+    expect(res.gaps).toEqual([{ from: 6, to: 8 }]);
+  });
+
+  it('isComplete：必须从 1 起连续；步号断开或不从 1 开始、没有步都不完整', () => {
+    const step = (stateID: number) => ({ stateID }) as never;
+    expect(isComplete([step(1), step(2), step(3)], [])).toBe(true);
+    expect(isComplete([step(1), step(3)], [])).toBe(false);
+    expect(isComplete([step(2), step(3)], [])).toBe(false);
+    expect(isComplete([], [])).toBe(false);
+    expect(isComplete([step(1)], [{ from: 2, to: 2 }])).toBe(false);
   });
 });

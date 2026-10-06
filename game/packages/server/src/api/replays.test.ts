@@ -212,6 +212,8 @@ describe('回放接口 · /frames 与 /download', () => {
       minMoveCounter: 1,
       maxMoveCounter: STEP_COUNT,
       totalFrames: STEP_COUNT,
+      complete: true,
+      gaps: [],
     });
   });
 
@@ -359,5 +361,26 @@ describe('GET /replays/:id', () => {
     expect(res.status).toBe(200);
     expect(res.json.winner).toBe('thief');
     expect(res.json.players[0]).toMatchObject({ role: 'master', finalFaction: 'master' });
+  });
+});
+
+describe('回放接口 · 记录完整性', () => {
+  it('完整归档：四个读取接口都带 complete=true 与空 gaps', async () => {
+    const { server } = await setup();
+    for (const suffix of ['events', 'range', 'frames', 'download']) {
+      const res = await server.get(`/replays/${FINISHED_ID}/${suffix}`);
+      expect(res.json.complete, suffix).toBe(true);
+      expect(res.json.gaps, suffix).toEqual([]);
+    }
+  });
+
+  it('归档里有缺口：四个读取接口都带 complete=false 与缺口区间', async () => {
+    const { server, archive } = await setup();
+    await archive.recordGap(FINISHED_ID, 6, 8);
+    for (const suffix of ['events', 'range', 'frames', 'download']) {
+      const res = await server.get(`/replays/${FINISHED_ID}/${suffix}`);
+      expect(res.json.complete, suffix).toBe(false);
+      expect(res.json.gaps, suffix).toEqual([{ from: 6, to: 8 }]);
+    }
   });
 });
