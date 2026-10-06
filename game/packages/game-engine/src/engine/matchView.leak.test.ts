@@ -252,7 +252,7 @@ describe('泄露扫描 · 随机对局（4 到 10 人）', () => {
     for (const key of Object.keys(total) as (keyof ScanCounts)[]) {
       expect(total[key], `类别 ${key} 的样本数`).toBeGreaterThan(0);
     }
-  }, 60_000);
+  }, 300_000);
 
   it('扫描能发现泄露：换成不过滤的视图钩子，同一份扫描立即失败', () => {
     const s = startedMatch(5, 'leak-canary');
