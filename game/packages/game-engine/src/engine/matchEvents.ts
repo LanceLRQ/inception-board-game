@@ -171,6 +171,13 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
       });
     }
   }
+  // 击杀者：只有被击杀才有（击杀结算会让凶手的击杀计数 +1），凶手不一定是这一步的发起者
+  // （例如被 SHOOT 者放弃响应后结算）；梦魇、世界观、密道传送、港口海啸、殉道者自尽等
+  // 非击杀进入迷失层没有凶手，cause 为 null
+  const killerThisStep =
+    order.find(
+      (id) => (after.players[id]?.shootCount ?? 0) > (before.players[id]?.shootCount ?? 0),
+    ) ?? null;
   for (const id of order) {
     const was = before.players[id];
     const now = after.players[id];
@@ -178,7 +185,11 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
       events.push({
         kind: 'player_died',
         actor: mover,
-        data: { player: id, layer: was.currentLayer, cause: mover === id ? null : mover },
+        data: {
+          player: id,
+          layer: was.currentLayer,
+          cause: killerThisStep !== id ? killerThisStep : null,
+        },
       });
     }
   }

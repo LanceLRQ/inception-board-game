@@ -5,6 +5,7 @@
 import type { SetupState, PlayerSetup, BribeSetup } from '../setup.js';
 import { seededShuffle } from '../prng.js';
 import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
+import { killPlayer, sendToLimbo } from './death.js';
 import { resolveShootCustom } from '../dice.js';
 import { flipCharacter } from './abilities/dual-faced.js';
 import type { CardID, Layer } from '@icgame/shared';
@@ -528,25 +529,7 @@ export function applyFortressColdness(
   // SHOOT 基础：1 点 = 击杀
   if (modifiedRoll === 1) {
     // 击杀目标
-    const handover = target.hand.slice(0, 2);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetPlayerID]: {
-          ...target,
-          isAlive: false,
-          deathTurn: s.turnNumber,
-          hand: target.hand.slice(2),
-        },
-        [masterID]: {
-          ...s.players[masterID]!,
-          hand: [...s.players[masterID]!.hand, ...handover],
-          shootCount: s.players[masterID]!.shootCount + 1,
-        },
-      },
-    };
-    s = movePlayerToLayer(s, targetPlayerID, 0);
+    s = killPlayer(s, targetPlayerID, masterID);
   } else if (modifiedRoll >= 2 && modifiedRoll <= 5) {
     // 强制移动
     const currentLayer = target.currentLayer;
@@ -693,40 +676,14 @@ export function applyMartyrSacrifice(
 
   let s = markSkillUsed(state, selfID, MARTYR_SKILL_ID);
 
-  // 自杀 + 弃手牌（无论骰值）
+  // 自杀 + 弃手牌（无论骰值）：自己进迷失层，不是被击杀，没有凶手，手牌进弃牌堆
   const handToDiscard = [...player.hand];
   s = {
     ...s,
-    players: {
-      ...s.players,
-      [selfID]: {
-        ...s.players[selfID]!,
-        isAlive: false,
-        deathTurn: s.turnNumber,
-        hand: [],
-        currentLayer: 0,
-      },
-    },
+    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: [] } },
     deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...handToDiscard] },
-    layers: {
-      ...s.layers,
-      [player.currentLayer]: {
-        ...layer,
-        playersInLayer: layer.playersInLayer.filter((id) => id !== selfID),
-      },
-      0: s.layers[0]
-        ? { ...s.layers[0]!, playersInLayer: [...s.layers[0]!.playersInLayer, selfID] }
-        : {
-            layer: 0,
-            dreamCardId: null,
-            nightmareId: null,
-            nightmareRevealed: false,
-            nightmareTriggered: false,
-            playersInLayer: [selfID],
-            heartLockValue: 0,
-          },
-    },
   };
+  s = sendToLimbo(s, selfID);
 
   let heartLockChanged = false;
   if (roll >= 3 && roll <= 6) {
@@ -808,7 +765,7 @@ export function applyAthenaAwe(
   if (!target || !target.isAlive) return null;
   if (target.currentLayer !== player.currentLayer) return null;
 
-  let s = markSkillUsed(state, selfID, ATHENA_AWE_SKILL_ID);
+  const s = markSkillUsed(state, selfID, ATHENA_AWE_SKILL_ID);
 
   // 5 张牌名是否全不同
   const all5 = [...shownHandIds, deckTop];
@@ -820,46 +777,7 @@ export function applyAthenaAwe(
   }
 
   // 成功：击杀 target，取其全部手牌
-  const targetHand = [...target.hand];
-  s = {
-    ...s,
-    players: {
-      ...s.players,
-      [selfID]: {
-        ...s.players[selfID]!,
-        hand: [...s.players[selfID]!.hand, ...targetHand],
-        shootCount: s.players[selfID]!.shootCount + 1,
-      },
-      [targetID]: {
-        ...s.players[targetID]!,
-        isAlive: false,
-        deathTurn: s.turnNumber,
-        hand: [],
-        currentLayer: 0,
-      },
-    },
-    layers: {
-      ...s.layers,
-      [player.currentLayer]: {
-        ...s.layers[player.currentLayer]!,
-        playersInLayer: s.layers[player.currentLayer]!.playersInLayer.filter(
-          (id) => id !== targetID,
-        ),
-      },
-      0: s.layers[0]
-        ? { ...s.layers[0]!, playersInLayer: [...s.layers[0]!.playersInLayer, targetID] }
-        : {
-            layer: 0,
-            dreamCardId: null,
-            nightmareId: null,
-            nightmareRevealed: false,
-            nightmareTriggered: false,
-            playersInLayer: [targetID],
-            heartLockValue: 0,
-          },
-    },
-  };
-  return s;
+  return killPlayer(s, targetID, selfID, Number.POSITIVE_INFINITY);
 }
 
 // ============================================================================
@@ -1489,25 +1407,7 @@ export function applyLunaEclipse(
     deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...shootCardIds] },
   };
   // 击杀 target
-  const targetHand = [...target.hand];
-  s = {
-    ...s,
-    players: {
-      ...s.players,
-      [selfID]: {
-        ...s.players[selfID]!,
-        hand: [...s.players[selfID]!.hand, ...targetHand.slice(0, 2)],
-        shootCount: s.players[selfID]!.shootCount + 1,
-      },
-      [targetID]: {
-        ...s.players[targetID]!,
-        isAlive: false,
-        deathTurn: s.turnNumber,
-        hand: targetHand.slice(2),
-      },
-    },
-  };
-  s = movePlayerToLayer(s, targetID, 0);
+  s = killPlayer(s, targetID, selfID);
   // 翻面
   s = flipCharacter(s, selfID);
   return s;
@@ -1814,18 +1714,7 @@ export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupSta
       // 死亡 → 直接迷失层；不交手牌（跳过击杀状态）
       const target = s.players[pid];
       if (!target || !target.isAlive) continue;
-      s = {
-        ...s,
-        players: {
-          ...s.players,
-          [pid]: {
-            ...target,
-            isAlive: false,
-            deathTurn: s.turnNumber,
-          },
-        },
-      };
-      s = movePlayerToLayer(s, pid, 0);
+      s = sendToLimbo(s, pid);
     }
   }
   return s;
@@ -2195,7 +2084,7 @@ export function applySecretPassageTeleport(
   };
   s = markSkillUsed(s, masterID, SECRET_PASSAGE_SKILL_ID);
   // 直接送到迷失层（跳过击杀状态，保留手牌）
-  s = movePlayerToLayer(s, targetID, 0);
+  s = sendToLimbo(s, targetID);
   return s;
 }
 
@@ -2367,7 +2256,7 @@ export function applyPlutoHellLostCheck(state: SetupState, playerID: string): Se
   if (!p || !p.isAlive || p.faction !== 'thief') return state;
   if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return state;
   if (p.currentLayer === 0) return state;
-  return movePlayerToLayer(state, playerID, 0);
+  return sendToLimbo(state, playerID);
 }
 
 // === 土星·领地世界观 ===
@@ -2743,15 +2632,7 @@ export function applyImperialCityWorldShoot(
   const modifiedRoll = Math.max(1, roll - 3);
   const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
   if (result === 'kill') {
-    let s = movePlayerToLayer(state, targetID, 0);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetID]: { ...s.players[targetID]!, isAlive: false, deathTurn: s.turnNumber },
-      },
-    };
-    return s;
+    return killPlayer(state, targetID, shooterID);
   }
   if (result === 'move') {
     const cur = state.players[targetID]!.currentLayer;
@@ -2908,32 +2789,12 @@ export function applyVenusMirrorWorld(
 
   if (lastCard === MIRRORABLE_KICK) {
     // KICK 效果：目标击杀 + 拿 2 张手牌
-    const tp = s.players[targetID]!;
-    const handover = tp.hand.slice(0, 2);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetID]: { ...tp, isAlive: false, deathTurn: s.turnNumber, hand: tp.hand.slice(2) },
-        [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...handover] },
-      },
-    };
-    s = movePlayerToLayer(s, targetID, 0);
+    s = killPlayer(s, targetID, selfID);
   } else {
     // SHOOT 效果：普通骰面 [1] 死 [2-4] 移 [5-6] miss
     const result = resolveShootCustom(roll, [1], [2, 3, 4]);
     if (result === 'kill') {
-      const tp = s.players[targetID]!;
-      const handover = tp.hand.slice(0, 2);
-      s = {
-        ...s,
-        players: {
-          ...s.players,
-          [targetID]: { ...tp, isAlive: false, deathTurn: s.turnNumber, hand: tp.hand.slice(2) },
-          [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...handover] },
-        },
-      };
-      s = movePlayerToLayer(s, targetID, 0);
+      s = killPlayer(s, targetID, selfID);
     } else if (result === 'move') {
       const cur = s.players[targetID]!.currentLayer;
       const newLayer = cur >= 4 ? cur - 1 : cur + 1;

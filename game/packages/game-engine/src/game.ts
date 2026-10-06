@@ -28,6 +28,7 @@ import {
   applyUnlockCancel,
   recordCardPlayed,
 } from './moves.js';
+import { killPlayer, sendToLimbo } from './engine/death.js';
 import { resolveShootCustom } from './dice.js';
 import {
   applyPointmanAssault,
@@ -833,27 +834,8 @@ export const InceptionCityGame = {
             let s = discardCard(G, ctx.currentPlayer, pending.cardId);
 
             if (result === 'kill') {
-              const tp = s.players[pending.targetPlayerID]!;
-              const handover = tp.hand.slice(0, 2);
-              s = {
-                ...s,
-                pendingSudgerRolls: null,
-                players: {
-                  ...s.players,
-                  [pending.targetPlayerID]: {
-                    ...tp,
-                    isAlive: false,
-                    deathTurn: s.turnNumber,
-                    hand: tp.hand.slice(2),
-                  },
-                  [ctx.currentPlayer]: {
-                    ...s.players[ctx.currentPlayer]!,
-                    hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
-                    shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
-                  },
-                },
-              };
-              s = movePlayerToLayer(s, pending.targetPlayerID, 0);
+              s = { ...s, pendingSudgerRolls: null };
+              s = killPlayer(s, pending.targetPlayerID, ctx.currentPlayer);
               s = dispatchPassives(s, 'onKilled').state;
             } else if (result === 'move') {
               if (pending.extraOnMove) {
@@ -1339,26 +1321,7 @@ export const InceptionCityGame = {
             const shootResult =
               finalRoll === 1 ? 'kill' : finalRoll >= 2 && finalRoll <= 5 ? 'move' : 'miss';
             if (shootResult === 'kill') {
-              const tp = s.players[targetID]!;
-              const handover = tp.hand.slice(0, 2);
-              s = {
-                ...s,
-                players: {
-                  ...s.players,
-                  [targetID]: {
-                    ...tp,
-                    isAlive: false,
-                    deathTurn: s.turnNumber,
-                    hand: tp.hand.slice(2),
-                  },
-                  [ctx.currentPlayer]: {
-                    ...s.players[ctx.currentPlayer]!,
-                    hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
-                    shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
-                  },
-                },
-              };
-              s = movePlayerToLayer(s, targetID, 0);
+              s = killPlayer(s, targetID, ctx.currentPlayer);
             } else if (shootResult === 'move') {
               const cur = target.currentLayer;
               const dir = cur >= 4 ? -1 : 1;
@@ -3053,7 +3016,7 @@ function applyNightmareEffect(
     for (const pid of thieves) {
       const roll = random.D6();
       if (roll === 5 || roll === 6 || roll === layer) {
-        s = movePlayerToLayer(s, pid, 0);
+        s = sendToLimbo(s, pid);
       } else if (roll >= 1 && roll <= 4) {
         s = movePlayerToLayer(s, pid, roll);
       }
@@ -3068,7 +3031,7 @@ function applyNightmareEffect(
     for (const pid of onLayer) {
       const p = s.players[pid];
       if (!p || !p.isAlive) continue;
-      s = movePlayerToLayer(s, pid, 0);
+      s = sendToLimbo(s, pid);
     }
     // 再处理其他层玩家
     for (const pid of G.playerOrder) {
@@ -3125,7 +3088,7 @@ function applyNightmareEffect(
           .map((b, i) => ({ b, i }))
           .filter(({ b }) => b.status === 'inPool');
         if (poolIdxs.length === 0) {
-          s = movePlayerToLayer(s, pid, 0);
+          s = sendToLimbo(s, pid);
           continue;
         }
         const pickIdx = (random.Die(poolIdxs.length) - 1) % poolIdxs.length;
@@ -3156,7 +3119,7 @@ function applyNightmareEffect(
           },
         };
       } else {
-        s = movePlayerToLayer(s, pid, 0);
+        s = sendToLimbo(s, pid);
       }
     }
     return s;
@@ -3181,7 +3144,7 @@ function applyNightmareEffect(
         };
       } else {
         // 不足 3 张 → 入迷失层（保留手牌，不视为被梦主击杀）
-        s = movePlayerToLayer(s, pid, 0);
+        s = sendToLimbo(s, pid);
       }
     }
     return s;
@@ -3420,31 +3383,11 @@ function applyShootVariant(
   s = applyMercuryReverse(s, ctx.currentPlayer, cardId, targetPlayerID) ?? s;
 
   if (result === 'kill') {
-    const tp = s.players[targetPlayerID]!;
-    const handover = tp.hand.slice(0, 2);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetPlayerID]: {
-          ...tp,
-          isAlive: false,
-          deathTurn: s.turnNumber,
-          hand: tp.hand.slice(2),
-        },
-        [ctx.currentPlayer]: {
-          ...s.players[ctx.currentPlayer]!,
-          hand: [...s.players[ctx.currentPlayer]!.hand, ...handover],
-          shootCount: s.players[ctx.currentPlayer]!.shootCount + 1,
-        },
-      },
-    };
     // 白羊·星尘 onKilled 响应（简化 pending，可替换为完整响应栈）
     // 对照：docs/manual/05-dream-thieves.md 白羊 62-71 行
-    // 注：在 movePlayerToLayer(..., 0) 之前捕获原所在层 —— 但此处 target 已被 isAlive=false 前已被处理，
-    // tp.currentLayer 仍在原层（isAlive 修改时未动 currentLayer，后续 movePlayerToLayer 才移走）
-    const victimLayer = tp.currentLayer;
-    s = movePlayerToLayer(s, targetPlayerID, 0);
+    // 注：击杀结算会把被害者挪进迷失层，所以先记下原所在层
+    const victimLayer = s.players[targetPlayerID]!.currentLayer;
+    s = killPlayer(s, targetPlayerID, ctx.currentPlayer);
     if (canAriesStardustTrigger(s, targetPlayerID, victimLayer)) {
       const ariesID = findAliveAriesID(s)!;
       s = {

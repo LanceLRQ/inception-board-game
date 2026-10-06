@@ -76,12 +76,13 @@ export type {
 export {
   LOST_LAYER,
   canAct,
-  applyDeath,
+  sendToLimbo,
+  killPlayer,
+  KILL_HANDOVER_COUNT,
   allThievesDead,
   getAlivePlayers,
   getAliveInLayer,
 } from './engine/death.js';
-export type { DeathCause, DeathEvent } from './engine/death.js';
 
 export {
   RESPONSE_WINDOW_MS,

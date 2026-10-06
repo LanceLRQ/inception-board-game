@@ -2,6 +2,7 @@
 
 import { HAND_LIMIT, BASE_DRAW_COUNT } from './config.js';
 import type { SetupState, PlayerSetup } from './setup.js';
+import { LOST_LAYER, placePlayerInLayer, sendToLimbo } from './engine/death.js';
 
 // === 抽牌阶段 ===
 // 纯函数：不 mutate 入参，以免与 BGIO/immer draft 行为冲突
@@ -143,52 +144,15 @@ export function setTurnPhase(state: SetupState, phase: SetupState['turnPhase']):
 }
 
 // === 移动玩家到层 ===
+// 目标层为 0（迷失层）时等价于 sendToLimbo：迷失层与死亡是同一个状态，不允许只挪层不置死亡。
+// 击杀（要交手牌）请直接调用 killPlayer。
 export function movePlayerToLayer(
   state: SetupState,
   playerID: string,
   targetLayer: number,
 ): SetupState {
-  const player = state.players[playerID];
-  if (!player) return state;
-
-  const oldLayer = player.currentLayer;
-
-  // Bug fix（2026-04-21 · client React key 重复）：
-  //   若 targetLayer === oldLayer（移到自身当前层 / 同层移动 no-op），
-  //   下方 layers[oldLayer]/[targetLayer] 写入同一 key，[targetLayer] 后写覆盖 →
-  //   playersInLayer = [...原数组, playerID] 含重复 playerID，
-  //   导致 client LayerMap PlayerBadge key 重复警告。
-  //   早返回保留原 state，行为与"未移动"一致。
-  if (oldLayer === targetLayer) return state;
-
-  // 从旧层移除
-  const oldLayerPlayers =
-    state.layers[oldLayer]?.playersInLayer.filter((id) => id !== playerID) ?? [];
-
-  // 加入新层（防御性 dedupe：若 target 层数组已含 playerID，避免重复）
-  const targetExisting = state.layers[targetLayer]?.playersInLayer ?? [];
-  const newLayerPlayers = targetExisting.includes(playerID)
-    ? targetExisting
-    : [...targetExisting, playerID];
-
-  return {
-    ...state,
-    players: {
-      ...state.players,
-      [playerID]: { ...player, currentLayer: targetLayer as import('@icgame/shared').Layer },
-    },
-    layers: {
-      ...state.layers,
-      [oldLayer]: {
-        ...state.layers[oldLayer]!,
-        playersInLayer: oldLayerPlayers,
-      },
-      [targetLayer]: {
-        ...state.layers[targetLayer]!,
-        playersInLayer: newLayerPlayers,
-      },
-    },
-  };
+  if (targetLayer === LOST_LAYER) return sendToLimbo(state, playerID);
+  return placePlayerInLayer(state, playerID, targetLayer);
 }
 
 // === 判断相邻层 ===

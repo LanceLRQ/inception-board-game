@@ -12,7 +12,7 @@
 //   4. 心锁值非负
 //   5. 手牌上限（turnEnd 时 <= HAND_LIMIT）
 //   6. 死亡玩家必须有 deathTurn
-//   7. isAlive=false 时不应有手牌
+//   7. （已删除：死亡玩家可以持有手牌）
 //   8. layers[].playersInLayer 与 players[].currentLayer 一致
 //   9. 金库：isOpened=true 时必须有 openedBy
 //   10. winner 合法（null | 'thief' | 'master'）
@@ -96,16 +96,12 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
-  // ---------- 7. 死亡玩家不应有手牌 ----------
-  for (const p of Object.values(state.players)) {
-    if (!p.isAlive && p.hand.length > 0) {
-      push('dead_no_hand', `Player ${p.id} is dead but hand=${p.hand.length}`);
-    }
-  }
+  // 7. 已删除：死亡玩家可以持有手牌——被击杀只交 2 张，非击杀进入迷失层手牌全留，
+  //    复活还要从手里弃 2 张（对照：docs/manual/03-game-flow.md 死亡 / 复活）
 
   // ---------- 8. layer.playersInLayer 与 player.currentLayer 一致 ----------
+  // 死亡玩家也要查：他们在迷失层（0）的名单里，进出迷失层漏改名单会从这里暴露
   for (const p of Object.values(state.players)) {
-    if (!p.isAlive) continue;
     const targetLayer = state.layers[p.currentLayer];
     if (targetLayer && !targetLayer.playersInLayer.includes(p.id)) {
       push(
@@ -119,7 +115,7 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     const layerNum = Number(numStr);
     for (const pid of layer.playersInLayer) {
       const p = state.players[pid];
-      if (p && p.isAlive && p.currentLayer !== layerNum) {
+      if (p && p.currentLayer !== layerNum) {
         push(
           'layer_membership_reverse',
           `Layer ${layerNum} lists ${pid} but player.currentLayer=${p.currentLayer}`,

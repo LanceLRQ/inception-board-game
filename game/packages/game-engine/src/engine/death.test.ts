@@ -5,11 +5,13 @@ import { createInitialState, type SetupState } from '../setup.js';
 import {
   LOST_LAYER,
   canAct,
-  applyDeath,
+  killPlayer,
+  sendToLimbo,
   allThievesDead,
   getAlivePlayers,
   getAliveInLayer,
 } from './death.js';
+import { movePlayerToLayer } from '../moves.js';
 import type { CardID, Layer } from '@icgame/shared';
 
 function makeState(): SetupState {
@@ -60,50 +62,91 @@ describe('Death & Lost Layer', () => {
     });
   });
 
-  describe('applyDeath · SHOOT', () => {
+  describe('killPlayer', () => {
     it('marks isAlive=false + moves to lost layer', () => {
-      const s = makeState();
-      const { state: next } = applyDeath(s, 'P1', 'shoot', 'P2');
+      const next = killPlayer(makeState(), 'P1', 'P2');
       expect(next.players.P1!.isAlive).toBe(false);
       expect(next.players.P1!.currentLayer).toBe(LOST_LAYER);
       expect(next.players.P1!.deathTurn).toBe(3);
     });
-    it('transfers hand to killer', () => {
+    it('hands the first two cards to the killer', () => {
       const s = makeState();
-      const { state: next, event } = applyDeath(s, 'P1', 'shoot', 'P2');
+      const withThree = {
+        ...s,
+        players: { ...s.players, P1: { ...s.players.P1!, hand: ['c1', 'c2', 'c9'] as CardID[] } },
+      };
+      const next = killPlayer(withThree, 'P1', 'P2');
       expect(next.players.P2!.hand).toEqual(['c3', 'c1', 'c2']);
+      expect(next.players.P1!.hand).toEqual(['c9']);
+    });
+    it('hands over everything when the victim holds fewer than two', () => {
+      const s = makeState();
+      const next = killPlayer(s, 'P2', 'P1');
+      expect(next.players.P1!.hand).toEqual(['c1', 'c2', 'c3']);
+      expect(next.players.P2!.hand).toEqual([]);
+    });
+    it('honours a larger handover count', () => {
+      const s = makeState();
+      const withFive = {
+        ...s,
+        players: {
+          ...s.players,
+          P1: { ...s.players.P1!, hand: ['a', 'b', 'c', 'd', 'e'] as CardID[] },
+        },
+      };
+      const next = killPlayer(withFive, 'P1', 'P2', Number.POSITIVE_INFINITY);
       expect(next.players.P1!.hand).toEqual([]);
-      expect(event.handTransfer).toEqual(['c1', 'c2']);
+      expect(next.players.P2!.hand).toHaveLength(6);
     });
     it('killer shootCount increments', () => {
       const s = makeState();
-      const { state: next } = applyDeath(s, 'P1', 'shoot', 'P2');
+      const next = killPlayer(s, 'P1', 'P2');
       expect(next.players.P2!.shootCount).toBe(s.players.P2!.shootCount + 1);
     });
-    it('removes player from old layer', () => {
-      const s = makeState();
-      const { state: next } = applyDeath(s, 'P1', 'shoot', 'P2');
+    it('moves the victim between layer rosters', () => {
+      const next = killPlayer(makeState(), 'P1', 'P2');
       expect(next.layers[2]!.playersInLayer).toEqual(['P2']);
+      expect(next.layers[0]!.playersInLayer).toEqual(['P1']);
+    });
+    it('is a no-op for a victim already in the lost layer', () => {
+      const once = killPlayer(makeState(), 'P1', 'P2');
+      expect(killPlayer(once, 'P1', 'P2')).toBe(once);
     });
   });
 
-  describe('applyDeath · nightmare', () => {
-    it('hand goes to discard pile', () => {
+  describe('sendToLimbo', () => {
+    it('marks the player dead and keeps the hand', () => {
+      const next = sendToLimbo(makeState(), 'P1');
+      expect(next.players.P1!.isAlive).toBe(false);
+      expect(next.players.P1!.deathTurn).toBe(3);
+      expect(next.players.P1!.currentLayer).toBe(LOST_LAYER);
+      expect(next.players.P1!.hand).toEqual(['c1', 'c2']);
+      expect(next.deck.discardPile).toEqual([]);
+    });
+    it('hands nothing to anybody', () => {
       const s = makeState();
-      const { state: next } = applyDeath(s, 'P1', 'nightmare');
-      expect(next.deck.discardPile).toContain('c1');
-      expect(next.deck.discardPile).toContain('c2');
-      expect(next.players.P1!.hand).toEqual([]);
+      const next = sendToLimbo(s, 'P1');
+      for (const id of ['P2', 'P3', 'P4']) {
+        expect(next.players[id]!.hand).toEqual(s.players[id]!.hand);
+        expect(next.players[id]!.shootCount).toBe(0);
+      }
+    });
+    it('is a no-op for a player already dead in the lost layer', () => {
+      const once = sendToLimbo(makeState(), 'P1');
+      expect(sendToLimbo(once, 'P1')).toBe(once);
+    });
+    it('keeps the original death turn when called again', () => {
+      const once = sendToLimbo(makeState(), 'P1');
+      const later = sendToLimbo({ ...once, turnNumber: 9 }, 'P1');
+      expect(later.players.P1!.deathTurn).toBe(3);
     });
   });
 
-  describe('no-op for already dead', () => {
-    it('returns same state', () => {
-      const s = makeState();
-      const dead = { ...s, players: { ...s.players, P1: { ...s.players.P1!, isAlive: false } } };
-      const { state: next, event } = applyDeath(dead, 'P1', 'skill');
-      expect(next).toBe(dead);
-      expect(event.handTransfer).toEqual([]);
+  describe('movePlayerToLayer 0', () => {
+    it('cannot park an alive player in the lost layer', () => {
+      const next = movePlayerToLayer(makeState(), 'P1', 0);
+      expect(next.players.P1!.isAlive).toBe(false);
+      expect(next.players.P1!.currentLayer).toBe(LOST_LAYER);
     });
   });
 
@@ -113,21 +156,21 @@ describe('Death & Lost Layer', () => {
     });
     it('allThievesDead true when all thieves dead', () => {
       let s = makeState();
-      s = applyDeath(s, 'P1', 'shoot', 'P4').state;
-      s = applyDeath(s, 'P2', 'shoot', 'P4').state;
-      s = applyDeath(s, 'P3', 'shoot', 'P4').state;
+      s = killPlayer(s, 'P1', 'P4');
+      s = killPlayer(s, 'P2', 'P4');
+      s = killPlayer(s, 'P3', 'P4');
       expect(allThievesDead(s)).toBe(true);
     });
     it('getAlivePlayers excludes dead', () => {
       const s = makeState();
-      const dead = applyDeath(s, 'P1', 'shoot', 'P2').state;
+      const dead = killPlayer(s, 'P1', 'P2');
       expect(getAlivePlayers(dead)).not.toContain('P1');
       expect(getAlivePlayers(dead)).toContain('P2');
     });
     it('getAliveInLayer filters by layer + alive', () => {
       const s = makeState();
       expect(getAliveInLayer(s, 2).sort()).toEqual(['P1', 'P2']);
-      const dead = applyDeath(s, 'P1', 'shoot', 'P2').state;
+      const dead = killPlayer(s, 'P1', 'P2');
       expect(getAliveInLayer(dead, 2)).toEqual(['P2']);
     });
   });

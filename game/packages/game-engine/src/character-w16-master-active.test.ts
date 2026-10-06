@@ -131,7 +131,7 @@ describe('密道（dm_secret_passage）·传送', () => {
     const r = applySecretPassageTeleport(s, 'pM', 'p1', 'action_dream_transit');
     expect(r).not.toBeNull();
     expect(r!.players.p1!.currentLayer).toBe(0);
-    expect(r!.players.p1!.isAlive).toBe(true); // 传送不算击杀
+    expect(r!.players.p1!.isAlive).toBe(false); // 迷失层即死亡状态；传送不算击杀，所以不交手牌
     expect(r!.players.pM!.hand.length).toBe(1);
     expect(r!.deck.discardPile).toContain('action_dream_transit');
   });

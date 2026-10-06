@@ -10,6 +10,7 @@ import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
 import { BLOCKING_FIELDS, listAwaiting } from './actionRights.js';
 import { knownMoves } from './validator.js';
+import { placePlayerInLayer, sendToLimbo } from './death.js';
 import { checkStateInvariants } from './stateInvariants.js';
 import { applyMove, createMatch, type GameDef, type MatchState } from '../runner/matchRunner.js';
 import {
@@ -122,9 +123,12 @@ function asActionTurn(
 ): MatchState<SetupState> {
   const players = { ...s.G.players };
   players[seat] = { ...players[seat]!, isAlive: true, deathTurn: null, hand: [...ACTION_CARD_IDS] };
+  // 原本死在迷失层的座位被拉起来：连同层内名单一起回到第 1 层，保持迷失层与存活状态一致
+  const revived = placePlayerInLayer({ ...s.G, players }, seat, 1);
+  const G = players[seat]!.currentLayer === 0 ? revived : { ...s.G, players };
   return {
     ...s,
-    G: { ...s.G, players, currentPlayerID: seat, turnPhase },
+    G: { ...G, currentPlayerID: seat, turnPhase },
     ctx: { ...s.ctx, currentPlayer: seat, playOrderPos: s.ctx.playOrder.indexOf(seat) },
   };
 }
@@ -142,17 +146,12 @@ function withCharacter(
 /** 让除 seat 之外的第一个玩家死亡，给复活类技能留出目标 */
 function withDeadBystander(s: MatchState<SetupState>, seat: string): MatchState<SetupState> {
   const victim = s.ctx.playOrder.find((id) => id !== seat && id !== s.G.dreamMasterID)!;
+  const dead = sendToLimbo(s.G, victim);
   const players = {
-    ...s.G.players,
-    [victim]: {
-      ...s.G.players[victim]!,
-      isAlive: false,
-      deathTurn: 1,
-      hand: [],
-      currentLayer: 0 as const,
-    },
+    ...dead.players,
+    [victim]: { ...dead.players[victim]!, deathTurn: 1, hand: [] },
   };
-  return { ...s, G: { ...s.G, players } };
+  return { ...s, G: { ...dead, players } };
 }
 
 function awaitingMoves(s: MatchState<SetupState>): string[] {

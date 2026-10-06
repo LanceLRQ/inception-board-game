@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -127,6 +127,28 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
           ...bribe,
           id: `bribe-${i}`,
         })),
+      };
+    },
+  ],
+  // v9 → v10：迷失层与死亡合为同一个状态（对照 docs/manual/08-appendix.md 迷失层条目）。
+  //   旧版本里梦魇、世界观、密道等只把人挪进迷失层而不置死亡，这些人无法被复活，却仍被当作活人。
+  //   把「在迷失层却标着存活」的玩家规范为已死亡，死亡回合取快照当时的回合数
+  [
+    10,
+    (state) => {
+      const players = state.players;
+      if (typeof players !== 'object' || players === null) return state;
+      const turn = typeof state.turnNumber === 'number' ? state.turnNumber : 0;
+      return {
+        ...state,
+        players: Object.fromEntries(
+          Object.entries(players as Record<string, Record<string, unknown>>).map(([id, p]) => [
+            id,
+            p && p.currentLayer === 0 && p.isAlive === true
+              ? { ...p, isAlive: false, deathTurn: turn }
+              : p,
+          ]),
+        ),
       };
     },
   ],

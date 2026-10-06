@@ -202,10 +202,10 @@ describe('checkInvariants - rule 6: dead + deathTurn', () => {
   });
 });
 
-describe('checkInvariants - rule 7: dead no hand', () => {
-  it('flags dead player still holding cards', () => {
+describe('checkInvariants - dead players may hold cards', () => {
+  it('does not flag a dead player still holding cards', () => {
     const s = scenarioStartOfGame3p();
-    const bad = {
+    const dead = {
       ...s,
       players: {
         ...s.players,
@@ -217,8 +217,8 @@ describe('checkInvariants - rule 7: dead no hand', () => {
         },
       },
     };
-    const v = checkInvariants(bad);
-    expect(v.some((x) => x.rule === 'dead_no_hand')).toBe(true);
+    const v = checkInvariants(dead);
+    expect(v.some((x) => x.rule === 'dead_no_hand')).toBe(false);
   });
 });
 
@@ -232,6 +232,33 @@ describe('checkInvariants - rule 8: layer membership consistency', () => {
     };
     const v = checkInvariants(bad);
     expect(v.some((x) => x.rule === 'layer_membership')).toBe(true);
+  });
+
+  it('flags a dead player missing from the lost layer roster', () => {
+    const s = scenarioStartOfGame3p();
+    const bad = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, isAlive: false, deathTurn: 2, hand: [], currentLayer: 0 as Layer },
+      },
+      layers: { ...s.layers, 0: { ...s.layers[1]!, playersInLayer: [] } },
+    };
+    const v = checkInvariants(bad);
+    expect(v.some((x) => x.rule === 'layer_membership')).toBe(true);
+  });
+
+  it('flags a dead player still listed in a dream layer roster', () => {
+    const s = scenarioStartOfGame3p();
+    const bad = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, isAlive: false, deathTurn: 2, hand: [], currentLayer: 0 as Layer },
+      },
+    };
+    const v = checkInvariants(bad);
+    expect(v.some((x) => x.rule === 'layer_membership_reverse')).toBe(true);
   });
 
   it('flags layer.playersInLayer vs player.currentLayer mismatch (reverse)', () => {

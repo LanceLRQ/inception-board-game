@@ -56,6 +56,50 @@ describe('checkStateInvariants', () => {
     expect(checkStateInvariants({ playerOrder: ['0'], players: 3 }).length).toBeGreaterThan(0);
   });
 
+  describe('迷失层与死亡、层内名单的一致性', () => {
+    it('在迷失层却还活着', () => {
+      const issues = inject((G, a) => {
+        G.players[a]!.currentLayer = 0 as never;
+        G.layers[1]!.playersInLayer = G.layers[1]!.playersInLayer.filter((id) => id !== a);
+        G.layers[0] = { ...G.layers[1]!, playersInLayer: [a] };
+      });
+      expect(issues.some((i) => i.includes('迷失层') && i.includes('isAlive'))).toBe(true);
+    });
+
+    it('已死亡却不在迷失层', () => {
+      const issues = inject((G, a) => {
+        G.players[a]!.isAlive = false;
+        G.players[a]!.deathTurn = 1;
+      });
+      expect(issues.some((i) => i.includes('迷失层') && i.includes('isAlive'))).toBe(true);
+    });
+
+    it('玩家所在层的名单里没有他', () => {
+      const issues = inject((G, a) => {
+        G.layers[1]!.playersInLayer = G.layers[1]!.playersInLayer.filter((id) => id !== a);
+      });
+      expect(issues.some((i) => i.includes('playersInLayer'))).toBe(true);
+    });
+
+    it('名单里列着的玩家实际在别的层', () => {
+      const issues = inject((G, a) => {
+        G.layers[2]!.playersInLayer = [a];
+      });
+      expect(issues.some((i) => i.includes('playersInLayer'))).toBe(true);
+    });
+
+    it('已死亡的玩家出现在迷失层名单里时通过', () => {
+      const issues = inject((G, a) => {
+        G.players[a]!.isAlive = false;
+        G.players[a]!.deathTurn = 1;
+        G.players[a]!.currentLayer = 0 as never;
+        G.layers[1]!.playersInLayer = G.layers[1]!.playersInLayer.filter((id) => id !== a);
+        G.layers[0] = { ...G.layers[1]!, playersInLayer: [a] };
+      });
+      expect(issues).toEqual([]);
+    });
+  });
+
   const cases: [string, string, (G: SetupState, a: string, b: string) => void][] = [
     [
       '当前行动者不是玩家',

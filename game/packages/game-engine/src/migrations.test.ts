@@ -185,6 +185,50 @@ describe('migrations', () => {
     expect(state.players['1']!.successfulUnlocksThisTurn).toBe(2);
   });
 
+  describe('v9 → v10 · 迷失层即死亡', () => {
+    const player = (over: Record<string, unknown>) => ({
+      id: 'x',
+      isAlive: true,
+      deathTurn: null,
+      currentLayer: 1,
+      ...over,
+    });
+
+    it('在迷失层却标着存活的玩家被规范为已死亡，deathTurn 取当时的回合数', () => {
+      const state = migrateGameState({
+        schemaVersion: 9,
+        turnNumber: 12,
+        players: { a: player({ id: 'a', currentLayer: 0 }) },
+      });
+      expect(state.players.a!.isAlive).toBe(false);
+      expect(state.players.a!.deathTurn).toBe(12);
+    });
+
+    it('已死亡的玩家保持原来的死亡回合；不在迷失层的存活玩家不动', () => {
+      const state = migrateGameState({
+        schemaVersion: 9,
+        turnNumber: 12,
+        players: {
+          dead: player({ id: 'dead', isAlive: false, deathTurn: 4, currentLayer: 0 }),
+          live: player({ id: 'live', currentLayer: 3 }),
+        },
+      });
+      expect(state.players.dead!.deathTurn).toBe(4);
+      expect(state.players.live!.isAlive).toBe(true);
+      expect(state.players.live!.deathTurn).toBeNull();
+    });
+
+    it('缺少 players 或回合数时不抛异常', () => {
+      expect(() => migrateGameState({ schemaVersion: 9 })).not.toThrow();
+      const state = migrateGameState({
+        schemaVersion: 9,
+        players: { a: player({ id: 'a', currentLayer: 0 }) },
+      });
+      expect(state.players.a!.isAlive).toBe(false);
+      expect(state.players.a!.deathTurn).toBe(0);
+    });
+  });
+
   describe('v8 → v9 · 贿赂池', () => {
     // 旧状态：成功牌在前，标识带成败前缀；有两张已派出
     function legacyState(seed: unknown): Record<string, unknown> {

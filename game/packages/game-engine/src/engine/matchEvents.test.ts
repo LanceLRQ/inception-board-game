@@ -322,6 +322,32 @@ describe('事件 · SHOOT 与死亡', () => {
     expect(one(events, 'player_died').data).toEqual({ player: 'p2', layer: 2, cause: 'p1' });
   });
 
+  it('player_died：梦魇把人送进迷失层不是击杀，没有击杀者', () => {
+    const base = scene('action');
+    const G = scene('action', {
+      currentPlayerID: 'pM',
+      layers: {
+        ...base.layers,
+        2: {
+          ...base.layers[2]!,
+          nightmareId: 'nightmare_space_fall' as CardID,
+          nightmareRevealed: true,
+        },
+      },
+    });
+    const { events } = step(load(G), 'pM', 'masterActivateNightmare', [2, {}], dice(5, 5));
+    const died = all(events, 'player_died');
+    expect(died.map((e) => e.data)).toEqual([
+      { player: 'p1', layer: 2, cause: null },
+      { player: 'p2', layer: 2, cause: null },
+    ]);
+  });
+
+  it('player_died：SHOOT 击杀仍报出击杀者', () => {
+    const { events } = afterKill();
+    expect(one(events, 'player_died').data.cause).toBe('p1');
+  });
+
   it('各事件按表里的顺序排列', () => {
     const order = [
       'move',

@@ -9,10 +9,10 @@ exports[`行动牌快照回归 · 21 卡 > 1. playShoot · 同层目标，骰 1 
   ],
   "layers": {
     "0": {
-      "heartLockValue": undefined,
-      "layer": undefined,
-      "nightmareId": undefined,
-      "nightmareRevealed": undefined,
+      "heartLockValue": 0,
+      "layer": 0,
+      "nightmareId": null,
+      "nightmareRevealed": false,
       "playersInLayer": [
         "p2",
       ],
@@ -286,10 +286,10 @@ exports[`行动牌快照回归 · 21 卡 > 4. playShootKing · 跨层 · 骰 1 �
   ],
   "layers": {
     "0": {
-      "heartLockValue": undefined,
-      "layer": undefined,
-      "nightmareId": undefined,
-      "nightmareRevealed": undefined,
+      "heartLockValue": 0,
+      "layer": 0,
+      "nightmareId": null,
+      "nightmareRevealed": false,
       "playersInLayer": [
         "p2",
       ],
@@ -1703,10 +1703,10 @@ exports[`行动牌快照回归 · 21 卡 > 19. 死亡宣言·3 + playShoot · �
   ],
   "layers": {
     "0": {
-      "heartLockValue": undefined,
-      "layer": undefined,
-      "nightmareId": undefined,
-      "nightmareRevealed": undefined,
+      "heartLockValue": 0,
+      "layer": 0,
+      "nightmareId": null,
+      "nightmareRevealed": false,
       "playersInLayer": [
         "p2",
       ],
@@ -1802,10 +1802,10 @@ exports[`行动牌快照回归 · 21 卡 > 20. 死亡宣言·4 + playShoot · �
   ],
   "layers": {
     "0": {
-      "heartLockValue": undefined,
-      "layer": undefined,
-      "nightmareId": undefined,
-      "nightmareRevealed": undefined,
+      "heartLockValue": 0,
+      "layer": 0,
+      "nightmareId": null,
+      "nightmareRevealed": false,
       "playersInLayer": [
         "p2",
       ],
@@ -1901,10 +1901,10 @@ exports[`行动牌快照回归 · 21 卡 > 21. 死亡宣言·5 + playShoot · �
   ],
   "layers": {
     "0": {
-      "heartLockValue": undefined,
-      "layer": undefined,
-      "nightmareId": undefined,
-      "nightmareRevealed": undefined,
+      "heartLockValue": 0,
+      "layer": 0,
+      "nightmareId": null,
+      "nightmareRevealed": false,
       "playersInLayer": [
         "p2",
       ],
