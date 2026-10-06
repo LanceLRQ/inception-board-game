@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ThemeToggle } from '../../components/ThemeToggle';
+import { ThemePicker } from '../../components/ThemePicker';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { AudioControls } from '../../components/AudioControls';
 import { AccountSection } from './AccountSection';
@@ -18,7 +18,7 @@ export default function Settings() {
         </h2>
         <div className="flex items-center justify-between">
           <span className="text-sm">{t('settings.theme')}</span>
-          <ThemeToggle />
+          <ThemePicker />
         </div>
       </section>
 

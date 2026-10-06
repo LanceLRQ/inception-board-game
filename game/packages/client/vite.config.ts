@@ -1,11 +1,32 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+import { buildThemeBootScript } from './src/theme/bootScript';
+import { DEFAULT_THEME_ID, THEMES } from './src/theme/themes';
+
+/** 把首屏主题脚本注入到 <head> 最前面，让主题属性在首次绘制之前就位 */
+function themeBootPlugin(): Plugin {
+  return {
+    name: 'icgame-theme-boot',
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'script',
+          children: buildThemeBootScript(),
+          injectTo: 'head-prepend',
+        },
+      ];
+    },
+  };
+}
+
+const defaultThemeColor = THEMES[DEFAULT_THEME_ID].themeColor;
 
 export default defineConfig({
   plugins: [
+    themeBootPlugin(),
     tailwindcss(),
     react(),
     VitePWA({
@@ -15,8 +36,8 @@ export default defineConfig({
         name: '盗梦都市 · Inception City Online',
         short_name: '盗梦都市',
         description: '移动端优先的桌游《盗梦都市》在线多人复刻',
-        theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
+        theme_color: defaultThemeColor,
+        background_color: defaultThemeColor,
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

@@ -134,11 +134,10 @@
     }
   },
   "theme": {
-    "toggle": "切换主题",
-    "toggle_hint": "点击循环：浅色 → 深色 → 跟随系统",
-    "light": "浅色",
-    "dark": "深色",
-    "system": "跟随系统"
+    "pick": "选择主题",
+    "names": {
+      "noir": "深眠影院"
+    }
   },
   "avatar": {
     "roll": "摇骰换头像",

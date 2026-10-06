@@ -134,11 +134,10 @@
     }
   },
   "theme": {
-    "toggle": "Toggle Theme",
-    "toggle_hint": "Click to cycle: Light → Dark → System",
-    "light": "Light",
-    "dark": "Dark",
-    "system": "System"
+    "pick": "Choose theme",
+    "names": {
+      "noir": "Cinematic Noir"
+    }
   },
   "avatar": {
     "roll": "Roll Avatar",

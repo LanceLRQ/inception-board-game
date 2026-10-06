@@ -1,41 +1,30 @@
-// useThemeEffect - 同步主题偏好到 document.documentElement.classList + 监听系统偏好变化
-// 明暗双主题 follow 系统
+// useThemeEffect - 把当前主题同步到 <html> 的 data-theme / data-scheme 与 theme-color meta
 
 import { useEffect } from 'react';
-import { resolveTheme, type ResolvedTheme } from '../lib/theme';
+import { getTheme, type ThemeDefinition } from '../theme/themes';
 import { useThemeStore } from '../stores/useThemeStore';
 
-/** 应用 resolved 主题到 HTML 根元素（`.dark` class） */
-export function applyThemeClass(resolved: ResolvedTheme): void {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  if (resolved === 'dark') {
-    root.classList.add('dark');
-  } else {
-    root.classList.remove('dark');
-  }
-  root.setAttribute('data-theme', resolved);
+/** applyTheme 用到的最小 document 形状，便于在没有 DOM 的测试环境里传入替身 */
+export interface ThemeDocument {
+  readonly documentElement: { setAttribute(name: string, value: string): void };
+  querySelector(selector: string): { setAttribute(name: string, value: string): void } | null;
+}
+
+/** 把主题落到根元素：设置主题 id 与明暗属性，并更新 theme-color meta */
+export function applyTheme(
+  theme: ThemeDefinition,
+  doc: ThemeDocument | undefined = typeof document === 'undefined' ? undefined : document,
+): void {
+  if (!doc) return;
+  doc.documentElement.setAttribute('data-theme', theme.id);
+  doc.documentElement.setAttribute('data-scheme', theme.scheme);
+  doc.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.themeColor);
 }
 
 export function useThemeEffect(): void {
-  const preference = useThemeStore((s) => s.preference);
+  const themeId = useThemeStore((s) => s.themeId);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const sync = () => {
-      const resolved = resolveTheme(preference, media.matches);
-      applyThemeClass(resolved);
-    };
-
-    sync();
-
-    // 仅在 preference === 'system' 时才关心系统偏好变化
-    if (preference === 'system') {
-      const onChange = () => sync();
-      media.addEventListener('change', onChange);
-      return () => media.removeEventListener('change', onChange);
-    }
-  }, [preference]);
+    applyTheme(getTheme(themeId));
+  }, [themeId]);
 }
