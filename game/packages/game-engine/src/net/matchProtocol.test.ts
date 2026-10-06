@@ -100,6 +100,26 @@ describe('parseClientMatchMessage', () => {
 
   // === intentId 校验 ===
 
+  it('should parse icg:resume with or without payload', () => {
+    expect(parseClientMatchMessage('icg:resume', undefined)).toEqual({ type: 'icg:resume' });
+    expect(parseClientMatchMessage('icg:resume', null)).toEqual({ type: 'icg:resume' });
+    expect(parseClientMatchMessage('icg:resume', { type: 'icg:resume' })).toEqual({
+      type: 'icg:resume',
+    });
+  });
+
+  it('should discard extra fields in icg:resume payload, never carrying a seat', () => {
+    expect(parseClientMatchMessage('icg:resume', { seat: '3', matchID: 'x' })).toEqual({
+      type: 'icg:resume',
+    });
+  });
+
+  it('should reject icg:resume with mismatched type or non-object payload', () => {
+    expect(parseClientMatchMessage('icg:resume', { type: 'icg:move' })).toBeNull();
+    expect(parseClientMatchMessage('icg:resume', 'resume')).toBeNull();
+    expect(parseClientMatchMessage('icg:resume', [])).toBeNull();
+  });
+
   it('should reject intentId that is not a string', () => {
     const result = parseClientMatchMessage('icg:move', {
       type: 'icg:move',

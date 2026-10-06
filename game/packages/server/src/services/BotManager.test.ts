@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { BotManager } from './BotManager.js';
 import type { TakeoverRecord } from '@icgame/bot';
 
+const { log } = vi.hoisted(() => ({
+  log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+vi.mock('../infra/logger.js', () => ({ logger: log }));
+
 describe('BotManager', () => {
   let now: number;
   let bot: BotManager;
@@ -168,6 +173,116 @@ describe('BotManager', () => {
       bot.onReconnect('m1', 'p1');
       expect(bot.isBotControlled('m1', 'p1')).toBe(false);
       expect(bot.isBotControlled('m2', 'p1')).toBe(true);
+    });
+  });
+
+  describe('idle takeover', () => {
+    it('takes over after the threshold of consecutive timeouts and fires takeover once', () => {
+      const listener = vi.fn<(matchID: string, record: TakeoverRecord) => void>();
+      bot.onTakeover(listener);
+
+      bot.recordTimeout('m1', 's1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(false);
+      expect(listener).not.toHaveBeenCalled();
+
+      bot.recordTimeout('m1', 's1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(true);
+      expect(bot.takeoverReason('m1', 's1')).toBe('idle');
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      bot.recordTimeout('m1', 's1');
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('threshold is configurable', () => {
+      const b = new BotManager({ idleTakeoverThreshold: 3, now: () => now });
+      b.recordTimeout('m1', 's1');
+      b.recordTimeout('m1', 's1');
+      expect(b.isBotControlled('m1', 's1')).toBe(false);
+      b.recordTimeout('m1', 's1');
+      expect(b.isBotControlled('m1', 's1')).toBe(true);
+    });
+
+    it('a player move clears the streak', () => {
+      bot.recordTimeout('m1', 's1');
+      bot.recordPlayerMove('m1', 's1');
+      bot.recordTimeout('m1', 's1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(false);
+      bot.recordTimeout('m1', 's1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(true);
+    });
+
+    it('counts per seat', () => {
+      bot.recordTimeout('m1', 's1');
+      bot.recordTimeout('m1', 's2');
+      expect(bot.isBotControlled('m1', 's1')).toBe(false);
+      expect(bot.isBotControlled('m1', 's2')).toBe(false);
+    });
+
+    it('idle takeover survives disconnect and reconnect', () => {
+      bot.recordTimeout('m1', 's1');
+      bot.recordTimeout('m1', 's1');
+      bot.onDisconnect('m1', 's1');
+      now += 70_000;
+      bot.tick();
+      bot.onReconnect('m1', 's1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(true);
+      expect(bot.takeoverReason('m1', 's1')).toBe('idle');
+    });
+
+    it('disconnect takeover reports its own reason and is lifted by reconnect', () => {
+      bot.onDisconnect('m1', 's1');
+      now += 60_000;
+      bot.tick();
+      expect(bot.takeoverReason('m1', 's1')).toBe('disconnected');
+      bot.onReconnect('m1', 's1');
+      expect(bot.takeoverReason('m1', 's1')).toBeUndefined();
+    });
+
+    it('resume lifts both reasons and resets the streak', () => {
+      bot.recordTimeout('m1', 's1');
+      bot.recordTimeout('m1', 's1');
+      bot.onDisconnect('m1', 's1');
+      now += 60_000;
+      bot.tick();
+      expect(bot.resume('m1', 's1')).toBe(true);
+      expect(bot.isBotControlled('m1', 's1')).toBe(false);
+      // 计数已清零：再一次超时不会立刻重新托管
+      bot.recordTimeout('m1', 's1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(false);
+    });
+
+    it('resume on a seat that is not taken over is a no-op', () => {
+      expect(bot.resume('m1', 's1')).toBe(false);
+      bot.recordTimeout('m1', 's1');
+      expect(bot.resume('m1', 's1')).toBe(false);
+    });
+
+    it('resume cannot lift a permanent takeover', () => {
+      bot.markPermanent('m1', 's1');
+      expect(bot.resume('m1', 's1')).toBe(false);
+      expect(bot.isBotControlled('m1', 's1')).toBe(true);
+    });
+
+    it('disposeMatch drops idle state', () => {
+      bot.recordTimeout('m1', 's1');
+      bot.recordTimeout('m1', 's1');
+      bot.disposeMatch('m1');
+      expect(bot.isBotControlled('m1', 's1')).toBe(false);
+    });
+
+    it('logs start and release at info level', () => {
+      bot.recordTimeout('m1', 's1');
+      bot.recordTimeout('m1', 's1');
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({ matchID: 'm1', seat: 's1' }),
+        'idle takeover started',
+      );
+      bot.resume('m1', 's1');
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({ matchID: 'm1', seat: 's1' }),
+        'takeover released by player',
+      );
     });
   });
 });

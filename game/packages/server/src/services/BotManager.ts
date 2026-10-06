@@ -12,7 +12,11 @@
 //     本类只负责"决定哪些玩家当前由 Bot 控制"。
 
 import { AITakeoverManager, type TakeoverReason, type TakeoverRecord } from '@icgame/bot';
+import type { SeatTakeoverReason } from '@icgame/game-engine';
 import { logger } from '../infra/logger.js';
+
+/** 同一座位连续被超时代发多少次后转为托管 */
+export const IDLE_TAKEOVER_THRESHOLD = 2;
 
 export interface BotManagerOptions {
   /** 掉线多少毫秒后接管（默认 60s） */
@@ -21,6 +25,8 @@ export interface BotManagerOptions {
   readonly tickIntervalMs?: number;
   /** 强制硬关阈值（默认 3min），超过则标记 abandoned */
   readonly hardCutoffMs?: number;
+  /** 连续被超时代发几次后转为挂机托管（默认 2） */
+  readonly idleTakeoverThreshold?: number;
   /** 获取当前时间（可注入用于测试） */
   readonly now?: () => number;
 }
@@ -36,6 +42,13 @@ interface MatchEntry {
   readonly disconnects: Map<string, number>;
   /** 永久补位名单（好友房房主离开允许） */
   readonly permanent: Set<string>;
+  /**
+   * 挂机托管记录，与掉线接管分开存放：
+   * 重连只清掉掉线接管，挂机托管必须由本人取消，否则刷新一下页面就能回到每步等满时限。
+   */
+  readonly idle: AITakeoverManager;
+  /** 座位号 → 连续被超时代发的次数；托管后不再累计 */
+  readonly timeoutStreaks: Map<string, number>;
 }
 
 export type TakeoverListener = (matchID: string, record: TakeoverRecord) => void;
@@ -50,12 +63,14 @@ export class BotManager {
   private readonly takeoverThresholdMs: number;
   private readonly tickIntervalMs: number;
   private readonly hardCutoffMs: number;
+  private readonly idleThreshold: number;
   private readonly now: () => number;
 
   constructor(opts: BotManagerOptions = {}) {
     this.takeoverThresholdMs = opts.takeoverThresholdMs ?? 60_000;
     this.tickIntervalMs = opts.tickIntervalMs ?? 5_000;
     this.hardCutoffMs = opts.hardCutoffMs ?? 180_000;
+    this.idleThreshold = opts.idleTakeoverThreshold ?? IDLE_TAKEOVER_THRESHOLD;
     this.now = opts.now ?? (() => Date.now());
   }
 
@@ -89,6 +104,8 @@ export class BotManager {
     const entry = this.matches.get(matchID);
     if (!entry) return;
     entry.manager.clear();
+    entry.idle.clear();
+    entry.timeoutStreaks.clear();
     entry.disconnects.clear();
     entry.permanent.clear();
     this.matches.delete(matchID);
@@ -112,6 +129,52 @@ export class BotManager {
     }
   }
 
+  /**
+   * 房间代这个座位超时发了一步。连续达到阈值后转为挂机托管，并通知 takeover 监听器。
+   * 已托管的座位不再累计（它的步由 Bot 走，不会再有超时代发）。
+   */
+  recordTimeout(matchID: string, seat: string): void {
+    const entry = this.ensureMatch(matchID);
+    if (entry.idle.isBotControlled(seat)) return;
+    const streak = (entry.timeoutStreaks.get(seat) ?? 0) + 1;
+    entry.timeoutStreaks.set(seat, streak);
+    if (streak < this.idleThreshold) return;
+    const record = entry.idle.takeover(seat, 'timeout');
+    logger.info({ matchID, seat, streak }, 'idle takeover started');
+    this.fireTakeover(matchID, record);
+  }
+
+  /** 座位本人提交了一步并被接受：连续超时的计数清零（已有的托管不因此解除） */
+  recordPlayerMove(matchID: string, seat: string): void {
+    this.matches.get(matchID)?.timeoutStreaks.delete(seat);
+  }
+
+  /**
+   * 本人取消托管：挂机与掉线两种原因都解除，计数清零。
+   * 返回此前是否处于托管；永久补位的座位不可解除。调用方负责重新排程与通知座位变化。
+   */
+  resume(matchID: string, seat: string): boolean {
+    const entry = this.matches.get(matchID);
+    if (!entry) return false;
+    const wasIdle = entry.idle.restore(seat);
+    const rec = entry.manager.list().find((r) => r.playerID === seat);
+    const wasDisconnected = rec !== undefined && entry.manager.restore(seat);
+    if (wasIdle || wasDisconnected) entry.timeoutStreaks.delete(seat);
+    if (wasIdle || wasDisconnected) {
+      logger.info({ matchID, seat, wasIdle, wasDisconnected }, 'takeover released by player');
+    }
+    return wasIdle || wasDisconnected;
+  }
+
+  /** 座位被托管的原因；没有托管返回 undefined。两种原因并存时报挂机（它不会因重连解除） */
+  takeoverReason(matchID: string, seat: string): SeatTakeoverReason | undefined {
+    const entry = this.matches.get(matchID);
+    if (!entry) return undefined;
+    if (entry.idle.isBotControlled(seat)) return 'idle';
+    if (entry.manager.isBotControlled(seat)) return 'disconnected';
+    return undefined;
+  }
+
   /** 好友房房主离开：标记永久补位 */
   markPermanent(matchID: string, playerID: string): void {
     const entry = this.ensureMatch(matchID);
@@ -123,7 +186,10 @@ export class BotManager {
   /** 查询某玩家当前是否由 Bot 控制 */
   isBotControlled(matchID: string, playerID: string): boolean {
     const entry = this.matches.get(matchID);
-    return entry?.manager.isBotControlled(playerID) ?? false;
+    return (
+      (entry?.manager.isBotControlled(playerID) ?? false) ||
+      (entry?.idle.isBotControlled(playerID) ?? false)
+    );
   }
 
   /** 获取对局快照（测试/调试用） */
@@ -189,6 +255,8 @@ export class BotManager {
         manager: new AITakeoverManager(),
         disconnects: new Map(),
         permanent: new Set(),
+        idle: new AITakeoverManager(),
+        timeoutStreaks: new Map(),
       };
       this.matches.set(matchID, entry);
     }

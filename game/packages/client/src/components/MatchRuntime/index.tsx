@@ -43,6 +43,7 @@ import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
 import { awaitingNotice } from './awaitingNotice';
 import { remainingSeconds, useSecondClock } from './deadline';
 import { seatMarkers } from './seatMarkers';
+import { SelfTakeoverBanner } from '../SelfTakeoverBanner';
 import { otherTurnLabel } from './turnLabel';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 
@@ -178,6 +179,16 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
     [sourceView, mySeat],
   );
   const isRemote = sourceKind === 'remote';
+  const selfTakenOver = source.selfTakenOver;
+  // 托管的开始与取消各打一条流程日志；首次渲染时本来就没托管，不记
+  const wasTakenOver = useRef(false);
+  useEffect(() => {
+    if (wasTakenOver.current === selfTakenOver) return;
+    wasTakenOver.current = selfTakenOver;
+    logger.flow('game', selfTakenOver ? 'self takeover started' : 'self takeover released', {
+      seat: mySeat,
+    });
+  }, [selfTakenOver, mySeat]);
   const seatByID = useMemo(() => new Map(source.seats.map((s) => [s.seat, s])), [source.seats]);
 
   const G = gameState?.G as Record<string, unknown> | undefined;
@@ -615,6 +626,8 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
           {topRight}
         </div>
       </div>
+
+      <SelfTakeoverBanner visible={isRemote && selfTakenOver} onResume={source.resume} />
 
       {awaiting && (
         <div

@@ -46,6 +46,7 @@ export class WSMessageRouter {
       // 对局消息由 matchGateway 处理，不应走到这里
       case 'icg:move':
       case 'icg:sync':
+      case 'icg:resume':
         return {};
 
       default: {

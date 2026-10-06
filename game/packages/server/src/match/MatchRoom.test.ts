@@ -5,6 +5,7 @@ import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/g
 import { nextAutoAction } from '@icgame/bot';
 import {
   MatchRoom,
+  seatActivityKind,
   type RoomDeps,
   type RoomSeat,
   type StepOutput,
@@ -219,6 +220,95 @@ describe('MatchRoom 排程', () => {
     h.room.close();
     await h.room.idle();
     expect(h.steps).toHaveLength(0);
+  });
+});
+
+describe('seatActivityKind', () => {
+  it('本人提交的一步算 player，不论是不是自己的回合', () => {
+    expect(seatActivityKind('player', '1', '1')).toBe('player');
+    expect(seatActivityKind('player', '1', '2')).toBe('player');
+  });
+
+  it('自己回合内被超时代发算 timeout', () => {
+    expect(seatActivityKind('timeout', '1', '1')).toBe('timeout');
+  });
+
+  it('回合外的应答被超时代发不算挂机：有些应答还没有操作界面，真人只能等', () => {
+    expect(seatActivityKind('timeout', '1', '2')).toBeNull();
+  });
+
+  it('Bot 自动步不算', () => {
+    expect(seatActivityKind('bot', '1', '1')).toBeNull();
+  });
+});
+
+describe('MatchRoom 座位活动上报', () => {
+  const humans = ['0', '1', '2', '3', '4'];
+
+  it('超时代发上报 timeout，对象是被代发的座位', async () => {
+    const onSeatActivity = vi.fn();
+    const h = makeHarness(5, humans, { onSeatActivity }, stateAfterSetup(5));
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+    expect(onSeatActivity).toHaveBeenCalledTimes(1);
+    expect(onSeatActivity).toHaveBeenCalledWith(h.steps[0]!.request.playerID, 'timeout');
+  });
+
+  it('玩家本人被接受的 move 上报 player', async () => {
+    const onSeatActivity = vi.fn();
+    const h = makeHarness(5, humans, { onSeatActivity }, stateAfterSetup(5));
+    h.room.start();
+    const action = nextAutoAction(h.room.current(), { humanPlayerIDs: [] })!;
+    await h.room.submit(action.playerID, { move: action.move, args: action.args, intentId: 'a' });
+    expect(onSeatActivity).toHaveBeenCalledTimes(1);
+    expect(onSeatActivity).toHaveBeenCalledWith(action.playerID, 'player');
+  });
+
+  it('被拒的 move 与 Bot 自动步不上报', async () => {
+    const onSeatActivity = vi.fn();
+    const h = makeHarness(5, [], { onSeatActivity });
+    h.room.start();
+    await h.room.submit('0', { move: 'noSuchMove', args: [], intentId: 'bad' });
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('bot');
+    expect(onSeatActivity).not.toHaveBeenCalled();
+  });
+
+  it('上报的回调抛错不影响这一步', async () => {
+    const onSeatActivity = vi.fn(() => {
+      throw new Error('boom');
+    });
+    const h = makeHarness(5, humans, { onSeatActivity }, stateAfterSetup(5));
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps).toHaveLength(1);
+    expect(h.timers.pending().length).toBeGreaterThan(0);
+  });
+
+  it('回调里把座位标为托管后，这一步之后立即按托管排程（自动步短延迟，没有截止）', async () => {
+    const h = makeHarness(
+      5,
+      humans,
+      {
+        onSeatActivity: (seat, kind) => {
+          if (kind === 'timeout') h.takenOver.add(seat);
+        },
+      },
+      stateAfterSetup(5),
+    );
+    h.room.start();
+    expect(h.room.deadlineAt()).not.toBeNull();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.room.deadlineAt()).toBeNull();
+    const owner = h.steps[0]!.request.playerID;
+    expect(h.takenOver.has(owner)).toBe(true);
+    // 下一个计时器是自动步的短延迟
+    expect(h.timers.pending()[0]!.at).toBe(h.timers.now() + timing.botStepDelayMs);
   });
 });
 

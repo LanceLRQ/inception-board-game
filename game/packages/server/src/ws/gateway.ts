@@ -218,6 +218,7 @@ export class SocketGateway {
       isConnected: (seat) =>
         registry.listMatchConnections(room.matchID).some((c) => c.seat === seat),
       isTakenOver: (seat) => bot.isBotControlled(room.matchID, seat),
+      takeoverReason: (seat) => bot.takeoverReason(room.matchID, seat),
     });
   }
 
@@ -290,6 +291,15 @@ export class SocketGateway {
             },
           );
           socket.emit(out.type, out);
+          return;
+        }
+        if (event === 'icg:resume') {
+          // 形状不对的取消托管请求同样要有回应
+          socket.emit('icg:error', {
+            type: 'icg:error',
+            code: 'INVALID_MESSAGE',
+            message: 'Malformed icg:resume',
+          });
           return;
         }
         if (event === 'icg:move') {

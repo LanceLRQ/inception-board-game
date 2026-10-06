@@ -33,6 +33,15 @@ describe('seatMarkers', () => {
     ]);
   });
 
+  it('因挂机被托管的真人显示 idle_takeover，替代通用的 taken_over', () => {
+    expect(seatMarkers({ ...base, takenOver: true, takeoverReason: 'idle' })).toEqual([
+      'idle_takeover',
+    ]);
+    expect(seatMarkers({ ...base, takenOver: true, takeoverReason: 'disconnected' })).toEqual([
+      'taken_over',
+    ]);
+  });
+
   it('座位表里没有该座位时没有标识', () => {
     expect(seatMarkers(undefined)).toEqual([]);
   });

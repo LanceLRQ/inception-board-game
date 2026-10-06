@@ -40,6 +40,7 @@ describe('WSMessageRouter', () => {
     it.each<ClientMessage>([
       { type: 'icg:move', move: 'x', args: [], intentId: 'i' },
       { type: 'icg:sync' },
+      { type: 'icg:resume' },
     ])('returns empty for $type (handled by the match gateway)', async (msg) => {
       expect(await router.route(ctx, msg)).toEqual({});
     });

@@ -59,6 +59,7 @@ function makeRoom(n: number, humans: readonly number[]): RoomState {
 
 interface Harness {
   svc: MatchService;
+  bot: BotManager;
   timers: FakeTimers;
   steps: StepOutput[];
 }
@@ -66,10 +67,11 @@ interface Harness {
 async function makeMatch(): Promise<Harness> {
   const timers = new FakeTimers();
   const steps: StepOutput[] = [];
+  const bot = new BotManager({ now: timers.now });
   const svc = new MatchService({
     store: new InMemoryMatchStore(),
     archive: new InMemoryMatchArchive(),
-    bot: new BotManager({ now: timers.now }),
+    bot,
     timing,
     timers,
     randomSeed: () => SEED,
@@ -80,7 +82,7 @@ async function makeMatch(): Promise<Harness> {
     onGameOver: () => undefined,
   });
   await svc.createFromRoom(makeRoom(5, [0, 2]));
-  return { svc, timers, steps };
+  return { svc, bot, timers, steps };
 }
 
 async function runUntilStep(h: Harness, count = 1): Promise<void> {
@@ -199,6 +201,22 @@ describe('seatInfos', () => {
   });
 });
 
+describe('seatInfos 托管原因', () => {
+  it('被托管的真人座位带 takeoverReason，未托管与 Bot 座位不带', async () => {
+    const h = await makeMatch();
+    const room = h.svc.get('room-1')!;
+    const infos = seatInfos(room, {
+      isConnected: () => true,
+      isTakenOver: (seat) => seat === '0' || seat === '2',
+      takeoverReason: (seat) => (seat === '0' ? 'idle' : 'disconnected'),
+    });
+    expect(infos[0]).toMatchObject({ takenOver: true, takeoverReason: 'idle' });
+    expect(infos[2]).toMatchObject({ takenOver: true, takeoverReason: 'disconnected' });
+    expect(infos[1]!.takeoverReason).toBeUndefined();
+    expect(infos[3]!.takeoverReason).toBeUndefined();
+  });
+});
+
 describe('state and step messages', () => {
   it('stateMessage carries protocol and the seat-specific view', async () => {
     const h = await makeMatch();
@@ -307,6 +325,7 @@ describe('handleMatchMessage', () => {
   it('maps a rate limit rejection and never calls room.submit', async () => {
     const submit = vi.fn();
     const matches = {
+      resumeSeat: () => false,
       get: () => ({ current: () => ({ ctx: { phase: 'playing' } }), submit }) as never,
     };
     const moveGateway = {
@@ -331,6 +350,7 @@ describe('handleMatchMessage', () => {
 
   it('maps a duplicate-intent rejection and passes shape codes through', async () => {
     const matches = {
+      resumeSeat: () => false,
       get: () => ({ current: () => ({ ctx: { phase: 'playing' } }), submit: vi.fn() }) as never,
     };
     const run = async (code: string) =>
@@ -351,6 +371,7 @@ describe('handleMatchMessage', () => {
     const commit = vi.fn();
     const out = await handleMatchMessage(move(), ctx, {
       matches: {
+        resumeSeat: () => false,
         get: () => ({ current: () => ({ ctx: { phase: 'playing' } }), submit: vi.fn() }) as never,
       },
       moveGateway: {
@@ -395,6 +416,7 @@ describe('handleMatchMessage', () => {
     })!;
     const out = await handleMatchMessage(forged, ctx, {
       matches: {
+        resumeSeat: () => false,
         get: () => ({ current: () => ({ ctx: { phase: 'playing' } }), submit }) as never,
       },
       moveGateway: { accept, commit, consumeRate: vi.fn() },
@@ -413,6 +435,7 @@ describe('handleMatchMessage', () => {
     const commit = vi.fn();
     const out = await handleMatchMessage(move(), ctx, {
       matches: {
+        resumeSeat: () => false,
         get: () =>
           ({
             current: () => ({ ctx: { phase: 'playing' } }),
@@ -451,6 +474,7 @@ describe('handleMatchMessage', () => {
   it('answers internal_error without leaking the exception text', async () => {
     const out = await handleMatchMessage(move(), ctx, {
       matches: {
+        resumeSeat: () => false,
         get: () => {
           throw new Error('boom: secret detail');
         },
@@ -466,5 +490,71 @@ describe('handleMatchMessage', () => {
     });
     expect(JSON.stringify(out)).not.toContain('secret');
     expect(log.error).toHaveBeenCalled();
+  });
+});
+
+describe('handleMatchMessage icg:resume', () => {
+  const ctx = { matchID: 'room-1', playerID: 'acct-0', seat: '0' };
+  const idle = (h: Harness, seat: string): void => {
+    h.bot.recordTimeout('room-1', seat);
+    h.bot.recordTimeout('room-1', seat);
+  };
+  const depsFor = (h: Harness, rate = new InMemoryRateGuard()) => ({
+    matches: h.svc,
+    moveGateway: new MoveGateway(rate),
+    seatsFor: (r: Parameters<typeof seatInfos>[0]) =>
+      seatInfos(r, {
+        isConnected: () => true,
+        isTakenOver: (seat) => h.bot.isBotControlled('room-1', seat),
+        takeoverReason: (seat) => h.bot.takeoverReason('room-1', seat),
+      }),
+  });
+
+  it('只解除发送者自己座位的托管，别人的不受影响', async () => {
+    const h = await makeMatch();
+    idle(h, '0');
+    idle(h, '2');
+    const out = await handleMatchMessage({ type: 'icg:resume' }, ctx, depsFor(h));
+    expect(h.bot.isBotControlled('room-1', '0')).toBe(false);
+    expect(h.bot.isBotControlled('room-1', '2')).toBe(true);
+    expect(out.type).toBe('icg:seats');
+    const seats = (out as Extract<ServerMatchMessage, { type: 'icg:seats' }>).seats;
+    expect(seats[0]).toMatchObject({ seat: '0', takenOver: false });
+    expect(seats[2]).toMatchObject({ seat: '2', takenOver: true, takeoverReason: 'idle' });
+  });
+
+  it('座位不在托管时是无操作，同样回座位表', async () => {
+    const h = await makeMatch();
+    idle(h, '2');
+    const out = await handleMatchMessage({ type: 'icg:resume' }, ctx, depsFor(h));
+    expect(out.type).toBe('icg:seats');
+    expect(h.bot.isBotControlled('room-1', '2')).toBe(true);
+  });
+
+  it('不在对局里的连接发来时被拒', async () => {
+    const h = await makeMatch();
+    const out = await handleMatchMessage(
+      { type: 'icg:resume' },
+      { ...ctx, matchID: 'ghost' },
+      depsFor(h),
+    );
+    expect(out).toMatchObject({ type: 'icg:error', code: 'NOT_IN_MATCH' });
+  });
+
+  it('与 move 共用限流：超限后被拒且不解除托管', async () => {
+    const h = await makeMatch();
+    idle(h, '0');
+    const deps = depsFor(h, new InMemoryRateGuard({ maxPerWindow: 0 }));
+    const out = await handleMatchMessage({ type: 'icg:resume' }, ctx, deps);
+    expect(out).toMatchObject({ type: 'icg:error', code: 'RATE_LIMITED' });
+    expect(h.bot.isBotControlled('room-1', '0')).toBe(true);
+  });
+
+  it('解除托管时通知座位变化', async () => {
+    const h = await makeMatch();
+    idle(h, '0');
+    const spy = vi.spyOn(h.svc, 'seatsChanged');
+    await handleMatchMessage({ type: 'icg:resume' }, ctx, depsFor(h));
+    expect(spy).toHaveBeenCalledWith('room-1');
   });
 });

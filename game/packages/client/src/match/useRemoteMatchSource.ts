@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { createIoSocket } from './createIoSocket';
 import { MatchSocket, type MatchSocketSnapshot } from './matchSocket';
-import type { MatchSource, MoveOutcome } from './matchSource';
+import { isSelfTakenOver, type MatchSource, type MoveOutcome } from './matchSource';
 
 export interface RemoteMatchParams {
   url: string;
@@ -15,6 +15,7 @@ export interface RemoteMatchParams {
 export function toMatchSource(
   snapshot: MatchSocketSnapshot,
   sendMove: (move: string, args?: unknown[]) => Promise<MoveOutcome>,
+  resume: () => void,
 ): MatchSource {
   return {
     kind: 'remote',
@@ -25,7 +26,9 @@ export function toMatchSource(
     connection: snapshot.connection,
     storageDegraded: snapshot.storageDegraded,
     error: snapshot.fatal === null ? null : `match.fatal.${snapshot.fatal}`,
+    selfTakenOver: isSelfTakenOver(snapshot.seats, snapshot.seat),
     makeMove: sendMove,
+    resume,
   };
 }
 
@@ -73,5 +76,7 @@ export function useRemoteMatchSource({ url, token, matchID }: RemoteMatchParams)
     [socket],
   );
 
-  return useMemo(() => toMatchSource(snapshot, sendMove), [snapshot, sendMove]);
+  const resume = useCallback(() => socket?.resume(), [socket]);
+
+  return useMemo(() => toMatchSource(snapshot, sendMove, resume), [snapshot, sendMove, resume]);
 }

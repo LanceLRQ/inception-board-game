@@ -30,5 +30,15 @@ export interface MatchSource {
   readonly storageDegraded: boolean;
   /** 无法继续时的错误文案键；正常为 null */
   readonly error: string | null;
+  /** 本人座位是否被 Bot 托管（挂机或掉线）；本地来源恒为 false */
+  readonly selfTakenOver: boolean;
   makeMove(move: string, args?: unknown[]): Promise<MoveOutcome>;
+  /** 取消本人座位的托管；本地来源是无操作 */
+  resume(): void;
+}
+
+/** 本人座位在座位表里是否处于托管 */
+export function isSelfTakenOver(seats: readonly SeatInfo[], seat: string | null): boolean {
+  if (seat === null) return false;
+  return seats.find((s) => s.seat === seat)?.takenOver === true;
 }

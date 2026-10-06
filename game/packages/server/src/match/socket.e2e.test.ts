@@ -487,6 +487,53 @@ describe('掉线接管', () => {
   }, 30_000);
 });
 
+describe('挂机托管', () => {
+  it('不操作的真人被代发两次后托管，只有本人的 icg:resume 能取消；畸形请求被拒', async () => {
+    const server = await boot({
+      timing: { turnTimeoutMs: 100, pendingTimeoutMs: 100, responseTimeoutCapMs: 100 },
+    });
+    const { room, accounts } = makeRoom({ humans: 2, bots: 2 });
+    await server.rt.matches.createFromRoom(room);
+    const [idle, active] = (await joinAll(server, accounts, room.id)) as [TestClient, TestClient];
+    active.startAutoPlay();
+    await waitUntil(() => allInPlaying([idle, active]), '进入对局阶段');
+    const seat = idle.seat!;
+    const seatOf = (c: TestClient) => c.seatTables.at(-1)?.seats.find((s) => s.seat === seat);
+
+    await active.waitFor(
+      (c) => seatOf(c)?.takenOver === true,
+      '挂机座位在座位表里显示托管',
+      20_000,
+    );
+    expect(seatOf(active)).toMatchObject({ takenOver: true, takeoverReason: 'idle' });
+
+    // 另一个座位发 icg:resume，不影响挂机座位；消息体里伪造座位也无效
+    const before = active.seatTables.length;
+    active.socket.emit('icg:resume', { type: 'icg:resume', seat });
+    await active.waitFor((c) => c.seatTables.length > before, '收到 icg:resume 的应答');
+    expect(seatOf(active)).toMatchObject({ takenOver: true, takeoverReason: 'idle' });
+
+    // 畸形载荷：回错误，连接保持
+    const errs = idle.received.length;
+    idle.socket.emit('icg:resume', { type: 'icg:move' });
+    await idle.waitFor(
+      (c) => c.received.slice(errs).some((r) => r.event === 'icg:error') && c.connected,
+      '畸形 icg:resume 被拒',
+    );
+
+    // 本人取消：座位表里出现 takenOver 为 false 的版本
+    const mark = active.seatTables.length;
+    idle.socket.emit('icg:resume', { type: 'icg:resume' });
+    await active.waitFor(
+      (c) =>
+        c.seatTables
+          .slice(mark)
+          .some((t) => t.seats.find((s) => s.seat === seat)?.takenOver === false),
+      '本人取消托管后座位表更新',
+    );
+  }, 30_000);
+});
+
 // ---------------------------------------------------------------------------
 // 封禁
 // ---------------------------------------------------------------------------

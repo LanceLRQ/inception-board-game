@@ -298,3 +298,37 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
     await b.context.close();
   }
 });
+
+test('真人一直不操作会被托管，提示条出现，取消托管后提示条消失', async ({ browser }) => {
+  const a = await newPlayer(browser, '挂机甲');
+  try {
+    await createProfile(a);
+    await a.page.locator('#lobby-maxPlayers').selectOption('4');
+    await a.page.getByTestId('lobby-create').click();
+    await expect(a.page).toHaveURL(/\/room\/[A-Z0-9]{6}/);
+    await a.page.getByTestId('room-fill-ai').click();
+    await expect(a.page.getByTestId('room-start')).toBeEnabled();
+    await a.page.getByTestId('room-start').click();
+
+    await expect(a.page).toHaveURL(/\/game\//, { timeout: 15_000 });
+    await expect(a.page.getByTestId('turn-indicator')).toBeVisible({ timeout: 20_000 });
+    const seat = stateFrames(a)[0]!.seat;
+
+    // 从不点任何按钮：服务端把每一步等满时限（e2e 里约 2.5 秒）后代发，连续两次后转为托管
+    const banner = a.page.getByTestId('self-takeover-banner');
+    await expect(banner).toBeVisible({ timeout: 60_000 });
+    await expect(banner).toContainText(/托管|auto-play/i);
+    // 座位上的标识区分了挂机托管（标识在默认折叠的座位清单里，只确认存在）
+    await expect(a.page.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(1);
+
+    // 提示条的按钮点得到，且不挡住操作栏：点击后提示条消失
+    await a.page.getByTestId('self-takeover-resume').click();
+    await expect(banner).toBeHidden({ timeout: 5_000 });
+    await expect(a.page.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(0);
+
+    // 取消之后座位回到等待真人：继续不操作，再次被托管，说明计数是从 0 重新开始的
+    await expect(banner).toBeVisible({ timeout: 60_000 });
+  } finally {
+    await a.context.close();
+  }
+});

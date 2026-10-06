@@ -485,6 +485,117 @@ describe('MatchService 对局过程', () => {
   });
 });
 
+describe('MatchService 挂机托管', () => {
+  type StepArgs = [string, { source: string; request: { playerID: string } }];
+
+  function sources(h: Harness): string[] {
+    return (h.onStep.mock.calls as StepArgs[]).map(
+      (c) => `${c[1].source}:${c[1].request.playerID}`,
+    );
+  }
+  function timeoutCount(h: Harness): number {
+    return (h.onStep.mock.calls as StepArgs[]).filter((c) => c[1].source === 'timeout').length;
+  }
+
+  /** 一直推进，直到条件成立（每次只触发一个计时器） */
+  async function fireUntil(h: Harness, id: string, cond: () => boolean): Promise<void> {
+    for (let i = 0; i < 20_000; i++) {
+      await h.svc.get(id)!.idle();
+      if (cond() || !h.timers.fireNext()) break;
+    }
+    await h.svc.get(id)!.idle();
+  }
+
+  async function setup(): Promise<{ h: Harness; id: string }> {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    h.bot.onReconnect(id, '0');
+    return { h, id };
+  }
+
+  it('连续两次超时代发后座位被托管，座位变化通知恰好一次，托管后走自动步不再等满时限', async () => {
+    const { h, id } = await setup();
+    h.onSeatsChanged.mockClear();
+    await fireUntil(h, id, () => h.bot.isBotControlled(id, '0'));
+    expect(timeoutCount(h)).toBe(2);
+    expect(h.bot.takeoverReason(id, '0')).toBe('idle');
+    expect(h.onSeatsChanged).toHaveBeenCalledTimes(1);
+
+    // 托管之后这个座位的步都是自动步：再推进一阵也不会再出现 timeout
+    const before = h.onStep.mock.calls.length;
+    await fireUntil(h, id, () => sources(h).slice(before).includes('bot:0'));
+    expect(timeoutCount(h)).toBe(2);
+    expect(sources(h).slice(before)).toContain('bot:0');
+    expect(h.svc.get(id)!.deadlineAt()).toBeNull();
+  });
+
+  it('中间有一次玩家本人的 move，计数清零', async () => {
+    const { h, id } = await setup();
+    await fireUntil(h, id, () => timeoutCount(h) === 1);
+    expect(h.bot.isBotControlled(id, '0')).toBe(false);
+
+    // 轮到座位 0 等待时，由它本人提交一步
+    const room = h.svc.get(id)!;
+    await fireUntil(h, id, () => room.deadlineAt() !== null);
+    const next = legalNext(room);
+    expect(next.seat).toBe('0');
+    const r = await room.submit('0', { move: next.move, args: next.args, intentId: 'p1' });
+    expect(r.ok).toBe(true);
+
+    // 再被代发一次：只有 1 次连续，不触发托管
+    await fireUntil(h, id, () => timeoutCount(h) === 2);
+    expect(h.bot.isBotControlled(id, '0')).toBe(false);
+    await fireUntil(h, id, () => h.bot.isBotControlled(id, '0'));
+    expect(timeoutCount(h)).toBe(3);
+  });
+
+  it('resumeSeat 解除托管：重新排程、通知座位变化、恢复等待真人，计数清零', async () => {
+    const { h, id } = await setup();
+    await fireUntil(h, id, () => h.bot.isBotControlled(id, '0'));
+    h.onSeatsChanged.mockClear();
+
+    expect(h.svc.resumeSeat(id, '0')).toBe(true);
+    expect(h.bot.isBotControlled(id, '0')).toBe(false);
+    expect(h.onSeatsChanged).toHaveBeenCalledTimes(1);
+
+    const room = h.svc.get(id)!;
+    await fireUntil(h, id, () => room.deadlineAt() !== null);
+    expect(room.deadlineAt()).not.toBeNull();
+
+    // 计数从 0 重新开始：再一次超时不会立刻托管
+    const timeouts = timeoutCount(h);
+    await fireUntil(h, id, () => timeoutCount(h) === timeouts + 1);
+    expect(h.bot.isBotControlled(id, '0')).toBe(false);
+  });
+
+  it('resumeSeat 对没有托管的座位与不存在的对局是无操作', async () => {
+    const { h, id } = await setup();
+    h.onSeatsChanged.mockClear();
+    expect(h.svc.resumeSeat(id, '0')).toBe(false);
+    expect(h.svc.resumeSeat('nope', '0')).toBe(false);
+    expect(h.onSeatsChanged).not.toHaveBeenCalled();
+  });
+
+  it('挂机托管的座位断线再重连后仍是托管', async () => {
+    const { h, id } = await setup();
+    await fireUntil(h, id, () => h.bot.isBotControlled(id, '0'));
+    h.bot.onDisconnect(id, '0');
+    h.bot.onReconnect(id, '0');
+    expect(h.bot.isBotControlled(id, '0')).toBe(true);
+    expect(h.bot.takeoverReason(id, '0')).toBe('idle');
+  });
+
+  it('因断线被接管的座位重连后解除', async () => {
+    const { h, id } = await setup();
+    h.bot.onDisconnect(id, '0');
+    h.timers.t += 61_000;
+    h.bot.tick();
+    expect(h.bot.takeoverReason(id, '0')).toBe('disconnected');
+    h.bot.onReconnect(id, '0');
+    expect(h.bot.isBotControlled(id, '0')).toBe(false);
+  });
+});
+
 describe('MatchService 对局结束', () => {
   it('全 Bot 房间打完：各调用一次 recordFinish / store.finish / disposeMatch / onGameOver，房间延迟移除', async () => {
     const h = makeHarness();

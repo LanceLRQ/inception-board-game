@@ -86,6 +86,14 @@ describe('createLocalSourceController', () => {
     expect(seats[0]!.nickname).toBe('P0');
   });
 
+  it('本地来源恒不处于托管，resume 是无操作', async () => {
+    const ctl = createLocalSourceController(fakeApi());
+    await ctl.refresh();
+    const source = ctl.getSnapshot();
+    expect(source.selfTakenOver).toBe(false);
+    expect(() => source.resume()).not.toThrow();
+  });
+
   it('状态变化时通知订阅者，取消订阅后不再通知', async () => {
     const ctl = createLocalSourceController(fakeApi());
     const listener = vi.fn();

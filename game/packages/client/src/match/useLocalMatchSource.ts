@@ -92,7 +92,9 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       connection,
       storageDegraded: false,
       error,
+      selfTakenOver: false,
       makeMove,
+      resume: () => {},
     };
   }
   snapshot = build();
@@ -166,5 +168,7 @@ const IDLE_SOURCE: MatchSource = {
   connection: 'idle',
   storageDegraded: false,
   error: null,
+  selfTakenOver: false,
   makeMove: async () => ({ ok: false, code: 'not_ready' }),
+  resume: () => {},
 };

@@ -178,6 +178,13 @@ export class MatchSocket {
     });
   }
 
+  /** 请求取消本人座位的托管。座位由服务端按连接判定，消息里不带；结果以随后的座位表为准 */
+  resume(): void {
+    if (this.closed || this.socket === null || this.snapshot.connection !== 'connected') return;
+    logger.flow('net/ws', 'resume requested', { matchID: this.options.matchID });
+    this.socket.emit('icg:resume', { type: 'icg:resume' });
+  }
+
   /** 向服务端要一份最新状态；只发一次，服务端限流时不重试 */
   requestSync(): void {
     if (this.closed || this.socket === null) return;

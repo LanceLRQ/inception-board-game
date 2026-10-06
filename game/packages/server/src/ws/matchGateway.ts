@@ -12,6 +12,7 @@ import {
   type MatchSnapshotForViewer,
   type MoveRejectCode,
   type SeatInfo,
+  type SeatTakeoverReason,
   type ServerMatchMessage,
 } from '@icgame/game-engine';
 import { logger } from '../infra/logger.js';
@@ -72,17 +73,24 @@ type RoomView = Pick<MatchRoom, 'matchID' | 'current' | 'deadlineAt' | 'seats'>;
 export interface SeatStatusSource {
   isConnected(seat: string): boolean;
   isTakenOver(seat: string): boolean;
+  /** 被托管的原因；不给时座位信息里不带原因 */
+  takeoverReason?(seat: string): SeatTakeoverReason | undefined;
 }
 
 /** 座位表：Bot 座位恒为在线且未被接管 */
 export function seatInfos(room: Pick<MatchRoom, 'seats'>, status: SeatStatusSource): SeatInfo[] {
-  return room.seats().map((s) => ({
-    seat: s.seat,
-    nickname: s.nickname,
-    isBot: s.isBot,
-    connected: s.isBot ? true : status.isConnected(s.seat),
-    takenOver: s.isBot ? false : status.isTakenOver(s.seat),
-  }));
+  return room.seats().map((s) => {
+    const takenOver = s.isBot ? false : status.isTakenOver(s.seat);
+    const reason = takenOver ? status.takeoverReason?.(s.seat) : undefined;
+    return {
+      seat: s.seat,
+      nickname: s.nickname,
+      isBot: s.isBot,
+      connected: s.isBot ? true : status.isConnected(s.seat),
+      takenOver,
+      ...(reason !== undefined ? { takeoverReason: reason } : {}),
+    };
+  });
 }
 
 function buildSnapshot(
@@ -141,7 +149,7 @@ export interface MatchMessageContext {
 }
 
 export interface MatchMessageDeps {
-  matches: Pick<MatchService, 'get'>;
+  matches: Pick<MatchService, 'get' | 'resumeSeat'>;
   moveGateway: Pick<MoveGateway, 'accept' | 'commit' | 'consumeRate'>;
   seatsFor(room: MatchRoom): SeatInfo[];
 }
@@ -169,6 +177,18 @@ export async function handleMatchMessage(
       }
       if (room === null) return rejected('', 'not_in_match');
       return stateMessage(room, ctx.seat, deps.seatsFor(room));
+    }
+    if (msg.type === 'icg:resume') {
+      // 与 sync 同样要重算座位表，共用限流计数
+      if (!(await deps.moveGateway.consumeRate(ctx.playerID))) {
+        return { type: 'icg:error', code: 'RATE_LIMITED', message: 'Too many requests' };
+      }
+      if (room === null) {
+        return { type: 'icg:error', code: 'NOT_IN_MATCH', message: 'Not in this match' };
+      }
+      // 座位只取自握手登记的连接，绝不读消息体
+      deps.matches.resumeSeat(ctx.matchID, ctx.seat);
+      return { type: 'icg:seats', matchID: ctx.matchID, seats: deps.seatsFor(room) };
     }
     if (room === null) return rejected(intentId, 'not_in_match');
 

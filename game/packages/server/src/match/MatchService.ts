@@ -174,6 +174,14 @@ export class MatchService {
     this.deps.onSeatsChanged(matchID);
   }
 
+  /** 本人取消座位的托管（挂机与掉线两种原因都解除）；返回此前是否处于托管 */
+  resumeSeat(matchID: string, seat: string): boolean {
+    if (!this.rooms.has(matchID)) return false;
+    const released = this.deps.bot.resume(matchID, seat);
+    if (released) this.seatsChanged(matchID);
+    return released;
+  }
+
   /** 进程启动时调用：把活跃集合里的对局逐个恢复；单个失败不影响其余 */
   async restoreAll(): Promise<{ restored: number; failed: string[] }> {
     const ids = await this.deps.store.listActive();
@@ -345,6 +353,11 @@ export class MatchService {
       },
       onGameOver: (final): Promise<void> => this.finishMatch(matchID, final, seats, room),
       isTakenOver: (seat) => deps.bot.isBotControlled(matchID, seat),
+      onSeatActivity: (seat, kind) => {
+        // 达到阈值时 Bot 管理器会触发接管事件，由构造函数里的订阅重新排程并通知座位变化
+        if (kind === 'timeout') deps.bot.recordTimeout(matchID, seat);
+        else deps.bot.recordPlayerMove(matchID, seat);
+      },
       loadStoredVersion: async () => (await deps.store.load(matchID))?.state.stateID ?? null,
       onStorageHealth: (healthy) => deps.onStorageHealth?.(matchID, healthy),
       onFatal: (reason) => {

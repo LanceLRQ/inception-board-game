@@ -43,6 +43,11 @@ export interface RoomDeps {
   /** 某个真人座位此刻是否由 Bot 接管 */
   isTakenOver(seat: string): boolean;
   /**
+   * 真人座位有了一步被接受的行动：本人提交（player）或被超时代发（timeout）。
+   * 在这一步之后的排程之前调用，回调里把座位转为托管，排程就按托管算；它抛错不影响对局。
+   */
+  onSeatActivity?(seat: string, kind: 'player' | 'timeout'): void;
+  /**
    * 读取库里已存的版本号，没有快照返回 null。
    * 写入重试时用来分辨「写成功但应答丢了」与真正的版本冲突。
    */
@@ -75,6 +80,21 @@ const PERSIST_RETRY_DELAYS_MS = [100, 400] as const;
 /** 存储不可用期间自动步的退避：起点、上限（每次翻倍） */
 const STORAGE_BACKOFF_START_MS = 1_000;
 const STORAGE_BACKOFF_MAX_MS = 30_000;
+
+/**
+ * 一步被接受后，算作这个座位的哪种活动；不算则为 null。
+ * 超时代发只在座位自己的回合内才算挂机：回合外的应答有些还没有操作界面，
+ * 真人只能等服务端代为处理，把它算进去会让正常在玩的人被托管。
+ */
+export function seatActivityKind(
+  source: StepOutput['source'],
+  seat: string,
+  turnOwner: string,
+): 'player' | 'timeout' | null {
+  if (source === 'player') return 'player';
+  if (source === 'timeout' && seat === turnOwner) return 'timeout';
+  return null;
+}
 
 export class MatchRoom {
   readonly matchID: string;
@@ -446,6 +466,18 @@ export class MatchRoom {
     }
   }
 
+  /** Bot 自动步与 Bot 座位不算「真人的活动」 */
+  private reportSeatActivity(seat: string, source: StepOutput['source'], turnOwner: string): void {
+    const kind = seatActivityKind(source, seat, turnOwner);
+    if (kind === null || this.deps.onSeatActivity === undefined) return;
+    if (this.seatList.find((s) => s.seat === seat)?.isBot !== false) return;
+    try {
+      this.deps.onSeatActivity(seat, kind);
+    } catch (err) {
+      logger.error({ matchID: this.matchID, seat, err }, 'onSeatActivity failed');
+    }
+  }
+
   /** 执行一步：运行器 → 快照 → 推进状态 → 排程 → 归档回调 */
   private async step(request: MoveRequest, source: StepOutput['source']): Promise<SubmitResult> {
     const before = this.state;
@@ -495,6 +527,7 @@ export class MatchRoom {
     this.state = outcome.state;
     this.autoRejects = 0;
     this.timeoutMisses = 0;
+    this.reportSeatActivity(request.playerID, source, before.ctx.currentPlayer);
     logger.info(
       {
         matchID: this.matchID,

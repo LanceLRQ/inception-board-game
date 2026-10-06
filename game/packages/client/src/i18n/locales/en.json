@@ -177,11 +177,16 @@
     "deadline": "{{seconds}}s left",
     "connecting": "Connecting",
     "online_unavailable": "A server connection is required to join an online match",
+    "self_takeover": {
+      "message": "You are on auto-play, a bot is acting for you",
+      "resume": "Take back control"
+    },
     "back_to_lobby": "Back to Lobby",
     "seat": {
       "bot": "Bot",
       "offline": "Offline",
-      "taken_over": "Taken over by system"
+      "taken_over": "Taken over by system",
+      "idle_takeover": "Idle, on auto-play"
     },
     "fatal": {
       "AUTH_REQUIRED": "Identity required",

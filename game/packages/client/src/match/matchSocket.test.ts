@@ -289,6 +289,28 @@ describe('MatchSocket', () => {
     expect(socket.sent('icg:sync')).toHaveLength(1);
   });
 
+  it('resume 发出一条不带座位的 icg:resume；未连接或已关闭时不发', () => {
+    ms.resume();
+    expect(socket.sent('icg:resume')).toHaveLength(0);
+
+    ready();
+    ms.resume();
+    expect(socket.sent('icg:resume')).toEqual([{ type: 'icg:resume' }]);
+
+    ms.close();
+    ms.resume();
+    expect(socket.sent('icg:resume')).toHaveLength(1);
+  });
+
+  it('托管解除后服务端发来的座位表更新快照', () => {
+    ready();
+    const taken = SEATS.map((s) => (s.seat === '0' ? { ...s, takenOver: true } : s));
+    socket.fire('icg:seats', { type: 'icg:seats', matchID: 'm1', seats: taken });
+    expect(ms.getSnapshot().seats[0]!.takenOver).toBe(true);
+    socket.fire('icg:seats', { type: 'icg:seats', matchID: 'm1', seats: SEATS });
+    expect(ms.getSnapshot().seats[0]!.takenOver).toBe(false);
+  });
+
   it('requestSync 只发一次 icg:sync', () => {
     ready(1);
     ms.requestSync();

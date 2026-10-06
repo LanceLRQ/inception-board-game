@@ -177,11 +177,16 @@
     "deadline": "剩余 {{seconds}} 秒",
     "connecting": "正在连接",
     "online_unavailable": "需要连接服务器才能进入联机对局",
+    "self_takeover": {
+      "message": "你已被托管，Bot 正在替你行动",
+      "resume": "取消托管"
+    },
     "back_to_lobby": "返回大厅",
     "seat": {
       "bot": "机器人",
       "offline": "已掉线",
-      "taken_over": "已由系统托管"
+      "taken_over": "已由系统托管",
+      "idle_takeover": "挂机托管中"
     },
     "fatal": {
       "AUTH_REQUIRED": "需要先登录身份",

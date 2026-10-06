@@ -25,7 +25,7 @@ function snap(patch: Partial<MatchSocketSnapshot> = {}): MatchSocketSnapshot {
 
 describe('toMatchSource', () => {
   it('字段原样带过来，kind 为 remote', () => {
-    const source = toMatchSource(snap(), vi.fn());
+    const source = toMatchSource(snap(), vi.fn(), vi.fn());
     expect(source.kind).toBe('remote');
     expect(source.view).toBe(view);
     expect(source.seat).toBe('0');
@@ -36,19 +36,59 @@ describe('toMatchSource', () => {
   });
 
   it('storageDegraded 原样带过来', () => {
-    expect(toMatchSource(snap(), vi.fn()).storageDegraded).toBe(false);
-    expect(toMatchSource(snap({ storageDegraded: true }), vi.fn()).storageDegraded).toBe(true);
+    expect(toMatchSource(snap(), vi.fn(), vi.fn()).storageDegraded).toBe(false);
+    expect(toMatchSource(snap({ storageDegraded: true }), vi.fn(), vi.fn()).storageDegraded).toBe(
+      true,
+    );
   });
 
   it('fatal 映射为 match.fatal.<码>', () => {
-    const source = toMatchSource(snap({ fatal: 'AUTH_INVALID', connection: 'failed' }), vi.fn());
+    const source = toMatchSource(
+      snap({ fatal: 'AUTH_INVALID', connection: 'failed' }),
+      vi.fn(),
+      vi.fn(),
+    );
     expect(source.error).toBe('match.fatal.AUTH_INVALID');
   });
 
   it('makeMove 转发给 sendMove', async () => {
     const send = vi.fn().mockResolvedValue({ ok: true });
-    const source = toMatchSource(snap(), send);
+    const source = toMatchSource(snap(), send, vi.fn());
     await expect(source.makeMove('doDraw', [1])).resolves.toEqual({ ok: true });
     expect(send).toHaveBeenCalledWith('doDraw', [1]);
+  });
+
+  describe('托管状态', () => {
+    const takenSeats = (reason: 'idle' | 'disconnected'): SeatInfo[] => [
+      { ...seats[0]!, takenOver: true, takeoverReason: reason },
+      { seat: '1', nickname: 'b', isBot: false, connected: true, takenOver: false },
+    ];
+
+    it('本人座位未托管时 selfTakenOver 为 false', () => {
+      expect(toMatchSource(snap(), vi.fn(), vi.fn()).selfTakenOver).toBe(false);
+    });
+
+    it('本人座位被托管时 selfTakenOver 为 true，别人被托管不算', () => {
+      expect(
+        toMatchSource(snap({ seats: takenSeats('idle') }), vi.fn(), vi.fn()).selfTakenOver,
+      ).toBe(true);
+      expect(
+        toMatchSource(snap({ seats: takenSeats('idle'), seat: '1' }), vi.fn(), vi.fn())
+          .selfTakenOver,
+      ).toBe(false);
+    });
+
+    it('座位尚未就绪（seat 为 null）时 selfTakenOver 为 false', () => {
+      expect(
+        toMatchSource(snap({ seats: takenSeats('idle'), seat: null }), vi.fn(), vi.fn())
+          .selfTakenOver,
+      ).toBe(false);
+    });
+
+    it('resume 转发给连接', () => {
+      const resume = vi.fn();
+      toMatchSource(snap(), vi.fn(), resume).resume();
+      expect(resume).toHaveBeenCalledTimes(1);
+    });
   });
 });

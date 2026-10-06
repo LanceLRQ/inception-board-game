@@ -265,6 +265,7 @@ export type {
   ClientMatchMessage,
   ServerMatchMessage,
   SeatInfo,
+  SeatTakeoverReason,
   MatchSnapshotForViewer,
   MoveRejectCode,
 } from './net/matchProtocol.js';

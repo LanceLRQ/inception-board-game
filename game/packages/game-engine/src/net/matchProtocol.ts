@@ -8,7 +8,12 @@ export const MATCH_PROTOCOL_VERSION = 1;
 /** 客户端 → 服务端 */
 export type ClientMatchMessage =
   | { type: 'icg:move'; move: string; args: unknown[]; intentId: string; stateID?: number }
-  | { type: 'icg:sync' };
+  | { type: 'icg:sync' }
+  /** 取消自己座位的托管；座位取自连接的握手，消息里不带任何座位信息 */
+  | { type: 'icg:resume' };
+
+/** 座位被 Bot 托管的原因：掉线时长到点，或连续多次超时未操作 */
+export type SeatTakeoverReason = 'disconnected' | 'idle';
 
 export interface SeatInfo {
   seat: string;
@@ -16,8 +21,10 @@ export interface SeatInfo {
   isBot: boolean;
   /** 真人座位当前是否在线；Bot 座位恒为 true */
   connected: boolean;
-  /** 掉线后是否已由 Bot 接管 */
+  /** 是否已由 Bot 接管（掉线或挂机） */
   takenOver: boolean;
+  /** 接管原因，仅 takenOver 为真时有；只含公开信息，供界面区分文案 */
+  takeoverReason?: SeatTakeoverReason;
 }
 
 export interface MatchSnapshotForViewer {
@@ -57,7 +64,7 @@ export type MoveRejectCode =
  * 返回值是新建的对象，仅包含协议定义的字段（丢弃多余字段）；args 浅拷贝。
  * 读取属性时用 try/catch 包住，任何异常都返回 null。
  * payload.type 存在但与事件名不一致时返回 null。
- * icg:sync 允许 payload 为 undefined / null / 空对象。
+ * icg:sync 与 icg:resume 允许 payload 为 undefined / null / 空对象。
  *
  * 规则补充：
  * - intentId 必须是 1–64 个字符的字符串
@@ -70,14 +77,17 @@ export function parseClientMatchMessage(
   payload: unknown,
 ): ClientMatchMessage | null {
   try {
-    // icg:sync 是特殊的，payload 可以不带或不是对象
-    if (event === 'icg:sync') {
-      // 如果 payload 是对象且有 type 字段，必须是 'icg:sync'
-      if (payload !== null && typeof payload === 'object' && !Array.isArray(payload)) {
+    // icg:sync 与 icg:resume 不带参数，payload 可以不带；带了对象时 type 必须一致，多余字段一律丢弃
+    if (event === 'icg:sync' || event === 'icg:resume') {
+      if (payload !== undefined && payload !== null) {
+        if (typeof payload !== 'object' || Array.isArray(payload)) {
+          // sync 历来容忍任意非对象载荷，保持不变；resume 是改变状态的请求，载荷必须是对象
+          return event === 'icg:sync' ? { type: 'icg:sync' } : null;
+        }
         const desc = Object.getOwnPropertyDescriptor(payload, 'type');
-        if (desc && 'value' in desc && desc.value !== 'icg:sync') return null;
+        if (desc && 'value' in desc && desc.value !== event) return null;
       }
-      return { type: 'icg:sync' };
+      return { type: event };
     }
 
     // 其他事件都要求 payload 是对象
