@@ -32,7 +32,13 @@ export interface IdentityPlayerRow {
 }
 
 /** 身份路由实际用到的数据库操作；真实实现是 Prisma 客户端，测试与内存服务用内存表 */
-export interface IdentityPrisma {
+export interface IdentityPrisma extends IdentityTables {
+  /** 交互式事务：回调抛错则全部回滚 */
+  $transaction<T>(fn: (tx: IdentityTables) => Promise<T>): Promise<T>;
+}
+
+/** 事务内外都可用的表操作 */
+export interface IdentityTables {
   player: {
     create(args: {
       data: { id: string; nickname: string; avatarSeed: string; locale: string };
@@ -178,26 +184,30 @@ export function createIdentityRouter(
     if (!record || record.revokedAt || isBanActive(record.player)) return fail();
 
     // 一次性：条件更新只会让仍有效的码命中，并发提交同一个码只有一个成功
-    const used = await prisma.recoveryCode.updateMany({
-      where: { codeHash: storedHash, revokedAt: null },
-      data: {
-        revokedAt: new Date(),
-        lastUsedAt: new Date(),
-        useCount: { increment: 1 },
-        ...(legacy ? { codeHash: hashRecoveryCode(code) } : {}),
-      },
-    });
-    if (used.count === 0) return fail();
-
+    // 作废旧码与签发新码放进同一个事务：中途失败时旧码仍然有效，账号不会落到没有任何可用恢复码
+    const playerId = record.playerId;
     const newCode = generateRecoveryCode();
-    await prisma.recoveryCode.create({
-      data: { codeHash: hashRecoveryCode(newCode), playerId: record.playerId },
+    const claimed = await prisma.$transaction(async (tx) => {
+      const used = await tx.recoveryCode.updateMany({
+        where: { codeHash: storedHash, revokedAt: null },
+        data: {
+          revokedAt: new Date(),
+          lastUsedAt: new Date(),
+          useCount: { increment: 1 },
+          ...(legacy ? { codeHash: hashRecoveryCode(code) } : {}),
+        },
+      });
+      if (used.count === 0) return false;
+      await tx.recoveryCode.create({
+        data: { codeHash: hashRecoveryCode(newCode), playerId },
+      });
+      await tx.player.update({
+        where: { id: playerId },
+        data: { lastSeenAt: new Date() },
+      });
+      return true;
     });
-
-    await prisma.player.update({
-      where: { id: record.playerId },
-      data: { lastSeenAt: new Date() },
-    });
+    if (!claimed) return fail();
 
     const token = signToken({ playerId: record.playerId, nickname: record.player.nickname });
 
@@ -264,15 +274,16 @@ export function createIdentityRouter(
   router.post('/identity/rotate-recovery-code', authMiddleware, async (ctx) => {
     const { playerId } = ctx.state.player;
 
-    // 作废旧码
-    await prisma.recoveryCode.updateMany({
-      where: { playerId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
+    // 作废旧码与建新码在同一事务内，建新码失败时旧码不会丢
     const newCode = generateRecoveryCode();
     const codeHash = hashRecoveryCode(newCode);
-    await prisma.recoveryCode.create({ data: { codeHash, playerId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.recoveryCode.updateMany({
+        where: { playerId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.recoveryCode.create({ data: { codeHash, playerId } });
+    });
 
     ctx.body = { code: newCode, oldRevoked: true };
   });

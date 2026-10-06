@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import { InMemoryMatchArchive, type StepRow } from './MatchArchive.js';
+import type { MatchSnapshot } from './MatchStore.js';
+import { makeTestSnapshot } from './MatchStore.contract.js';
 import { ARCHIVE_RETRY_MAX_MS, StepArchiver } from './StepArchiver.js';
 
 const { log } = vi.hoisted(() => ({
@@ -25,6 +27,9 @@ class FlakyArchive extends InMemoryMatchArchive {
   /** 接下来的这么多次 appendStep 调用抛错 */
   failAppends = 0;
   failGaps = 0;
+  /** 接下来的这么多次 recordStart 调用抛错 */
+  failStarts = 0;
+  startAttempts = 0;
   /** 为真时 appendStep 不返回，直到 release 被调用 */
   hold = false;
   /** 为真时 recordGap 不返回，直到 release 被调用 */
@@ -48,6 +53,15 @@ class FlakyArchive extends InMemoryMatchArchive {
     if (this.hold) await new Promise<void>((resolve) => this.waiting.push(resolve));
     await super.appendStep(r);
     this.written.push(r.stateID);
+  }
+
+  override async recordStart(snapshot: MatchSnapshot): Promise<void> {
+    this.startAttempts += 1;
+    if (this.failStarts > 0) {
+      this.failStarts -= 1;
+      throw new Error('pg down');
+    }
+    await super.recordStart(snapshot);
   }
 
   override async recordGap(matchID: string, from: number, to: number): Promise<void> {
@@ -321,6 +335,64 @@ describe('StepArchiver', () => {
       expect(timers.pending()).toHaveLength(1);
       a.stop();
       expect(timers.pending()).toHaveLength(0);
+    });
+  });
+
+  describe('对局元信息作为队列首项', () => {
+    const snap = makeTestSnapshot('m1');
+
+    async function retryUntil(cond: () => boolean): Promise<void> {
+      for (let i = 0; i < 20 && !cond(); i++) {
+        await pump();
+        timers.fireNext();
+      }
+      await pump();
+    }
+
+    it('recordStart 前两次失败、第三次成功：步骤在它之后按序落库，一条不缺', async () => {
+      const a = new StepArchiver(archive, timers);
+      archive.failStarts = 2;
+      a.enqueueStart(snap);
+      a.enqueue(row(1));
+      a.enqueue(row(2));
+      a.enqueue(row(3));
+      await pump();
+      // 元信息没写成之前，步骤一条都不尝试写
+      expect(archive.attempts).toEqual([]);
+      await retryUntil(() => archive.written.length === 3);
+      expect(archive.startAttempts).toBe(3);
+      expect(archive.started.has('m1')).toBe(true);
+      expect(archive.written).toEqual([1, 2, 3]);
+      expect(a.pendingOf('m1')).toBe(0);
+    });
+
+    it('recordStart 一直失败：步骤不会被尝试写入，退避间隔逐步加长', async () => {
+      const a = new StepArchiver(archive, timers);
+      archive.failStarts = Number.MAX_SAFE_INTEGER;
+      a.enqueueStart(snap);
+      a.enqueue(row(1));
+      for (let i = 0; i < 6; i++) {
+        await pump();
+        timers.fireNext();
+      }
+      await pump();
+      expect(archive.startAttempts).toBeGreaterThanOrEqual(6);
+      expect(archive.attempts).toEqual([]);
+      expect(a.pendingOf('m1')).toBe(2);
+    });
+
+    it('撤销对局后不再重试 recordStart', async () => {
+      const a = new StepArchiver(archive, timers);
+      archive.failStarts = Number.MAX_SAFE_INTEGER;
+      a.enqueueStart(snap);
+      await pump();
+      expect(archive.startAttempts).toBe(1);
+      a.discard('m1');
+      expect(timers.pending()).toHaveLength(0);
+      timers.fireNext();
+      await pump();
+      expect(archive.startAttempts).toBe(1);
+      expect(a.pendingOf('m1')).toBe(0);
     });
   });
 });

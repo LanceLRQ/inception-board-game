@@ -9,6 +9,7 @@
     "WS_*",
     "TRUST_PROXY",
     "HTTP_RATE_LIMIT_PER_MINUTE",
+    "REDIS_COMMAND_TIMEOUT_MS",
     "LOG_LEVEL",
     "MATCH_*",
     "PORT",

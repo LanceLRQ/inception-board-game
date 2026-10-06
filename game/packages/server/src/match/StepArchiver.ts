@@ -6,6 +6,7 @@
 
 import { logger } from '../infra/logger.js';
 import type { MatchArchive, StepRow } from './MatchArchive.js';
+import type { MatchSnapshot } from './MatchStore.js';
 
 /** 每局队列的上限 */
 export const STEP_QUEUE_LIMIT = 500;
@@ -26,6 +27,8 @@ interface GapRange {
 }
 
 interface MatchQueue {
+  /** 对局元信息：步骤与缺口都以它为外键，写成功之前后面的一律不写 */
+  start: MatchSnapshot | null;
   rows: StepRow[];
   gaps: GapRange[];
   /** 正在等待 await 归档写入返回 */
@@ -47,6 +50,20 @@ export class StepArchiver {
     private readonly timers: StepArchiverTimers,
     private readonly limit = STEP_QUEUE_LIMIT,
   ) {}
+
+  /**
+   * 对局元信息作为这一局队列的首项：写成功之前这一局的步骤和缺口都不写（它们引用这一行），
+   * 失败按同样的退避重试。立即返回，数据库不可用不该挡住开局。
+   */
+  enqueueStart(snapshot: MatchSnapshot): void {
+    if (this.stopped) {
+      logger.warn({ matchID: snapshot.matchID }, 'archive stopped, match start dropped');
+      return;
+    }
+    const q = this.queueOf(snapshot.matchID);
+    q.start = snapshot;
+    this.kick(snapshot.matchID, q, false);
+  }
 
   /** 入队并立即返回；写入在后台进行 */
   enqueue(row: StepRow): void {
@@ -123,7 +140,7 @@ export class StepArchiver {
 
   pendingOf(matchID: string): number {
     const q = this.queues.get(matchID);
-    return q ? q.rows.length + q.gaps.length : 0;
+    return q ? q.rows.length + q.gaps.length + (q.start ? 1 : 0) : 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -132,6 +149,7 @@ export class StepArchiver {
     let q = this.queues.get(matchID);
     if (!q) {
       q = {
+        start: null,
         rows: [],
         gaps: [],
         writing: false,
@@ -167,20 +185,31 @@ export class StepArchiver {
     try {
       for (;;) {
         if (this.queues.get(matchID) !== q) return;
-        const gap = q.gaps[0];
-        const row = q.rows[0];
-        if (!gap && !row) break;
+        const start = q.start;
+        const gap = start ? undefined : q.gaps[0];
+        const row = start ? undefined : q.rows[0];
+        if (!start && !gap && !row) break;
         try {
-          if (gap) {
+          if (start) {
+            await this.archive.recordStart(start);
+          } else if (gap) {
             q.writingGap = gap;
             await this.archive.recordGap(matchID, gap.from, gap.to);
           } else await this.archive.appendStep(row!);
         } catch (err) {
           q.writingGap = null;
-          this.scheduleRetry(matchID, q, err, gap ? { gapTo: gap.to } : { stateID: row!.stateID });
+          this.scheduleRetry(
+            matchID,
+            q,
+            err,
+            start ? { start: true } : gap ? { gapTo: gap.to } : { stateID: row!.stateID },
+          );
           return;
         }
-        if (gap) {
+        if (start) {
+          // 写入期间若又入了新的元信息（同一局重建），保留新的
+          if (q.start === start) q.start = null;
+        } else if (gap) {
           q.gaps.shift();
           q.writingGap = null;
         } else q.rows.shift();
@@ -197,7 +226,7 @@ export class StepArchiver {
     matchID: string,
     q: MatchQueue,
     err: unknown,
-    at: { stateID: number } | { gapTo: number },
+    at: { stateID: number } | { gapTo: number } | { start: true },
   ): void {
     const delay = q.backoffMs;
     q.backoffMs = Math.min(q.backoffMs * 2, ARCHIVE_RETRY_MAX_MS);

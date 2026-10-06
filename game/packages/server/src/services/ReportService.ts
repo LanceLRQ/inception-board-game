@@ -5,7 +5,7 @@
 //   - 同一局内同一举报者对同一目标只能举报 1 次（由归档的唯一约束保证）
 //   - 举报理由白名单（cheating / afk / abusive / other）
 //   - 每次有效举报 → targetID 信誉分 -10
-//   - 先写归档再扣分；归档失败（含重复）不扣分
+//   - 落库与扣分在同一个事务内：任一步失败都整体回滚，不会出现「有举报行没扣分」或反过来
 //
 // ReportArchive 抽象：供运营审核面板查询与状态流转
 //   - insert / findById / list（按筛选） / count / updateStatus
@@ -90,22 +90,43 @@ export class DuplicateReportError extends Error {
   }
 }
 
+/** 一次原子操作里用到的归档与信誉分服务；生产环境两者绑在同一个数据库事务上 */
+export interface ReportUnit {
+  readonly archive: ReportArchive;
+  readonly reputation: ReputationService;
+}
+
+/** 事务执行器：fn 抛错则其中的写入全部回滚 */
+export type ReportAtomicRunner = <T>(fn: (unit: ReportUnit) => Promise<T>) => Promise<T>;
+
 export interface ReportServiceOptions {
   readonly now?: () => Date;
   /** 举报归档；不传则用进程内存实现（仅供测试 / 内存服务） */
   readonly archive?: ReportArchive;
+  /** 事务执行器；不传时在进程内直接执行（内存归档带快照回滚） */
+  readonly runAtomically?: ReportAtomicRunner;
 }
 
 export class ReportService {
   private readonly now: () => Date;
   private readonly archive: ReportArchive;
+  private readonly runAtomically: ReportAtomicRunner;
 
-  constructor(
-    private readonly reputation: ReputationService,
-    opts: ReportServiceOptions = {},
-  ) {
+  constructor(reputation: ReputationService, opts: ReportServiceOptions = {}) {
     this.now = opts.now ?? (() => new Date());
     this.archive = opts.archive ?? new InMemoryReportArchive();
+    this.runAtomically =
+      opts.runAtomically ??
+      (async (fn) => {
+        const restore =
+          this.archive instanceof InMemoryReportArchive ? this.archive.snapshot() : null;
+        try {
+          return await fn({ archive: this.archive, reputation });
+        } catch (err) {
+          restore?.();
+          throw err;
+        }
+      });
   }
 
   async submit(input: SubmitReportInput): Promise<ReportResult> {
@@ -119,26 +140,29 @@ export class ReportService {
       return { ok: false, code: 'SELF_REPORT' };
     }
 
-    // 先落库再扣分：落库失败（含重复）不得扣分；重复由存储的唯一约束判定
+    // 落库与扣分同在一个事务：重复由存储的唯一约束判定（此时没有扣分），
+    // 扣分失败则举报行一并回滚，不会留下永远补不上的扣分
+    let updated;
     try {
-      await this.archive.insert({
-        matchID: input.matchID,
-        reporterID: input.reporterID,
-        targetID: input.targetID,
-        reason: input.reason,
-        description: input.description?.slice(0, 500) ?? null,
-        status: 'pending',
-        createdAt: this.now(),
-        resolvedAt: null,
-        resolvedByOperatorID: null,
-        notes: null,
+      updated = await this.runAtomically(async (unit) => {
+        await unit.archive.insert({
+          matchID: input.matchID,
+          reporterID: input.reporterID,
+          targetID: input.targetID,
+          reason: input.reason,
+          description: input.description?.slice(0, 500) ?? null,
+          status: 'pending',
+          createdAt: this.now(),
+          resolvedAt: null,
+          resolvedByOperatorID: null,
+          notes: null,
+        });
+        return unit.reputation.adjust(input.targetID, 'report');
       });
     } catch (err) {
       if (err instanceof DuplicateReportError) return { ok: false, code: 'DUPLICATE' };
       throw err;
     }
-
-    const updated = await this.reputation.adjust(input.targetID, 'report');
 
     logger.info(
       {
@@ -216,6 +240,17 @@ export class InMemoryReportArchive implements ReportArchive {
     };
     this.records.set(id, updated);
     return updated;
+  }
+
+  /** 回滚用快照：返回的函数会把记录还原到此刻的状态 */
+  snapshot(): () => void {
+    const records = new Map(this.records);
+    const idCounter = this.idCounter;
+    return () => {
+      this.records.clear();
+      for (const [k, v] of records) this.records.set(k, v);
+      this.idCounter = idCounter;
+    };
   }
 
   /** 测试辅助：清空 */

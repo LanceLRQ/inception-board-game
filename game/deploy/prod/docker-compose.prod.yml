@@ -64,6 +64,7 @@ services:
       # api 前面是 nginx，限流按 X-Forwarded-For 的真实来源地址计数；后端端口直接暴露公网时不要开启
       TRUST_PROXY: ${TRUST_PROXY:-1}
       HTTP_RATE_LIMIT_PER_MINUTE: ${HTTP_RATE_LIMIT_PER_MINUTE:-300}
+      REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # 对局节奏（毫秒）：Bot 每步间隔 / 待结算事项的应答时限 / 一个回合的时限；超时由服务端代为行动
       MATCH_BOT_STEP_DELAY_MS: ${MATCH_BOT_STEP_DELAY_MS:-600}

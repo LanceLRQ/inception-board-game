@@ -172,6 +172,41 @@ describe('恢复码存储与一次性', () => {
   });
 });
 
+describe('恢复码作废与新建在同一事务内', () => {
+  it('轮换时新码写入失败，旧码仍然有效', async () => {
+    await start();
+    const c = await init();
+    db.recoveryCode.create = async () => {
+      throw new Error('db write failed');
+    };
+    const res = await fetch(`${base}/identity/rotate-recovery-code`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${c.token}` },
+    });
+    expect(res.status).toBe(500);
+    const row = await db.recoveryCode.findUnique({
+      where: { codeHash: hashRecoveryCode(c.recoveryCode) },
+      include: { player: true },
+    });
+    expect(row?.revokedAt).toBeNull();
+  });
+
+  it('恢复时新码写入失败，用过的码仍然有效', async () => {
+    await start();
+    const c = await init();
+    db.recoveryCode.create = async () => {
+      throw new Error('db write failed');
+    };
+    const res = await post('/identity/recover', { code: c.recoveryCode });
+    expect(res.status).toBe(500);
+    const row = await db.recoveryCode.findUnique({
+      where: { codeHash: hashRecoveryCode(c.recoveryCode) },
+      include: { player: true },
+    });
+    expect(row?.revokedAt).toBeNull();
+  });
+});
+
 describe('恢复失败限速', () => {
   it('失败满 10 次后一律 429，包括正确的恢复码', async () => {
     await start();

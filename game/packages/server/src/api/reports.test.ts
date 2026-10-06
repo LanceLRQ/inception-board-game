@@ -5,7 +5,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import Koa from 'koa';
 import bodyParser from 'koa-bodyparser';
-import { createReportsRouter, type ReportsPrisma } from './reports.js';
+import { createPrismaReputationStore, createReportsRouter, type ReportsPrisma } from './reports.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import { signToken } from '../infra/jwt.js';
 import { InMemoryReportArchive, ReportService } from '../services/ReportService.js';
@@ -155,5 +155,22 @@ describe('POST /matches/:id/report', () => {
     const { post } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_A, { targetPlayerId: ACCOUNT_B, reason: 'afk' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('createPrismaReputationStore.applyDelta', () => {
+  it('一次加减只发一条原子写入语句，不先读后写', async () => {
+    const queryRaw = vi.fn(async () => [
+      { playerId: ACCOUNT_B, score: 990, level: 'normal', updatedAt: new Date() },
+    ]);
+    const findUnique = vi.fn();
+    const store = createPrismaReputationStore({
+      reputation: { findUnique },
+      $queryRaw: queryRaw,
+    } as never);
+    const rec = await store.applyDelta(ACCOUNT_B, -10, 1000);
+    expect(rec.score).toBe(990);
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(findUnique).not.toHaveBeenCalled();
   });
 });

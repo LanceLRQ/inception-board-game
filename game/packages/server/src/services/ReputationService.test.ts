@@ -56,7 +56,7 @@ describe('ReputationService', () => {
     });
 
     it('returns existing record when present', async () => {
-      await store.upsert('p1', { score: 600, level: 'watched' });
+      await store.applyDelta('p1', -400, INITIAL_REPUTATION_SCORE);
       const r = await svc.get('p1');
       expect(r.score).toBe(600);
       expect(r.level).toBe('watched');

@@ -96,5 +96,26 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
     },
   };
 
-  return { player, recoveryCode };
+  // 事务：串行执行，先存快照，回调抛错就整体还原；表对象与外部共用，便于测试替换其中的方法
+  let txChain: Promise<unknown> = Promise.resolve();
+  const $transaction: MemoryIdentityPrisma['$transaction'] = (fn) => {
+    const run = async () => {
+      const playersSnap = new Map([...players].map(([k, v]) => [k, { ...v }]));
+      const codesSnap = new Map([...codes].map(([k, v]) => [k, { ...v }]));
+      try {
+        return await fn({ player, recoveryCode });
+      } catch (err) {
+        players.clear();
+        for (const [k, v] of playersSnap) players.set(k, v);
+        codes.clear();
+        for (const v of codesSnap.values()) codes.set(v.codeHash, v);
+        throw err;
+      }
+    };
+    const result = txChain.then(run, run);
+    txChain = result.catch(() => undefined);
+    return result;
+  };
+
+  return { player, recoveryCode, $transaction };
 }

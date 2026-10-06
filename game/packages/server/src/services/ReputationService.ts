@@ -30,17 +30,22 @@ export interface ReputationRecord {
 
 export interface ReputationStore {
   get(playerId: string): Promise<ReputationRecord | null>;
-  upsert(
-    playerId: string,
-    next: { readonly score: number; readonly level: ReputationLevel },
-  ): Promise<ReputationRecord>;
+  /**
+   * 原子地加减信誉分：分数夹在 [REPUTATION_MIN, REPUTATION_MAX]，等级随之重算；
+   * 没有记录时从 initialScore 起算。必须由存储自己保证并发安全（不能「读出再写回」），
+   * 否则两个并发举报会丢掉一次扣分。
+   */
+  applyDelta(playerId: string, delta: number, initialScore: number): Promise<ReputationRecord>;
 }
+
+/** 等级下限分数；SQL 版的等级计算也读这组常量，保证两边一致 */
+export const REPUTATION_LEVEL_FLOORS = { watched: 600, normal: 800, trusted: 1100 } as const;
 
 /** 纯函数：根据当前分计算等级 */
 export function computeReputationLevel(score: number): ReputationLevel {
-  if (score < 600) return 'restricted';
-  if (score < 800) return 'watched';
-  if (score < 1100) return 'normal';
+  if (score < REPUTATION_LEVEL_FLOORS.watched) return 'restricted';
+  if (score < REPUTATION_LEVEL_FLOORS.normal) return 'watched';
+  if (score < REPUTATION_LEVEL_FLOORS.trusted) return 'normal';
   return 'trusted';
 }
 
@@ -82,12 +87,7 @@ export class ReputationService {
     playerId: string,
     deltaKey: keyof typeof REPUTATION_DELTAS,
   ): Promise<ReputationRecord> {
-    const delta = REPUTATION_DELTAS[deltaKey];
-    const current = await this.store.get(playerId);
-    const base = current?.score ?? this.initialScore;
-    const nextScore = computeNextScore(base, delta);
-    const nextLevel = computeReputationLevel(nextScore);
-    return this.store.upsert(playerId, { score: nextScore, level: nextLevel });
+    return this.store.applyDelta(playerId, REPUTATION_DELTAS[deltaKey], this.initialScore);
   }
 }
 
@@ -100,14 +100,17 @@ export class InMemoryReputationStore implements ReputationStore {
     return this.records.get(playerId) ?? null;
   }
 
-  async upsert(
+  // 读与写之间没有 await，单线程下天然原子
+  async applyDelta(
     playerId: string,
-    next: { readonly score: number; readonly level: ReputationLevel },
+    delta: number,
+    initialScore: number,
   ): Promise<ReputationRecord> {
+    const score = computeNextScore(this.records.get(playerId)?.score ?? initialScore, delta);
     const rec: ReputationRecord = {
       playerId,
-      score: next.score,
-      level: next.level,
+      score,
+      level: computeReputationLevel(score),
       updatedAt: new Date(),
     };
     this.records.set(playerId, rec);

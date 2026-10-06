@@ -46,7 +46,8 @@ export function toReportRecord(row: PrismaReportRow): ReportRecord {
 }
 
 export class PrismaReportArchive implements ReportArchive {
-  constructor(private readonly prisma: PrismaClient) {}
+  /** 传事务客户端时，读写都落在那个事务里 */
+  constructor(private readonly prisma: Pick<PrismaClient, 'report'>) {}
 
   async insert(input: Omit<ReportRecord, 'id'>): Promise<ReportRecord> {
     try {

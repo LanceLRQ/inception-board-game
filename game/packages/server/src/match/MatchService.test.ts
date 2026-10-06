@@ -313,6 +313,23 @@ describe('MatchService 建局', () => {
     expect(log.error).toHaveBeenCalled();
   });
 
+  it('archive.recordStart 失败后由归档队列退避重试，写成功才有对局行', async () => {
+    const h = makeHarness();
+    const spy = vi
+      .spyOn(h.archive, 'recordStart')
+      .mockRejectedValueOnce(new Error('pg down'))
+      .mockRejectedValueOnce(new Error('pg down'));
+    await h.svc.createFromRoom(makeRoom(4, [0]));
+    await new Promise((r) => setImmediate(r));
+    expect(h.archive.started.has('room-1')).toBe(false);
+    for (let i = 0; i < 10 && !h.archive.started.has('room-1'); i++) {
+      h.timers.fireNext();
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(h.archive.started.has('room-1')).toBe(true);
+  });
+
   it('建局时向 Bot 管理器登记对局', async () => {
     const h = makeHarness();
     const register = vi.spyOn(h.bot, 'registerMatch');

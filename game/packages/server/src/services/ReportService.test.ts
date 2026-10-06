@@ -149,6 +149,58 @@ describe('ReportService', () => {
   });
 });
 
+describe('ReportService · 落库与扣分原子', () => {
+  it('两次并发举报同一目标（不同举报人）后恰好扣两次', async () => {
+    const rep = new ReputationService(new InMemoryReputationStore());
+    const svc = new ReportService(rep);
+    const [a, b] = await Promise.all([
+      svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p3', reason: 'afk' }),
+      svc.submit({ matchID: 'm1', reporterID: 'p2', targetID: 'p3', reason: 'afk' }),
+    ]);
+    expect(a.ok && b.ok).toBe(true);
+    expect((await rep.get('p3')).score).toBe(980);
+  });
+
+  it('扣分那一步失败时举报行不残留，同一举报可以重新提交', async () => {
+    const store = new InMemoryReputationStore();
+    const archive = new InMemoryReportArchive();
+    const realApply = store.applyDelta.bind(store);
+    let failOnce = true;
+    store.applyDelta = async (id, delta, initial) => {
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('db down');
+      }
+      return realApply(id, delta, initial);
+    };
+    const svc = new ReportService(new ReputationService(store), { archive });
+    const input = { matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' as const };
+    await expect(svc.submit(input)).rejects.toThrow('db down');
+    expect(archive.size()).toBe(0);
+    const retry = await svc.submit(input);
+    expect(retry.ok).toBe(true);
+    expect(archive.size()).toBe(1);
+  });
+
+  it('提供事务执行器时，落库与扣分都在同一次执行内完成', async () => {
+    const store = new InMemoryReputationStore();
+    const archive = new InMemoryReportArchive();
+    const rep = new ReputationService(store);
+    let runs = 0;
+    const svc = new ReportService(rep, {
+      archive,
+      runAtomically: async (fn) => {
+        runs += 1;
+        return fn({ archive, reputation: rep });
+      },
+    });
+    await svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' });
+    expect(runs).toBe(1);
+    expect(archive.size()).toBe(1);
+    expect((await rep.get('p2')).score).toBe(990);
+  });
+});
+
 // === ReportArchive 持久化 + 运营查询 ===
 
 describe('ReportService · 注入 ReportArchive 后', () => {

@@ -101,11 +101,8 @@ export class MatchService {
           // 本进程没有这一局在跑，撞上的只会是建局中途失败的残留或已结束的上一局
           logger.warn({ matchID }, 'match snapshot replaced an existing one');
         }
-        try {
-          await this.deps.archive.recordStart(snapshot);
-        } catch (err) {
-          logger.error({ matchID, err }, 'archive recordStart failed');
-        }
+        // 元信息走归档队列，写成功之前这一局的步骤不写；不等它，数据库不可用不该挡住开局
+        this.archiver.enqueueStart(snapshot);
 
         this.deps.bot.registerMatch(matchID);
         this.mount(matchID, seats, state);
