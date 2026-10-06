@@ -15,3 +15,13 @@ export function seatMarkers(info: SeatInfo | undefined): SeatMarker[] {
   }
   return markers;
 }
+
+/** 按座位聚合状态标识；没有任何标识的座位不出现在结果里 */
+export function markersBySeat(seats: readonly SeatInfo[]): Record<string, SeatMarker[]> {
+  const result: Record<string, SeatMarker[]> = {};
+  for (const info of seats) {
+    const markers = seatMarkers(info);
+    if (markers.length > 0) result[info.seat] = markers;
+  }
+  return result;
+}

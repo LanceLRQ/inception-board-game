@@ -5,6 +5,7 @@ import { cn } from '../../../lib/utils.js';
 import { PlayerSeat } from '../../../components/PlayerSeat/index.js';
 import { computeSeats } from './seatLayout.js';
 import type { MockMatchState } from '../../../hooks/useMockMatch.js';
+import type { SeatMarker } from '../../../components/MatchRuntime/seatMarkers.js';
 
 export interface TableStageProps {
   state: MockMatchState;
@@ -12,6 +13,8 @@ export interface TableStageProps {
   onOpenCharacterDetail: (cardId: string) => void;
   /** 舞台中央节点（CenterPanel） */
   centerSlot?: ReactNode;
+  /** 按座位号索引的状态标识；不传则不显示（Mock 调试路径无座位表） */
+  seatMarkers?: Readonly<Record<string, readonly SeatMarker[]>>;
   className?: string;
 }
 
@@ -19,6 +22,7 @@ export function TableStage({
   state,
   onOpenCharacterDetail,
   centerSlot,
+  seatMarkers,
   className,
 }: TableStageProps) {
   const seats = computeSeats({
@@ -58,6 +62,7 @@ export function TableStage({
             isCurrent={state.currentPlayerID === seat.id}
             characterCardId={characterCardId}
             onOpenDetail={onOpenCharacterDetail}
+            markers={seatMarkers?.[seat.id]}
           />
         );
       })}

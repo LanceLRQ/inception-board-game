@@ -10,7 +10,7 @@
 // 选目标：MatchRuntime 已使用 TargetPlayerPickerDialog 弹层完成（符合主人"弹层选目标"要求），
 //        本组件上的 Seat/Slot 只做查看详情（长按/双击）
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '../../lib/utils.js';
 import { useMediaQuery } from '../../hooks/useMediaQuery.js';
 import { TableStage } from '../../pages/Game/Table/TableStage.js';
@@ -18,19 +18,23 @@ import { TurnOrderRail } from '../../pages/Game/Track/TurnOrderRail.js';
 import { CenterPanel } from '../../pages/Game/shared/CenterPanel.js';
 import { CardDetailModal } from '../CardDetailModal/index.js';
 import { adaptViewToStage } from './viewAdapter.js';
-import type { MatchView, RunnerCtx } from '@icgame/game-engine';
+import { markersBySeat } from './seatMarkers.js';
+import type { MatchView, RunnerCtx, SeatInfo } from '@icgame/game-engine';
 import type { CardID } from '@icgame/shared';
 
 export interface RuntimeStageProps {
   G: MatchView;
   ctx: Pick<RunnerCtx, 'currentPlayer'>;
   humanPlayerID: string;
+  /** 对局来源的座位表；用于在舞台座位上显示 Bot / 掉线 / 托管标识 */
+  seats?: readonly SeatInfo[];
   className?: string;
 }
 
-export function RuntimeStage({ G, ctx, humanPlayerID, className }: RuntimeStageProps) {
+export function RuntimeStage({ G, ctx, humanPlayerID, seats, className }: RuntimeStageProps) {
   const [detailCard, setDetailCard] = useState<CardID | null>(null);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const seatMarkers = useMemo(() => (seats ? markersBySeat(seats) : undefined), [seats]);
 
   const state = adaptViewToStage({ G, ctx, humanPlayerID });
   if (!state) return null;
@@ -52,11 +56,12 @@ export function RuntimeStage({ G, ctx, humanPlayerID, className }: RuntimeStageP
         <TableStage
           state={state}
           onOpenCharacterDetail={handleOpenDetail}
+          seatMarkers={seatMarkers}
           centerSlot={<CenterPanel state={state} focusLayer={focusLayer} />}
         />
       ) : (
         <div className="flex overflow-hidden rounded-2xl border border-border bg-card/40">
-          <TurnOrderRail state={state} onOpenDetail={handleOpenDetail} />
+          <TurnOrderRail state={state} onOpenDetail={handleOpenDetail} seatMarkers={seatMarkers} />
           <div className="flex-1 p-3">
             <CenterPanel state={state} focusLayer={focusLayer} />
           </div>

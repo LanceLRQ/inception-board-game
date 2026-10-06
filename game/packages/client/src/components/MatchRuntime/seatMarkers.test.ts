@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { SeatInfo } from '@icgame/game-engine';
-import { seatMarkers } from './seatMarkers';
+import { seatMarkers, markersBySeat } from './seatMarkers';
 
 const base: SeatInfo = {
   seat: '1',
@@ -44,5 +44,32 @@ describe('seatMarkers', () => {
 
   it('座位表里没有该座位时没有标识', () => {
     expect(seatMarkers(undefined)).toEqual([]);
+  });
+});
+
+describe('markersBySeat', () => {
+  it('空座位表得到空对象', () => {
+    expect(markersBySeat([])).toEqual({});
+  });
+
+  it('全部在线真人的座位表得到空对象', () => {
+    expect(markersBySeat([base, { ...base, seat: '2' }])).toEqual({});
+  });
+
+  it('按座位聚合标识，没有标识的座位不出现', () => {
+    const result = markersBySeat([
+      { ...base, seat: '0' },
+      { ...base, seat: '1', isBot: true },
+      { ...base, seat: '2', connected: false },
+      { ...base, seat: '3', connected: false, takenOver: true },
+      { ...base, seat: '4', takenOver: true, takeoverReason: 'idle' },
+    ]);
+    expect(result).toEqual({
+      '1': ['bot'],
+      '2': ['offline'],
+      '3': ['offline', 'taken_over'],
+      '4': ['idle_takeover'],
+    });
+    expect('0' in result).toBe(false);
   });
 });

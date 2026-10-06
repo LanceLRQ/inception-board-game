@@ -11,10 +11,12 @@ import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils.js';
 import { GameCard } from '../GameCard/index.js';
 import { LayerBadge } from '../LayerBadge/index.js';
+import { SeatStatusBadges } from '../SeatStatusBadges/index.js';
 import { activeTurnPulse, seatEnter } from '../../styles/animations.js';
 import { getCardImageUrl } from '../../lib/cardImages.js';
 import type { Seat } from '../../pages/Game/Table/seatLayout.js';
 import type { MockPlayer } from '../../hooks/useMockMatch.js';
+import type { SeatMarker } from '../MatchRuntime/seatMarkers.js';
 
 export interface PlayerSeatProps {
   player: MockPlayer;
@@ -25,6 +27,8 @@ export interface PlayerSeatProps {
   characterCardId?: string | null;
   /** 长按/双击打开详情 */
   onOpenDetail: (cardId: string) => void;
+  /** 座位状态标识（Bot / 掉线 / 托管 / 挂机）；不传或为空则不显示 */
+  markers?: readonly SeatMarker[];
 }
 
 export function PlayerSeat({
@@ -33,6 +37,7 @@ export function PlayerSeat({
   isCurrent,
   characterCardId,
   onOpenDetail,
+  markers,
 }: PlayerSeatProps) {
   const cardId = characterCardId ?? '__back__';
   const orientation = seat.isMaster ? 'landscape' : 'portrait';
@@ -73,7 +78,12 @@ export function PlayerSeat({
 
       {/* 右：层徽 + 手牌数 + 昵称 */}
       <div className="flex flex-col items-start gap-1">
-        <LayerBadge layer={player.currentLayer} size={size === 'lg' ? 'md' : 'sm'} />
+        <div className="flex items-center gap-1">
+          <LayerBadge layer={player.currentLayer} size={size === 'lg' ? 'md' : 'sm'} />
+          {markers && markers.length > 0 && (
+            <SeatStatusBadges markers={markers} seatId={player.id} size="sm" />
+          )}
+        </div>
         <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-100">
           <span aria-hidden>🂠</span>
           <span className="tabular-nums">{player.handCount}</span>

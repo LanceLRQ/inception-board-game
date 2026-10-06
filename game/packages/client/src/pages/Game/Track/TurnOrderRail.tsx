@@ -12,18 +12,22 @@ import { motion } from 'framer-motion';
 import { cn } from '../../../lib/utils.js';
 import { GameCard } from '../../../components/GameCard/index.js';
 import { LayerBadge } from '../../../components/LayerBadge/index.js';
+import { SeatStatusBadges } from '../../../components/SeatStatusBadges/index.js';
 import { activeTurnPulse, railSlotEnter } from '../../../styles/animations.js';
 import { getCardImageUrl, GENERIC_BACK_IMAGES } from '../../../lib/cardImages.js';
 import { computeRailSlots } from './turnOrder.js';
 import type { MockMatchState } from '../../../hooks/useMockMatch.js';
+import type { SeatMarker } from '../../../components/MatchRuntime/seatMarkers.js';
 
 export interface TurnOrderRailProps {
   state: MockMatchState;
   onOpenDetail: (cardId: string) => void;
+  /** 按座位号索引的状态标识；不传则不显示（Mock 调试路径无座位表） */
+  seatMarkers?: Readonly<Record<string, readonly SeatMarker[]>>;
   className?: string;
 }
 
-export function TurnOrderRail({ state, onOpenDetail, className }: TurnOrderRailProps) {
+export function TurnOrderRail({ state, onOpenDetail, seatMarkers, className }: TurnOrderRailProps) {
   const slots = computeRailSlots({
     playerOrder: state.playerOrder,
     players: state.players,
@@ -107,6 +111,14 @@ export function TurnOrderRail({ state, onOpenDetail, className }: TurnOrderRailP
             >
               {slot.isViewer ? `${p.nickname}（你）` : p.nickname}
             </span>
+            {seatMarkers?.[slot.id] && (
+              <SeatStatusBadges
+                markers={seatMarkers[slot.id]!}
+                seatId={slot.id}
+                size="sm"
+                className="justify-center"
+              />
+            )}
           </motion.div>
         );
       })}

@@ -2,17 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ArrowRight,
-  Bot,
-  Check,
-  RotateCcw,
-  Skull,
-  Timer,
-  Trophy,
-  UserCog,
-  WifiOff,
-} from 'lucide-react';
+import { ArrowRight, Check, RotateCcw, Skull, Timer, Trophy } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { logger } from '../../lib/logger';
 import { actionMoveFor, getCardName, getCharacterSkillSummary } from '../../lib/cards';
@@ -43,6 +33,7 @@ import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
 import { awaitingNotice } from './awaitingNotice';
 import { remainingSeconds, useSecondClock } from './deadline';
 import { seatMarkers } from './seatMarkers';
+import { SeatStatusBadges } from '../SeatStatusBadges';
 import { SelfTakeoverBanner } from '../SelfTakeoverBanner';
 import { otherTurnLabel } from './turnLabel';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
@@ -676,7 +667,12 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
       {/* 新 UI 围坐/星穹行动轴 · 只做视觉展示；选目标仍走下方 Dialog 群 */}
       {gameState && mySeat !== null && (
         <div className="mb-4">
-          <RuntimeStage G={gameState.G} ctx={gameState.ctx} humanPlayerID={mySeat} />
+          <RuntimeStage
+            G={gameState.G}
+            ctx={gameState.ctx}
+            humanPlayerID={mySeat}
+            seats={source.seats}
+          />
         </div>
       )}
 
@@ -1041,18 +1037,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
                         ? seatByID.get(id)?.nickname || id
                         : `AI ${id}`}
                   </span>
-                  {seatMarkers(seatByID.get(id)).map((m) => {
-                    const Icon = m === 'bot' ? Bot : m === 'offline' ? WifiOff : UserCog;
-                    return (
-                      <Icon
-                        key={m}
-                        className="h-3 w-3 text-muted-foreground"
-                        role="img"
-                        aria-label={t(`match.seat.${m}`)}
-                        data-testid={`seat-marker-${m}-${id}`}
-                      />
-                    );
-                  })}
+                  <SeatStatusBadges markers={seatMarkers(seatByID.get(id))} seatId={id} size="sm" />
                   <span className="text-muted-foreground">{String(p.faction)}</span>
                   <span className="text-muted-foreground">L{String(p.currentLayer)}</span>
                   {!p.isAlive && <Skull className="h-3 w-3 text-destructive" />}

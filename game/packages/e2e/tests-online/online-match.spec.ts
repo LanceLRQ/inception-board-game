@@ -318,13 +318,14 @@ test('真人一直不操作会被托管，提示条出现，取消托管后提�
     const banner = a.page.getByTestId('self-takeover-banner');
     await expect(banner).toBeVisible({ timeout: 60_000 });
     await expect(banner).toContainText(/托管|auto-play/i);
-    // 座位上的标识区分了挂机托管（标识在默认折叠的座位清单里，只确认存在）
-    await expect(a.page.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(1);
+    // 座位上的标识区分了挂机托管（限定在舞台座位内：折叠的座位清单里还有一份同名标识）
+    const stage = a.page.getByTestId('runtime-stage');
+    await expect(stage.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(1);
 
     // 提示条的按钮点得到，且不挡住操作栏：点击后提示条消失
     await a.page.getByTestId('self-takeover-resume').click();
     await expect(banner).toBeHidden({ timeout: 5_000 });
-    await expect(a.page.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(0);
+    await expect(stage.getByTestId(`seat-marker-idle_takeover-${seat}`)).toHaveCount(0);
 
     // 取消之后座位回到等待真人：继续不操作，再次被托管，说明计数是从 0 重新开始的
     await expect(banner).toBeVisible({ timeout: 60_000 });
