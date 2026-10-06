@@ -2,7 +2,13 @@ import { describe, it, expect, afterAll } from 'vitest';
 import Redis from 'ioredis';
 import { RedisKeys, RedisTTL } from '../infra/redisKeys.js';
 import { describeMatchStoreContract, makeTestSnapshot } from './MatchStore.contract.js';
-import { InMemoryMatchStore, RedisMatchStore, SAVE_SCRIPT } from './MatchStore.js';
+import {
+  CREATE_SCRIPT,
+  DISCARD_SCRIPT,
+  InMemoryMatchStore,
+  RedisMatchStore,
+  SAVE_SCRIPT,
+} from './MatchStore.js';
 
 /**
  * 手写的 Redis 桩，只实现 RedisMatchStore 用到的命令。
@@ -41,11 +47,35 @@ class FakeRedis {
     this.ttl.set(key, seconds);
     return 1;
   }
-  async eval(script: string, _numKeys: number, key: string, expected: string, next: string) {
-    if (script !== SAVE_SCRIPT) throw new Error('unexpected script');
-    if (this.kv.get(key) !== expected) return 'conflict';
-    this.kv.set(key, next);
-    return 'ok';
+  /** 记录每次 eval 的脚本，用来断言建局只发了一次调用 */
+  readonly evalCalls: string[] = [];
+  async eval(script: string, _numKeys: number, ...rest: string[]): Promise<string> {
+    this.evalCalls.push(script);
+    if (script === SAVE_SCRIPT) {
+      const [key, expected, next] = rest as [string, string, string];
+      if (this.kv.get(key) !== expected) return 'conflict';
+      this.kv.set(key, next);
+      return 'ok';
+    }
+    if (script === CREATE_SCRIPT) {
+      // 等价于脚本：覆盖写（不带 NX，清掉过期）、加入活跃集合
+      const [key, activeKey, json, matchID] = rest as [string, string, string, string];
+      const existed = this.kv.has(key);
+      this.kv.set(key, json);
+      this.ttl.delete(key);
+      const s = this.sets.get(activeKey) ?? new Set<string>();
+      this.sets.set(activeKey, s);
+      s.add(matchID);
+      return existed ? 'replaced' : 'created';
+    }
+    if (script === DISCARD_SCRIPT) {
+      const [key, activeKey, matchID] = rest as [string, string, string];
+      this.kv.delete(key);
+      this.ttl.delete(key);
+      this.sets.get(activeKey)?.delete(matchID);
+      return 'ok';
+    }
+    throw new Error('unexpected script');
   }
 }
 
@@ -66,6 +96,32 @@ describe('RedisMatchStore · 键与过期', () => {
     expect(fake.sets.get(RedisKeys.matchActive())?.has('m-key')).toBe(true);
     expect(RedisKeys.matchSnapshot('m-key')).toBe('ico:match:m-key');
     expect(RedisKeys.matchActive()).toBe('ico:match:active');
+  });
+
+  it('建局只发一次脚本调用，不拆成多条命令', async () => {
+    const fake = new FakeRedis();
+    const store = new RedisMatchStore(fake as unknown as Redis);
+    await store.create(makeTestSnapshot('m-once'));
+    expect(fake.evalCalls).toEqual([CREATE_SCRIPT]);
+  });
+
+  it('覆盖上一局的旧快照时去掉旧的过期时间', async () => {
+    const fake = new FakeRedis();
+    const store = new RedisMatchStore(fake as unknown as Redis);
+    await store.create(makeTestSnapshot('m-redo'));
+    await store.finish('m-redo');
+    expect(fake.ttl.has(RedisKeys.matchSnapshot('m-redo'))).toBe(true);
+    await store.create(makeTestSnapshot('m-redo'));
+    expect(fake.ttl.has(RedisKeys.matchSnapshot('m-redo'))).toBe(false);
+  });
+
+  it('丢弃只发一次脚本调用', async () => {
+    const fake = new FakeRedis();
+    const store = new RedisMatchStore(fake as unknown as Redis);
+    await store.create(makeTestSnapshot('m-gone'));
+    fake.evalCalls.length = 0;
+    await store.discard('m-gone');
+    expect(fake.evalCalls).toEqual([DISCARD_SCRIPT]);
   });
 
   it('进行中的快照不设过期，finish 后设 1 天过期', async () => {

@@ -65,11 +65,17 @@ function makePlayer(id: string, nickname?: string) {
 
 describe('LobbyService', () => {
   let service: LobbyService;
-  let matches: { createFromRoom: Mock<(room: RoomState) => Promise<string>> };
+  let matches: {
+    createFromRoom: Mock<(room: RoomState) => Promise<string>>;
+    discardMatch: Mock<(matchID: string) => Promise<void>>;
+  };
 
   beforeEach(() => {
     mock = createMockRedis();
-    matches = { createFromRoom: vi.fn(async (room: RoomState) => room.id) };
+    matches = {
+      createFromRoom: vi.fn(async (room: RoomState) => room.id),
+      discardMatch: vi.fn(async () => undefined),
+    };
     service = new LobbyService({ matches });
     vi.clearAllMocks();
   });
@@ -326,6 +332,27 @@ describe('LobbyService', () => {
 
       // 锁已释放，可以重试
       await expect(service.startGame(room.code, 'P1')).resolves.toBe(room.id);
+    });
+
+    it('saves failing after the match was created: discards the match, releases the lock, can start again', async () => {
+      const room = await roomWith(4);
+      const realSetex = mock.redis.setex;
+      let failNext = true;
+      mock.redis.setex = (key: string, ttl: number, val: string) => {
+        if (failNext) {
+          failNext = false;
+          return Promise.reject(new Error('redis write failed'));
+        }
+        return realSetex(key, ttl, val);
+      };
+
+      await expect(service.startGame(room.code, 'P1')).rejects.toThrow('redis write failed');
+      expect(matches.discardMatch).toHaveBeenCalledWith(room.id);
+      expect((await service.getRoom(room.code))!.status).toBe('waiting');
+      expect(mock.store.has(`ico:room:${room.code}:starting`)).toBe(false);
+
+      await expect(service.startGame(room.code, 'P1')).resolves.toBe(room.id);
+      expect((await service.getRoom(room.code))!.status).toBe('playing');
     });
 
     it('takes a short start lock: SET NX EX 10', async () => {

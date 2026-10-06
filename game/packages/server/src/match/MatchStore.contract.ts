@@ -44,12 +44,35 @@ export function describeMatchStoreContract(
       expect(await store.load('nope')).toBeNull();
     });
 
-    it('create 重复的对局 id 抛错且不覆盖原快照', async () => {
+    it('create 返回 created；同 id 再 create 返回 replaced 且内容是新的', async () => {
       const store = await make();
       const snap = makeTestSnapshot('m-dup');
-      await store.create(snap);
-      await expect(store.create({ ...snap, roomCode: 'OTHER' })).rejects.toThrow();
-      expect((await store.load('m-dup'))?.roomCode).toBe('ROOM01');
+      expect(await store.create(snap)).toBe('created');
+      expect(await store.create({ ...snap, roomCode: 'OTHER' })).toBe('replaced');
+      expect((await store.load('m-dup'))?.roomCode).toBe('OTHER');
+      expect(await store.listActive()).toEqual(['m-dup']);
+    });
+
+    it('discard 后 load 为 null 且不在活跃集合；不存在的对局 discard 也成功', async () => {
+      const store = await make();
+      await store.create(makeTestSnapshot('m-del'));
+      await store.create(makeTestSnapshot('m-keep'));
+      await store.discard('m-del');
+      expect(await store.load('m-del')).toBeNull();
+      expect(await store.listActive()).toEqual(['m-keep']);
+      await expect(store.discard('never-existed')).resolves.toBeUndefined();
+    });
+
+    it('finish 过的对局可以再 create，并重新出现在活跃集合里', async () => {
+      const store = await make();
+      await store.create(makeTestSnapshot('m-again'));
+      await store.finish('m-again');
+      expect(await store.listActive()).toEqual([]);
+      expect(await store.create({ ...makeTestSnapshot('m-again'), roomCode: 'NEXT' })).toBe(
+        'replaced',
+      );
+      expect(await store.listActive()).toEqual(['m-again']);
+      expect((await store.load('m-again'))?.roomCode).toBe('NEXT');
     });
 
     it('load 返回的对象与库内数据不共享引用', async () => {

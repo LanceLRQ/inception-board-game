@@ -66,13 +66,13 @@ export interface LobbyPrisma {
 export interface LobbyDeps {
   redis?: LobbyRedis;
   prisma?: LobbyPrisma;
-  matches?: Pick<MatchService, 'createFromRoom'>;
+  matches?: Pick<MatchService, 'createFromRoom' | 'discardMatch'>;
 }
 
 export class LobbyService {
   private readonly redis: LobbyRedis;
   private readonly prisma: LobbyPrisma;
-  private readonly matches: Pick<MatchService, 'createFromRoom'> | undefined;
+  private readonly matches: Pick<MatchService, 'createFromRoom' | 'discardMatch'> | undefined;
 
   constructor(deps: LobbyDeps = {}) {
     this.redis = deps.redis ?? createRedisClient();
@@ -218,7 +218,13 @@ export class LobbyService {
       const matchId = await this.matches.createFromRoom(room);
       room.status = 'playing';
       room.matchId = matchId;
-      await this.saveRoom(room);
+      try {
+        await this.saveRoom(room);
+      } catch (err) {
+        // 房间仍是 waiting，对局却已在运行；不撤销的话再点开始只会得到「已存在」
+        await this.matches.discardMatch(matchId);
+        throw err;
+      }
       logger.info({ roomId: room.id, matchId }, 'Game started');
       return matchId;
     } catch (err) {

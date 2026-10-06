@@ -5,6 +5,7 @@ import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import { InMemoryMatchArchive } from './MatchArchive.js';
 import { InMemoryMatchStore, type MatchSnapshot } from './MatchStore.js';
+import { makeTestSnapshot } from './MatchStore.contract.js';
 import { FINISHED_ROOM_LINGER_MS, MatchService, type MatchServiceDeps } from './MatchService.js';
 import type { TimingConfig } from './scheduling.js';
 
@@ -38,6 +39,32 @@ function makeRoom(n: number, humans: readonly number[] = [], id = 'room-1'): Roo
     createdAt: 0,
     expiresAt: 0,
   };
+}
+
+/** 按指令失败的存储替身：failDiscard 为真时撤销快照抛错 */
+class FlakyStore extends InMemoryMatchStore {
+  failDiscard = false;
+  override async discard(matchID: string): Promise<void> {
+    if (this.failDiscard) throw new Error('discard down');
+    await super.discard(matchID);
+  }
+}
+
+/** 登记时按指令失败的 Bot 管理器替身 */
+class FlakyBotManager extends BotManager {
+  failRegister = 0;
+  disposed: string[] = [];
+  override registerMatch(matchID: string): void {
+    if (this.failRegister > 0) {
+      this.failRegister -= 1;
+      throw new Error('register failed');
+    }
+    super.registerMatch(matchID);
+  }
+  override disposeMatch(matchID: string): void {
+    this.disposed.push(matchID);
+    super.disposeMatch(matchID);
+  }
 }
 
 interface Harness {
@@ -75,6 +102,11 @@ function makeHarness(
     ...patch,
   });
   return { svc, store, archive, bot, timers, onStep, onSeatsChanged, onGameOver };
+}
+
+/** 造一份残留快照：借一局真实建局产生的快照改 id */
+function makeSnapshotFor(_h: Harness, matchID: string): MatchSnapshot {
+  return { ...makeTestSnapshot(matchID), roomCode: 'STALE' };
 }
 
 /** 一直触发计时器，直到没有计时器、步数用尽或 stop 返回 true */
@@ -152,6 +184,65 @@ describe('MatchService 建局', () => {
     ]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+  });
+
+  it('快照写入之后的步骤失败：回滚到无残留，原错误抛出，再建一次成功', async () => {
+    const timers = new FakeTimers();
+    const store = new FlakyStore();
+    const bot = new FlakyBotManager({ now: timers.now });
+    const h = makeHarness({ bot }, { store });
+    bot.failRegister = 1;
+
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).rejects.toThrow('register failed');
+    expect(h.svc.get('room-1')).toBeNull();
+    expect(await store.load('room-1')).toBeNull();
+    expect(await store.listActive()).toEqual([]);
+    expect(bot.disposed).toContain('room-1');
+
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).resolves.toBe('room-1');
+    expect(h.svc.get('room-1')).not.toBeNull();
+    expect(await store.listActive()).toEqual(['room-1']);
+  });
+
+  it('回滚自身失败只记 error，不盖住原错误', async () => {
+    const timers = new FakeTimers();
+    const store = new FlakyStore();
+    const bot = new FlakyBotManager({ now: timers.now });
+    const h = makeHarness({ bot }, { store });
+    bot.failRegister = 1;
+    store.failDiscard = true;
+    log.error.mockClear();
+
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).rejects.toThrow('register failed');
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: 'room-1' }),
+      'store discard failed',
+    );
+  });
+
+  it('存储里留着同 id 的旧快照时覆盖并打 warn，建局成功', async () => {
+    const h = makeHarness();
+    await h.store.create({ ...makeSnapshotFor(h, 'room-1') });
+    log.warn.mockClear();
+    await expect(h.svc.createFromRoom(makeRoom(4, [0]))).resolves.toBe('room-1');
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ matchID: 'room-1' }),
+      expect.stringContaining('replaced'),
+    );
+    expect((await h.store.load('room-1'))!.setup.seed).toBe(SEED);
+  });
+
+  it('discardMatch：关房间、清 Bot 登记、删快照', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    const room = h.svc.get(id)!;
+    await h.svc.discardMatch(id);
+    expect(h.svc.get(id)).toBeNull();
+    expect(room.deadlineAt()).toBeNull();
+    expect(await h.store.load(id)).toBeNull();
+    expect(await h.store.listActive()).toEqual([]);
+    // 不存在的对局也不抛错
+    await expect(h.svc.discardMatch('nope')).resolves.toBeUndefined();
   });
 
   it('默认种子是 64 位十六进制，两局不同', async () => {

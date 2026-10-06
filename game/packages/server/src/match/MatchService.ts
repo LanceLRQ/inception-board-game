@@ -85,15 +85,25 @@ export class MatchService {
         updatedAt: now,
       };
 
-      await this.deps.store.create(snapshot);
+      // 快照写入之后到返回之前任何一步失败都要回滚，否则存储里留下无人管理的快照
+      const outcome = await this.deps.store.create(snapshot);
       try {
-        await this.deps.archive.recordStart(snapshot);
-      } catch (err) {
-        logger.error({ matchID, err }, 'archive recordStart failed');
-      }
+        if (outcome === 'replaced') {
+          // 本进程没有这一局在跑，撞上的只会是建局中途失败的残留或已结束的上一局
+          logger.warn({ matchID }, 'match snapshot replaced an existing one');
+        }
+        try {
+          await this.deps.archive.recordStart(snapshot);
+        } catch (err) {
+          logger.error({ matchID, err }, 'archive recordStart failed');
+        }
 
-      this.deps.bot.registerMatch(matchID);
-      this.mount(matchID, seats, state);
+        this.deps.bot.registerMatch(matchID);
+        this.mount(matchID, seats, state);
+      } catch (err) {
+        await this.teardown(matchID);
+        throw err;
+      }
       logger.info(
         {
           matchID,
@@ -106,6 +116,26 @@ export class MatchService {
       return matchID;
     } finally {
       this.creating.delete(matchID);
+    }
+  }
+
+  /**
+   * 撤销一局：关闭房间、清掉 Bot 管理器登记、删存储里的快照。
+   * 供建局之后的后续步骤失败时调用；每一步独立容错，不抛错。
+   */
+  async discardMatch(matchID: string): Promise<void> {
+    await this.teardown(matchID);
+  }
+
+  private async teardown(matchID: string): Promise<void> {
+    const room = this.rooms.get(matchID);
+    this.rooms.delete(matchID);
+    if (room) this.safely(matchID, 'room close', () => room.close());
+    this.safely(matchID, 'bot dispose', () => this.deps.bot.disposeMatch(matchID));
+    try {
+      await this.deps.store.discard(matchID);
+    } catch (err) {
+      logger.error({ matchID, err }, 'store discard failed');
     }
   }
 
