@@ -156,8 +156,8 @@ describe('playJokerGamble move', () => {
   });
 });
 
-describe('小丑罚则 · 下回合 discard 强制全弃', () => {
-  it('同回合 discard（armed===turnNumber）→ 不强制，允许部分弃', () => {
+describe('小丑罚则 · 发动当回合 discard 强制全弃', () => {
+  it('后续回合 discard（armed<turnNumber）→ 不强制，允许部分弃', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
@@ -169,29 +169,29 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
         p1: {
           ...s.players.p1!,
           hand: ['action_unlock' as CardID, 'action_shoot' as CardID],
-          forcedDiscardArmedAtTurn: 5, // 同回合设防
+          forcedDiscardArmedAtTurn: 4, // 旧回合设防，已失效
         },
       },
     };
     const r = callMove(s, 'doDiscard', [['action_unlock' as CardID]]);
     expectMoveOk(r);
-    // 未过期 → armed 保留
-    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBe(5);
+    // 失效标记不被动
+    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBe(4);
   });
 
-  it('下回合 discard + 仅弃部分 → INVALID_MOVE', () => {
+  it('当回合 discard + 仅弃部分 → INVALID_MOVE', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
           ...s.players.p1!,
           hand: ['action_unlock' as CardID, 'action_shoot' as CardID, 'action_shift' as CardID],
-          forcedDiscardArmedAtTurn: 5, // 上回合设防
+          forcedDiscardArmedAtTurn: 5, // 当回合设防
         },
       },
     };
@@ -199,13 +199,13 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('下回合 discard + 弃全部 → 成功 + armed 清除', () => {
+  it('当回合 discard + 弃全部 → 成功 + armed 清除', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
@@ -221,13 +221,13 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
     expect(r.players.p1!.forcedDiscardArmedAtTurn).toBeNull();
   });
 
-  it('下回合 skipDiscard 但手牌 > 0 → INVALID_MOVE（不得跳过）', () => {
+  it('当回合 skipDiscard 但手牌 > 0 → INVALID_MOVE（不得跳过）', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
@@ -241,13 +241,13 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('下回合 skipDiscard + 手牌=0 → 允许（已自然满足全弃）', () => {
+  it('当回合 skipDiscard + 手牌=0 → 允许（已自然满足全弃）', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {

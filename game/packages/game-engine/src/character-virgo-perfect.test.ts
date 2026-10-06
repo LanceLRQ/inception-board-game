@@ -51,9 +51,13 @@ function virgoCtx(state: SetupState, virgoID: string, shootRoll?: number) {
 // ============================================================================
 
 describe('处女 · 完美 · applyVirgoResurrect', () => {
-  it('正确路径：复活己方阵营死者到 L1', () => {
+  it('正确路径：复活死者到处女所在层，手牌保留', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
+    s = {
+      ...s,
+      players: { ...s.players, p2: { ...s.players.p2!, hand: ['action_kick' as CardID] } },
+    };
     s = killPlayer(s, 'p2');
     expect(s.players.p2!.isAlive).toBe(false);
 
@@ -62,7 +66,7 @@ describe('处女 · 完美 · applyVirgoResurrect', () => {
     expect(next!.players.p2!.isAlive).toBe(true);
     expect(next!.players.p2!.deathTurn).toBeNull();
     expect(next!.players.p2!.currentLayer).toBe(1);
-    expect(next!.players.p2!.hand).toEqual([]);
+    expect(next!.players.p2!.hand).toEqual(['action_kick']);
   });
 
   it('拒绝：处女自己不在场 / 角色不匹配', () => {
@@ -76,11 +80,11 @@ describe('处女 · 完美 · applyVirgoResurrect', () => {
     expect(applyVirgoResurrect(s, 'p1', 'p2')).toBeNull();
   });
 
-  it('拒绝：target 是梦主阵营', () => {
+  it('梦主阵营的死亡玩家同样可以复活', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
     s = killPlayer(s, 'pM');
-    expect(applyVirgoResurrect(s, 'p1', 'pM')).toBeNull();
+    expect(applyVirgoResurrect(s, 'p1', 'pM')?.players.pM!.isAlive).toBe(true);
   });
 
   it('拒绝：target=virgo 自己', () => {

@@ -185,6 +185,52 @@ describe('migrations', () => {
     expect(state.players['1']!.successfulUnlocksThisTurn).toBe(2);
   });
 
+  describe('v10 → v11 · 来源层与皇城机会', () => {
+    const player = (over: Record<string, unknown>) => ({
+      id: 'x',
+      isAlive: true,
+      deathTurn: null,
+      currentLayer: 2,
+      ...over,
+    });
+
+    it('已在迷失层的玩家补第 1 层作为来源层，其余补 null', () => {
+      const state = migrateGameState({
+        schemaVersion: 10,
+        players: {
+          dead: player({ id: 'dead', isAlive: false, deathTurn: 3, currentLayer: 0 }),
+          live: player({ id: 'live' }),
+        },
+      });
+      expect(state.players.dead!.layerBeforeLimbo).toBe(1);
+      expect(state.players.live!.layerBeforeLimbo).toBeNull();
+    });
+
+    it('已有的来源层不被覆盖，皇城机会补 0', () => {
+      const state = migrateGameState({
+        schemaVersion: 10,
+        players: {
+          a: player({
+            id: 'a',
+            isAlive: false,
+            currentLayer: 0,
+            layerBeforeLimbo: 3,
+            imperialShootCharges: 2,
+          }),
+          b: player({ id: 'b' }),
+        },
+      });
+      expect(state.players.a!.layerBeforeLimbo).toBe(3);
+      expect(state.players.a!.imperialShootCharges).toBe(2);
+      expect(state.players.b!.imperialShootCharges).toBe(0);
+    });
+
+    it('缺少 players 时不抛异常，版本号升到当前', () => {
+      const state = migrateGameState({ schemaVersion: 10 });
+      expect(state.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    });
+  });
+
   describe('v9 → v10 · 迷失层即死亡', () => {
     const player = (over: Record<string, unknown>) => ({
       id: 'x',

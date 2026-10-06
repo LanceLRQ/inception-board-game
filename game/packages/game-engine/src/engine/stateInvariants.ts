@@ -189,6 +189,12 @@ function checkPlayers(c: Collector, G: Rec, orderIds: readonly string[]): void {
     c.bool(`${at}.isAlive`, p.isAlive);
     c.bool(`${at}.isRevealed`, p.isRevealed);
     if (p.deathTurn !== null) c.nonNegInt(`${at}.deathTurn`, p.deathTurn);
+    if (p.layerBeforeLimbo !== null && p.layerBeforeLimbo !== undefined) {
+      c.layer(`${at}.layerBeforeLimbo`, p.layerBeforeLimbo);
+    }
+    if (p.imperialShootCharges !== undefined) {
+      c.nonNegInt(`${at}.imperialShootCharges`, p.imperialShootCharges);
+    }
     for (const field of [
       'unlockCount',
       'shootCount',

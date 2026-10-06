@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -146,6 +146,33 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
             id,
             p && p.currentLayer === 0 && p.isAlive === true
               ? { ...p, isAlive: false, deathTurn: turn }
+              : p,
+          ]),
+        ),
+      };
+    },
+  ],
+  // v10 → v11：玩家新增两个字段
+  //   - layerBeforeLimbo：进入迷失层之前所在的层，梦主回合开始的自动复活按它落点。
+  //     旧状态没有记录：已在迷失层的玩家补 1（旧行为就是回第 1 层），其余补 null
+  //   - imperialShootCharges：皇城世界观下尚未用掉的 SHOOT 机会数，旧状态补 0
+  [
+    11,
+    (state) => {
+      const players = state.players;
+      if (typeof players !== 'object' || players === null) return state;
+      return {
+        ...state,
+        players: Object.fromEntries(
+          Object.entries(players as Record<string, Record<string, unknown>>).map(([id, p]) => [
+            id,
+            p && typeof p === 'object'
+              ? {
+                  ...p,
+                  layerBeforeLimbo:
+                    p.layerBeforeLimbo ?? (p.currentLayer === 0 && p.isAlive === false ? 1 : null),
+                  imperialShootCharges: p.imperialShootCharges ?? 0,
+                }
               : p,
           ]),
         ),

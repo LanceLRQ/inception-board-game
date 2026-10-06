@@ -135,7 +135,8 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   if (n === 'cardstoreturn' && rnd() < 0.7) return sample(rnd, hand, 2);
   // 小丑赌博的罚则生效后，弃牌阶段必须一次弃掉全部手牌；随机子集几乎碰不到这一种
   const forcedAt = G.players[actor]?.forcedDiscardArmedAtTurn;
-  if (n === 'cardids' && typeof forcedAt === 'number' && forcedAt < G.turnNumber) return [...hand];
+  if (n === 'cardids' && typeof forcedAt === 'number' && forcedAt === G.turnNumber)
+    return [...hand];
   if (/(cardids|handids|discardids|returncards|cardstoreturn|^pile\d$)/.test(n)) {
     return subset(rnd, hand, hand.length);
   }

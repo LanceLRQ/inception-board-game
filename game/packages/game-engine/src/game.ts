@@ -30,6 +30,7 @@ import {
   recordCardPlayed,
 } from './moves.js';
 import { killPlayer, sendToLimbo } from './engine/death.js';
+import { THIEF_POOL } from './engine/characterPool.js';
 import { resolveShootCustom } from './dice.js';
 import {
   applyPointmanAssault,
@@ -103,6 +104,8 @@ import {
   applyBlackHoleLevy,
   applyBlackHoleAbsorb,
   applyImperialCityWorldShoot,
+  grantImperialShootCharge,
+  applyKickEffect,
   applyRevive,
   applyVenusMirrorWorld,
   getMidsummerExtraDraws,
@@ -206,18 +209,21 @@ function applyCoinVaultBribeReward(
         }
       : b,
   );
-  return {
-    ...state,
-    bribePool: nextPool,
-    players: {
-      ...state.players,
-      [targetPlayerID]: {
-        ...target,
-        bribeReceived: target.bribeReceived + 1,
-        faction: isDeal ? ('master' as Faction) : target.faction,
+  return grantImperialShootCharge(
+    {
+      ...state,
+      bribePool: nextPool,
+      players: {
+        ...state.players,
+        [targetPlayerID]: {
+          ...target,
+          bribeReceived: target.bribeReceived + 1,
+          faction: isDeal ? ('master' as Faction) : target.faction,
+        },
       },
     },
-  };
+    targetPlayerID,
+  );
 }
 
 /** 对比 before/after 的 vaults，返回本次刚打开的金币金库（若有） */
@@ -336,7 +342,7 @@ export const InceptionCityGame = {
             const masterID = G.playerOrder[masterIdx]!;
 
             // 给玩家随机分配角色 —— 涵盖所有已实装角色
-            // 梦主 13 个 · 盗梦者 37 个
+            // 梦主 13 个 · 盗梦者见 engine/characterPool.ts
             const masterPool: CardID[] = [
               'dm_fortress',
               'dm_chess',
@@ -358,47 +364,8 @@ export const InceptionCityGame = {
               //   均已完整实装并通过 mercury-joker-swan.test.ts / venus-mirror-world.test.ts 覆盖
               'dm_venus_mirror',
             ];
-            const thiefPool: CardID[] = [
-              'thief_pointman',
-              'thief_dream_interpreter',
-              'thief_space_queen',
-              'thief_joker',
-              'thief_leo',
-              'thief_tourist',
-              'thief_capricornus',
-              'thief_chemist',
-              'thief_paprik',
-              'thief_lord_of_war',
-              'thief_libra',
-              'thief_sudger_of_mind',
-              'thief_scorpius',
-              'thief_taurus',
-              'thief_apollo',
-              'thief_athena',
-              'thief_architect',
-              'thief_virgo',
-              'thief_haley',
-              'thief_martyr',
-              'thief_soul_sculptor',
-              'thief_shade',
-              'thief_hlnino',
-              'thief_extractor',
-              'thief_forger',
-              'thief_terrorist',
-              'thief_black_hole',
-              'thief_black_swan',
-              'thief_gemini',
-              'thief_pisces',
-              'thief_luna',
-              'thief_aries',
-              'thief_gaia',
-              'thief_sagittarius',
-              'thief_aquarius',
-              'thief_green_ray',
-              'thief_darwin',
-            ];
             const masterChar = masterPool[random.Die(masterPool.length) - 1]!;
-            const shuffledThieves = random.Shuffle([...thiefPool]);
+            const shuffledThieves = random.Shuffle([...THIEF_POOL]);
 
             const nextPlayers: typeof G.players = { ...G.players };
             let thiefCursor = 0;
@@ -457,24 +424,27 @@ export const InceptionCityGame = {
         // 回合开始时同步 G 的 turn 状态
         onBegin: ({ G, ctx }: { G: SetupState; ctx: BGIOCtx }) => {
           let s = beginTurn(G, ctx.currentPlayer);
-          // 梦主 M4-3：若梦主回合开始时处于迷失层（layer 0），自动原地复活
-          //   —— 规则：梦主无需弃手牌、无需回 layer 1；直接在当前迷失层站起来
-          //   —— 对照：docs/manual/08-appendix.md M4 梦主优势第 3 条
-          // 注意：currentLayer === 0 即"迷失层"；复活目的地统一定为 layer 1
-          //   （规则原文"原地站起来"在多数版本中被解释为回到 layer 1，
-          //    因为 layer 0 不是正式的梦境层，是迷失区。这里选择 layer 1
-          //    更符合多数对局实践，且便于后续 passive 触发）
+          // 梦主 M4-3：若梦主回合开始时处于迷失层（layer 0），自动复活
+          //   —— 规则：梦主无需弃手牌，落在进入迷失层之前所在的那一层
+          //   —— 对照：docs/manual/03-game-flow.md 复活；docs/manual/08-appendix.md M4 梦主优势第 3 条
+          //   记录缺失（旧状态）时回落第 1 层
           if (ctx.currentPlayer === s.dreamMasterID) {
             const master = s.players[s.dreamMasterID];
             if (master && (master.currentLayer === 0 || !master.isAlive)) {
+              const returnLayer = (master.layerBeforeLimbo ?? 1) as Layer;
               s = {
                 ...s,
                 players: {
                   ...s.players,
-                  [s.dreamMasterID]: { ...master, isAlive: true, deathTurn: null },
+                  [s.dreamMasterID]: {
+                    ...master,
+                    isAlive: true,
+                    deathTurn: null,
+                    layerBeforeLimbo: null,
+                  },
                 },
               };
-              s = movePlayerToLayer(s, s.dreamMasterID, 1);
+              s = movePlayerToLayer(s, s.dreamMasterID, returnLayer);
             }
           }
           // abilities registry：触发 onTurnStart passive
@@ -566,7 +536,6 @@ export const InceptionCityGame = {
 
         // 小丑·赌博（略过抽牌阶段 → 掷骰 → 抽 D6 张）
         // 对照：docs/manual/05-dream-thieves.md 小丑
-        // MVP：下回合强制全弃的惩罚尚未实装（需 forcedDiscardAllNextTurn 字段；预留）
         playJokerGamble: {
           move: ({ G, ctx, random }: MoveCtx) => {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
@@ -576,8 +545,8 @@ export const InceptionCityGame = {
             const roll = random.D6();
             const count = jokerDrawCount(roll);
             let s = drawCards(G, G.currentPlayerID, count);
-            // 罚则：下回合本玩家 discard 阶段强制全弃
-            // 记录当前 turnNumber 作为"设防时刻"，discard 检查时仅在 turnNumber 前进后触发
+            // 罚则：发动当回合的弃牌阶段强制全弃（巨蟹·庇佑不豁免）
+            // 记录当前 turnNumber，discard 检查时与回合号相等才生效，回合结束后自然失效
             s = {
               ...s,
               players: {
@@ -639,6 +608,7 @@ export const InceptionCityGame = {
         },
 
         // 皇城世界观：收到贿赂的玩家选一个未收到贿赂的盗梦者视为 SHOOT（掷骰-3）
+        // 每收到 1 张贿赂牌获得 1 次机会（imperialShootCharges），发动即消耗
         // 对照：docs/manual/06-dream-master.md 皇城
         useImperialCityWorldShoot: {
           move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
@@ -1413,28 +1383,15 @@ export const InceptionCityGame = {
           move: ({ G, ctx }: MoveCtx, cardId: CardID, targetPlayerID: string) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             if (!isCardForPlayMove('playKick', cardId)) return INVALID_MOVE;
-            if (isMazeBlocked(G, targetPlayerID, 'playKick')) return INVALID_MOVE;
             const self = G.players[ctx.currentPlayer];
-            const target = G.players[targetPlayerID];
-            if (!self || !target) return INVALID_MOVE;
-            if (targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
-            if (!self.isAlive || !target.isAlive) return INVALID_MOVE;
-            if (!self.hand.includes(cardId)) return INVALID_MOVE;
+            if (!self || !self.hand.includes(cardId)) return INVALID_MOVE;
 
             let s = discardCard(G, ctx.currentPlayer, cardId);
             // 水星·逆流：贿赂者对梦主出牌 → 梦主先收入
             s = applyMercuryReverse(s, ctx.currentPlayer, cardId, targetPlayerID) ?? s;
-            const selfLayer = self.currentLayer;
-            const targetLayer = target.currentLayer;
-            const sameLayer = selfLayer === targetLayer;
-            s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
-            s = movePlayerToLayer(s, targetPlayerID, selfLayer);
-            // 天王星·苍穹世界观：每位因行动牌改变层数的盗梦者各触发一次（同层 KICK 不算改变）
-            if (!sameLayer) {
-              s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
-              s = applyUranusFirmamentMoveDiscard(s, targetPlayerID);
-            }
-            return recordCardPlayed(incrementMoveCounter(s), cardId);
+            const kicked = applyKickEffect(s, ctx.currentPlayer, targetPlayerID);
+            if (kicked === null) return INVALID_MOVE;
+            return recordCardPlayed(incrementMoveCounter(kicked), cardId);
           },
           client: false,
         },
@@ -1550,6 +1507,7 @@ export const InceptionCityGame = {
                     },
                   },
                 };
+                s = grantImperialShootCharge(s, peekerID);
               }
             }
             // 清 pending + 挂 peekReveal（peeker 私密查看）
@@ -1659,6 +1617,7 @@ export const InceptionCityGame = {
                 },
               },
             };
+            s = grantImperialShootCharge(s, targetPlayerID);
             s = incrementMoveCounter(s);
             return s;
           },
@@ -1701,6 +1660,7 @@ export const InceptionCityGame = {
                 },
               },
             };
+            s = grantImperialShootCharge(s, targetPlayerID);
             s = incrementMoveCounter(s);
             return s;
           },
@@ -2787,11 +2747,12 @@ export const InceptionCityGame = {
             if (!isStringArray(cardIds)) return INVALID_MOVE;
             if (!guardTurnPhase(G, ctx, 'discard')) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
-            // 小丑·赌博罚则：armed 且已过"下个回合"（armedAtTurn < turnNumber）→ 强制传入 = 全手牌
+            // 小丑·失控罚则：发动失控的当回合弃牌阶段必须弃光手牌（armedAtTurn === turnNumber）
+            // 对照：docs/manual/05-dream-thieves.md 小丑「则你在弃牌阶段必须弃掉所有手牌」
             const forced =
               player &&
               typeof player.forcedDiscardArmedAtTurn === 'number' &&
-              player.forcedDiscardArmedAtTurn < G.turnNumber;
+              player.forcedDiscardArmedAtTurn === G.turnNumber;
             if (forced) {
               // 必须一次性弃掉全部手牌，否则拒绝
               if (cardIds.length !== player!.hand.length) return INVALID_MOVE;
@@ -2861,17 +2822,21 @@ export const InceptionCityGame = {
             const player = G.players[ctx.currentPlayer];
             const sheltered = isCancerShelterActive(G, ctx.currentPlayer);
             if (player && player.hand.length > HAND_LIMIT && !sheltered) return INVALID_MOVE;
-            // 小丑·赌博罚则：armed 已过期且手牌 > 0 → 不得跳过（必须走 doDiscard 全弃）
-            if (
-              player &&
+            // 小丑·失控罚则：当回合发动过且手牌 > 0 → 不得跳过（必须走 doDiscard 全弃）
+            const armed =
+              !!player &&
               typeof player.forcedDiscardArmedAtTurn === 'number' &&
-              player.forcedDiscardArmedAtTurn < G.turnNumber &&
-              player.hand.length > 0
-            ) {
-              return INVALID_MOVE;
-            }
+              player.forcedDiscardArmedAtTurn === G.turnNumber;
+            if (armed && player!.hand.length > 0) return INVALID_MOVE;
             events.endTurn();
-            return G;
+            if (!armed) return G;
+            return {
+              ...G,
+              players: {
+                ...G.players,
+                [ctx.currentPlayer]: { ...player!, forcedDiscardArmedAtTurn: null },
+              },
+            };
           },
           client: false,
         },
@@ -3118,6 +3083,7 @@ function applyNightmareEffect(
             },
           },
         };
+        s = grantImperialShootCharge(s, pid);
       } else {
         s = sendToLimbo(s, pid);
       }

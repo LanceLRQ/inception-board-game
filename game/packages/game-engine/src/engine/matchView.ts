@@ -46,6 +46,10 @@ export interface PlayerView {
   currentLayer: Layer;
   isAlive: boolean;
   deathTurn: number | null;
+  /** 进入迷失层之前所在的层；能从公开的移动推出，与 deathTurn 同样公开 */
+  layerBeforeLimbo: Layer | null;
+  /** 皇城世界观下尚未用掉的 SHOOT 机会；来自公开的收贿与发动，与 bribeReceived 同样公开 */
+  imperialShootCharges: number;
   unlockCount: number;
   shootCount: number;
   bribeReceived: number;
@@ -324,6 +328,8 @@ export const PLAYER_FIELD_DISPOSITION: Record<keyof PlayerSetup, Disposition> = 
   hand: 'conditional',
   isAlive: 'public',
   deathTurn: 'public',
+  layerBeforeLimbo: 'public',
+  imperialShootCharges: 'public',
   unlockCount: 'public',
   shootCount: 'public',
   bribeReceived: 'public',
@@ -406,6 +412,8 @@ function viewPlayer(id: string, p: PlayerSetup, who: Audience): PlayerView {
     currentLayer: p.currentLayer,
     isAlive: p.isAlive,
     deathTurn: p.deathTurn,
+    layerBeforeLimbo: p.layerBeforeLimbo ?? null,
+    imperialShootCharges: p.imperialShootCharges ?? 0,
     unlockCount: p.unlockCount,
     shootCount: p.shootCount,
     bribeReceived: p.bribeReceived,

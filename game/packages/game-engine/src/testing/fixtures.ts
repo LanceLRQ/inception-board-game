@@ -36,6 +36,8 @@ export function makePlayer(overrides: Partial<PlayerSetup> = {}): PlayerSetup {
       hand: [],
       isAlive: true,
       deathTurn: null,
+      layerBeforeLimbo: null,
+      imperialShootCharges: 0,
       unlockCount: 0,
       shootCount: 0,
       bribeReceived: 0,

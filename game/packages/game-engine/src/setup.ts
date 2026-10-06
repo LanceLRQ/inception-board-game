@@ -249,6 +249,17 @@ export interface PlayerSetup {
   hand: CardID[];
   isAlive: boolean;
   deathTurn: number | null;
+  /**
+   * 进入迷失层之前所在的层（1-4）；不在迷失层时为 null。
+   * 梦主回合开始时的自动复活按它落点，缺失则回落第 1 层。
+   * 对照：docs/manual/03-game-flow.md 复活；docs/manual/08-appendix.md 梦主优势
+   */
+  layerBeforeLimbo?: Layer | null;
+  /**
+   * 皇城世界观：尚未用掉的「视为 SHOOT」机会数。每收到 1 张贿赂牌 +1，发动一次 -1。
+   * 对照：docs/manual/06-dream-master.md 皇城
+   */
+  imperialShootCharges?: number;
   unlockCount: number;
   shootCount: number;
   bribeReceived: number;
@@ -256,9 +267,9 @@ export interface PlayerSetup {
   skillUsedThisGame: Record<string, number>;
   successfulUnlocksThisTurn: number;
   /**
-   * 小丑·赌博：下一次本玩家回合 discard 阶段强制清空手牌。
-   * 记录设防时的 turnNumber；discard 检查时若 `armedAtTurn < G.turnNumber` 则触发后清空标记。
-   * 这样保证本回合 discard 不会误触发（本回合 armed===turnNumber，不满足 <）。
+   * 小丑·失控：发动当回合的 discard 阶段强制清空手牌。
+   * 记录发动时的 turnNumber；discard 检查时 `armedAtTurn === G.turnNumber` 才强制，弃光后清空标记；
+   * 回合号前进后旧值自然失效。
    */
   forcedDiscardArmedAtTurn?: number | null;
 }
@@ -332,6 +343,8 @@ export function createInitialState(options: {
       hand: [],
       isAlive: true,
       deathTurn: null,
+      layerBeforeLimbo: null,
+      imperialShootCharges: 0,
       unlockCount: 0,
       shootCount: 0,
       bribeReceived: 0,

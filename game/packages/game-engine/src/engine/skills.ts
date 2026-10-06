@@ -381,6 +381,7 @@ export function applyPaprikSalvation(
         ...s.players[targetID]!,
         isAlive: true,
         deathTurn: null,
+        layerBeforeLimbo: null,
         hand: [],
       },
     },
@@ -799,11 +800,13 @@ export function isVirgoPerfectTriggered(rawRoll: number): boolean {
 }
 
 /**
- * 处女·完美 · 选项一：复活一位己方阵营死亡角色
+ * 处女·完美 · 选项一：复活一位玩家
+ * 对照：docs/manual/05-dream-thieves.md 处女「复活一位玩家」；
+ *       docs/manual/08-appendix.md 盗梦十诫（复活他人：被复活者移动到自己所在层）
  *  - virgo 必须存活
- *  - target 必须死亡且阵营=thief（己方）
- *  - target 复活到 L1（梦境入口）+ deathTurn=null + isAlive=true
- *  - target 复活后手牌清空（与 paprik 复活时把手牌交给救援者不同；处女只是单纯复活）
+ *  - target 必须死亡，不限阵营（含梦主、背叛者）
+ *  - target 复活到处女所在层 + deathTurn=null + isAlive=true
+ *  - target 的手牌保留
  */
 export function applyVirgoResurrect(
   state: SetupState,
@@ -818,9 +821,8 @@ export function applyVirgoResurrect(
   const target = state.players[targetID];
   if (!target) return null;
   if (target.isAlive) return null;
-  if (target.faction !== 'thief') return null;
 
-  let s: SetupState = {
+  const s: SetupState = {
     ...state,
     players: {
       ...state.players,
@@ -828,13 +830,11 @@ export function applyVirgoResurrect(
         ...target,
         isAlive: true,
         deathTurn: null,
-        hand: [],
+        layerBeforeLimbo: null,
       },
     },
   };
-  // 复活到 L1（梦境入口）
-  s = movePlayerToLayer(s, targetID, 1 as Layer);
-  return s;
+  return movePlayerToLayer(s, targetID, virgo.currentLayer);
 }
 
 /**
@@ -911,6 +911,33 @@ export function isMazeBlocked(state: SetupState, targetID: string, moveName: str
   if (!state.mazeState) return false;
   if (state.mazeState.mazedPlayerID !== targetID) return false;
   return !MAZE_ALLOWED_MOVES.has(moveName);
+}
+
+/**
+ * KICK 的效果：与目标玩家交换梦境层；双方各自按天王星·苍穹世界观结算（同层互换不算改变层数）。
+ * 出牌路径（playKick）与金星·镜界复制路径共用。目标不合法或被筑梦师·迷宫困住时返回 null。
+ * 对照：docs/manual/04-action-cards.md KICK；docs/manual/05-dream-thieves.md 筑梦师
+ */
+export function applyKickEffect(
+  state: SetupState,
+  selfID: string,
+  targetID: string,
+): SetupState | null {
+  if (isMazeBlocked(state, targetID, 'playKick')) return null;
+  const self = state.players[selfID];
+  const target = state.players[targetID];
+  if (!self || !target) return null;
+  if (selfID === targetID) return null;
+  if (!self.isAlive || !target.isAlive) return null;
+  const sameLayer = self.currentLayer === target.currentLayer;
+  let s = movePlayerToLayer(state, selfID, target.currentLayer);
+  s = movePlayerToLayer(s, targetID, self.currentLayer);
+  // 天王星·苍穹世界观：每位因行动牌改变层数的盗梦者各触发一次（同层 KICK 不算改变）
+  if (!sameLayer) {
+    s = applyUranusFirmamentMoveDiscard(s, selfID);
+    s = applyUranusFirmamentMoveDiscard(s, targetID);
+  }
+  return s;
 }
 
 // === 雅典娜 · 急智 ===
@@ -1366,7 +1393,7 @@ export function applyPiscesBlessing(
       ...s,
       players: {
         ...s.players,
-        [reviveID]: { ...target, isAlive: true, deathTurn: null },
+        [reviveID]: { ...target, isAlive: true, deathTurn: null, layerBeforeLimbo: null },
       },
     };
     s = movePlayerToLayer(s, reviveID, newLayer);
@@ -1472,7 +1499,10 @@ export function applyLunaFullMoon(
     const rp = s.players[rid]!;
     s = {
       ...s,
-      players: { ...s.players, [rid]: { ...rp, isAlive: true, deathTurn: null } },
+      players: {
+        ...s.players,
+        [rid]: { ...rp, isAlive: true, deathTurn: null, layerBeforeLimbo: null },
+      },
     };
     s = movePlayerToLayer(s, rid, player.currentLayer as Layer);
   }
@@ -1748,10 +1778,13 @@ export function checkHarborWin(state: SetupState): boolean {
 // 世界观 盛夏：所有盗梦者抽牌阶段抽牌数 +1
 // 对照：cards-data.json dm_midsummer
 
-/** 盛夏·充盈：梦主额外抽牌数（=未派发贿赂池剩余张数） */
+/**
+ * 盛夏·充盈：梦主额外抽牌数（=未派发的贿赂牌张数，已派出的不算）
+ * 对照：docs/manual/06-dream-master.md 盛夏「每拥有1张未派发的贿赂牌则多抽牌1张」
+ */
 export function getMidsummerExtraDraws(state: SetupState): number {
   if (getMasterCharacterID(state) !== 'dm_midsummer') return 0;
-  return state.bribePool?.length ?? 0;
+  return (state.bribePool ?? []).filter((b) => b.status === 'inPool').length;
 }
 
 /** 盛夏世界观：盗梦者抽牌额外 +N（默认 +1） */
@@ -2629,7 +2662,25 @@ export function applyMercuryReverse(
 // === 皇城世界观 · 贿赂后 SHOOT（纯函数） ===
 // 对照：docs/manual/06-dream-master.md 皇城
 // 收到贿赂的玩家选一个未收到贿赂的盗梦者视为 SHOOT，掷骰结果 -3
+// 每收到 1 张贿赂牌获得 1 次机会（imperialShootCharges），发动即消耗 1 次
 export const IMPERIAL_CITY_WORLD_SKILL_ID = 'dm_imperial_city.world_0';
+
+/**
+ * 收到 1 张贿赂牌时调用：皇城世界观下，该玩家获得 1 次视为 SHOOT 的发动机会。
+ * 对照：docs/manual/06-dream-master.md 皇城「当玩家收到贿赂牌时」
+ */
+export function grantImperialShootCharge(state: SetupState, playerID: string): SetupState {
+  if (getMasterCharacterID(state) !== 'dm_imperial_city') return state;
+  const p = state.players[playerID];
+  if (!p) return state;
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerID]: { ...p, imperialShootCharges: (p.imperialShootCharges ?? 0) + 1 },
+    },
+  };
+}
 
 export function applyImperialCityWorldShoot(
   state: SetupState,
@@ -2644,19 +2695,29 @@ export function applyImperialCityWorldShoot(
   if (shooterID === targetID) return null;
   if (target.faction !== 'thief') return null;
   if (target.bribeReceived > 0) return null;
+  // 发起者必须有未用掉的机会
+  const charges = shooter.imperialShootCharges ?? 0;
+  if (charges <= 0) return null;
+  const spent: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [shooterID]: { ...shooter, imperialShootCharges: charges - 1 },
+    },
+  };
   // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4]（规则 docs/manual/04-action-cards.md SHOOT 章）
   const modifiedRoll = Math.max(1, roll - 3);
   const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
   if (result === 'kill') {
-    return killPlayer(state, targetID, shooterID);
+    return killPlayer(spent, targetID, shooterID);
   }
   if (result === 'move') {
-    const cur = state.players[targetID]!.currentLayer;
+    const cur = spent.players[targetID]!.currentLayer;
     const newLayer = cur >= 4 ? cur - 1 : cur + 1;
-    return movePlayerToLayer(state, targetID, newLayer as Layer);
+    return movePlayerToLayer(spent, targetID, newLayer as Layer);
   }
   // miss
-  return { ...state };
+  return spent;
 }
 
 // === 复活机制 ===
@@ -2730,6 +2791,7 @@ export function applyRevive(
         ...state.players[effectiveTarget]!,
         isAlive: true,
         deathTurn: null,
+        layerBeforeLimbo: null,
       },
     },
     deck: {
@@ -2804,8 +2866,10 @@ export function applyVenusMirrorWorld(
   s = markSkillUsed(s, selfID, VENUS_MIRROR_WORLD_SKILL_ID);
 
   if (lastCard === MIRRORABLE_KICK) {
-    // KICK 效果：目标击杀 + 拿 2 张手牌
-    s = killPlayer(s, targetID, selfID);
+    // 重复执行 KICK 的效果：与目标交换梦境层（对照 docs/manual/04-action-cards.md KICK）
+    const kicked = applyKickEffect(s, selfID, targetID);
+    if (kicked === null) return null;
+    s = kicked;
   } else {
     // SHOOT 效果：普通骰面 [1] 死 [2-4] 移 [5-6] miss
     const result = resolveShootCustom(roll, [1], [2, 3, 4]);

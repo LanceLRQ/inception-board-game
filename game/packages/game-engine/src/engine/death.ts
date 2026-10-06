@@ -88,13 +88,20 @@ export function sendToLimbo(state: SetupState, playerID: string): SetupState {
   const player = state.players[playerID];
   if (!player) return state;
   if (player.currentLayer === LOST_LAYER && !player.isAlive) return state;
+  // 记下来自哪一层：梦主回合开始的自动复活落回这一层
+  const from = player.currentLayer === LOST_LAYER ? null : player.currentLayer;
   const placed = placePlayerInLayer(state, playerID, LOST_LAYER);
   const current = placed.players[playerID]!;
   return {
     ...placed,
     players: {
       ...placed.players,
-      [playerID]: { ...current, isAlive: false, deathTurn: state.turnNumber },
+      [playerID]: {
+        ...current,
+        isAlive: false,
+        deathTurn: state.turnNumber,
+        layerBeforeLimbo: from,
+      },
     },
   };
 }

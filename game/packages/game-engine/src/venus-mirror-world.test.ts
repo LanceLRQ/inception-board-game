@@ -62,13 +62,20 @@ describe('金星·镜界世界观（useVenusMirrorWorld）', () => {
     expect(r!.players.p2!.currentLayer).toBe(1);
   });
 
-  it('复制 KICK → 击杀+拿手牌', () => {
+  it('复制 KICK → 与目标交换梦境层，无人死亡、手牌不转移', () => {
     let s = setupVenusMirror();
-    s = { ...s, playedCardsThisTurn: ['action_kick' as CardID] };
+    s = {
+      ...s,
+      playedCardsThisTurn: ['action_kick' as CardID],
+      players: { ...s.players, p2: { ...s.players.p2!, currentLayer: 3 } },
+    };
     const r = applyVenusMirrorWorld(s, 'p1', 'p2', ['action_unlock', 'action_shoot'], 0);
     expect(r).not.toBeNull();
-    expect(r!.players.p2!.isAlive).toBe(false);
-    expect(r!.players.p1!.hand).toContain('action_dream_transit');
+    expect(r!.players.p2!.isAlive).toBe(true);
+    expect(r!.players.p1!.currentLayer).toBe(3);
+    expect(r!.players.p2!.currentLayer).toBe(1);
+    expect(r!.players.p2!.hand).toEqual(['action_dream_transit']);
+    expect(r!.players.p1!.hand).not.toContain('action_dream_transit');
   });
 
   it('无可复制牌 → null', () => {

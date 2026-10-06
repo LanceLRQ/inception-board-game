@@ -43,6 +43,7 @@ function sceneCrossSystem(): SetupState {
         faction: 'thief',
         characterId: 'thief_aquarius' as CardID,
         currentLayer: 1 as Layer,
+        imperialShootCharges: 1,
       }),
       p2: makePlayer({
         id: 'p2',
