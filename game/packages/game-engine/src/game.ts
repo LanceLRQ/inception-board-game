@@ -15,7 +15,7 @@
 import { INVALID_MOVE } from './engine/invalidMove.js';
 import { createInitialState, type SetupState, type BribeSetup } from './setup.js';
 import { migrateGameState } from './migrations.js';
-import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT } from './config.js';
+import { PLAYER_COUNT_CONFIGS, BASE_DRAW_COUNT, HAND_LIMIT } from './config.js';
 import {
   drawCards,
   discardCard,
@@ -62,7 +62,6 @@ import {
   applyExtractorBounty,
   applyForgerExchange,
   isTerroristCrossLayerActive,
-  type ForgerExchange,
   applyGeminiSync,
   applyGeminiChoice,
   applyLunaEclipse,
@@ -130,7 +129,7 @@ import { denyAction } from './engine/actionRights.js';
 import { viewFor } from './engine/matchView.js';
 import { matchOutcome } from './engine/outcome.js';
 import { describeMatchEvents } from './engine/matchEvents.js';
-import { isPlainRecord, isRecordOf, isString, isStringArray } from './engine/argShape.js';
+import { isRecordOf, isString, isStringArray } from './engine/argShape.js';
 import {
   openResponseWindow,
   respondToWindow,
@@ -1237,7 +1236,7 @@ export const InceptionCityGame = {
         // playUnlock 成功后即刻打开响应窗口（对照：§解封 使用时机②
         //   "任意玩家使用【解封】的效果①时"），允许其他玩家出效果②抵消
         playUnlock: {
-          move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+          move: ({ G, ctx, random }: MoveCtx, cardId: CardID) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
             const player = G.players[ctx.currentPlayer];
             if (!player || !player.isAlive) return INVALID_MOVE;
@@ -1281,8 +1280,10 @@ export const InceptionCityGame = {
                 validResponseAbilityIDs: ['action_unlock_effect_2'],
                 onTimeout: 'resolve',
               });
+              return recordCardPlayed(s, cardId);
             }
-            return recordCardPlayed(s, cardId);
+            // 没有可响应者：不开窗口，先记录出牌再直接结算，避免 pendingUnlock 悬空卡住对局
+            return resolveUnlockFull(recordCardPlayed(s, cardId), random);
           },
           client: false,
         },
@@ -2521,26 +2522,6 @@ export const InceptionCityGame = {
           client: false,
         },
 
-        // 欺诈师·盗心：抽 target 1-2 张 + 还回等量
-        // 对照：docs/manual/05-dream-thieves.md 欺诈师
-        playForgerExchange: {
-          move: ({ G, ctx }: MoveCtx, exchange: ForgerExchange) => {
-            if (
-              !isPlainRecord(exchange) ||
-              !isString(exchange.targetID) ||
-              !isStringArray(exchange.takenFromTarget) ||
-              !isStringArray(exchange.returnedToTarget)
-            ) {
-              return INVALID_MOVE;
-            }
-            if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            const next = applyForgerExchange(G, ctx.currentPlayer, exchange);
-            if (next === null) return INVALID_MOVE;
-            return incrementMoveCounter(next);
-          },
-          client: false,
-        },
-
         // 欺诈师·盗心（单机盲抽版）—— 固定抽 1 张，用 BGIO Random 在服务端
         // 随机挑选，避免客户端能看到 target 手牌即违反隐藏信息原则。
         // 对照：docs/manual/05-dream-thieves.md 欺诈师 · applyForgerExchange
@@ -2831,6 +2812,18 @@ export const InceptionCityGame = {
               // 必须一次性弃掉全部手牌，否则拒绝
               if (cardIds.length !== player!.hand.length) return INVALID_MOVE;
             }
+            // 每张要弃的牌都必须在手里（同一张写两次要求手里有两张）
+            if (!player) return INVALID_MOVE;
+            const remainingHand = [...player.hand];
+            for (const c of cardIds) {
+              const idx = remainingHand.indexOf(c);
+              if (idx === -1) return INVALID_MOVE;
+              remainingHand.splice(idx, 1);
+            }
+            // 弃完后须不超手牌上限；巨蟹·庇佑生效时不限（与 skipDiscard 一致）
+            if (remainingHand.length > HAND_LIMIT && !isCancerShelterActive(G, ctx.currentPlayer)) {
+              return INVALID_MOVE;
+            }
             let next = discardToLimit(G, ctx.currentPlayer, cardIds);
             if (forced) {
               next = {
@@ -2883,7 +2876,7 @@ export const InceptionCityGame = {
             // 对照：docs/manual/05-dream-thieves.md 巨蟹「庇佑」
             const player = G.players[ctx.currentPlayer];
             const sheltered = isCancerShelterActive(G, ctx.currentPlayer);
-            if (player && player.hand.length > 5 && !sheltered) return INVALID_MOVE;
+            if (player && player.hand.length > HAND_LIMIT && !sheltered) return INVALID_MOVE;
             // 小丑·赌博罚则：armed 已过期且手牌 > 0 → 不得跳过（必须走 doDiscard 全弃）
             if (
               player &&

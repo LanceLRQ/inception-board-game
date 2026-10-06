@@ -214,20 +214,6 @@ describe('欺诈师 · 盗心（thief_forger）', () => {
     expect(r).toBeNull();
   });
 
-  it('move 接入：playForgerExchange', () => {
-    const s = setupForgerScenario();
-    const r = callMove(s, 'playForgerExchange', [
-      {
-        targetID: 'p2',
-        takenFromTarget: ['action_creation'] as CardID[],
-        returnedToTarget: ['action_kick'] as CardID[],
-      },
-    ]);
-    expectMoveOk(r);
-    expect(r.players.p1!.hand).toContain('action_creation');
-    expect(r.players.p2!.hand).toContain('action_kick');
-  });
-
   // 单机盲抽版 —— UI 调用入口，RNG 在服务端挑 1 张
   it('move 接入：playForgerExchangeSingle 盲抽 1 张', () => {
     const s = setupForgerScenario();

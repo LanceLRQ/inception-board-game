@@ -32,12 +32,15 @@ describe('applyMercuryRouteExtraFailBribe（水星世界观）', () => {
     const before = s.bribePool.length;
     const r = applyMercuryRouteExtraFailBribe(s, 'dm_mercury_route' as CardID);
     expect(r.bribePool.length).toBe(before + 1);
-    const added = r.bribePool[r.bribePool.length - 1]!;
-    expect(added.kind).toBe('fail');
-    expect(added.id).toMatch(/^bribe-\d+$/);
-    expect(added.status).toBe('inPool');
-    expect(added.heldBy).toBeNull();
-    expect(added.originalOwnerId).toBeNull();
+    expect(r.bribePool.filter((b) => b.kind === 'fail').length).toBe(
+      s.bribePool.filter((b) => b.kind === 'fail').length + 1,
+    );
+    for (const b of r.bribePool) {
+      expect(b.id).toMatch(/^bribe-\d+$/);
+      expect(b.status).toBe('inPool');
+      expect(b.heldBy).toBeNull();
+      expect(b.originalOwnerId).toBeNull();
+    }
   });
 
   it('水星梦主 → fail 计数相对 +1（不影响 deal 计数）', () => {

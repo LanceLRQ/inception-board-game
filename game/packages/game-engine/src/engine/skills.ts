@@ -2,7 +2,8 @@
 // MVP 4 角色：先锋（突袭）/ 译梦师（伏笔）/ 要塞（冷酷）/ 棋局（易位）
 // 对照：docs/manual/05-dream-thieves.md / docs/manual/06-dream-master.md
 
-import type { SetupState, PlayerSetup } from '../setup.js';
+import type { SetupState, PlayerSetup, BribeSetup } from '../setup.js';
+import { seededShuffle } from '../prng.js';
 import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
 import { resolveShootCustom } from '../dice.js';
 import { flipCharacter } from './abilities/dual-faced.js';
@@ -2554,24 +2555,29 @@ export function applyMercuryRouteExtraFailBribe(
   masterCharacterID: CardID | null,
 ): SetupState {
   if (masterCharacterID !== 'dm_mercury_route') return state;
-  // 新牌的标识沿用不透明的编号：取池里现有最大编号加一
-  const maxIndex = state.bribePool.reduce((max, b) => {
-    const m = /^bribe-(\d+)$/.exec(b.id);
-    return m ? Math.max(max, Number(m[1])) : max;
-  }, -1);
-  const newId = `bribe-${maxIndex + 1}`;
+  const extra: BribeSetup = {
+    id: '',
+    kind: 'fail',
+    status: 'inPool',
+    heldBy: null,
+    originalOwnerId: null,
+  };
+  const allInPool = state.bribePool.every((b) => b.status === 'inPool');
+  if (!allInPool) {
+    // 已有牌派出时不能重编号（编号已被对方看见）：沿用旧办法，取最大编号加一
+    const maxIndex = state.bribePool.reduce((max, b) => {
+      const m = /^bribe-(\d+)$/.exec(b.id);
+      return m ? Math.max(max, Number(m[1])) : max;
+    }, -1);
+    return { ...state, bribePool: [...state.bribePool, { ...extra, id: `bribe-${maxIndex + 1}` }] };
+  }
+  // 追加后整池重新洗乱并重新编号：编号与池内顺序都推不出成败（视图对所有人公开编号）。
+  // 按种子洗，同一局可重放。
+  const merged = [...state.bribePool, extra];
+  const shuffled = seededShuffle(merged, state.rngSeed, 'bribe-mercury');
   return {
     ...state,
-    bribePool: [
-      ...state.bribePool,
-      {
-        id: newId,
-        kind: 'fail',
-        status: 'inPool',
-        heldBy: null,
-        originalOwnerId: null,
-      },
-    ],
+    bribePool: shuffled.map((b, i) => ({ ...b, id: `bribe-${i}` })),
   };
 }
 

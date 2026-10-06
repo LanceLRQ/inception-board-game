@@ -82,13 +82,6 @@ const nightmareParams: ArgCheck = optional(
     optional(playerList)(v.bribedTargets, G, args),
 );
 
-/** 欺诈师·盗心的交换内容 */
-const forgerExchange: ArgCheck = (v, G, args) =>
-  isRecord(v) &&
-  player(v.targetID, G, args) &&
-  cardList(v.takenFromTarget, G, args) &&
-  cardList(v.returnedToTarget, G, args);
-
 const virgoParams: ArgCheck = optional(
   (v, G, args) =>
     isRecord(v) && optional(player)(v.targetID, G, args) && optional(layer)(v.layer, G, args),
@@ -179,7 +172,6 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   respondVirgoPerfect: [oneOf('revive', 'draw_two', 'teleport', 'skip'), virgoParams],
   playGaiaShift: [recordByPlayer(oneOf(-1, 1))],
   playDarwinEvolution: [cardList],
-  playForgerExchange: [forgerExchange],
   playForgerExchangeSingle: [player, card],
   playLibraBalance: [player],
   resolveLibraSplit: [cardList, cardList],
