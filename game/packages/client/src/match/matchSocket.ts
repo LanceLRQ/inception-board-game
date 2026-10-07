@@ -57,13 +57,20 @@ export interface MatchSocketSnapshot {
   connection: ConnectionState;
   /** 服务端暂时无法保存进度（正在重试）；恢复或断线后为 false */
   storageDegraded: boolean;
-  /** 无法继续的原因：握手被拒、协议版本不符、连接被同座位的新连接替换，或服务端判定对局中断 */
+  /** 无法继续的原因：握手被拒（含账号被封禁）、协议版本不符、连接被同座位的新连接替换，或服务端判定对局中断 */
   fatal: string | null;
   /** 本连接收到的预设短语，旧的在前，只留最近一批 */
   chat: readonly ChatEntry[];
 }
 
-const HANDSHAKE_REJECTIONS = ['AUTH_REQUIRED', 'AUTH_INVALID', 'TOKEN_REVOKED', 'NOT_IN_MATCH'];
+/** 握手被拒的原因：重连也不会成功，直接失败、不再重试 */
+const HANDSHAKE_REJECTIONS = [
+  'AUTH_REQUIRED',
+  'AUTH_INVALID',
+  'TOKEN_REVOKED',
+  'BANNED',
+  'NOT_IN_MATCH',
+];
 const DEFAULT_MOVE_TIMEOUT_MS = 10_000;
 
 const INITIAL: MatchSocketSnapshot = {
@@ -264,6 +271,7 @@ export class MatchSocket {
     if (
       msg?.code === 'REPLACED' ||
       msg?.code === 'MATCH_ABORTED' ||
+      msg?.code === 'BANNED' ||
       msg?.code === TOKEN_REVOKED_CODE
     ) {
       this.fail(msg.code);

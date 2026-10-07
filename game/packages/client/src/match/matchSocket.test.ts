@@ -523,7 +523,7 @@ describe('MatchSocket', () => {
     expect(ms.getSnapshot().connection).toBe('reconnecting');
   });
 
-  it.each(['AUTH_REQUIRED', 'AUTH_INVALID', 'TOKEN_REVOKED', 'NOT_IN_MATCH'])(
+  it.each(['AUTH_REQUIRED', 'AUTH_INVALID', 'TOKEN_REVOKED', 'BANNED', 'NOT_IN_MATCH'])(
     '握手被拒 %s：fatal 置位、failed、停止重连',
     (code) => {
       ms.connect();
@@ -559,6 +559,21 @@ describe('MatchSocket', () => {
     expect(ms.getSnapshot().fatal).toBe('TOKEN_REVOKED');
     expect(ms.getSnapshot().connection).toBe('failed');
     expect(seen).toEqual(['tok']);
+  });
+
+  it('账号被封禁：已连上后收到 icg:error 同样 fatal、failed，不再重连，也不当作令牌失效', () => {
+    const seen: Array<string | null> = [];
+    const off = subscribeIdentityRevoked((t) => seen.push(t));
+    try {
+      ready(1);
+      socket.fire('icg:error', { type: 'icg:error', code: 'BANNED', message: 'x' });
+    } finally {
+      off();
+    }
+    expect(ms.getSnapshot().fatal).toBe('BANNED');
+    expect(ms.getSnapshot().connection).toBe('failed');
+    expect(socket.disconnectCalls).toBe(1);
+    expect(seen).toEqual([]);
   });
 
   it('其他握手拒绝不通知身份失效', () => {

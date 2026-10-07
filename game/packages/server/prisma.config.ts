@@ -7,6 +7,8 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    // 预设短语与成就定义的初始数据；幂等，部署时紧跟 migrate deploy 之后执行
+    seed: 'tsx src/seed/run.ts',
   },
   datasource: {
     url: process.env['DATABASE_URL'],

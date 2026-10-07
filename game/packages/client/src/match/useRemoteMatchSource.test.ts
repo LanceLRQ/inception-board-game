@@ -2,6 +2,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { MatchViewState, SeatInfo } from '@icgame/game-engine';
+import zhCN from '../i18n/locales/zh-CN.json';
+import en from '../i18n/locales/en.json';
 import { toMatchSource } from './useRemoteMatchSource';
 import type { MatchSocketSnapshot } from './matchSocket';
 
@@ -72,6 +74,13 @@ describe('toMatchSource', () => {
       vi.fn(),
     );
     expect(source.error).toBe('match.fatal.AUTH_INVALID');
+  });
+
+  it('账号被封禁：映射为 match.fatal.BANNED，中英文案都有', () => {
+    const source = toMatchSource(snap({ fatal: 'BANNED', connection: 'failed' }), vi.fn(), vi.fn());
+    expect(source.error).toBe('match.fatal.BANNED');
+    expect(zhCN.match.fatal.BANNED).toBeTruthy();
+    expect(en.match.fatal.BANNED).toBeTruthy();
   });
 
   it('makeMove 转发给 sendMove', async () => {

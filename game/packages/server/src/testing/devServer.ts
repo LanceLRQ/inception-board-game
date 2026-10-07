@@ -13,6 +13,7 @@ import { resolveFixedMatchSeed } from '../match/fixedSeed.js';
 import { InMemoryMatchStore } from '../match/MatchStore.js';
 import type { TimingConfig } from '../match/scheduling.js';
 import type { LobbyRedis } from '../services/LobbyService.js';
+import { InMemoryChatLog } from '../services/ChatLog.js';
 import { InMemoryRateGuard } from '../services/RateGuardService.js';
 import type { ReportsPrisma } from '../api/reports.js';
 import { InMemoryReportArchive, ReportService } from '../services/ReportService.js';
@@ -117,6 +118,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
   const rt = buildRealtime({
     store: new InMemoryMatchStore(),
     archive: new InMemoryMatchArchive(),
+    chatLog: new InMemoryChatLog(),
     lobbyRedis: redis,
     lobbyPrisma: identity,
     identityPrisma: identity,

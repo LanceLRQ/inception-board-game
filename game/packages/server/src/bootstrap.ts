@@ -20,6 +20,7 @@ import { prisma } from './infra/postgres.js';
 import { createBanChecker, type BanChecker } from './services/BanChecker.js';
 import type { RecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js';
 import { BotManager } from './services/BotManager.js';
+import type { ChatLog } from './services/ChatLog.js';
 import { ChatService } from './services/ChatService.js';
 import {
   LobbyService,
@@ -51,6 +52,8 @@ export interface RealtimeDeps {
   heartbeatRedis?: HeartbeatRedis;
   /** 默认 InMemoryRateGuard */
   rateGuard?: RateGuardMutable;
+  /** 预设短语的聊天记录落库；不给就不记。只在服务端留存，不向客户端下发 */
+  chatLog?: ChatLog;
   /** 默认 DEFAULT_TIMING */
   timing?: TimingConfig;
   /** 默认真实的 setTimeout / clearTimeout / Date.now */
@@ -107,7 +110,9 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
   const bans = deps.bans ?? createBanChecker(deps.identityPrisma ?? prisma);
 
   // 聊天先挂一个转调网关的广播函数；网关建好之后才有真正的广播
-  const chat = new ChatService((matchID, msg) => gateway.broadcastToMatch(matchID, msg));
+  const chat = new ChatService((matchID, msg) => gateway.broadcastToMatch(matchID, msg), {
+    ...(deps.chatLog !== undefined ? { log: deps.chatLog } : {}),
+  });
   const router = new WSMessageRouter({ heartbeat, bot, chat });
   const gateway = new SocketGateway(
     { registry, router, bot, heartbeat, moveGateway, bans },

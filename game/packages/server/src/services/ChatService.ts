@@ -17,10 +17,14 @@ import {
 } from '@icgame/shared';
 import type { BroadcastableMessage } from '../ws/types.js';
 import { logger } from '../infra/logger.js';
+import type { ChatLog } from './ChatLog.js';
 
 export interface SendChatInput {
   readonly matchID: string;
+  /** 发送者在对局内的标识（座位号） */
   readonly senderID: string;
+  /** 发送者账号 id，只用于聊天记录；Bot 座位没有 */
+  readonly senderPlayerId?: string;
   readonly senderFaction: ChatPresetFaction | string;
   readonly presetId: string;
 }
@@ -49,7 +53,12 @@ export interface ChatServiceOptions {
   readonly cooldownMs?: number;
   /** 注入的时间函数（测试用） */
   readonly now?: () => number;
+  /** 聊天记录落库；不给就不记 */
+  readonly log?: ChatLog;
 }
+
+/** 落库失败的 WARN 最多这么久记一次：数据库不可用时每条短语都会失败，不能刷屏 */
+const LOG_WARN_INTERVAL_MS = 60_000;
 
 /** 冷却记录超过这个条数就顺手清理过期项，不依赖对局结束时的回收 */
 const PRUNE_THRESHOLD = 1_000;
@@ -61,6 +70,8 @@ export class ChatService {
   private readonly lastSentAt = new Map<string, number>();
   private readonly cooldownMs: number;
   private readonly now: () => number;
+  private readonly log: ChatLog | undefined;
+  private lastLogWarnAt = 0;
 
   constructor(
     private readonly broadcaster: ChatBroadcaster,
@@ -68,6 +79,7 @@ export class ChatService {
   ) {
     this.cooldownMs = opts.cooldownMs ?? CHAT_COOLDOWN_MS;
     this.now = opts.now ?? (() => Date.now());
+    this.log = opts.log;
   }
 
   /** 发送预设短语：冷却+白名单+阵营校验，通过则广播并返回成功结果 */
@@ -116,7 +128,37 @@ export class ChatService {
       logger.warn({ err, matchID: input.matchID }, 'chat broadcast failed');
     }
 
+    this.recordLog(input, nowTs);
     return { ok: true, payload };
+  }
+
+  /** 写聊天记录：不等待、不抛错，失败只记 WARN，不影响广播与对局 */
+  private recordLog(input: SendChatInput, sentAt: number): void {
+    if (!this.log) return;
+    const seat = Number(input.senderID);
+    if (!Number.isInteger(seat)) return;
+    const entry = {
+      matchID: input.matchID,
+      senderPlayerId: input.senderPlayerId ?? null,
+      seat,
+      phraseId: input.presetId,
+      sentAt: new Date(sentAt),
+      broadcastTo: 'all' as const,
+    };
+    try {
+      this.log
+        .record(entry)
+        .catch((err: unknown) => this.warnLogFailure(err, input.matchID, sentAt));
+    } catch (err) {
+      this.warnLogFailure(err, input.matchID, sentAt);
+    }
+  }
+
+  private warnLogFailure(err: unknown, matchID: string, at: number): void {
+    if (this.lastLogWarnAt > 0 && at - this.lastLogWarnAt < LOG_WARN_INTERVAL_MS) return;
+    this.lastLogWarnAt = at;
+    // 常见原因：对局行尚未写入（归档队列落后）、预设短语表还没有数据（没执行 seed）、数据库不可用
+    logger.warn({ err, matchID }, 'chat log write failed');
   }
 
   /** 查询某玩家剩余冷却时间（测试/UI 用） */

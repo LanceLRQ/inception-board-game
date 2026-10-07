@@ -277,6 +277,7 @@ menu_database() {
     print_menu_item 2 "开发迁移" "prisma migrate dev（会按 schema 生成新迁移）"
     print_menu_item 3 "应用迁移" "prisma migrate deploy（只应用已有迁移）"
     print_menu_item 4 "生成客户端" "prisma generate"
+    print_menu_item 5 "写入初始数据" "prisma db seed（预设短语与成就定义，可重复执行）"
     print_back
 
     local choice
@@ -287,6 +288,7 @@ menu_database() {
       2) print_running "prisma migrate dev"; run_server_prisma migrate dev || true; pause_and_return;;
       3) print_running "prisma migrate deploy"; run_server_prisma migrate deploy || true; pause_and_return;;
       4) print_running "prisma generate"; run_server_prisma generate || true; pause_and_return;;
+      5) print_running "prisma db seed"; run_server_prisma db seed || true; pause_and_return;;
       0) return;;
       *) ;;
     esac
@@ -414,6 +416,7 @@ Docker Compose 命令:
   migrate                   prisma migrate dev
   migrate-deploy            prisma migrate deploy
   generate                  prisma generate
+  seed                      prisma db seed（预设短语与成就定义，幂等；迁移之后执行）
 
 Redis 命令:
   redis-cli [args...]       进入 redis-cli（自动带密码）
@@ -474,6 +477,8 @@ case "$cmd" in
     run_server_prisma migrate deploy "$@";;
   "generate")
     run_server_prisma generate "$@";;
+  "seed")
+    run_server_prisma db seed "$@";;
   "redis-cli")
     run_redis_cli "$@";;
   "redis-info")

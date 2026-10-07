@@ -61,6 +61,19 @@ describe('WSMessageRouter', () => {
       expect(JSON.stringify(sent)).not.toContain('acct-1');
     });
 
+    it('聊天记录里带上发送者的账号 id 与座位号', async () => {
+      const record = vi.fn().mockResolvedValue(undefined);
+      const chat = new ChatService(vi.fn() as never, { cooldownMs: 3_000, log: { record } });
+      const withChatRouter = new WSMessageRouter({ heartbeat: heartbeat as never, bot, chat });
+      await withChatRouter.route(
+        { ...ctx, faction: 'thief' },
+        { type: 'icg:chatBroadcast', scope: 'match', message: 'greet_hi' },
+      );
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ senderPlayerId: 'acct-1', seat: 1, phraseId: 'greet_hi' }),
+      );
+    });
+
     it('returns empty (broadcast handled by ChatService) for valid preset', async () => {
       const broadcaster = vi.fn();
       const chat = new ChatService(broadcaster as never, { cooldownMs: 3_000 });

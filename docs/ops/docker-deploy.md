@@ -187,11 +187,11 @@ git pull
 
 ### 数据库迁移（手动触发）
 
-后端容器每次启动都会先执行 `prisma migrate deploy`。需要手动触发时：
+后端容器每次启动都会先执行 `prisma migrate deploy`，再执行 `prisma db seed` 写入初始数据（预设短语与成就定义；幂等，重复执行结果不变，清单里已不存在的旧短语只会标为停用、不会删除），最后启动服务。需要手动触发时：
 
 ```bash
 ./scripts/prod.sh compose exec api \
-  sh -c "cd /app/packages/server && pnpm exec prisma migrate deploy"
+  sh -c "cd /app/packages/server && pnpm exec prisma migrate deploy && pnpm exec prisma db seed"
 ```
 
 ### 停止与清理
@@ -222,6 +222,7 @@ rm -rf deploy/prod/data/pg-data deploy/prod/data/redis-data
 cp .env.example .env              # 开发用的变量保持默认即可
 ./scripts/dev.sh up               # 启动开发用 Postgres（127.0.0.1:15432）与 Redis（127.0.0.1:16379）
 ./scripts/dev.sh migrate          # 对开发库执行 prisma migrate dev
+./scripts/dev.sh seed             # 写入初始数据（预设短语与成就定义，可重复执行）；新库迁移之后执行一次
 ./scripts/dev.sh dev              # pnpm dev：服务端 + 客户端
 ```
 
@@ -231,7 +232,7 @@ cp .env.example .env              # 开发用的变量保持默认即可
 | --- | --- |
 | `up` / `down` / `restart` / `ps` / `logs` / `compose` | 开发容器管理 |
 | `psql` | 进入开发库 |
-| `migrate` / `migrate-deploy` / `generate` | `prisma migrate dev` / `migrate deploy` / `generate` |
+| `migrate` / `migrate-deploy` / `generate` / `seed` | `prisma migrate dev` / `migrate deploy` / `generate` / `db seed` |
 | `redis-cli` / `redis-info` | 进入 redis-cli（自动带密码）/ INFO |
 | `redis-scan [前缀]` | 按前缀列出键，默认 `ico:*` |
 | `redis-flush` | 清空开发 Redis 当前库（要求输入 yes 确认） |

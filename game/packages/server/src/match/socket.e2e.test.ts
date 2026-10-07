@@ -395,6 +395,36 @@ describe('预设短语', () => {
       .filter((r) => r.event === 'icg:chatMessage')
       .map((r) => (r.payload as { message: { sender: string; phraseId: string } }).message);
 
+  it('广播的同时写一行聊天记录：对局、座位、账号、短语；被拒绝的不记', async () => {
+    const { server, room, accounts, cs } = await chatRoom();
+    const a = cs[0]!;
+    a.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'greet_hi',
+    });
+    a.socket.emit('icg:chatBroadcast', {
+      type: 'icg:chatBroadcast',
+      scope: 'match',
+      message: 'bad',
+    });
+    await waitUntil(() => server.chatLog.entries().length === 1, '写入一行聊天记录');
+    expect(server.chatLog.entries()[0]).toMatchObject({
+      matchID: room.id,
+      seat: Number(a.seat),
+      senderPlayerId: accounts.find((x) => x.seat === a.seat)!.playerId,
+      phraseId: 'greet_hi',
+      broadcastTo: 'all',
+    });
+    // 记录里的账号 id 不会出现在任何下发给客户端的消息里
+    const accountId = accounts.find((x) => x.seat === a.seat)!.playerId;
+    for (const c of cs) {
+      for (const r of c.received.filter((m) => m.event === 'icg:chatMessage')) {
+        expect(JSON.stringify(r.payload)).not.toContain(accountId);
+      }
+    }
+  });
+
   it('同一局的所有连接都收到，发送者是座位号；冷却内再发被拒绝', async () => {
     const { cs } = await chatRoom();
     const [a, b, c] = cs as [TestClient, TestClient, TestClient];

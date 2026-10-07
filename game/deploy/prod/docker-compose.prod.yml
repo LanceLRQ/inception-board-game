@@ -83,10 +83,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-    # 首次启动：跑 migrate deploy → 启动服务
+    # 每次启动：migrate deploy → 写入初始数据（预设短语与成就定义，幂等） → 启动服务
     command: >
       sh -c "cd /app/packages/server &&
              pnpm exec prisma migrate deploy &&
+             pnpm exec prisma db seed &&
              pnpm exec tsx src/index.ts"
 
   client:

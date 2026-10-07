@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ChatService } from './ChatService.js';
 import type { BroadcastableMessage } from '../ws/types.js';
+import type { ChatLog, ChatLogEntry } from './ChatLog.js';
+import { logger } from '../infra/logger.js';
 
 describe('ChatService', () => {
   let now: number;
@@ -265,6 +267,98 @@ describe('ChatService', () => {
       chat.send({ matchID: 'fresh', senderID: '1', senderFaction: 'thief', presetId: 'greet_hi' });
       const size = (chat as unknown as { lastSentAt: Map<string, number> }).lastSentAt.size;
       expect(size).toBeLessThan(10);
+    });
+  });
+
+  describe('聊天记录落库', () => {
+    const input = {
+      matchID: 'm1',
+      senderID: '3',
+      senderPlayerId: 'acct-3',
+      senderFaction: 'thief',
+      presetId: 'greet_hi',
+    };
+    const makeLog = () => {
+      const entries: ChatLogEntry[] = [];
+      const log: ChatLog = {
+        record: vi.fn(async (e: ChatLogEntry) => {
+          entries.push(e);
+        }),
+      };
+      return { entries, log };
+    };
+
+    it('广播一条就记一行：对局、账号、座位号、短语、时间、范围', () => {
+      const { entries, log } = makeLog();
+      const c = new ChatService(broadcaster as never, { cooldownMs: 3_000, now: () => now, log });
+      expect(c.send(input).ok).toBe(true);
+      expect(entries).toEqual([
+        {
+          matchID: 'm1',
+          senderPlayerId: 'acct-3',
+          seat: 3,
+          phraseId: 'greet_hi',
+          sentAt: new Date(now),
+          broadcastTo: 'all',
+        },
+      ]);
+    });
+
+    it('没有账号的发送者（Bot 座位）记成空账号', () => {
+      const { entries, log } = makeLog();
+      const c = new ChatService(broadcaster as never, { cooldownMs: 3_000, now: () => now, log });
+      c.send({ matchID: 'm1', senderID: '3', senderFaction: 'thief', presetId: 'greet_hi' });
+      expect(entries[0]?.senderPlayerId).toBeNull();
+    });
+
+    it('被拒绝的短语（未知、阵营不符、冷却中）不记', () => {
+      const { log } = makeLog();
+      const c = new ChatService(broadcaster as never, { cooldownMs: 3_000, now: () => now, log });
+      c.send({ ...input, presetId: 'nope' });
+      c.send({ ...input, senderFaction: 'master', presetId: 'tactic_push' });
+      c.send(input);
+      c.send(input);
+      expect(log.record).toHaveBeenCalledTimes(1);
+    });
+
+    it('写库永远不挂住也不影响广播与返回', () => {
+      const log: ChatLog = { record: () => new Promise<void>(() => {}) };
+      const c = new ChatService(broadcaster as never, { cooldownMs: 3_000, now: () => now, log });
+      expect(c.send(input).ok).toBe(true);
+      expect(broadcasts).toHaveLength(1);
+    });
+
+    it('写库失败只记 WARN：异步失败与同步抛错都不影响结果；短时间内只记一次', async () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        let mode: 'reject' | 'throw' = 'reject';
+        const log: ChatLog = {
+          record: () => {
+            if (mode === 'throw') throw new Error('sync boom');
+            return Promise.reject(new Error('fk'));
+          },
+        };
+        const c = new ChatService(broadcaster as never, {
+          cooldownMs: 0,
+          now: () => now,
+          log,
+        });
+        expect(c.send(input).ok).toBe(true);
+        mode = 'throw';
+        expect(c.send(input).ok).toBe(true);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(broadcasts).toHaveLength(2);
+        expect(warn).toHaveBeenCalledTimes(1);
+        // 过了静默期再失败，会再记一次
+        now += 61_000;
+        c.send(input);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(warn).toHaveBeenCalledTimes(2);
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 });

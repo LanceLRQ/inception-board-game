@@ -27,6 +27,7 @@ import { InMemoryMatchArchive, type MatchArchive } from '../match/MatchArchive.j
 import { InMemoryMatchStore, type MatchStore } from '../match/MatchStore.js';
 import type { TimingConfig } from '../match/scheduling.js';
 import { InMemoryBanChecker } from '../services/BanChecker.js';
+import { InMemoryChatLog } from '../services/ChatLog.js';
 import { BotManager, type BotManagerOptions } from '../services/BotManager.js';
 import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
 import { InMemoryRateGuard, type RateGuardMutable } from '../services/RateGuardService.js';
@@ -45,6 +46,8 @@ export const HAND_LIMIT = 5;
 export interface ServerOptions {
   store?: MatchStore;
   archive?: MatchArchive;
+  /** 聊天记录；不给时用内存实现 */
+  chatLog?: InMemoryChatLog;
   timing?: Partial<TimingConfig>;
   rateGuard?: RateGuardMutable;
   bans?: InMemoryBanChecker;
@@ -60,6 +63,8 @@ export interface TestServer {
   url: string;
   store: MatchStore;
   archive: MatchArchive;
+  /** 服务端使用的聊天记录 */
+  chatLog: InMemoryChatLog;
   /** 服务端正在使用的排程时长对象；改它再让房间重新排程即可调整节奏 */
   timing: TimingConfig;
   /** 服务端使用的封禁查询器 */
@@ -70,12 +75,14 @@ export interface TestServer {
 export async function startServer(opts: ServerOptions = {}): Promise<TestServer> {
   const store = opts.store ?? new InMemoryMatchStore();
   const archive = opts.archive ?? new InMemoryMatchArchive();
+  const chatLog = opts.chatLog ?? new InMemoryChatLog();
   const timing: TimingConfig = { ...FAST_TIMING, ...opts.timing };
   const bans = opts.bans ?? new InMemoryBanChecker();
   const noop = async (): Promise<null> => null;
   const rt = buildRealtime({
     store,
     archive,
+    chatLog,
     lobbyRedis: {
       get: noop,
       setex: async () => 'OK',
@@ -101,6 +108,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<TestServer>
     url: `http://127.0.0.1:${port}`,
     store,
     archive,
+    chatLog,
     timing,
     bans,
     stop: () => rt.stop(),

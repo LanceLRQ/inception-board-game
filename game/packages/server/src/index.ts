@@ -6,6 +6,7 @@ import { prisma } from './infra/postgres.js';
 import { createRedisClient } from './infra/redis.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
+import { PrismaChatLog } from './services/ChatLog.js';
 import { isOperatorTokenTooShort, MIN_OPERATOR_TOKEN_LENGTH } from './middleware/operatorAuth.js';
 import { isWildcardInProduction, resolveCorsOrigins } from './middleware/cors.js';
 import { resolveRecoveryPepper } from './infra/recoveryCode.js';
@@ -51,6 +52,7 @@ const redis = createRedisClient();
 const realtime = buildRealtime({
   store: new RedisMatchStore(redis),
   archive: new PrismaMatchArchive(prisma),
+  chatLog: new PrismaChatLog(prisma),
   lobbyRedis: redis,
   lobbyPrisma: prisma,
   heartbeatRedis: redis,

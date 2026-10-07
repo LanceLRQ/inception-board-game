@@ -291,6 +291,7 @@
       "PROTOCOL_MISMATCH": "Client version differs from the server, please refresh",
       "REPLACED": "You joined this match from another page",
       "TOKEN_REVOKED": "This account was restored on another device, please re-enter",
+      "BANNED": "This account is banned and cannot join matches",
       "MATCH_ABORTED": "The server cannot continue this match, please re-enter later"
     }
   },

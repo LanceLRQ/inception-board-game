@@ -78,6 +78,7 @@ export class WSMessageRouter {
       matchID: ctx.matchID,
       // 广播里的发送者与对局内其他通知一致，用座位号；冷却也按座位计（座位在对局内唯一）
       senderID: ctx.seat,
+      senderPlayerId: ctx.playerID,
       senderFaction: ctx.faction ?? 'all',
       presetId: message,
     });
