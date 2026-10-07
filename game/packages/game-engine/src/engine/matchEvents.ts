@@ -91,7 +91,15 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   // 已知局限：别的玩家弃掉的牌若与发起者手里的牌同种，且同种牌也被抽走，可能多算。
   const playedNow = newlyPlayed(before, after);
   const discarded = addedCards(before.deck.discardPile, after.deck.discardPile);
+  // 打出后移出游戏的牌（时间风暴）不进弃牌堆，不用从新增里扣：
+  // 否则翻开的牌里恰好还有一张同名风暴时，会被错当成打出的那张扣掉
+  const removedNow = addedCards(before.removedFromGame, after.removedFromGame);
   for (const card of playedNow) {
+    const gone = removedNow.indexOf(card);
+    if (gone >= 0) {
+      removedNow.splice(gone, 1);
+      continue;
+    }
     const at = discarded.indexOf(card);
     if (at >= 0) discarded.splice(at, 1);
   }

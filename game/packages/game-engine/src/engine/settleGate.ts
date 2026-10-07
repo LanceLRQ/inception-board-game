@@ -30,7 +30,8 @@ interface GateContext {
 /**
  * 给一组 move 套上行动权与参数形状校验：发起者此刻没有行动权、或参数类型不对时直接返回非法，不进入 move 本身。
  * 发起者取上下文里的 playerID；直接手写上下文调用、没有 playerID 时退回 ctx.currentPlayer。
- * 原函数挂在包装函数的 unwrapped 属性上，供测试工具读取形参。
+ * 原函数挂在包装函数的 unwrapped 属性上，供测试工具读取形参；
+ * 里面若还套着别的包装层（出牌记录等，同样带 unwrapped），取最里层的原函数。
  */
 export function withSettleGate<M extends Record<string, GatedMove>>(moves: M): M {
   const gatedMoves: Record<string, GatedMove> = {};
@@ -48,7 +49,8 @@ export function withSettleGate<M extends Record<string, GatedMove>>(moves: M): M
       if (result === INVALID_MOVE || typeof result !== 'object' || result === null) return result;
       return applyHlninoAscent(context.G, result as SetupState);
     };
-    Object.defineProperty(gated, 'unwrapped', { value: original });
+    const innermost = (original as { unwrapped?: unknown }).unwrapped ?? original;
+    Object.defineProperty(gated, 'unwrapped', { value: innermost });
     gatedMoves[name] = { ...def, move: gated as never };
   }
   return gatedMoves as M;

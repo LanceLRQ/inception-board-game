@@ -89,6 +89,13 @@ describe('withSettleGate 包装层', () => {
     );
   });
 
+  it('里面还套着带 unwrapped 的包装层时，unwrapped 取最里层的原函数', () => {
+    const inner = (): unknown => 'inner';
+    const middle = Object.assign((): unknown => 'middle', { unwrapped: inner });
+    const nested = withSettleGate({ probe: { move: middle as never } });
+    expect((nested.probe.move as unknown as { unwrapped?: unknown }).unwrapped).toBe(inner);
+  });
+
   it('保留 unwrapped 属性供测试工具读取形参', () => {
     expect(typeof (gated.probe.move as unknown as { unwrapped?: unknown }).unwrapped).toBe(
       'function',

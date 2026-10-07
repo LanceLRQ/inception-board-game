@@ -280,6 +280,20 @@ describe('事件 · 抽牌与阶段', () => {
     expect(ev.secret).toBeUndefined();
   });
 
+  it('打出时间风暴：风暴自己移出游戏，翻开的 10 张牌（含另一张风暴）都在 cards_discarded 里', () => {
+    const STORM = 'action_time_storm' as CardID;
+    const flipped: CardID[] = [STORM, KICK, KICK, SHOOT, KICK, KICK, SHOOT, KICK, KICK, SHOOT];
+    const G = scene(
+      'action',
+      { deck: { cards: [...flipped, KICK, KICK], discardPile: [] } },
+      { p1: { hand: [STORM, KICK] } },
+    );
+    const { events, state } = step(load(G), 'p1', 'playTimeStorm', [STORM]);
+    expect(state.G.removedFromGame).toEqual([STORM]);
+    expect(one(events, 'card_played').data).toMatchObject({ player: 'p1', card: STORM });
+    expect(one(events, 'cards_discarded').data).toMatchObject({ count: 10, cards: flipped });
+  });
+
   it('turn_started：回合主人与回合数', () => {
     const { events, state } = step(load(scene('discard')), 'p1', 'skipDiscard');
     const ev = one(events, 'turn_started');

@@ -12,13 +12,7 @@ import {
   isDreamMaster,
   isMazeBlocked,
 } from '../engine/skills.js';
-import {
-  discardCard,
-  drawCards,
-  incrementMoveCounter,
-  movePlayerToLayer,
-  recordCardPlayed,
-} from '../stateOps.js';
+import { discardCard, drawCards, incrementMoveCounter, movePlayerToLayer } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase, isAdjacent } from './common.js';
 
 export const actionCardMoves = {
@@ -108,7 +102,7 @@ export const actionCardMoves = {
       s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer);
       // 天王星·苍穹世界观：盗梦者因行动牌移动 → 牌库顶弃 1（贿赂派完弃 2）
       s = applyUranusFirmamentMoveDiscard(s, ctx.currentPlayer);
-      return recordCardPlayed(incrementMoveCounter(s), cardId);
+      return incrementMoveCounter(s);
     },
     client: false,
   },
@@ -127,7 +121,7 @@ export const actionCardMoves = {
       s = applyMercuryReverse(s, ctx.currentPlayer, cardId, targetPlayerID) ?? s;
       const kicked = applyKickEffect(s, ctx.currentPlayer, targetPlayerID);
       if (kicked === null) return INVALID_MOVE;
-      return recordCardPlayed(incrementMoveCounter(kicked), cardId);
+      return incrementMoveCounter(kicked);
     },
     client: false,
   },

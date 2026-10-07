@@ -147,7 +147,8 @@ export function beginTurn(state: SetupState, playerID: string): SetupState {
 
 /**
  * 记录本回合打出一张行动牌 · 追加到 playedCardsThisTurn + 更新 lastPlayedCardThisTurn。
- * 由所有 playXxx move 在成功结算后调用（不改变其他状态，纯追加日志）。
+ * 出牌 move 表里的 move 由 engine/recordPlayedCards.ts 的包装层统一调用；
+ * 不经过出牌 move 的路径（意念判官·定罪、格林射线·缉捕）在自己的 move 里调用（不改变其他状态，纯追加日志）。
  * 水星/金星/格林射线等能力
  */
 export function recordCardPlayed(state: SetupState, cardId: string): SetupState {

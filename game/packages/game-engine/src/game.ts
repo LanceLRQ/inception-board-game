@@ -24,6 +24,7 @@ import { denyAction } from './engine/actionRights.js';
 import { viewFor } from './engine/matchView.js';
 import { describeMatchEvents } from './engine/matchEvents.js';
 import { matchOutcome } from './engine/outcome.js';
+import { recordPlayedCards } from './engine/recordPlayedCards.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { matchEndIf } from './endCondition.js';
 import { setupMatch } from './matchSetup.js';
@@ -65,20 +66,22 @@ export const InceptionCityGame = {
 
     playing: {
       turn: playingTurn,
-      // 所有 move 扁平化（不用 BGIO stages）；统一套上待结算闸门
-      moves: withSettleGate({
-        ...turnFlowMoves,
-        ...shootMoves,
-        ...unlockMoves,
-        ...actionCardMoves,
-        ...peekMoves,
-        ...masterMoves,
-        ...masterSkillMoves,
-        ...thiefAttackSkillMoves,
-        ...thiefBoardSkillMoves,
-        ...thiefCardSkillMoves,
-        ...responseMoves,
-      }),
+      // 所有 move 扁平化（不用 BGIO stages）；出牌 move 统一记录打出的牌，再统一套上待结算闸门
+      moves: withSettleGate(
+        recordPlayedCards({
+          ...turnFlowMoves,
+          ...shootMoves,
+          ...unlockMoves,
+          ...actionCardMoves,
+          ...peekMoves,
+          ...masterMoves,
+          ...masterSkillMoves,
+          ...thiefAttackSkillMoves,
+          ...thiefBoardSkillMoves,
+          ...thiefCardSkillMoves,
+          ...responseMoves,
+        }),
+      ),
     },
 
     endgame: {

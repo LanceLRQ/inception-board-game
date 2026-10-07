@@ -5,7 +5,7 @@ import { INVALID_MOVE } from '../engine/invalidMove.js';
 import { isCardForPlayMove } from '../engine/playCardKinds.js';
 import { dealBribeCard, isDreamMaster, isOutwardThief } from '../engine/skills.js';
 import type { SetupState } from '../setup.js';
-import { discardCard, incrementMoveCounter, recordCardPlayed } from '../stateOps.js';
+import { discardCard, incrementMoveCounter } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
 import { resolveBribePick } from './settlement.js';
 
@@ -47,7 +47,7 @@ export const peekMoves = {
           },
         };
       }
-      return recordCardPlayed(s, cardId);
+      return s;
     },
     client: false,
   },
@@ -122,7 +122,7 @@ export const peekMoves = {
           targetThiefID,
         },
       };
-      return recordCardPlayed(s, cardId);
+      return s;
     },
     client: false,
   },

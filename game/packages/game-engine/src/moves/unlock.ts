@@ -14,7 +14,7 @@ import {
   isDreamMaster,
 } from '../engine/skills.js';
 import type { SetupState } from '../setup.js';
-import { applyUnlockCancel, discardCard, recordCardPlayed } from '../stateOps.js';
+import { applyUnlockCancel, discardCard } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
 import { resolveUnlockFull } from './settlement.js';
 
@@ -67,10 +67,10 @@ export const unlockMoves = {
           validResponseAbilityIDs: ['action_unlock_effect_2'],
           onTimeout: 'resolve',
         });
-        return recordCardPlayed(s, cardId);
+        return s;
       }
-      // 没有可响应者：不开窗口，先记录出牌再直接结算，避免 pendingUnlock 悬空卡住对局
-      return resolveUnlockFull(recordCardPlayed(s, cardId));
+      // 没有可响应者：不开窗口，直接结算，避免 pendingUnlock 悬空卡住对局
+      return resolveUnlockFull(s);
     },
     client: false,
   },

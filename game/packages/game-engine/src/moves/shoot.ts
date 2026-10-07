@@ -5,12 +5,7 @@ import type { CardID } from '@icgame/shared';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import { isCardForPlayMove } from '../engine/playCardKinds.js';
 import type { SetupState } from '../setup.js';
-import {
-  discardCard,
-  incrementMoveCounter,
-  movePlayerToLayer,
-  recordCardPlayed,
-} from '../stateOps.js';
+import { discardCard, incrementMoveCounter, movePlayerToLayer } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase, isAdjacent } from './common.js';
 import { applyShootByCard } from './shootResolution.js';
 
@@ -28,11 +23,10 @@ export const shootMoves = {
       // 射手·禁足：仅射手角色可阻止移动
       const shooter = G.players[ctx.currentPlayer];
       const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
-      const r = applyShootByCard(G, ctx, random, targetPlayerID, cardId, {
+      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, {
         decreeId,
         preventMove: canPrevent,
       });
-      return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
     },
     client: false,
   },
@@ -58,8 +52,7 @@ export const shootMoves = {
       if (mode === 'shoot') {
         // 目标为玩家 ID
         if (typeof targetOrLayer !== 'string') return INVALID_MOVE;
-        const r = applyShootByCard(G, ctx, random, targetOrLayer, cardId, { decreeId });
-        return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
+        return applyShootByCard(G, ctx, random, targetOrLayer, cardId, { decreeId });
       } else if (mode === 'transit') {
         // 自己移动到相邻层
         if (typeof targetOrLayer !== 'number') return INVALID_MOVE;

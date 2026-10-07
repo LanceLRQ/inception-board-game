@@ -1702,7 +1702,7 @@ export function isAquariusUnlimitedActive(player: PlayerSetup): boolean {
  * 水瓶·凝聚可触发次数：本回合已打出的牌按 name 分组，每 2 张同名贡献 1 次触发额度
  * 扣除已使用的触发次数后即为剩余额度
  * 对照：docs/manual/05-dream-thieves.md 水瓶 46-50 行
- * 注：manual "金星·镜界复制不算"由 applyVenusMirrorWorld 不调用 recordCardPlayed 自然实现
+ * 注：manual "金星·镜界复制不算"由 applyVenusMirrorWorld 不记录出牌自然实现（出牌记录只在出牌 move 的包装层里写）
  */
 export function availableAquariusCoherence(state: SetupState, selfID: string): number {
   const player = state.players[selfID];
