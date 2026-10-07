@@ -3,7 +3,7 @@
 // 对照：setup.ts playedCardsThisTurn
 
 import { describe, it, expect } from 'vitest';
-import { recordCardPlayed, beginTurn } from './moves.js';
+import { recordCardPlayed, beginTurn } from './stateOps.js';
 import { createTestState } from './testing/fixtures.js';
 import type { CardID } from '@icgame/shared';
 

@@ -17,7 +17,7 @@ export {
   movePlayerToLayer,
   isAdjacentLayer,
   recordCardPlayed,
-} from './moves.js';
+} from './stateOps.js';
 export * from './config.js';
 export type { ShootOutcome } from './dice.js';
 export { migrateGameState, getSchemaVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';

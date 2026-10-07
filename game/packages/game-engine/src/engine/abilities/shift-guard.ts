@@ -1,5 +1,5 @@
 // 移形换影强校验 — 回合末还原 + 一致性检查
-// 对照：docs/manual/04-action-cards.md 移形换影 + game.ts turn.onEnd
+// 对照：docs/manual/04-action-cards.md 移形换影 + turnHooks.ts 的 onEnd
 
 import type { SetupState } from '../../setup.js';
 

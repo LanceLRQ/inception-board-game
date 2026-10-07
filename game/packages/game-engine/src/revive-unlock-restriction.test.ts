@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import type { CardID } from '@icgame/shared';
 import type { SetupState } from './setup.js';
 import { applyMove } from './runner/matchRunner.js';
-import { beginTurn } from './moves.js';
+import { beginTurn } from './stateOps.js';
 import { sendToLimbo } from './engine/death.js';
 import {
   game,

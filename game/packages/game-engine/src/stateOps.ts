@@ -1,4 +1,4 @@
-// 核心 Move 定义 - 回合流程
+// 对局状态的底层操作：抽牌 / 弃牌 / 回合推进 / 移层 / 解封与心锁等纯函数（不 mutate 入参），供 move、回合钩子与技能执行器复用
 
 import { HAND_LIMIT, BASE_DRAW_COUNT } from './config.js';
 import type { SetupState, PlayerSetup } from './setup.js';

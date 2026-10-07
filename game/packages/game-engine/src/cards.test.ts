@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyUnlockSuccess, applyUnlockCancel, drawCards, movePlayerToLayer } from './moves.js';
+import { applyUnlockSuccess, applyUnlockCancel, drawCards, movePlayerToLayer } from './stateOps.js';
 import type { SetupState } from './setup.js';
 import type { CardID } from '@icgame/shared';
 

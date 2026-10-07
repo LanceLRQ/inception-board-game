@@ -99,6 +99,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 │   ├── packages/
 │   │   ├── shared/                 # 共享类型、卡牌数据、通用规则
 │   │   ├── game-engine/            # 游戏引擎（对局定义、moves、技能，含对局运行器）
+│   │   │                           #   src/game.ts 只做装配；move 按主题分在 src/moves/，回合钩子 turnHooks.ts、终局判定 endCondition.ts、建局 matchSetup.ts，底层状态操作 stateOps.ts
 │   │   ├── bot/                    # AI Bot
 │   │   ├── server/                 # Koa 服务端（REST / WebSocket / Prisma）
 │   │   ├── client/                 # React PWA 客户端

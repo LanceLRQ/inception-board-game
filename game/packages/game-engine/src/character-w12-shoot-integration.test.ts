@@ -1,4 +1,4 @@
-// SHOOT 修饰角色 game.ts 接入集成测试
+// SHOOT 修饰角色接入对局的集成测试
 // 天蝎 / 金牛 接入 applyShootVariant
 // 对照：docs/manual/05-dream-thieves.md
 //

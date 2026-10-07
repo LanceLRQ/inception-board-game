@@ -128,7 +128,7 @@ describe('白羊 · 星尘 · 弃牌分支', () => {
 // =============================================================================
 
 describe('白羊 · 星尘 · 发动分支（reveal）', () => {
-  it('翻开梦魇 + 清 pending（效果分发由 game.ts move 层执行）', () => {
+  it('翻开梦魇 + 清 pending（效果分发由 move 层执行）', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p2', 'thief_aries');
     s = setLayerNightmare(s, 2 as Layer, 'nightmare_despair_storm' as CardID);

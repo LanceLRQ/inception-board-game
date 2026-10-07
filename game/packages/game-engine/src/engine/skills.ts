@@ -13,7 +13,7 @@ import {
   setLayerHeartLock,
   setTurnPhase,
   HEART_LOCK_REDUCED_BY_SKILL_KEY,
-} from '../moves.js';
+} from '../stateOps.js';
 import { killPlayer, sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './death.js';
 import { resolveShootCustom } from '../dice.js';
 import { flipCharacter, isCharacterFace } from './abilities/dual-faced.js';
@@ -1920,7 +1920,7 @@ export function applyAriesStardustDiscard(state: SetupState): SetupState | null 
   };
 }
 
-/** 白羊·星尘 · 发动分支的准备：翻开梦魇 + 清 pending（梦魇效果的实际分发由 game.ts move 层执行） */
+/** 白羊·星尘 · 发动分支的准备：翻开梦魇 + 清 pending（梦魇效果的实际分发由 moves/responses.ts 的 move 执行） */
 export function applyAriesStardustReveal(state: SetupState): SetupState | null {
   const pending = state.pendingAriesChoice;
   if (!pending) return null;
@@ -2287,7 +2287,7 @@ export function canMarsKill(state: SetupState, masterID: string): boolean {
   return master.hand.includes('action_unlock');
 }
 
-/** 火星·杀戮：弃掉 1 张解封（不消耗 perTurn 计数；梦魇结算由 game.ts 接入） */
+/** 火星·杀戮：弃掉 1 张解封（不消耗 perTurn 计数；梦魇结算由 moves/masterSkills.ts 接入） */
 export function applyMarsKillDiscardUnlock(state: SetupState, masterID: string): SetupState | null {
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_mars_battlefield') return null;

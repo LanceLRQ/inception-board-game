@@ -75,7 +75,7 @@ describe('嫁接（playGraft + resolveGraft）', () => {
 
   it('endActionPhase 在 pendingGraft 存在时被阻断', () => {
     // 直接对 endIf 无关，这里用 engine 纯测试：模拟 G 状态
-    // 由于 BGIO Local 无法强塞 G，改为验证 game.ts 守卫逻辑的行为断言
+    // 由于 BGIO Local 无法强塞 G，改为验证 move 守卫逻辑的行为断言
     // （完整路径在 bot-regression.ts 测试中走通）
     // 简化：确认 endActionPhase 的 guard 行为由 INVALID_MOVE 返回
     const clients = spawn(4);

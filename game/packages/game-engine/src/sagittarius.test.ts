@@ -7,7 +7,7 @@ import { scenarioStartOfGame3p } from './testing/scenarios.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 import { SAGITTARIUS_HEART_LOCK_SKILL_ID } from './engine/skills.js';
 import { sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './engine/death.js';
-import { beginTurn } from './moves.js';
+import { beginTurn } from './stateOps.js';
 
 /** killed=true：本回合已击杀过一位玩家（穿心的发动前提），其余场景都需要它 */
 function setupSagittarius(opts: { killed?: boolean } = {}) {

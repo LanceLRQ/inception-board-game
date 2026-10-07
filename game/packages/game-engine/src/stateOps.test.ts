@@ -1,4 +1,4 @@
-// 核心 Move 测试
+// 核心状态操作测试
 
 import { describe, it, expect } from 'vitest';
 import { createInitialState, type SetupState, type PlayerSetup } from './setup.js';
@@ -16,7 +16,7 @@ import {
   incrementMoveCounter,
   applyUnlockSuccess,
   applyUnlockCancel,
-} from './moves.js';
+} from './stateOps.js';
 
 // 共享测试 fixture
 function makeState(overrides?: Partial<SetupState>): SetupState {

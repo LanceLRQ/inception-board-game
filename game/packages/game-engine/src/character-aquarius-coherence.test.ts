@@ -137,7 +137,7 @@ describe('水瓶 · 凝聚 · 取牌', () => {
 
 // ============================================================================
 // BGIO move 集成测试（playAquariusCoherence）
-// 对照：game.ts:2503 playAquariusCoherence move 入口
+// 对照：moves/thiefSkillsCards.ts 的 playAquariusCoherence
 // ============================================================================
 
 describe('水瓶 · 凝聚 · BGIO move 集成', () => {

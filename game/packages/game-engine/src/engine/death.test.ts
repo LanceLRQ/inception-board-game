@@ -10,7 +10,7 @@ import {
   getAlivePlayers,
   getAliveInLayer,
 } from './death.js';
-import { movePlayerToLayer } from '../moves.js';
+import { movePlayerToLayer } from '../stateOps.js';
 import type { CardID, Layer } from '@icgame/shared';
 
 function makeState(): SetupState {

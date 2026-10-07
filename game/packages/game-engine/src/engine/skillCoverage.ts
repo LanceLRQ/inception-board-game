@@ -19,7 +19,7 @@ export const SKILLS_NOT_IMPLEMENTED: Readonly<Record<string, string>> = {
 /** 效果已在引擎里生效，但以梦主 / 角色 id 内联判断，没有以配置标识登记的入口 */
 export const SKILLS_IMPLEMENTED_WITHOUT_ID: Readonly<Record<string, string>> = {
   'thief_terrorist.skill_1':
-    '狂热：SHOOT 结算前由 game.ts 按射手角色 id 挂起应答窗口，拒绝弃牌则骰值 -1',
+    '狂热：SHOOT 结算前由 moves/shootResolution.ts 按射手角色 id 挂起应答窗口，拒绝弃牌则骰值 -1',
   'dm_harbor.worldview':
     '港口世界观：终局判定 endIf 里的 checkHarborWin（两个金库打开且秘密未开，梦主胜）',
   'dm_mercury_route.worldview':
