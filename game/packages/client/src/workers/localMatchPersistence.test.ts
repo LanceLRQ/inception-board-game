@@ -35,6 +35,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/** 自动循环一直走到轮到真人，让角色分配等由种子决定的内容进入视图 */
+function runToHuman(session: LocalMatchSession): void {
+  for (let i = 0; i < 5000; i++) {
+    if (!session.step().continue) return;
+  }
+}
+
 describe('startLocalMatch', () => {
   it('不恢复也不存档：直接开新局，不碰存档', async () => {
     const store = createMemoryStore();
@@ -60,6 +67,37 @@ describe('startLocalMatch', () => {
     expect(result.resumed).toBe(false);
     expect(await saves.readMeta()).toBeNull();
     expect(result.session.view().ctx.numPlayers).toBe(5);
+  });
+
+  it('给了固定种子：同样的种子与人数开出同一局，与建局时刻无关', async () => {
+    const saves = makeSaves();
+    const request = { playerCount: 4, persist: false, resume: false, seed: 'fixed-1' };
+    const a = await startLocalMatch(request, saves, log, () => 1000);
+    const b = await startLocalMatch(request, saves, log, () => 2000);
+    expect(a.session.snapshot().G.rngSeed).toBe('fixed-1');
+    runToHuman(a.session);
+    runToHuman(b.session);
+    expect(a.session.view()).toEqual(b.session.view());
+  });
+
+  it('固定种子不同：开出的局不同', async () => {
+    const saves = makeSaves();
+    const base = { playerCount: 4, persist: false, resume: false };
+    const a = await startLocalMatch({ ...base, seed: 'fixed-1' }, saves, log);
+    const b = await startLocalMatch({ ...base, seed: 'fixed-2' }, saves, log);
+    runToHuman(a.session);
+    runToHuman(b.session);
+    expect(JSON.stringify(a.session.view().G)).not.toBe(JSON.stringify(b.session.view().G));
+  });
+
+  it('没给固定种子：种子由房间号与建局时刻生成', async () => {
+    const result = await startLocalMatch(
+      { playerCount: 4, matchID: 'room-1', persist: false, resume: false },
+      makeSaves(),
+      log,
+      () => 1234,
+    );
+    expect(result.session.snapshot().G.rngSeed).toBe('room-1-1234');
   });
 
   it('恢复：得到与存档时一致的局面，人数取自存档', async () => {

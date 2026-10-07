@@ -51,6 +51,23 @@ describe('buildRealtime', () => {
     await expect(fetch(`http://127.0.0.1:${port}/health`)).rejects.toThrow();
   });
 
+  it('生产环境传入固定种子：拒绝装配', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      expect(() =>
+        buildRealtime({
+          store: new InMemoryMatchStore(),
+          archive: new InMemoryMatchArchive(),
+          bot: new BotManager({ tickIntervalMs: 99_999 }),
+          httpRateLimit: passThrough,
+          randomSeed: () => 'fixed',
+        }),
+      ).toThrow('生产环境不允许固定对局种子');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('stop 会等归档队列写完再返回：停机时落库的步数与快照版本一致', async () => {
     class SlowArchive extends InMemoryMatchArchive {
       override async appendStep(row: Parameters<InMemoryMatchArchive['appendStep']>[0]) {

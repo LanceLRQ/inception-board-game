@@ -19,6 +19,8 @@ interface LocalMatchRuntimeProps {
   readonly resume?: boolean;
   /** 要求恢复但存档不可用，已开了新局 */
   readonly onResumeFallback?: () => void;
+  /** 固定种子（端到端与走查用）；不给就每局随机 */
+  readonly seed?: string;
 }
 
 export function LocalMatchRuntime({
@@ -29,6 +31,7 @@ export function LocalMatchRuntime({
   persist,
   resume,
   onResumeFallback,
+  seed,
 }: LocalMatchRuntimeProps) {
   const [restartKey, setRestartKey] = useState(0);
   const source = useLocalMatchSource({
@@ -38,6 +41,7 @@ export function LocalMatchRuntime({
     persist,
     resume,
     onResumeFallback,
+    seed,
   });
 
   const handleRestart = useCallback(() => {

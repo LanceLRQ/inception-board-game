@@ -2,6 +2,8 @@
 //
 // 使用本机已安装的 Chrome；服务端与客户端用专用端口，避免和正在运行的开发服务冲突。
 // 无人操作的座位由服务端按短时长代发，让整局在几分钟内打完。
+// 对局种子固定（只经服务端进程的环境变量注入，客户端拿不到也指定不了），
+// 每次都走同一局，不会偶然抽到打满很多回合的长局而撞上超时。
 
 import { defineConfig, devices } from '@playwright/test';
 
@@ -37,6 +39,8 @@ export default defineConfig({
         MATCH_PENDING_TIMEOUT_MS: '1500',
         MATCH_TURN_TIMEOUT_MS: '2500',
         MATCH_RESPONSE_TIMEOUT_CAP_MS: '1500',
+        // 挑过的种子：4 人局（2 真人 + 2 Bot）二十多回合分出胜负
+        MATCH_FIXED_SEED: 'e2e-online-35',
       },
     },
     {

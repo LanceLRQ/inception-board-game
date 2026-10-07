@@ -1,6 +1,6 @@
 // 人机局"再来一局"流程 E2E
 
-import { test, expect, waitForAppReady } from './fixtures/index.js';
+import { LOCAL_MATCH_URL, test, expect, waitForAppReady } from './fixtures/index.js';
 
 test.describe('LocalMatch 重开局', () => {
   test('首次进入显示选人数界面', async ({ page }) => {
@@ -11,7 +11,7 @@ test.describe('LocalMatch 重开局', () => {
   });
 
   test('开始后刷新页面仍能回到初始选择（Worker 不残留）', async ({ page }) => {
-    await page.goto('/local');
+    await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
 

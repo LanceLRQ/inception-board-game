@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { buildRealtime, timingFromEnv, type Realtime } from '../bootstrap.js';
 import { logger } from '../infra/logger.js';
 import { InMemoryMatchArchive } from '../match/MatchArchive.js';
+import { resolveFixedMatchSeed } from '../match/fixedSeed.js';
 import { InMemoryMatchStore } from '../match/MatchStore.js';
 import type { TimingConfig } from '../match/scheduling.js';
 import type { LobbyRedis } from '../services/LobbyService.js';
@@ -67,6 +68,8 @@ export interface DevServerOptions {
   timing?: TimingConfig;
   /** 允许跨域访问的页面源（客户端开发服务的地址） */
   corsOrigin?: string;
+  /** 对局种子来源；默认读环境变量 MATCH_FIXED_SEED，没配置就每局随机 */
+  randomSeed?: () => string;
 }
 
 export interface DevServer {
@@ -108,6 +111,10 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
   let started: Realtime | null = null;
   const identity = createMemoryIdentityPrisma();
   const origin = opts.corsOrigin ?? '*';
+  // 配置了固定种子时，每一局都用同一个种子（端到端用例要求每次走同一局）；
+  // 生产环境配置该变量会在这里抛错，进程拒绝启动
+  const randomSeed = opts.randomSeed ?? resolveFixedMatchSeed(process.env);
+  if (randomSeed !== undefined) logger.warn('fixed match seed enabled (test only)');
   const rt = buildRealtime({
     store: new InMemoryMatchStore(),
     archive: new InMemoryMatchArchive(),
@@ -118,6 +125,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     heartbeatRedis: redis,
     rateGuard: new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
     timing: opts.timing ?? devTimingFromEnv(process.env),
+    ...(randomSeed !== undefined ? { randomSeed } : {}),
     // 内存服务没有 Redis，所以不挂基于 Redis 的 HTTP 限流
     httpRateLimit: async (_ctx, next) => {
       await next();

@@ -133,6 +133,8 @@ export interface UseLocalMatchSourceOptions {
   resume?: boolean;
   /** 要求恢复但存档不可用，已开了新局 */
   onResumeFallback?: () => void;
+  /** 固定种子（端到端与走查用）；不给就每局随机 */
+  seed?: string;
 }
 
 /** 起一个本机 Worker 跑人机对局，返回对局来源 */
@@ -143,6 +145,7 @@ export function useLocalMatchSource({
   persist = false,
   resume = false,
   onResumeFallback,
+  seed,
 }: UseLocalMatchSourceOptions): MatchSource {
   const [source, setSource] = useState<MatchSource | null>(null);
   const fallbackRef = useRef(onResumeFallback);
@@ -159,7 +162,7 @@ export function useLocalMatchSource({
     const off = controller.subscribe(() => setSource(controller.getSnapshot()));
 
     void api
-      .createLocalMatch(playerCount, matchId, { persist, resume })
+      .createLocalMatch(playerCount, matchId, { persist, resume, seed })
       .then((result) => {
         if (result.fellBack) {
           logger.warn('game', 'saved match unavailable, started a new one');
@@ -178,7 +181,7 @@ export function useLocalMatchSource({
       off();
       worker.terminate();
     };
-  }, [playerCount, matchId, restartKey, persist, resume]);
+  }, [playerCount, matchId, restartKey, persist, resume, seed]);
 
   // 本地来源的座位表没有账号信息：本人座位用身份里的头像，其余座位由界面按座位推导
   const identityAvatar = useIdentityStore((s) =>

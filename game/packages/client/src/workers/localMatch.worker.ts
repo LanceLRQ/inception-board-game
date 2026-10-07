@@ -28,6 +28,8 @@ export interface CreateLocalMatchOptions {
   persist?: boolean;
   /** 优先从存档恢复；存档不可用时开新局 */
   resume?: boolean;
+  /** 固定种子（端到端与走查用）：同样的种子与人数开出同一局 */
+  seed?: string;
 }
 
 export interface CreateLocalMatchResult {
@@ -220,7 +222,7 @@ const workerApi: LocalMatchWorker = {
     const resume = options?.resume === true;
     const saves = persist || resume ? await getSaves() : NO_LOCAL_SAVES;
     const started = await startLocalMatch(
-      { playerCount, matchID, persist, resume },
+      { playerCount, matchID, persist, resume, seed: options?.seed },
       saves,
       saveLog,
     );
@@ -237,6 +239,7 @@ const workerApi: LocalMatchWorker = {
       resumed: started.resumed,
       fellBack: started.fellBack,
       persist,
+      fixedSeed: options?.seed !== undefined,
     });
     logFlowChanges(started.session);
     scheduleNext();

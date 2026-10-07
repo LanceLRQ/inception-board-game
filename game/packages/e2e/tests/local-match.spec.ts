@@ -3,6 +3,7 @@
 
 import type { Page } from '@playwright/test';
 import {
+  LOCAL_MATCH_URL,
   test,
   expect,
   pickCardsToDiscard,
@@ -33,7 +34,7 @@ test.describe('人机对战 LocalMatch', () => {
   });
 
   test('4 人局：开始游戏后进入回合阶段，轮次信息与玩家列表可见', async ({ page }) => {
-    await page.goto('/local');
+    await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
 
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
@@ -49,7 +50,7 @@ test.describe('人机对战 LocalMatch', () => {
   });
 
   test('人类玩家手牌随抽牌增加，流程推进到 action 阶段', async ({ page }) => {
-    await page.goto('/local');
+    await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
 
@@ -78,7 +79,7 @@ test.describe('人机对战 LocalMatch', () => {
       else if (msg.type() === 'warning') consoleWarnings.push(text);
     });
 
-    await page.goto('/local');
+    await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
 
@@ -118,7 +119,7 @@ test.describe('人机对战 LocalMatch', () => {
   });
 
   test('不同人数（5 人局）可正常开局', async ({ page }) => {
-    await page.goto('/local');
+    await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
 
     await page.getByRole('button', { name: /^5$/ }).click();

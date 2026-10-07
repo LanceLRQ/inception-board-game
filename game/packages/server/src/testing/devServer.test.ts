@@ -71,6 +71,82 @@ describe('全内存开发服务', () => {
     expect(new Set([sa.seat, sb.seat]).size).toBe(2);
   });
 
+  it('固定了种子：每一局的种子都是它，首包里却看不到种子', async () => {
+    dev = await startDevServer({ port: 0, randomSeed: () => 'fixed-seed-for-test' });
+    const base = dev.url;
+    const a = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+      nickname: '甲',
+    });
+    const starts: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const room = await api<{ code: string }>(base, 'POST', '/rooms', a.token, { maxPlayers: 4 });
+      await api(base, 'POST', `/rooms/${room.code}/fill-ai`, a.token);
+      const started = await api<{ matchId: string }>(
+        base,
+        'POST',
+        `/rooms/${room.code}/start`,
+        a.token,
+      );
+      starts.push(started.matchId);
+      const first = await firstState(base, a.token, started.matchId);
+      expect(JSON.stringify(first)).not.toContain('fixed-seed-for-test');
+      // 两局都用同一个种子，也就是同一份布局
+      expect(dev.rt.matches.get(started.matchId)?.current().G.rngSeed).toBe('fixed-seed-for-test');
+      // 腾出玩家的「已在房间中」限制，下一局才能再建房
+      await api(base, 'POST', `/rooms/${room.code}/leave`, a.token).catch(() => undefined);
+    }
+    expect(new Set(starts).size).toBe(2);
+  });
+
+  it('环境变量配置了固定种子：开发服务采用；生产环境配置则拒绝启动', async () => {
+    vi.stubEnv('MATCH_FIXED_SEED', 'env-seed');
+    try {
+      dev = await startDevServer({ port: 0 });
+      const base = dev.url;
+      const a = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+        nickname: '甲',
+      });
+      const room = await api<{ code: string }>(base, 'POST', '/rooms', a.token, { maxPlayers: 4 });
+      await api(base, 'POST', `/rooms/${room.code}/fill-ai`, a.token);
+      const started = await api<{ matchId: string }>(
+        base,
+        'POST',
+        `/rooms/${room.code}/start`,
+        a.token,
+      );
+      expect(dev.rt.matches.get(started.matchId)?.current().G.rngSeed).toBe('env-seed');
+      await dev.stop();
+      dev = null;
+
+      vi.stubEnv('NODE_ENV', 'production');
+      await expect(startDevServer({ port: 0 })).rejects.toThrow('MATCH_FIXED_SEED');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('没固定种子：每一局的种子都不一样', async () => {
+    dev = await startDevServer({ port: 0 });
+    const base = dev.url;
+    const a = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+      nickname: '甲',
+    });
+    const seeds = new Set<string>();
+    for (let i = 0; i < 2; i++) {
+      const room = await api<{ code: string }>(base, 'POST', '/rooms', a.token, { maxPlayers: 4 });
+      await api(base, 'POST', `/rooms/${room.code}/fill-ai`, a.token);
+      const started = await api<{ matchId: string }>(
+        base,
+        'POST',
+        `/rooms/${room.code}/start`,
+        a.token,
+      );
+      seeds.add(dev.rt.matches.get(started.matchId)!.current().G.rngSeed);
+      await api(base, 'POST', `/rooms/${room.code}/leave`, a.token).catch(() => undefined);
+    }
+    expect(seeds.size).toBe(2);
+  });
+
   it('房间变化经 /rooms 命名空间推给成员：加入、补 Bot、开始都不用轮询；局外人连不上', async () => {
     dev = await startDevServer({ port: 0 });
     const base = dev.url;

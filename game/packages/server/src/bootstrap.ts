@@ -59,6 +59,11 @@ export interface RealtimeDeps {
   archiveFlushTimeoutMs?: number;
   /** 默认 new BotManager() */
   bot?: BotManager;
+  /**
+   * 对局种子来源；默认每局随机。只给端到端测试用来固定种子，生产环境传入会直接抛错。
+   * 种子只在服务端进程里，不进任何下发给客户端的数据。
+   */
+  randomSeed?: () => string;
   ws?: { corsOrigin?: string | string[]; path?: string };
   /** 全局 HTTP 限流中间件；默认基于 Redis 的 IP 限流 */
   httpRateLimit?: Middleware;
@@ -92,6 +97,9 @@ const realTimers: RoomDeps['timers'] = {
 };
 
 export function buildRealtime(deps: RealtimeDeps): Realtime {
+  if (deps.randomSeed !== undefined && process.env.NODE_ENV === 'production') {
+    throw new Error('生产环境不允许固定对局种子');
+  }
   const bot = deps.bot ?? new BotManager();
   const registry = new ConnectionRegistry();
   const heartbeat = new HeartbeatManager(deps.heartbeatRedis);
@@ -112,6 +120,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     bot,
     timing: deps.timing ?? DEFAULT_TIMING,
     timers: deps.timers ?? realTimers,
+    ...(deps.randomSeed !== undefined ? { randomSeed: deps.randomSeed } : {}),
     onStep: (matchID, output) => gateway.sendStep(matchID, output),
     onSeatsChanged: (matchID) => gateway.sendSeats(matchID),
     onStorageHealth: (matchID, healthy) => gateway.sendStorageHealth(matchID, healthy),

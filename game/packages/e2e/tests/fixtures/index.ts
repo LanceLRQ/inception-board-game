@@ -45,6 +45,13 @@ export function isMobileProject(projectName: string): boolean {
   return projectName.startsWith('mobile-') || projectName.startsWith('tablet-');
 }
 
+/**
+ * 人机对战页的固定种子地址：同样的种子与人数每次开出同一局，用例不再被随机到的角色与布局影响。
+ * 这个种子下真人是一名没有开局弹窗、前几回合不会被点名应答的盗梦者；
+ * 4 人局与 5 人局都已验证。想覆盖别的角色，换一个种子并跑一遍相关用例。
+ */
+export const LOCAL_MATCH_URL = '/local?seed=e2e-local-1';
+
 // 等待页面就绪
 // - 不依赖 networkidle（Web Worker / WS 长连接会让它永不触发）
 // - 仅等待 DOM 完成 + React 懒加载根节点挂载

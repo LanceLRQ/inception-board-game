@@ -3,7 +3,13 @@
 // 存档在本机 IndexedDB 里（库 icgame-local，仓库 saves），引擎的完整状态只由 Worker 读写。
 
 import type { Page } from '@playwright/test';
-import { test, expect, waitForAppReady, waitVisibleAnswering } from './fixtures/index.js';
+import {
+  LOCAL_MATCH_URL,
+  test,
+  expect,
+  waitForAppReady,
+  waitVisibleAnswering,
+} from './fixtures/index.js';
 import { ENGINE_SCHEMA, readSavedMeta, seedSave, validMeta } from './fixtures/localSave.js';
 
 /** 等存档落盘并稳定：已写入且连续两次读到的版本号一致 */
@@ -36,7 +42,7 @@ async function handOf(page: Page): Promise<Array<string | null>> {
 
 /** 开一局 4 人局，抽一张牌后停在行动阶段（此时没有任何东西会自己往前走） */
 async function startAndDraw(page: Page): Promise<void> {
-  await page.goto('/local');
+  await page.goto(LOCAL_MATCH_URL);
   await waitForAppReady(page);
   await page.getByRole('button', { name: /开始游戏|Start/ }).click();
   const draw = page.getByRole('button', { name: /抽牌|Draw/ });
@@ -107,7 +113,7 @@ test.describe('人机对局本地存档', () => {
     });
     page.on('pageerror', (err) => errors.push(err.message));
 
-    await page.goto('/local');
+    await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
     // 摘要合法、状态是垃圾
     await seedSave(page, validMeta({ playerCount: 5, turn: 3, stateID: 7 }), { not: 'a match' });

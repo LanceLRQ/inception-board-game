@@ -20,6 +20,8 @@ export interface StartLocalMatchRequest {
   persist: boolean;
   /** 优先从存档恢复 */
   resume: boolean;
+  /** 固定种子（端到端与走查用）；不给就按房间号与当前时刻生成。恢复存档时不起作用 */
+  seed?: string;
 }
 
 export interface StartLocalMatchResult {
@@ -65,7 +67,7 @@ export async function startLocalMatch(
 
   const session = new LocalMatchSession({
     playerCount: request.playerCount,
-    seed: buildMatchSeed(request.matchID, now()),
+    seed: request.seed ?? buildMatchSeed(request.matchID, now()),
     humanPlayerID: LOCAL_HUMAN_SEAT,
   });
   return { session, resumed: false, fellBack };

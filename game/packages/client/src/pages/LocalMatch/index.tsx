@@ -8,9 +8,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 import { History, Play, Plus, RotateCcw, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatSavedAt } from '../../lib/formatSavedAt';
+import { readFixedSeed } from '../../lib/fixedSeed';
 import { clearLocalSave, readLocalSaveMeta } from '../../lib/localSaveAccess';
 import type { LocalSaveMeta } from '../../lib/localMatchSave';
 import { logger } from '../../lib/logger';
@@ -28,6 +30,9 @@ export default function LocalMatch() {
   const { t, i18n } = useTranslation();
   const [playerCount, setPlayerCount] = useState(4);
   const [stage, setStage] = useState<Stage>({ kind: 'checking' });
+  // `/local?seed=...`：固定种子，端到端与走查用（本地单机局，无信息优势问题）
+  const [search] = useSearchParams();
+  const fixedSeed = readFixedSeed(search);
 
   // 进入页面时看一眼有没有未结束的存档
   useEffect(() => {
@@ -187,6 +192,7 @@ export default function LocalMatch() {
       onRestart={handleRestart}
       persist
       resume={stage.resume}
+      seed={fixedSeed}
       onResumeFallback={handleResumeFallback}
     />
   );

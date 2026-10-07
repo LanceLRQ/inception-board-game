@@ -159,8 +159,8 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 
 | 来源 | 入口 URL | 驱动组件 | 状态源 | 用途 |
 |------|---------|---------|-------|------|
-| **本地** | `/local` / `/game/:matchId?friend=1&players=N` | `components/LocalMatchRuntime/index.tsx` | `match/useLocalMatchSource.ts`：本地 Worker（`workers/localMatch.worker.ts`）经对局运行器驱动真实引擎，只向界面交出按座位裁剪的视图 | 人机对战；后端不可达时好友房的本地模式 |
-| **联机** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` | `match/useRemoteMatchSource.ts`：服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局 |
+| **本地** | `/local` / `/game/:matchId?friend=1&players=N` | `components/LocalMatchRuntime/index.tsx` | `match/useLocalMatchSource.ts`：本地 Worker（`workers/localMatch.worker.ts`）经对局运行器驱动真实引擎，只向界面交出按座位裁剪的视图 | 人机对战；后端不可达时好友房的本地模式。`/local?seed=xxx` 固定种子（端到端用，同样的种子与人数开出同一局；单机局无信息优势问题） |
+| **联机** | `/game/:matchId?online=1` | `components/RemoteMatchRuntime/index.tsx` | `match/useRemoteMatchSource.ts`：服务端权威对局（`match/matchSocket.ts` 经 WebSocket 接收视图与事件） | 好友房联机对局。联机种子绝不由客户端指定；端到端用服务端进程的环境变量 `MATCH_FIXED_SEED` 固定（生产环境配置即拒绝启动） |
 | **固定场景** | `/game/:matchId` 不带 `online` / `friend` 参数（常用 `/game/debug`） | `components/FixtureMatchRuntime/index.tsx` | `match/useFixtureMatchSource.ts`：固定种子建局、调整局面后经引擎的视角过滤得到视图（构造见 `match/fixtures/buildScenario.ts`），发出的 move 只记日志、不推进状态 | 开发调试、UI 走查、视角 / 人数 / 待应答状态切换 |
 
 **固定场景的地址参数：** 缺省是 6 人局、盗梦者视角（行动阶段、手里有几种牌）；`?as=master` 梦主视角；`?pending=1` 有一个等待本人应答的【解封】响应窗口（可与 `as=master` 叠加）；`?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries` 盗梦者视角下轮到本人应答对应的待决状态（依次是被 SHOOT 的双鱼·游离、恐怖分子·狂热、天秤分牌、天秤挑一份、意念判官选骰、处女·完美、白羊·星尘；不与 `as=master` 叠加）；`?as=master&chess=1` 梦主是「棋局」，行动阶段自动弹出易位弹窗；`?discard=1` 盗梦者处于弃牌阶段、手牌超出上限（梦主视角与响应窗口参数优先）；`?character=sudger` 盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的出牌入口；梦主视角、响应窗口、待应答与弃牌参数优先）；`?chat=1` 打开预设短语通道并注入几条示例消息（固定场景没有连接，发出的短语只在本机回显）；`?outcome=1` 对局已结束、对手按真人对待，走查局后举报（`?outcome=duplicate` / `failed` 让举报接口回「已举报过」/ 网络失败；可与其他参数叠加）；`?players=N` 人数，4–10，缺失或非法回落 6，用来走查座位环在不同人数下的排布（如 `/game/debug?players=10`）。场景由 `match/fixtures/scenarios.ts` 的 `resolveFixtureScenario` 选择，同样的参数每次得到同样的视图。新增场景在 `buildScenario.ts` 里补，并在 `buildScenario.test.ts` 里验证它仍是引擎过滤后的结果。
