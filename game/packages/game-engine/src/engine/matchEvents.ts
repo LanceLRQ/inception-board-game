@@ -236,6 +236,19 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
       actor: mover,
       data: { success: lockAfter < lockBefore, player: playerID, layer },
     });
+  } else if (!before.pendingUnlock && !after.pendingUnlock) {
+    // 没有可响应者时打出解封不开窗口，同一步里直接结算，待解封不会留在前后状态里；
+    // 解封计数只在解封成功时增加，据此识别（解封者没有换层，层取结算前所在层）
+    for (const id of order) {
+      const was = before.players[id];
+      const now = after.players[id];
+      if (!was || !now || now.unlockCount <= was.unlockCount) continue;
+      events.push({
+        kind: 'unlock_resolved',
+        actor: mover,
+        data: { success: true, player: id, layer: was.currentLayer },
+      });
+    }
   }
 
   // vault_opened

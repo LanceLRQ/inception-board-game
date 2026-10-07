@@ -61,6 +61,25 @@ function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] 
 /** 金币金库打开后梦主的三个选项：派贿赂并弃梦魇 / 翻开并发动梦魇 / 弃梦魇 */
 export type VaultDecisionChoice = 'bribe' | 'nightmare' | 'discard';
 
+/**
+ * 改写了 SHOOT 结算的技能来源：
+ *   - 'sudger_verdict'：意念判官·定罪，目标改掷 2 颗骰、由射手挑 1 颗
+ *   - 'haley_impact'：哈雷·冲击，没有实体牌，掷骰结果 -2
+ *   - 'fortress_coldness'：要塞·冷酷，没有实体牌，按普通 SHOOT 的骰面结算
+ */
+export type ShootSkillSource = 'sudger_verdict' | 'haley_impact' | 'fortress_coldness';
+
+/** 「视为使用 SHOOT」、没有实体牌的技能来源：这类 SHOOT 的牌 id 恒为 null，其余来源都要出一张牌 */
+export const CARDLESS_SHOOT_SKILLS: readonly ShootSkillSource[] = [
+  'haley_impact',
+  'fortress_coldness',
+];
+
+/** 这次 SHOOT 是否没有实体牌（技能来源决定，缺省的普通出牌总有一张牌） */
+export function isCardlessShootSkill(skill: ShootSkillSource | undefined): boolean {
+  return skill !== undefined && CARDLESS_SHOOT_SKILLS.includes(skill);
+}
+
 export interface SetupState {
   matchId: string;
   schemaVersion: number;
@@ -219,7 +238,7 @@ export interface SetupState {
   pendingShootResponse: {
     shooterID: string;
     targetPlayerID: string;
-    /** 被应答的 SHOOT 用的牌；null 表示没有实体牌（哈雷·冲击），此时 skill 必为 'haley_impact' */
+    /** 被应答的 SHOOT 用的牌；null 表示没有实体牌（哈雷·冲击、要塞·冷酷），此时 skill 必为 CARDLESS_SHOOT_SKILLS 之一 */
     cardId: CardID | null;
     sameLayerRequired: boolean;
     deathFaces: number[];
@@ -235,11 +254,9 @@ export interface SetupState {
     responseType?: 'pisces' | 'terrorist';
     /**
      * 这次 SHOOT 由哪个技能改写了结算：应答结束后重入结算时据此还原。
-     *   - 'sudger_verdict'：意念判官·定罪，目标改掷 2 颗骰、由射手挑 1 颗
-     *   - 'haley_impact'：哈雷·冲击，没有实体牌，掷骰结果 -2
-     * 缺省为普通出牌。
+     * 取值见 ShootSkillSource；缺省为普通出牌。
      */
-    skill?: 'sudger_verdict' | 'haley_impact';
+    skill?: ShootSkillSource;
   } | null;
   winner: Faction | null;
   winReason: string | null;

@@ -70,6 +70,7 @@ const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
   useVenusDouble: ['revealedHandIds'],
   useUranusPower: ['targetPlayerID', 'targetLayer'],
   usePlutoBurning: ['discardCardId'],
+  useFortressColdness: ['targetID'],
   useMarsKill: ['layer', 'params'],
   useSaturnFreeMove: ['targetLayer'],
   useSagittariusHeartLock: ['layer', 'delta'],

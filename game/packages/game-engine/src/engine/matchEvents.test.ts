@@ -428,6 +428,26 @@ describe('事件 · 解封', () => {
     expect(one(last, 'heart_lock_changed').data).toEqual({ layer: 2, from: 4, to: 3 });
   });
 
+  it('unlock_resolved：没有可响应者时解封同一步里直接结算，也写出事件', () => {
+    const G = scene(
+      'action',
+      {},
+      {
+        p2: { isAlive: false, currentLayer: 0 as Layer },
+        p3: { isAlive: false, currentLayer: 0 as Layer },
+        pM: { isAlive: false, currentLayer: 0 as Layer },
+      },
+    );
+    const done = step(load(G), 'p1', 'playUnlock', [UNLOCK]);
+    expect(done.state.G.pendingUnlock).toBeNull();
+    expect(one(done.events, 'unlock_resolved').data).toEqual({
+      success: true,
+      player: 'p1',
+      layer: 2,
+    });
+    expect(one(done.events, 'heart_lock_changed').data).toEqual({ layer: 2, from: 4, to: 3 });
+  });
+
   it('unlock_resolved：被取消的解封，成功为否', () => {
     const G = scene('action', {}, { p2: { hand: [UNLOCK] } });
     let s = step(load(G), 'p1', 'playUnlock', [UNLOCK]);

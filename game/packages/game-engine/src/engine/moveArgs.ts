@@ -157,6 +157,7 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   useVenusDouble: [cardList],
   useUranusPower: [player, layer],
   usePlutoBurning: [card],
+  useFortressColdness: [player],
   useMarsKill: [layer, nightmareParams],
   useSaturnFreeMove: [layer],
   useSagittariusHeartLock: [layer, oneOf(-1, 1)],

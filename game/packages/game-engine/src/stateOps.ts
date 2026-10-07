@@ -209,7 +209,46 @@ export function movePlayerToLayer(
   targetLayer: number,
 ): SetupState {
   if (targetLayer === LOST_LAYER) return sendToLimbo(state, playerID);
-  return placePlayerInLayer(state, playerID, targetLayer);
+  return grantFortressColdnessChance(
+    placePlayerInLayer(state, playerID, targetLayer),
+    state,
+    playerID,
+  );
+}
+
+// === 要塞·冷酷的发动机会 ===
+// 对照：docs/manual/06-dream-master.md 要塞 121 行「你的出牌阶段，当你移动到另一层梦境里」
+// 梦主在自己的出牌阶段每换一次层，就在自己的 skillUsedThisTurn 里记一次机会（回合开始随之清零）；
+// 已发动的次数记在技能标识下，可发动次数 = 机会数 - 已发动数（见 engine/skills.ts 的 fortressColdnessChancesLeft）。
+// 梦主在自己回合里的换层都经 movePlayerToLayer：梦主自己的移动、行动牌、各类技能与世界观造成的换层。
+// 唯一绕开它直接改层的是黑洞·吸纳，那是盗梦者在自己的回合发动，轮不到梦主自己的出牌阶段。
+// 回合开始从迷失层复活不在出牌阶段（turnPhase 为 draw），层没变、进迷失层也不算。
+export const FORTRESS_COLDNESS_CHANCES_KEY = 'dm_fortress.skill_0.chances';
+
+function grantFortressColdnessChance(
+  moved: SetupState,
+  before: SetupState,
+  playerID: string,
+): SetupState {
+  if (moved === before) return moved;
+  if (moved.turnPhase !== 'action' || moved.currentPlayerID !== playerID) return moved;
+  if (playerID !== moved.dreamMasterID) return moved;
+  const master = moved.players[playerID];
+  if (!master || !master.isAlive || master.characterId !== 'dm_fortress') return moved;
+  return {
+    ...moved,
+    players: {
+      ...moved.players,
+      [playerID]: {
+        ...master,
+        skillUsedThisTurn: {
+          ...master.skillUsedThisTurn,
+          [FORTRESS_COLDNESS_CHANCES_KEY]:
+            (master.skillUsedThisTurn[FORTRESS_COLDNESS_CHANCES_KEY] ?? 0) + 1,
+        },
+      },
+    },
+  };
 }
 
 // === 判断相邻层 ===

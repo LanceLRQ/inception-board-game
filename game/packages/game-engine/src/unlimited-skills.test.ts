@@ -8,11 +8,7 @@ import { describe, it, expect } from 'vitest';
 import type { SetupState } from './setup.js';
 import { applyMove } from './runner/matchRunner.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
-import {
-  applyFortressColdness,
-  applyInterpreterForeshadow,
-  applyLeoKingdom,
-} from './engine/skills.js';
+import { applyInterpreterForeshadow, applyLeoKingdom } from './engine/skills.js';
 import {
   c,
   fixedRandom,
@@ -24,8 +20,8 @@ import {
   withPlayer,
 } from './testing/runnerHarness.js';
 
-function run(G: SetupState, playerID: string, move: string, args: unknown[]) {
-  const res = applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(3) });
+function run(G: SetupState, playerID: string, move: string, args: unknown[], roll = 3) {
+  const res = applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
   expect(res.ok).toBe(true);
   if (!res.ok) throw new Error(`${move} 被拒绝`);
   expect(checkStateInvariants(res.state.G)).toEqual([]);
@@ -176,7 +172,7 @@ describe('狮子·王道 / 译梦师·伏笔 / 要塞·冷酷：规则触发时�
   });
 
   it('要塞·冷酷：每次移动到另一层都可以视为使用【SHOOT】', () => {
-    const G = withPlayer(
+    let G = withPlayer(
       scene({
         p1: { layer: 2, hand: [KICK] },
         p2: { layer: 1, hand: [KICK] },
@@ -187,10 +183,14 @@ describe('狮子·王道 / 译梦师·伏笔 / 要塞·冷酷：规则触发时�
       'pM',
       { characterId: c('dm_fortress') },
     );
-    const killRoll = () => 2; // 要塞世界观掷骰 -1 → 1，击杀
-    const once = applyFortressColdness(G, 'pM', 'p1', killRoll);
-    expect(once.players.p1!.isAlive).toBe(false);
-    const twice = applyFortressColdness(once, 'pM', 'p3', killRoll);
-    expect(twice.players.p3!.isAlive).toBe(false);
+    // 固定骰值 2：梦主射手的 M4 把目标骰 -1 → 1，击杀
+    G = run(G, 'pM', 'dreamMasterMove', [2]);
+    G = run(G, 'pM', 'useFortressColdness', ['p1'], 2);
+    expect(G.players.p1!.isAlive).toBe(false);
+    G = run(G, 'pM', 'dreamMasterMove', [1]);
+    G = run(G, 'pM', 'dreamMasterMove', [2]);
+    G = run(G, 'pM', 'useFortressColdness', ['p3'], 2);
+    expect(G.players.p3!.isAlive).toBe(false);
+    expect(checkStateInvariants(G)).toEqual([]);
   });
 });

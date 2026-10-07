@@ -101,6 +101,7 @@ const PLAYING_MOVE_ARITY: Record<string, number> = {
   useAthenaWit: 1,
   useBlackHoleAbsorb: 2,
   useChessTranspose: 3,
+  useFortressColdness: 2,
   useImperialCityWorldShoot: 2,
   useMarsBattlefield: 4,
   useMarsKill: 3,
@@ -159,7 +160,7 @@ describe('对局定义的结构', () => {
     expect(sortedEntries(arityTable(phases.setup!.moves))).toEqual(sortedEntries(SETUP_MOVE_ARITY));
   });
 
-  it('对局阶段的 move 名与参数个数不变（共 86 个）', () => {
+  it('对局阶段的 move 名与参数个数不变（共 87 个）', () => {
     expect(sortedEntries(arityTable(phases.playing!.moves))).toEqual(
       sortedEntries(PLAYING_MOVE_ARITY),
     );

@@ -10,6 +10,14 @@
 const LAYER_MAX = 4;
 const MAX_WINDOW_DEPTH = 8;
 const FACTIONS: readonly string[] = ['thief', 'master'];
+/** 改写 SHOOT 结算的技能来源（与 setup.ts 的 ShootSkillSource 一致；本文件不引用其他模块，值在此重列） */
+const SHOOT_SKILL_SOURCES: readonly string[] = [
+  'sudger_verdict',
+  'haley_impact',
+  'fortress_coldness',
+];
+/** 其中没有实体牌的来源（与 setup.ts 的 CARDLESS_SHOOT_SKILLS 一致） */
+const CARDLESS_SHOOT_SKILL_SOURCES: readonly string[] = ['haley_impact', 'fortress_coldness'];
 
 type Rec = Record<string, unknown>;
 
@@ -430,11 +438,12 @@ function checkPending(c: Collector, G: Rec): void {
       c.oneOf('pendingShootResponse.responseType', o.responseType, ['pisces', 'terrorist']);
     }
     if (o.skill !== undefined) {
-      c.oneOf('pendingShootResponse.skill', o.skill, ['sudger_verdict', 'haley_impact']);
+      c.oneOf('pendingShootResponse.skill', o.skill, SHOOT_SKILL_SOURCES);
     }
-    // 没有实体牌的 SHOOT 只有哈雷·冲击；其余来源都有一张牌
-    if ((o.cardId === null) !== (o.skill === 'haley_impact')) {
-      c.add('pendingShootResponse.cardId', '没有实体牌当且仅当技能来源为哈雷·冲击');
+    // 没有实体牌的 SHOOT 只有哈雷·冲击与要塞·冷酷；其余来源都有一张牌
+    const cardless = typeof o.skill === 'string' && CARDLESS_SHOOT_SKILL_SOURCES.includes(o.skill);
+    if ((o.cardId === null) !== cardless) {
+      c.add('pendingShootResponse.cardId', '没有实体牌当且仅当技能来源为哈雷·冲击或要塞·冷酷');
     }
   });
 }

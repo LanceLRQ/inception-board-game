@@ -14,7 +14,14 @@
 //       docs/manual/04-action-cards.md 梦境窥视 / 天秤、docs/manual/08-appendix.md 背叛者的阵营在结束前不公开
 
 import type { CardID, Faction, Layer } from '@icgame/shared';
-import type { BribeSetup, LayerSetup, PlayerSetup, SetupState, VaultSetup } from '../setup.js';
+import type {
+  BribeSetup,
+  LayerSetup,
+  PlayerSetup,
+  SetupState,
+  ShootSkillSource,
+  VaultSetup,
+} from '../setup.js';
 import type { ResponseWindowState } from './abilities/response-chain.js';
 import type { ResponseWindowSourceType } from './abilities/types.js';
 import { getDiscardRequired, getEffectiveMaxUnlockPerTurn } from './limits.js';
@@ -171,7 +178,7 @@ export interface PendingSudgerRollsView {
 export interface PendingShootMoveView {
   shooterID: string;
   targetPlayerID: string;
-  /** null 表示没有实体牌（哈雷·冲击） */
+  /** null 表示没有实体牌（哈雷·冲击、要塞·冷酷） */
   cardId: CardID | null;
   extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
   choices: number[];
@@ -199,7 +206,7 @@ export interface PendingVirgoChoiceView {
 export interface PendingShootResponseView {
   shooterID: string;
   targetPlayerID: string;
-  /** null 表示没有实体牌（哈雷·冲击） */
+  /** null 表示没有实体牌（哈雷·冲击、要塞·冷酷） */
   cardId: CardID | null;
   sameLayerRequired: boolean;
   deathFaces: number[];
@@ -209,8 +216,8 @@ export interface PendingShootResponseView {
   preventMove: boolean;
   /** 响应类型会暴露目标的角色，只有目标本人（和对局结束后）可见 */
   responseType: 'pisces' | 'terrorist' | null;
-  /** 改写了这次 SHOOT 的技能（意念判官·定罪 / 哈雷·冲击），普通出牌为 null；发动技能本身是公开的 */
-  skill: 'sudger_verdict' | 'haley_impact' | null;
+  /** 改写了这次 SHOOT 的技能（意念判官·定罪 / 哈雷·冲击 / 要塞·冷酷），普通出牌为 null；发动技能本身是公开的 */
+  skill: ShootSkillSource | null;
 }
 
 /** 某个观察者能看到的对局状态。字段是白名单：这里没有的，观察者就看不到 */

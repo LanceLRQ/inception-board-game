@@ -474,6 +474,12 @@
         "desc": "Shift each same-layer player +1/-1 (up to 2/turn)"
       }
     },
+    "dm_fortress": {
+      "skill_0": {
+        "name": "Fortress · Coldness",
+        "desc": "Each time you move to another layer during your action phase, you may act as if you played 1 SHOOT on any thief (no limit)"
+      }
+    },
     "dm_chess": {
       "skill_0": {
         "name": "Chess · Transpose",

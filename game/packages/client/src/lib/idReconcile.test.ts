@@ -131,6 +131,8 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   vault_back: '界面里取金库通用背面用的固定 id（金库未翻开）',
   action_unlock_effect_1: '【解封】两种效果之一，出牌 move 的参数值',
   action_unlock_effect_2: '【解封】两种效果之一，出牌 move 的参数值',
+  'dm_fortress.skill_0.chances':
+    '技能使用记录里的内部计数键：要塞·冷酷本回合的发动机会数，不是技能标识',
   thief_char: '卡牌类别名',
   master_char: '卡牌类别名',
 };

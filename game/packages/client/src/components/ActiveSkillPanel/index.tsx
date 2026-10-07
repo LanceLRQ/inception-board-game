@@ -372,21 +372,25 @@ export function ActiveSkillPanel({
         !pendingPlayerBribeSkill &&
         !pendingTwoCardsShootSkill && (
           <div className="flex flex-wrap gap-2" data-testid="active-skill-buttons">
-            {skills.map((skill) => (
-              <button
-                key={skill.id}
-                type="button"
-                onClick={() => handleClick(skill)}
-                className={cn(
-                  'rounded-full border border-primary/50 bg-background px-3 py-1 text-xs font-medium text-primary',
-                  'transition-colors hover:bg-primary/10',
-                )}
-                data-testid={`active-skill-${skill.move}`}
-                title={t(skill.descKey, { defaultValue: skill.id })}
-              >
-                {t(skill.nameKey, { defaultValue: skill.id })}
-              </button>
-            ))}
+            {skills.map((skill) => {
+              const remaining = skill.remaining?.(context) ?? 0;
+              return (
+                <button
+                  key={skill.id}
+                  type="button"
+                  onClick={() => handleClick(skill)}
+                  className={cn(
+                    'rounded-full border border-primary/50 bg-background px-3 py-1 text-xs font-medium text-primary',
+                    'transition-colors hover:bg-primary/10',
+                  )}
+                  data-testid={`active-skill-${skill.move}`}
+                  title={t(skill.descKey, { defaultValue: skill.id })}
+                >
+                  {t(skill.nameKey, { defaultValue: skill.id })}
+                  {remaining > 1 && <span data-testid="active-skill-remaining"> ×{remaining}</span>}
+                </button>
+              );
+            })}
           </div>
         )}
 

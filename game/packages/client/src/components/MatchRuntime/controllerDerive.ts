@@ -378,7 +378,9 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
     !!G.pendingGraft ||
     !!G.pendingGravity ||
     !!G.pendingLibra ||
-    !!G.pendingResponseWindow;
+    !!G.pendingResponseWindow ||
+    !!G.pendingShootResponse ||
+    !!G.pendingShootMove;
   const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
   const humanLayer = (humanPlayer?.currentLayer as number) ?? 1;
   return {

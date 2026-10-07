@@ -13,6 +13,7 @@ import {
   discardCards,
   setLayerHeartLock,
   setTurnPhase,
+  FORTRESS_COLDNESS_CHANCES_KEY,
   HEART_LOCK_REDUCED_BY_SKILL_KEY,
 } from '../stateOps.js';
 import { killPlayer, sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './death.js';
@@ -478,7 +479,7 @@ export function applyInterpreterForeshadow(state: SetupState, playerID: string):
 
 // === 要塞 · 冷酷 ===
 // 对照：docs/manual/06-dream-master.md 要塞
-// 梦主出牌阶段移动到另一层时，可视为对任一盗梦者使用 1 张 SHOOT
+// 梦主出牌阶段移动到另一层时，可视为对任一盗梦者使用 1 张 SHOOT（move 见 moves/masterSkills.ts）
 // 世界观：梦主掷骰结果 -1
 
 export const FORTRESS_SKILL_ID = 'dm_fortress.skill_0';
@@ -510,41 +511,17 @@ export function applyM4CarbineModifier(shooterIsMaster: boolean, roll: number): 
   return Math.max(1, roll - 1);
 }
 
-/** 要塞技能：梦主移动后触发，附加免费 SHOOT */
-export function applyFortressColdness(
-  state: SetupState,
-  masterID: string,
-  targetPlayerID: string,
-  d6: () => number,
-): SetupState {
-  const master = state.players[masterID];
-  const target = state.players[targetPlayerID];
-  if (!master || !target) return state;
-  if (master.characterId !== 'dm_fortress') return state;
-  if (!target.isAlive) return state;
-  if (!isOutwardThief(state, targetPlayerID)) return state;
-
-  // 卡面没有「限一次」：每次移动到另一层梦境都可以触发
-  let s = state;
-
-  // 免费掷骰（受世界观 -1 影响）
-  const rawRoll = d6();
-  const modifiedRoll = applyFortressDiceModifier(rawRoll);
-
-  // SHOOT 基础：1 点 = 击杀
-  if (modifiedRoll === 1) {
-    // 击杀目标
-    s = killPlayer(s, targetPlayerID, masterID);
-  } else if (modifiedRoll >= 2 && modifiedRoll <= 5) {
-    // 强制移动
-    const currentLayer = target.currentLayer;
-    const direction = currentLayer >= 4 ? -1 : 1;
-    const newLayer = Math.max(1, Math.min(4, currentLayer + direction));
-    s = movePlayerToLayer(s, targetPlayerID, newLayer as Layer);
-  }
-  // 6 = 躲过
-
-  return incrementMoveCounter(s);
+/**
+ * 要塞·冷酷还剩几次发动机会：梦主本回合出牌阶段的换层次数减去已发动次数。
+ * 参数是梦主的 skillUsedThisTurn（本人视图里也有这张表，客户端按同一公式推导）。
+ * 换层时记机会见 stateOps.ts 的 FORTRESS_COLDNESS_CHANCES_KEY；发动见 moves/masterSkills.ts 的 useFortressColdness。
+ */
+export function fortressColdnessChancesLeft(
+  skillUsedThisTurn: Readonly<Record<string, number>>,
+): number {
+  const chances = skillUsedThisTurn[FORTRESS_COLDNESS_CHANCES_KEY] ?? 0;
+  const used = skillUsedThisTurn[FORTRESS_SKILL_ID] ?? 0;
+  return Math.max(0, chances - used);
 }
 
 // === 棋局 · 易位 ===

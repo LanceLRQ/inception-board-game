@@ -28,7 +28,12 @@ import {
   settleVirgoPerfect,
   shouldJupiterThunderKill,
 } from '../engine/skills.js';
-import type { PlayerSetup, SetupState } from '../setup.js';
+import {
+  type PlayerSetup,
+  type SetupState,
+  type ShootSkillSource,
+  isCardlessShootSkill,
+} from '../setup.js';
 import { discardCard, discardCards, incrementMoveCounter, movePlayerToLayer } from '../stateOps.js';
 import type { BGIOCtx, BGIORandom } from './common.js';
 import { type ShootExtraOnMove, getShootProfile } from './shootProfiles.js';
@@ -61,13 +66,11 @@ export function validateDecree(
   return face;
 }
 
-/**
- * 改写了 SHOOT 结算的角色技能：只改掷骰这一步，其余与普通 SHOOT 完全相同。
- *   - sudger_verdict：意念判官·定罪，目标改掷 2 颗骰、由射手挑 1 颗
- *   - haley_impact：哈雷·冲击，没有实体牌，掷骰结果 -2
- * 对照：docs/manual/05-dream-thieves.md 意念判官 261 行、哈雷 145 行
- */
-export type ShootSkillSource = NonNullable<PendingShootResponse['skill']>;
+// 改写了 SHOOT 结算的角色技能（ShootSkillSource）：只改掷骰这一步，其余与普通 SHOOT 完全相同。
+//   - sudger_verdict：意念判官·定罪，目标改掷 2 颗骰、由射手挑 1 颗
+//   - haley_impact：哈雷·冲击，没有实体牌，掷骰结果 -2
+//   - fortress_coldness：要塞·冷酷，没有实体牌，骰值不另加修正（梦主射手自带 M4 的 -1）
+// 对照：docs/manual/05-dream-thieves.md 意念判官 261 行、哈雷 145 行；docs/manual/06-dream-master.md 要塞 121 行
 
 export interface ShootVariantOpts {
   sameLayerRequired: boolean;
@@ -138,7 +141,7 @@ export interface ShootRollOutcome {
 }
 
 /**
- * 前置校验：射手 / 目标 / 手里有牌（哈雷·冲击没有牌） / 层数限制 / 死亡宣言。
+ * 前置校验：射手 / 目标 / 手里有牌（哈雷·冲击、要塞·冷酷没有牌） / 层数限制 / 死亡宣言。
  * 通过时返回射手、目标，以及附加死亡宣言后的死亡骰面。
  */
 function validateShootRequest(
@@ -153,8 +156,8 @@ function validateShootRequest(
   if (!shooter || !target) return INVALID_MOVE;
   if (targetPlayerID === shooterID) return INVALID_MOVE;
   if (!target.isAlive) return INVALID_MOVE;
-  // 没有实体牌的 SHOOT 只有哈雷·冲击；其余都要从手里出一张牌
-  if ((cardId === null) !== (opts.skill === 'haley_impact')) return INVALID_MOVE;
+  // 没有实体牌的 SHOOT 只有哈雷·冲击与要塞·冷酷；其余都要从手里出一张牌
+  if ((cardId === null) !== isCardlessShootSkill(opts.skill)) return INVALID_MOVE;
   if (cardId !== null && !shooter.hand.includes(cardId)) return INVALID_MOVE;
   if (violatesShootLayerLimit(G, shooter, target, opts.sameLayerRequired)) return INVALID_MOVE;
 
@@ -391,7 +394,7 @@ type SettleOpts = Pick<ShootVariantOpts, 'extraOnMove' | 'preventMove'>;
 
 /**
  * 结果落地：弃牌、水星·逆流，再按击杀 / 移动 / 未命中处理，最后检查处女·完美。
- * 普通 SHOOT、意念判官选骰后、哈雷·冲击都从这里落地；cardId 为 null（哈雷）时没有牌可弃，
+ * 普通 SHOOT、意念判官选骰后、哈雷·冲击、要塞·冷酷都从这里落地；cardId 为 null（哈雷、要塞）时没有牌可弃，
  * 也不触发水星·逆流。
  */
 export function settleShootResult(

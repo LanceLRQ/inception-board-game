@@ -328,8 +328,10 @@ describe('nextAutoAction · 判定顺序', () => {
     });
   });
 
-  describe('7b. 没有实体牌的 SHOOT（哈雷·冲击）', () => {
-    function haleyResponseState(): State {
+  describe('7b. 没有实体牌的 SHOOT（哈雷·冲击、要塞·冷酷）', () => {
+    function haleyResponseState(
+      skill: 'haley_impact' | 'fortress_coldness' = 'haley_impact',
+    ): State {
       const s = playingState();
       const target = othersOf(s, 1)[0]!;
       return withG(s, {
@@ -342,13 +344,25 @@ describe('nextAutoAction · 判定顺序', () => {
           moveFaces: [2, 3, 4],
           extraOnMove: null,
           responseType: 'pisces',
-          skill: 'haley_impact',
+          skill,
         },
       });
     }
 
     it('目标是 Bot：以目标本人的名义放弃闪避，经运行器执行后窗口被清空', () => {
       const s = haleyResponseState();
+      const action = nextAutoAction(s, NO_HUMAN)!;
+      expect(action).toMatchObject({
+        playerID: s.G.pendingShootResponse!.targetPlayerID,
+        move: 'respondShootPass',
+      });
+      const res = applyMove(game, s, action);
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.state.G.pendingShootResponse).toBeNull();
+    });
+
+    it('要塞·冷酷的应答窗口：目标是 Bot 时同样以目标本人的名义放弃闪避', () => {
+      const s = haleyResponseState('fortress_coldness');
       const action = nextAutoAction(s, NO_HUMAN)!;
       expect(action).toMatchObject({
         playerID: s.G.pendingShootResponse!.targetPlayerID,

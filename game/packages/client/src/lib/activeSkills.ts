@@ -39,6 +39,8 @@ export interface ActiveSkillDescriptor {
   readonly requiredPhase?: 'action' | 'discard' | 'draw';
   /** 额外合法性约束（如"已经抽过牌 + 行动阶段 + 存活"） */
   readonly extraCheck?: (ctx: ActiveSkillContext) => boolean;
+  /** 本回合还能发动几次（技能不限次数、次数由规则触发积累时给出；按钮上显示剩余次数） */
+  readonly remaining?: (ctx: ActiveSkillContext) => number;
 }
 
 export interface ActiveSkillContext {
@@ -257,6 +259,32 @@ export const PLUTO_BURNING: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.faction === 'master' && ctx.hand.length > 0,
 };
 
+// 要塞·冷酷：梦主在自己的出牌阶段每移动到另一层一次，可视为对任一盗梦者使用 1 张 SHOOT，不限次数
+// 对照：docs/manual/06-dream-master.md 要塞 121 行 + 引擎的 useFortressColdness
+// 剩余次数 = 换层次数 - 已发动次数，两个计数都在梦主本人视图的 skillUsedThisTurn 里（键与引擎一致，有测试对账）
+export const FORTRESS_COLDNESS_CHANCES_KEY = 'dm_fortress.skill_0.chances';
+
+/** 要塞·冷酷本回合还剩几次发动机会 */
+export function fortressColdnessRemaining(
+  skillUsedThisTurn: Readonly<Record<string, number>>,
+): number {
+  const chances = skillUsedThisTurn[FORTRESS_COLDNESS_CHANCES_KEY] ?? 0;
+  const used = skillUsedThisTurn['dm_fortress.skill_0'] ?? 0;
+  return Math.max(0, chances - used);
+}
+
+export const FORTRESS_COLDNESS: ActiveSkillDescriptor = {
+  id: 'dm_fortress.skill_0',
+  characterId: 'dm_fortress',
+  move: 'useFortressColdness',
+  nameKey: 'skill.dm_fortress.skill_0.name',
+  descKey: 'skill.dm_fortress.skill_0.desc',
+  argKind: 'targetPlayer',
+  extraCheck: (ctx) =>
+    ctx.faction === 'master' && fortressColdnessRemaining(ctx.skillUsedThisTurn) > 0,
+  remaining: (ctx) => fortressColdnessRemaining(ctx.skillUsedThisTurn),
+};
+
 // 哈雷·冲击 —— 每成功解封 1 次可触发 1 次，掷骰击杀 / 位移目标
 // 对照：docs/manual/05-dream-thieves.md 哈雷 + 引擎的 playHaleyImpact
 export const HALEY_IMPACT: ActiveSkillDescriptor = {
@@ -393,6 +421,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   GEMINI_SYNC,
   ARCHITECT_MAZE,
   PLUTO_BURNING,
+  FORTRESS_COLDNESS,
   MARS_KILL,
   CHESS_TRANSPOSE,
   SATURN_FREE_MOVE,

@@ -16,6 +16,7 @@ export {
   movePlayerToLayer,
   isAdjacentLayer,
   recordCardPlayed,
+  FORTRESS_COLDNESS_CHANCES_KEY,
 } from './stateOps.js';
 export * from './config.js';
 export {
@@ -79,8 +80,8 @@ export {
   applyPointmanAssault,
   pointmanCheckDrawnCards,
   applyInterpreterForeshadow,
-  applyFortressColdness,
   applyFortressDiceModifier,
+  fortressColdnessChancesLeft,
   applyChessTranspose,
   applyChessWorldViewPeek,
   applyTouristAssist,

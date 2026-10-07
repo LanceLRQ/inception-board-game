@@ -1,12 +1,24 @@
 // activeSkills 纯函数推导测试
 
 import { describe, expect, it } from 'vitest';
+import type { CardID, Layer } from '@icgame/shared';
+import {
+  FORTRESS_COLDNESS_CHANCES_KEY as ENGINE_CHANCES_KEY,
+  fortressColdnessChancesLeft,
+  movePlayerToLayer,
+  viewFor,
+} from '@icgame/game-engine';
+import { createTestState, makePlayer } from '@icgame/game-engine/testing/fixtures';
+import { buildActiveSkillContext } from '../components/MatchRuntime/controllerDerive.js';
 import {
   APOLLO_WORSHIP,
   ARCHITECT_MAZE,
   ATHENA_AWE,
   CHEMIST_REFINE,
   FORGER_EXCHANGE,
+  FORTRESS_COLDNESS,
+  FORTRESS_COLDNESS_CHANCES_KEY,
+  fortressColdnessRemaining,
   GAIA_SHIFT,
   GEMINI_SYNC,
   getAvailableActiveSkills,
@@ -797,5 +809,107 @@ describe('getAvailableActiveSkills · 双面角色按面出现', () => {
       baseCtx({ characterId: 'thief_luna_back', hand: ['action_shoot', 'action_shoot'] }),
     );
     expect(list).not.toContain(LUNA_ECLIPSE);
+  });
+});
+
+describe('getAvailableActiveSkills · 要塞·冷酷', () => {
+  const master = (overrides: Partial<ActiveSkillContext> = {}) =>
+    baseCtx({ characterId: 'dm_fortress', faction: 'master', ...overrides });
+
+  it('梦主 + 本回合换过层且还没发动 → 含；按钮上的剩余次数为 1', () => {
+    const ctx = master({ skillUsedThisTurn: { [FORTRESS_COLDNESS_CHANCES_KEY]: 1 } });
+    expect(getAvailableActiveSkills(ctx)).toContain(FORTRESS_COLDNESS);
+    expect(FORTRESS_COLDNESS.remaining?.(ctx)).toBe(1);
+  });
+
+  it('没有换过层 → 不含', () => {
+    expect(getAvailableActiveSkills(master())).not.toContain(FORTRESS_COLDNESS);
+  });
+
+  it('换一次层、已发动一次 → 不含；换两次、已发动一次 → 含，剩余 1', () => {
+    const spent = master({
+      skillUsedThisTurn: { [FORTRESS_COLDNESS_CHANCES_KEY]: 1, 'dm_fortress.skill_0': 1 },
+    });
+    expect(getAvailableActiveSkills(spent)).not.toContain(FORTRESS_COLDNESS);
+    const again = master({
+      skillUsedThisTurn: { [FORTRESS_COLDNESS_CHANCES_KEY]: 2, 'dm_fortress.skill_0': 1 },
+    });
+    expect(getAvailableActiveSkills(again)).toContain(FORTRESS_COLDNESS);
+    expect(FORTRESS_COLDNESS.remaining?.(again)).toBe(1);
+  });
+
+  it('不是出牌阶段、不是自己的回合、有待结算事项 → 不含', () => {
+    const used = { [FORTRESS_COLDNESS_CHANCES_KEY]: 2 };
+    for (const o of [
+      { turnPhase: 'draw' },
+      { turnPhase: 'discard' },
+      { isHumanTurn: false },
+      { hasPending: true },
+    ] as const) {
+      expect(getAvailableActiveSkills(master({ skillUsedThisTurn: used, ...o }))).not.toContain(
+        FORTRESS_COLDNESS,
+      );
+    }
+  });
+
+  it('不是要塞梦主 → 不含（其他梦主、盗梦者即使记录里有计数）', () => {
+    const used = { [FORTRESS_COLDNESS_CHANCES_KEY]: 2 };
+    expect(
+      getAvailableActiveSkills(master({ characterId: 'dm_chess', skillUsedThisTurn: used })),
+    ).not.toContain(FORTRESS_COLDNESS);
+    expect(
+      getAvailableActiveSkills(
+        baseCtx({ characterId: 'thief_shade', faction: 'thief', skillUsedThisTurn: used }),
+      ),
+    ).not.toContain(FORTRESS_COLDNESS);
+  });
+
+  it('选一名玩家后发 useFortressColdness', () => {
+    expect(FORTRESS_COLDNESS.argKind).toBe('targetPlayer');
+    expect(FORTRESS_COLDNESS.move).toBe('useFortressColdness');
+  });
+
+  it('与引擎对账：计数键相同，剩余次数的公式与引擎一致', () => {
+    expect(FORTRESS_COLDNESS_CHANCES_KEY).toBe(ENGINE_CHANCES_KEY);
+    const records: Record<string, number>[] = [
+      {},
+      { [ENGINE_CHANCES_KEY]: 3 },
+      { [ENGINE_CHANCES_KEY]: 3, 'dm_fortress.skill_0': 2 },
+      { [ENGINE_CHANCES_KEY]: 1, 'dm_fortress.skill_0': 4 },
+    ];
+    for (const used of records) {
+      expect(fortressColdnessRemaining(used)).toBe(fortressColdnessChancesLeft(used));
+    }
+  });
+
+  it('只靠梦主本人的视图判断：引擎里换层后，视图推出可发动；别人的视图看不到计数', () => {
+    const base = createTestState({
+      phase: 'playing',
+      turnPhase: 'action',
+      currentPlayerID: 'pM',
+      dreamMasterID: 'pM',
+      playerOrder: ['p1', 'p2', 'pM'],
+    });
+    const players = {
+      p1: makePlayer({ id: 'p1', faction: 'thief', characterId: 'thief_shade' as CardID }),
+      p2: makePlayer({ id: 'p2', faction: 'thief', characterId: 'thief_shade' as CardID }),
+      pM: makePlayer({
+        id: 'pM',
+        faction: 'master',
+        characterId: 'dm_fortress' as CardID,
+        currentLayer: 1 as Layer,
+      }),
+    };
+    const moved = movePlayerToLayer({ ...base, players }, 'pM', 2);
+
+    const own = viewFor(moved, 'pM', { gameOver: false });
+    const ctx = buildActiveSkillContext({ G: own, seat: 'pM', isMyTurn: true, hand: [] });
+    expect(getAvailableActiveSkills(ctx)).toContain(FORTRESS_COLDNESS);
+
+    const before = viewFor({ ...base, players }, 'pM', { gameOver: false });
+    const idle = buildActiveSkillContext({ G: before, seat: 'pM', isMyTurn: true, hand: [] });
+    expect(getAvailableActiveSkills(idle)).not.toContain(FORTRESS_COLDNESS);
+
+    expect(viewFor(moved, 'p1', { gameOver: false }).players.pM!.skillUsedThisTurn).toBeNull();
   });
 });

@@ -641,6 +641,36 @@ describe('buildActiveSkillContext', () => {
     expect(ctxOf(G, thief.seat).hasPending).toBe(true);
   });
 
+  it('SHOOT 的应答窗口或待选层挂着时 hasPending 为真（此时不该再发动技能）', () => {
+    const response = {
+      shooterID: thief.seat,
+      targetPlayerID: master.seat,
+      cardId: null,
+      sameLayerRequired: false,
+      deathFaces: [1],
+      moveFaces: [2, 3, 4],
+      extraOnMove: null,
+      decreeId: null,
+      preventMove: false,
+      responseType: null,
+      skill: 'fortress_coldness',
+    } as const;
+    expect(
+      ctxOf({ ...thiefG, pendingShootResponse: response } as unknown as MatchView, thief.seat)
+        .hasPending,
+    ).toBe(true);
+    const move = {
+      shooterID: thief.seat,
+      targetPlayerID: master.seat,
+      cardId: null,
+      extraOnMove: null,
+      choices: [1, 3],
+    };
+    expect(
+      ctxOf({ ...thiefG, pendingShootMove: move } as unknown as MatchView, thief.seat).hasPending,
+    ).toBe(true);
+  });
+
   it('弃牌堆来自视图；梦主是火星·战场时标记生效', () => {
     expect(ctxOf(thiefG, thief.seat).discardPile).toEqual(thiefG.deck.discardPile);
     const mars = {

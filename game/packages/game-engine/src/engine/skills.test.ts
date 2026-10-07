@@ -6,7 +6,8 @@ import {
   applyPointmanAssault,
   pointmanCheckDrawnCards,
   applyInterpreterForeshadow,
-  applyFortressColdness,
+  fortressColdnessChancesLeft,
+  FORTRESS_SKILL_ID,
   applyFortressDiceModifier,
   applyChessTranspose,
   applyChessWorldViewPeek,
@@ -21,11 +22,7 @@ import {
   makeDefaultVaults,
 } from '../testing/fixtures.js';
 import type { PlayerSetup } from '../setup.js';
-
-// 固定骰子：返回指定值的 d6 工厂
-function fixedD6(value: number) {
-  return () => value;
-}
+import { FORTRESS_COLDNESS_CHANCES_KEY } from '../stateOps.js';
 
 function makeStateWithPlayer(overrides: Partial<PlayerSetup> = {}) {
   const player = makePlayer({ id: 'p0', characterId: 'thief_pointman', ...overrides });
@@ -202,78 +199,23 @@ describe('译梦师 · 伏笔 (Dream Interpreter)', () => {
 });
 
 // === 要塞 · 冷酷 ===
+// 发动机会与发动的整条链路见 ../fortress-coldness.test.ts；这里只测可发动次数的公式
 
-describe('要塞 · 冷酷 (Fortress)', () => {
-  function makeFortressState() {
-    const master = makePlayer({
-      id: 'dm',
-      characterId: 'dm_fortress',
-      faction: 'master',
-      currentLayer: 1,
-      hand: [],
-    });
-    const thief = makePlayer({
-      id: 't1',
-      characterId: 'thief_pointman',
-      faction: 'thief',
-      currentLayer: 2,
-      hand: ['action_shoot', 'action_unlock'],
-    });
-    const state = createTestState({
-      players: { dm: master, t1: thief },
-      playerOrder: ['dm', 't1'],
-      layers: makeDefaultLayers(),
-      vaults: makeDefaultVaults(),
-    });
-    return { ...state, currentPlayerID: 'dm', dreamMasterID: 'dm' };
-  }
-
-  it('kills target on modified roll 1 (raw roll 2, -1 = 1)', () => {
-    const state = makeFortressState();
-    const result = applyFortressColdness(state, 'dm', 't1', fixedD6(2));
-
-    expect(result.players.t1!.isAlive).toBe(false);
-    expect(result.players.t1!.deathTurn).toBe(state.turnNumber);
-    expect(result.players.dm!.hand).toHaveLength(2); // 拿 2 张
-    expect(result.players.dm!.shootCount).toBe(1);
+describe('要塞 · 冷酷 · 可发动次数', () => {
+  it('没有记录时为 0', () => {
+    expect(fortressColdnessChancesLeft({})).toBe(0);
   });
 
-  it('moves target on modified roll 2-5', () => {
-    const state = makeFortressState();
-    const result = applyFortressColdness(state, 'dm', 't1', fixedD6(3)); // 3-1=2 → move
-
-    expect(result.players.t1!.isAlive).toBe(true);
-    expect(result.players.t1!.currentLayer).not.toBe(2); // moved
+  it('换层次数减去已发动次数', () => {
+    expect(
+      fortressColdnessChancesLeft({ [FORTRESS_COLDNESS_CHANCES_KEY]: 3, [FORTRESS_SKILL_ID]: 1 }),
+    ).toBe(2);
   });
 
-  it('misses on modified roll 6 (raw 6+ roll results in miss via 6)', () => {
-    const state = makeFortressState();
-    // raw 6 → modified 5 → move (not miss)
-    // raw 7 不存在，要塞 -1 最低 1
-    // 测试 raw 6: 6-1=5 → move
-    const result = applyFortressColdness(state, 'dm', 't1', fixedD6(6));
-    expect(result.players.t1!.isAlive).toBe(true);
-  });
-
-  it('does not trigger for non-fortress', () => {
-    const state = makeFortressState();
-    const s = {
-      ...state,
-      players: { ...state.players, dm: { ...state.players.dm!, characterId: 'dm_chess' } },
-    };
-    const result = applyFortressColdness(s, 'dm', 't1', fixedD6(2));
-    expect(result.players.t1!.isAlive).toBe(true);
-  });
-
-  it('does not target dead players', () => {
-    const state = makeFortressState();
-    const s = {
-      ...state,
-      players: { ...state.players, t1: { ...state.players.t1!, isAlive: false } },
-    };
-    const result = applyFortressColdness(s, 'dm', 't1', fixedD6(2));
-    // 不变
-    expect(result).toBe(s);
+  it('已发动次数不会让结果变成负数', () => {
+    expect(
+      fortressColdnessChancesLeft({ [FORTRESS_COLDNESS_CHANCES_KEY]: 1, [FORTRESS_SKILL_ID]: 4 }),
+    ).toBe(0);
   });
 });
 
