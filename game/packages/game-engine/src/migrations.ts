@@ -4,9 +4,52 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
+
+/**
+ * 第 10 版统一牌与技能标识时改掉的旧写法（旧 → 新）。
+ * 状态里这些标识出现在手牌、牌库、弃牌堆、出牌记录等牌 id 的位置，
+ * 也出现在玩家的技能使用记录（skillUsedThisTurn / skillUsedThisGame）的键上，
+ * 按阶段计数的键带 `:<阶段>` 后缀。
+ */
+export const RENAMED_IDS_V10: Readonly<Record<string, string>> = {
+  action_shoot_king: 'action_shoot_assassin',
+  action_shoot_armor: 'action_shoot_drill',
+  'dm_saturn_territory.world.skill': 'dm_saturn_territory.worldview',
+  'dm_mars_battlefield.world.skill': 'dm_mars_battlefield.worldview',
+  'dm_imperial_city.world_0': 'dm_imperial_city.worldview',
+  'dm_venus_mirror.world_0': 'dm_venus_mirror.worldview',
+  'dm_mercury_route.skill_1': 'dm_mercury_route.skill_0',
+};
+
+/** 把一个字符串里的旧标识换成新标识：整串相等，或带 `:<阶段>` 后缀的键 */
+function renameId(text: string, renames: Readonly<Record<string, string>>): string {
+  const direct = renames[text];
+  if (direct !== undefined) return direct;
+  const colon = text.indexOf(':');
+  if (colon > 0) {
+    const head = renames[text.slice(0, colon)];
+    if (head !== undefined) return head + text.slice(colon);
+  }
+  return text;
+}
+
+/** 递归改写状态里所有字符串值与对象键 */
+export function renameIdsDeep(value: unknown, renames: Readonly<Record<string, string>>): unknown {
+  if (typeof value === 'string') return renameId(value, renames);
+  if (Array.isArray(value)) return value.map((item) => renameIdsDeep(item, renames));
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        renameId(key, renames),
+        renameIdsDeep(item, renames),
+      ]),
+    );
+  }
+  return value;
+}
 
 // 迁移链：按版本号顺序排列
 const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
@@ -130,6 +173,8 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       };
     },
   ],
+  // v9 → v10：牌与技能标识统一成一套（见 RENAMED_IDS_V10），状态里的旧写法一并改过来
+  [10, (state) => renameIdsDeep(state, RENAMED_IDS_V10) as Record<string, unknown>],
 ]);
 
 // 错误信息里展示收到的值：字符串带引号以区分 '3' 与 3，数组、null 等用 JSON 表示

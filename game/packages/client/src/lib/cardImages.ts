@@ -4,8 +4,10 @@
 // （由 shared/scripts/codegen.ts 从内部素材目录下的 cards-data.json 生成，
 //  且扩展名被 normalizeImagePath 强制转为 .webp）
 //
-// 静态资源路径：game/packages/client/public/cards/**（由 `pnpm assets:sync` 生成）
+// 静态资源路径：game/packages/client/public/cards/**（由 `pnpm assets:sync` 同步，随仓库入库）
 // 部署路径：/cards/**（Vite 会把 public/ 原样拷到 dist/）
+// 地址带内容哈希作版本参数（见 cardImageVersion.ts）：预加载、<img> 请求与运行时缓存用的是同一个地址，
+// 卡图内容换了地址就变，缓存里的旧图不会一直占着
 
 import {
   THIEF_CHARACTERS,
@@ -17,8 +19,7 @@ import {
   BRIBE_CARDS,
   CARD_BACK_IMAGES,
 } from '@icgame/shared';
-
-const PUBLIC_PREFIX = '/cards/';
+import { cardImageInfo, versionedCardImageUrl } from './cardImageVersion';
 
 /** 卡图在 public/cards 下的分类目录；与素材目录的分类一致 */
 export type CardImageCategory =
@@ -33,7 +34,9 @@ export type CardImageCategory =
 
 interface ImageEntry {
   readonly front: string;
+  readonly frontBytes: number;
   readonly back?: string;
+  readonly backBytes?: number;
   readonly category: CardImageCategory;
   /** 通用背面：界面按固定 id 取图，但它不是卡牌，不参与按地址反查卡牌 */
   readonly isGenericBack?: boolean;
@@ -46,6 +49,11 @@ const GENERIC_BACK_ENTRIES: ReadonlyArray<[string, CardImageCategory, string]> =
   ['vault_back', 'vault', CARD_BACK_IMAGES.vault],
   ['bribe_back', 'bribe', CARD_BACK_IMAGES.bribe],
 ];
+
+/** 卡图文件的字节数；清单里没有（配置与卡图目录对不上）按 0 算 */
+function bytesOf(imagePath: string): number {
+  return cardImageInfo(imagePath)?.bytes ?? 0;
+}
 
 function buildImageMap(): ReadonlyMap<string, ImageEntry> {
   const map = new Map<string, ImageEntry>();
@@ -67,14 +75,25 @@ function buildImageMap(): ReadonlyMap<string, ImageEntry> {
       const front = card.imagePath;
       if (!card.id || !front) continue;
       map.set(card.id, {
-        front: PUBLIC_PREFIX + encodeURI(front),
-        ...(card.backImagePath ? { back: PUBLIC_PREFIX + encodeURI(card.backImagePath) } : {}),
+        front: versionedCardImageUrl(front),
+        frontBytes: bytesOf(front),
+        ...(card.backImagePath
+          ? {
+              back: versionedCardImageUrl(card.backImagePath),
+              backBytes: bytesOf(card.backImagePath),
+            }
+          : {}),
         category,
       });
     }
   }
   for (const [id, category, path] of GENERIC_BACK_ENTRIES) {
-    map.set(id, { front: PUBLIC_PREFIX + encodeURI(path), category, isGenericBack: true });
+    map.set(id, {
+      front: versionedCardImageUrl(path),
+      frontBytes: bytesOf(path),
+      category,
+      isGenericBack: true,
+    });
   }
   return map;
 }
@@ -83,14 +102,20 @@ const IMAGE_MAP = buildImageMap();
 
 /** 通用角色背面图（未揭示身份时展示） */
 export const GENERIC_BACK_IMAGES = {
-  thief: PUBLIC_PREFIX + encodeURI(CARD_BACK_IMAGES.thief),
-  master: PUBLIC_PREFIX + encodeURI(CARD_BACK_IMAGES.master),
+  thief: versionedCardImageUrl(CARD_BACK_IMAGES.thief),
+  master: versionedCardImageUrl(CARD_BACK_IMAGES.master),
+} as const;
+
+/** 通用角色背面图的字节数（预加载进度用） */
+export const GENERIC_BACK_BYTES = {
+  thief: bytesOf(CARD_BACK_IMAGES.thief),
+  master: bytesOf(CARD_BACK_IMAGES.master),
 } as const;
 
 /**
  * 通过 cardId 查询卡图的可访问 URL。
  * @param cardId 数据库 ID（如 thief_space_queen / action_shoot）
- * @returns 形如 `/cards/thief/...webp` 的相对路径；未登记则 undefined
+ * @returns 形如 `/cards/thief/...webp?v=<哈希>` 的相对路径；未登记则 undefined
  */
 export function getCardImageUrl(cardId: string | null | undefined): string | undefined {
   if (!cardId) return undefined;
@@ -117,12 +142,14 @@ export function getCardImageCount(): number {
   return IMAGE_MAP.size;
 }
 
-/** 卡图目录中的一项：卡牌 id、分类与正面图地址；双面卡另给背面图 */
+/** 卡图目录中的一项：卡牌 id、分类与正面图地址及字节数；双面卡另给背面图 */
 export interface CardImageRecord {
   readonly id: string;
   readonly category: CardImageCategory;
   readonly url: string;
+  readonly bytes: number;
   readonly backUrl?: string;
+  readonly backBytes?: number;
 }
 
 /** 全部已登记的卡图，含界面按固定 id 取用的通用背面；顺序稳定 */
@@ -131,7 +158,8 @@ export function getCardImageCatalog(): CardImageRecord[] {
     id,
     category: e.category,
     url: e.front,
-    ...(e.back ? { backUrl: e.back } : {}),
+    bytes: e.frontBytes,
+    ...(e.back ? { backUrl: e.back, backBytes: e.backBytes ?? 0 } : {}),
   }));
 }
 

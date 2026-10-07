@@ -8,9 +8,10 @@
 
 import type { AbilityContext, AbilityDefinition } from '../../types.js';
 import type { SetupState } from '../../../../setup.js';
+import { VENUS_DOUBLE_SKILL_ID, VENUS_MIRROR_WORLD_SKILL_ID } from '../../../skills.js';
 
-export const VENUS_DOUBLE_SKILL_ID = 'dm_venus_mirror.skill_0';
-export const VENUS_WORLD_VIEW_ID = 'dm_venus_mirror.world_view';
+export { VENUS_DOUBLE_SKILL_ID };
+export const VENUS_WORLD_VIEW_ID = VENUS_MIRROR_WORLD_SKILL_ID;
 
 /** 金星·重影：技能 stub（待 pending state/展示窗口） */
 export const venusDouble: AbilityDefinition = {
@@ -42,8 +43,8 @@ export const venusDouble: AbilityDefinition = {
 /** 金星·镜界世界观：stub（弃 2 张重复非抽弃效果） */
 export const venusMirrorWorldView: AbilityDefinition = {
   id: VENUS_WORLD_VIEW_ID,
-  name: 'character.dm_venus_mirror.world_view.name',
-  description: 'character.dm_venus_mirror.world_view.desc',
+  name: 'character.dm_venus_mirror.worldview.name',
+  description: 'character.dm_venus_mirror.worldview.desc',
   kind: 'worldView',
   priorityBucket: 3,
   triggers: ['onActionPhase'],

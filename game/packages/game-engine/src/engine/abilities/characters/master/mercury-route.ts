@@ -7,9 +7,10 @@
 
 import type { AbilityContext, AbilityDefinition } from '../../types.js';
 import type { SetupState } from '../../../../setup.js';
+import { MERCURY_REVERSE_SKILL_ID } from '../../../skills.js';
 
-export const MERCURY_REVERSE_SKILL_ID = 'dm_mercury_route.skill_0';
-export const MERCURY_WORLD_VIEW_ID = 'dm_mercury_route.world_view';
+export { MERCURY_REVERSE_SKILL_ID };
+export const MERCURY_WORLD_VIEW_ID = 'dm_mercury_route.worldview';
 
 /** 水星·逆流：技能 stub（待响应窗口/出牌追踪就绪） */
 export const mercuryReverse: AbilityDefinition = {
@@ -42,8 +43,8 @@ export const mercuryReverse: AbilityDefinition = {
 /** 水星·航路世界观：stub（梦主翻面时增加失败贿赂） */
 export const mercuryRouteWorldView: AbilityDefinition = {
   id: MERCURY_WORLD_VIEW_ID,
-  name: 'character.dm_mercury_route.world_view.name',
-  description: 'character.dm_mercury_route.world_view.desc',
+  name: 'character.dm_mercury_route.worldview.name',
+  description: 'character.dm_mercury_route.worldview.desc',
   kind: 'worldView',
   priorityBucket: 3,
   triggers: ['passive'],

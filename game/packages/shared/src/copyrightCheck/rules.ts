@@ -236,7 +236,7 @@ const SOURCE_BASENAME = /(?:^|\/)(?:Dockerfile(?:\.[\w.-]+)?|[\w.-]+\.Dockerfile
  *
  * 范围：各包 src/ 与 scripts/ 与 prisma/、e2e 包、各包根目录的配置文件、game/scripts、game/deploy、.github。
  * 测试文件要扫。排除：文档与素材目录、generated、__snapshots__、规则模块自身（copyrightCheck/）、
- * 以内部素材目录为输入的三个脚本、锁文件、构建与测试产物、.env*。
+ * 以内部素材目录为输入的两个脚本、锁文件、构建与测试产物、.env*。
  */
 export function isSourceScanTarget(relPath: string): boolean {
   const excludePatterns = [
@@ -251,7 +251,6 @@ export function isSourceScanTarget(relPath: string): boolean {
     /^game\/packages\/shared\/src\/copyrightCheck\//,
     // 素材同步与卡牌数据生成脚本：输入就是不入库的内部素材目录，代码里必须写出它的路径
     /^game\/scripts\/sync-card-assets\.ts$/,
-    /^game\/packages\/client\/scripts\/sync-assets\.ts$/,
     /^game\/packages\/shared\/scripts\/codegen\.ts$/,
     /(?:^|\/)(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$/,
     /\.tsbuildinfo$/,

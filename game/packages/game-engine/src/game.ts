@@ -29,6 +29,7 @@ import {
   recordCardPlayed,
 } from './moves.js';
 import { resolveShootCustom } from './dice.js';
+import { MASTER_POOL, THIEF_POOL } from './characterPools.js';
 import {
   applyPointmanAssault,
   applyInterpreterForeshadow,
@@ -327,70 +328,9 @@ export const InceptionCityGame = {
             const masterIdx = random.Die(G.playerOrder.length) - 1;
             const masterID = G.playerOrder[masterIdx]!;
 
-            // 给玩家随机分配角色 —— 涵盖所有已实装角色
-            // 梦主 13 个 · 盗梦者 37 个
-            const masterPool: CardID[] = [
-              'dm_fortress',
-              'dm_chess',
-              'dm_harbor',
-              'dm_midsummer',
-              'dm_black_hole',
-              'dm_neptune_ocean',
-              'dm_jupiter_peak',
-              'dm_saturn_territory',
-              'dm_imperial_city',
-              'dm_secret_passage',
-              'dm_uranus_firmament',
-              'dm_pluto_hell',
-              'dm_mars_battlefield',
-              // C1 · 水星·航路：世界观（+1 fail 贿赂）+ 逆流 SHOOT 响应已接入
-              // 注：非 SHOOT 类牌的逆流响应依赖完整响应窗口（并入 P2）
-              'dm_mercury_route',
-              // C2 · 金星·镜界：重影技能（applyVenusDouble + useVenusDouble）+ 镜界世界观（applyVenusMirrorWorld）
-              //   均已完整实装并通过 mercury-joker-swan.test.ts / venus-mirror-world.test.ts 覆盖
-              'dm_venus_mirror',
-            ];
-            const thiefPool: CardID[] = [
-              'thief_pointman',
-              'thief_dream_interpreter',
-              'thief_space_queen',
-              'thief_joker',
-              'thief_leo',
-              'thief_tourist',
-              'thief_capricornus',
-              'thief_chemist',
-              'thief_paprik',
-              'thief_lord_of_war',
-              'thief_libra',
-              'thief_sudger_of_mind',
-              'thief_scorpius',
-              'thief_taurus',
-              'thief_apollo',
-              'thief_athena',
-              'thief_architect',
-              'thief_virgo',
-              'thief_haley',
-              'thief_martyr',
-              'thief_soul_sculptor',
-              'thief_shade',
-              'thief_hlnino',
-              'thief_extractor',
-              'thief_forger',
-              'thief_terrorist',
-              'thief_black_hole',
-              'thief_black_swan',
-              'thief_gemini',
-              'thief_pisces',
-              'thief_luna',
-              'thief_aries',
-              'thief_gaia',
-              'thief_sagittarius',
-              'thief_aquarius',
-              'thief_green_ray',
-              'thief_darwin',
-            ];
-            const masterChar = masterPool[random.Die(masterPool.length) - 1]!;
-            const shuffledThieves = random.Shuffle([...thiefPool]);
+            // 给玩家随机分配角色：候选池见 characterPools.ts
+            const masterChar = MASTER_POOL[random.Die(MASTER_POOL.length) - 1]!;
+            const shuffledThieves = random.Shuffle([...THIEF_POOL]);
 
             const nextPlayers: typeof G.players = { ...G.players };
             let thiefCursor = 0;
@@ -776,8 +716,12 @@ export const InceptionCityGame = {
                 moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
-              action_shoot_king: { deathFaces: [1, 2], moveFaces: [3, 4, 5], extraOnMove: null },
-              action_shoot_armor: {
+              action_shoot_assassin: {
+                deathFaces: [1, 2],
+                moveFaces: [3, 4, 5],
+                extraOnMove: null,
+              },
+              action_shoot_drill: {
                 deathFaces: [1, 2],
                 moveFaces: [3, 4, 5],
                 extraOnMove: 'discard_unlocks',
@@ -1084,7 +1028,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_shoot_king') return INVALID_MOVE;
+            if (cardId !== 'action_shoot_assassin') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: false,
               deathFaces: [1, 2],
@@ -1104,7 +1048,7 @@ export const InceptionCityGame = {
             decreeId?: CardID,
           ) => {
             if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-            if (cardId !== 'action_shoot_armor') return INVALID_MOVE;
+            if (cardId !== 'action_shoot_drill') return INVALID_MOVE;
             return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
               sameLayerRequired: true,
               deathFaces: [1, 2],
@@ -1194,13 +1138,13 @@ export const InceptionCityGame = {
                 moveFaces: [2, 3, 4],
                 extraOnMove: null,
               },
-              action_shoot_king: {
+              action_shoot_assassin: {
                 sameLayerRequired: false,
                 deathFaces: [1, 2],
                 moveFaces: [3, 4, 5],
                 extraOnMove: null,
               },
-              action_shoot_armor: {
+              action_shoot_drill: {
                 sameLayerRequired: true,
                 deathFaces: [1, 2],
                 moveFaces: [3, 4, 5],
@@ -3450,8 +3394,8 @@ function applyShootVariant(
           opts.extraOnMove === 'discard_unlocks'
             ? id === 'action_unlock'
             : id === 'action_shoot' ||
-              id === 'action_shoot_king' ||
-              id === 'action_shoot_armor' ||
+              id === 'action_shoot_assassin' ||
+              id === 'action_shoot_drill' ||
               id === 'action_shoot_burst' ||
               id === 'action_shoot_dream_transit';
         (shouldDrop ? dropped : keep).push(id);

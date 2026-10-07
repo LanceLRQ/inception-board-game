@@ -89,7 +89,7 @@ describe('dispatchTrigger', () => {
   it('世界观类能力全局触发（不受角色限制）', () => {
     let applied = false;
     registry.register(
-      makeAbility('dm_fortress.wv_0', ['onBeforeShoot'], 3, () => {
+      makeAbility('dm_fortress.worldview', ['onBeforeShoot'], 3, () => {
         applied = true;
         return null;
       }),
@@ -129,7 +129,7 @@ describe('dispatchTrigger', () => {
   it('canActivate 返回 false 时跳过', () => {
     let applied = false;
     const ability: AbilityDefinition = {
-      id: 'dm_test.wv_0',
+      id: 'dm_test.worldview',
       name: 'test',
       description: '',
       kind: 'worldView',

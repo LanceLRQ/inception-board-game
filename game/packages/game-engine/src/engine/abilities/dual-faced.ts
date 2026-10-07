@@ -6,9 +6,9 @@ import type { SetupState } from '../../setup.js';
 
 /** 双面角色配置 */
 export interface DualFacedConfig {
-  /** 角色正面 ID（如 'thief_gemini_front'） */
+  /** 角色牌 id，也是正面朝上时玩家的 characterId（如 'thief_gemini'） */
   frontId: CardID;
-  /** 角色背面 ID（如 'thief_gemini_back'） */
+  /** 翻面后玩家的 characterId（如 'thief_gemini_back'）；它只是运行时的「背面朝上」状态，不是另一张牌 */
   backId: CardID;
   /** 正面阵营 */
   frontFaction: Faction;
@@ -16,30 +16,25 @@ export interface DualFacedConfig {
   backFaction: Faction;
 }
 
-/** 已知的双面角色配置表 */
-export const DUAL_FACED_CHARS: DualFacedConfig[] = [
-  // 双子（Gemini）
-  {
-    frontId: 'thief_gemini',
-    backId: 'thief_gemini_back',
-    frontFaction: 'thief',
-    backFaction: 'thief',
-  },
-  // 双鱼（Pisces）
-  {
-    frontId: 'thief_pisces',
-    backId: 'thief_pisces_back',
-    frontFaction: 'thief',
-    backFaction: 'thief',
-  },
-  // 露娜（Luna）
-  {
-    frontId: 'thief_luna',
-    backId: 'thief_luna_back',
-    frontFaction: 'thief',
-    backFaction: 'thief',
-  },
+/** 双面角色的牌 id；与卡牌配置里 doubleSided 的角色一一对应（由测试对账） */
+export const DUAL_FACED_CARD_IDS: readonly CardID[] = [
+  'thief_gemini',
+  'thief_pisces',
+  'thief_luna',
 ];
+
+/** 翻面后玩家的 characterId：牌 id 加 `_back` */
+export function backFaceId(cardId: CardID): CardID {
+  return `${cardId}_back`;
+}
+
+/** 已知的双面角色配置表 */
+export const DUAL_FACED_CHARS: DualFacedConfig[] = DUAL_FACED_CARD_IDS.map((id) => ({
+  frontId: id,
+  backId: backFaceId(id),
+  frontFaction: 'thief',
+  backFaction: 'thief',
+}));
 
 /** 查找角色的双面配置 */
 export function getDualFacedConfig(characterId: CardID): DualFacedConfig | undefined {

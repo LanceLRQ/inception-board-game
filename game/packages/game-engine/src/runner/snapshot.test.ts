@@ -135,6 +135,20 @@ describe('对局运行器 · 快照校验', () => {
       expect(m.G.pendingUnlock).toBeNull();
     });
 
+    it('第 9 版快照里的旧牌 id 与旧技能标识恢复时被改成统一后的标识（服务端快照恢复走这条路）', () => {
+      const raw = broken((s) => {
+        const g = s.G as Record<string, unknown>;
+        g.schemaVersion = 9;
+        const players = g.players as Record<string, { hand: string[]; skillUsedThisTurn: object }>;
+        players['0']!.hand = ['action_shoot_king', 'action_shoot_armor'];
+        players['0']!.skillUsedThisTurn = { 'dm_saturn_territory.world.skill': 1 };
+      });
+      const m = matchFromSnapshot<SetupState>(raw, game);
+      expect(m.G.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      expect(m.G.players['0']!.hand).toEqual(['action_shoot_assassin', 'action_shoot_drill']);
+      expect(m.G.players['0']!.skillUsedThisTurn).toEqual({ 'dm_saturn_territory.worldview': 1 });
+    });
+
     it('当前版本的快照迁移后原样返回', () => {
       const s = valid();
       expect(matchFromSnapshot<SetupState>(JSON.parse(JSON.stringify(s)), game)).toEqual(s);

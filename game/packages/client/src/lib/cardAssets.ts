@@ -3,10 +3,12 @@
 import { AssetPreloader } from './assetPreloader';
 import { buildCardCatalog } from './cardCatalog';
 
+const entries = buildCardCatalog();
+
 export const cardAssets = new AssetPreloader();
 cardAssets.setManifest({
   version: 'catalog',
   generatedAt: '',
-  totalBytes: 0,
-  entries: buildCardCatalog(),
+  totalBytes: entries.reduce((sum, e) => sum + e.bytes, 0),
+  entries,
 });

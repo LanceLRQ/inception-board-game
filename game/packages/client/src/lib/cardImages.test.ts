@@ -10,17 +10,17 @@ import {
 
 describe('cardImages', () => {
   describe('getCardImageUrl', () => {
-    it('returns a /cards/-prefixed .webp URL for a known thief character', () => {
+    it('returns a /cards/-prefixed .webp URL with a version parameter for a known thief character', () => {
       const url = getCardImageUrl('thief_space_queen');
       expect(url).toBeDefined();
       expect(url).toMatch(/^\/cards\//);
-      expect(url).toMatch(/\.webp$/);
+      expect(url).toMatch(/\.webp\?v=[0-9a-f]{10}$/);
     });
 
     it('returns a URL for a known action card', () => {
       const url = getCardImageUrl('action_shoot');
       expect(url).toBeDefined();
-      expect(url).toMatch(/\.webp$/);
+      expect(url).toMatch(/\.webp\?v=[0-9a-f]{10}$/);
     });
 
     it('returns undefined for unknown cardId', () => {

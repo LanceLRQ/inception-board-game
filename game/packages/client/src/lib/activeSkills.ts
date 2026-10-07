@@ -212,11 +212,11 @@ export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
 };
 
 export const SATURN_FREE_MOVE: ActiveSkillDescriptor = {
-  id: 'dm_saturn_territory.wv_free_move',
+  id: 'dm_saturn_territory.worldview',
   characterId: '__any__', // 任意 thief 角色，只要持贿赂
   move: 'useSaturnFreeMove',
-  nameKey: 'skill.dm_saturn_territory.free_move.name',
-  descKey: 'skill.dm_saturn_territory.free_move.desc',
+  nameKey: 'skill.dm_saturn_territory.worldview.name',
+  descKey: 'skill.dm_saturn_territory.worldview.desc',
   argKind: 'targetLayer',
   extraCheck: (ctx) => ctx.faction === 'thief' && ctx.hasBribe === true,
 };
@@ -321,11 +321,11 @@ export const LUNA_ECLIPSE: ActiveSkillDescriptor = {
 // 雅典娜·惊叹 —— 展示 4 张手牌 + 1 牌库顶 → 5 张同名击杀同层玩家
 // 对照：docs/manual/05-dream-thieves.md 雅典娜 + engine/game.ts playAthenaAwe
 export const ATHENA_AWE: ActiveSkillDescriptor = {
-  id: 'thief_athena.skill_0',
+  id: 'thief_athena.skill_1',
   characterId: 'thief_athena',
   move: 'playAthenaAwe',
-  nameKey: 'skill.thief_athena.skill_0.name',
-  descKey: 'skill.thief_athena.skill_0.desc',
+  nameKey: 'skill.thief_athena.skill_1.name',
+  descKey: 'skill.thief_athena.skill_1.desc',
   argKind: 'multiCardAndPlayer',
   // 至少 4 张手牌才能参与展示
   extraCheck: (ctx) => ctx.hand.length >= 4,
@@ -369,11 +369,11 @@ export const LIBRA_BALANCE: ActiveSkillDescriptor = {
 // 对照：cards-data.json dm_mars_battlefield 世界观 + engine/game.ts useMarsBattlefield
 // 世界观激活时对所有存活玩家可用，SHOOT 类筛选交由 engine 精校
 export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
-  id: '__any__.mars_battlefield_exchange',
+  id: 'dm_mars_battlefield.worldview',
   characterId: '__any__',
   move: 'useMarsBattlefield',
-  nameKey: 'skill.dm_mars_battlefield.world.name',
-  descKey: 'skill.dm_mars_battlefield.world.desc',
+  nameKey: 'skill.dm_mars_battlefield.worldview.name',
+  descKey: 'skill.dm_mars_battlefield.worldview.desc',
   argKind: 'twoCardsAndShoot',
   extraCheck: (ctx) =>
     ctx.marsBattlefieldActive === true &&

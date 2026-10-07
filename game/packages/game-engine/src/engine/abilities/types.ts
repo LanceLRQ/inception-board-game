@@ -199,7 +199,7 @@ export interface GameEvent {
  * AbilityDefinition
  */
 export interface AbilityDefinition {
-  /** 唯一标识（如 "thief_pointman.skill_0" / "dm_fortress.wv_0"） */
+  /** 唯一标识（如 "thief_pointman.skill_0" / "dm_fortress.worldview"） */
   readonly id: string;
   /** 显示名称（i18n key） */
   readonly name: string;

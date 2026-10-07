@@ -445,7 +445,7 @@
       }
     },
     "thief_athena": {
-      "skill_0": {
+      "skill_1": {
         "name": "雅典娜·惊叹",
         "desc": "展示 4 张手牌 + 1 张牌库顶，5 张皆不同名可击杀同层玩家"
       }
@@ -491,7 +491,7 @@
         "name": "火星·杀戮",
         "desc": "指定目标层进行杀戮结算"
       },
-      "world": {
+      "worldview": {
         "name": "火星·战场",
         "desc": "弃 2 张非 SHOOT → 从弃牌堆取 1 张 SHOOT"
       }
@@ -503,7 +503,7 @@
       }
     },
     "dm_saturn_territory": {
-      "free_move": {
+      "worldview": {
         "name": "土星·自由移动",
         "desc": "盗梦者持贿赂时可自由移动到目标层"
       }

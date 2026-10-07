@@ -91,8 +91,9 @@ describe('生成的卡牌配置 · 角色', () => {
     );
     expect(new Set(skillIds).size).toBe(skillIds.length);
     for (const c of CHARACTERS) {
-      c.front.skills.forEach((s, i) => expect(s.id).toBe(`${c.id}.skill_${i}`));
-      c.back?.skills.forEach((s, i) => expect(s.id).toBe(`${c.id}.back.skill_${i}`));
+      // 整张角色牌连续编号：背面技能接在正面之后
+      const all = [...c.front.skills, ...(c.back?.skills ?? [])];
+      all.forEach((s, i) => expect(s.id).toBe(`${c.id}.skill_${i}`));
     }
   });
 

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { migrateGameState, getSchemaVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';
+import {
+  migrateGameState,
+  getSchemaVersion,
+  CURRENT_SCHEMA_VERSION,
+  RENAMED_IDS_V10,
+  renameIdsDeep,
+} from './migrations.js';
 import { createInitialState } from './setup.js';
 import { viewFor } from './engine/matchView.js';
 
@@ -297,6 +303,101 @@ describe('migrations', () => {
     it('rngSeed 缺失或不是字符串时不抛错', () => {
       expect(() => migrateGameState(legacyState(undefined))).not.toThrow();
       expect(() => migrateGameState(legacyState(42))).not.toThrow();
+    });
+  });
+
+  describe('v9 → v10 · 牌与技能标识统一', () => {
+    function legacyState(): Record<string, unknown> {
+      const fresh = createInitialState({
+        playerCount: 5,
+        playerIds: ['0', '1', '2', '3', '4'],
+        nicknames: ['a', 'b', 'c', 'd', 'e'],
+        rngSeed: 'rename-base',
+      }) as unknown as Record<string, unknown>;
+      const players = fresh.players as Record<string, Record<string, unknown>>;
+      return {
+        ...fresh,
+        schemaVersion: 9,
+        players: {
+          ...players,
+          '0': {
+            ...players['0'],
+            hand: ['action_shoot_king', 'action_shoot_armor', 'action_unlock'],
+            skillUsedThisTurn: {
+              'dm_saturn_territory.world.skill': 1,
+              'dm_venus_mirror.world_0:action': 1,
+              'dm_mercury_route.skill_1': 2,
+              'thief_haley.skill_0': 1,
+            },
+            skillUsedThisGame: {
+              'dm_imperial_city.world_0': 1,
+              'dm_mars_battlefield.world.skill': 1,
+            },
+          },
+        },
+        deck: {
+          cards: ['action_shoot_armor', 'action_kick'],
+          discardPile: ['action_shoot_king'],
+        },
+        lastPlayedCardThisTurn: 'action_shoot_king',
+        playedCardsThisTurn: ['action_shoot_armor'],
+      };
+    }
+
+    it('手牌、牌库、弃牌堆与出牌记录里的旧牌 id 换成新 id', () => {
+      const state = migrateGameState(legacyState());
+      expect(state.players['0']!.hand).toEqual([
+        'action_shoot_assassin',
+        'action_shoot_drill',
+        'action_unlock',
+      ]);
+      expect(state.deck.cards).toEqual(['action_shoot_drill', 'action_kick']);
+      expect(state.deck.discardPile).toEqual(['action_shoot_assassin']);
+      expect(state.lastPlayedCardThisTurn).toBe('action_shoot_assassin');
+      expect(state.playedCardsThisTurn).toEqual(['action_shoot_drill']);
+    });
+
+    it('技能使用记录的键换成新标识，按阶段计数的后缀保留，其他键不动', () => {
+      const p = migrateGameState(legacyState()).players['0']!;
+      expect(p.skillUsedThisTurn).toEqual({
+        'dm_saturn_territory.worldview': 1,
+        'dm_venus_mirror.worldview:action': 1,
+        'dm_mercury_route.skill_0': 2,
+        'thief_haley.skill_0': 1,
+      });
+      expect(p.skillUsedThisGame).toEqual({
+        'dm_imperial_city.worldview': 1,
+        'dm_mars_battlefield.worldview': 1,
+      });
+    });
+
+    it('迁移后的状态里不再出现任何旧标识', () => {
+      const text = JSON.stringify(migrateGameState(legacyState()));
+      for (const old of Object.keys(RENAMED_IDS_V10)) expect(text).not.toContain(old);
+    });
+
+    it('不改入参，已经是新标识的状态原样通过', () => {
+      const raw = legacyState();
+      const before = JSON.stringify(raw);
+      const once = migrateGameState(raw);
+      expect(JSON.stringify(raw)).toBe(before);
+      expect(migrateGameState({ ...once, schemaVersion: 9 } as Record<string, unknown>)).toEqual(
+        once,
+      );
+    });
+
+    it('改写表里没有旧 → 新互相接龙的项（重复迁移不会二次改写）', () => {
+      const olds = new Set(Object.keys(RENAMED_IDS_V10));
+      for (const next of Object.values(RENAMED_IDS_V10)) expect(olds.has(next)).toBe(false);
+    });
+
+    it('renameIdsDeep 只改整串相等的值，不动含有旧标识的长文本', () => {
+      expect(
+        renameIdsDeep({ a: 'action_shoot_king', b: 'x action_shoot_king y' }, RENAMED_IDS_V10),
+      ).toEqual({
+        a: 'action_shoot_assassin',
+        b: 'x action_shoot_king y',
+      });
     });
   });
 });

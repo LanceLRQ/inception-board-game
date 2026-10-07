@@ -31,9 +31,9 @@ describe('master 注册集', () => {
     const ids = ALL_MASTER_ABILITIES.map((a) => a.id).sort();
     expect(ids).toEqual([
       'dm_mercury_route.skill_0',
-      'dm_mercury_route.world_view',
+      'dm_mercury_route.worldview',
       'dm_venus_mirror.skill_0',
-      'dm_venus_mirror.world_view',
+      'dm_venus_mirror.worldview',
     ]);
   });
 

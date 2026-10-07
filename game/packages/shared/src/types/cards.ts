@@ -32,7 +32,7 @@ export interface ActionCardDefinition {
 // === 角色定义 ===
 
 export interface SkillDefinition {
-  /** 形如 `<角色id>.skill_<序号>`；双面角色背面为 `<角色id>.back.skill_<序号>`；序号只数技能，不含世界观 */
+  /** 形如 `<角色id>.skill_<序号>`；序号从 0 起整张角色牌连续编号（双面角色的背面技能接在正面之后），只数技能，不含世界观 */
   readonly id: string;
   readonly name: string;
   readonly description: string;

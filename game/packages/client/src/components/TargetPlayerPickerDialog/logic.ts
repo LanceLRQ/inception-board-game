@@ -14,7 +14,7 @@ export interface TargetPlayerOption {
 }
 
 export interface TargetPickerInputs {
-  /** effectivePending.card（如 'action_shoot' / 'action_shoot_king' 等） */
+  /** effectivePending.card（如 'action_shoot' / 'action_shoot_assassin' 等） */
   cardId: string | null | undefined;
   /** viewer 自身当前层（决定同层判定） */
   viewerLayer: number;
@@ -29,14 +29,14 @@ export interface TargetPickerInputs {
 
 /**
  * 判定当前卡牌是否"同层限制"。
- *   action_shoot / action_shoot_armor / action_shoot_burst / action_shoot_dream_transit → 同层
- *   action_shoot_king → 跨层（刺客之王）
+ *   action_shoot / action_shoot_drill / action_shoot_burst / action_shoot_dream_transit → 同层
+ *   action_shoot_assassin → 跨层（刺客之王）
  *   非 SHOOT 类 → 不做同层限制（取决于卡牌本身，此处默认 false 即不限）
  */
 export function isSameLayerRequired(cardId: string | null | undefined): boolean {
   if (!cardId) return false;
   if (!cardId.startsWith('action_shoot')) return false;
-  return cardId !== 'action_shoot_king';
+  return cardId !== 'action_shoot_assassin';
 }
 
 export function computeTargetOptions(inputs: TargetPickerInputs): TargetPlayerOption[] {

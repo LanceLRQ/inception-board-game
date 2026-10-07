@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 import { buildThemeBootScript } from './src/theme/bootScript';
 import { DEFAULT_THEME_ID, THEMES } from './src/theme/themes';
+import { CARD_ART_CACHE_NAME, CARD_ART_URL_PATTERN } from './src/lib/cardArtRoute';
 
 /** 把首屏主题脚本注入到 <head> 最前面，让主题属性在首次绘制之前就位 */
 function themeBootPlugin(): Plugin {
@@ -52,12 +53,14 @@ export default defineConfig({
         runtimeCaching: [
           {
             // 卡图（约 100 张、十几 MB）不进预缓存：用到哪张缓存哪张，下次（含离线）直接取缓存。
-            // 必须排在通用图片规则之前：Workbox 取第一条匹配的规则
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith('/cards/') && /\.webp$/i.test(url.pathname),
+            // 必须排在通用图片规则之前：Workbox 取第一条匹配的规则。
+            // 卡图地址带内容哈希作版本参数（?v=...）：路由只看路径所以照样命中，缓存的键是完整地址，
+            // 图换了哈希就变、旧图自动失效。匹配器会被 toString() 写进 Service Worker，
+            // 所以用正则字面量而不是引用别处标识符的函数（见 src/lib/cardArtRoute.ts）
+            urlPattern: CARD_ART_URL_PATTERN,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'card-art-cache',
+              cacheName: CARD_ART_CACHE_NAME,
               // 全部卡图 + 背面不到 120 张；留出余量，超出时淘汰最久没用的
               expiration: { maxEntries: 160, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [200] },

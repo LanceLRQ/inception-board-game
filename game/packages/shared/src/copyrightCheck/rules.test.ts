@@ -168,7 +168,7 @@ describe('isScanTarget · 白名单目标', () => {
   });
 
   it('excludes binary asset dirs', () => {
-    expect(isScanTarget('game/packages/client/public/cards/manifest.json')).toBe(false);
+    expect(isScanTarget('game/packages/client/public/cards/thief/x.webp')).toBe(false);
     expect(isScanTarget('game/packages/client/public/dice/dice-red-1.svg')).toBe(false);
     expect(isScanTarget('game/packages/client/public/sfx/README.md')).toBe(false);
   });
@@ -364,7 +364,6 @@ describe('isSourceScanTarget · 源码扫描范围', () => {
     'game/packages/shared/src/copyrightCheck/rules.test.ts',
     // 以内部素材目录为输入的脚本：代码里必须写出那个路径
     'game/scripts/sync-card-assets.ts',
-    'game/packages/client/scripts/sync-assets.ts',
     'game/packages/shared/scripts/codegen.ts',
     'docs/manual/x.md',
     'docs/_internal/design/00-overview.md',
@@ -374,7 +373,7 @@ describe('isSourceScanTarget · 源码扫描范围', () => {
     'experimental_demo/foo/src/index.ts',
     'game/packages/client/node_modules/foo/index.js',
     'game/packages/client/dist/main.js',
-    'game/packages/client/public/cards/manifest.json',
+    'game/packages/client/public/cards/thief/x.webp',
     'game/packages/client/public/dice/dice-red-1.svg',
     'game/packages/client/public/sfx/README.md',
     'game/pnpm-lock.yaml',

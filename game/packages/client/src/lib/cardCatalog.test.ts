@@ -25,11 +25,15 @@ describe('buildCardCatalog', () => {
     for (const rec of getCardImageCatalog()) expect(urls).toContain(rec.url);
   });
 
-  it('所有地址都在 /cards/ 下，且是 webp', () => {
+  it('所有地址都在 /cards/ 下，是 webp，且带版本参数', () => {
     for (const e of entries) {
       expect(e.url.startsWith('/cards/')).toBe(true);
-      expect(e.url).toMatch(/\.webp$/);
+      expect(e.url).toMatch(/\.webp\?v=[0-9a-f]{10}$/);
     }
+  });
+
+  it('每项都带真实的字节数（取自卡图清单）', () => {
+    for (const e of entries) expect(e.bytes, e.id).toBeGreaterThan(1000);
   });
 
   it('进站只取关键素材：数量很少，都是背面或金库', () => {

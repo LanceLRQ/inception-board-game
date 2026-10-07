@@ -16,7 +16,6 @@ function mkEntry(id: string, tier: AssetManifestEntry['tier'], bytes = 1000): As
     category: 'thief',
     url: `/cards/thief/${id}.webp`,
     bytes,
-    sha256: 'deadbeef',
     tier,
   };
 }

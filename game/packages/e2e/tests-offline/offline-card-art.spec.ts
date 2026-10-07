@@ -80,6 +80,13 @@ test('卡图不进预缓存，看过的进运行时缓存，断网后仍能显�
     )
     .toBeGreaterThan(5);
 
+  // 2b. 运行时缓存的键是带版本参数的完整地址：路由规则命中带参数的地址，图换了哈希就变
+  const cachedKeys = await page.evaluate(async () =>
+    (await (await caches.open('card-art-cache')).keys()).map((r) => new URL(r.url).search),
+  );
+  expect(cachedKeys.length).toBeGreaterThan(5);
+  for (const search of cachedKeys) expect(search).toMatch(/^\?v=[0-9a-f]{10}$/);
+
   // 3. 断网后刷新：同一局面的卡图仍然是图，不是文字占位
   await context.setOffline(true);
   await page.reload();

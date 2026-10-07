@@ -445,7 +445,7 @@
       }
     },
     "thief_athena": {
-      "skill_0": {
+      "skill_1": {
         "name": "Athena · Awe",
         "desc": "Reveal 4 hand cards + top of deck; if all 5 have different names, kill a same-layer player"
       }
@@ -491,7 +491,7 @@
         "name": "Mars · Slaughter",
         "desc": "Resolve slaughter on a target layer"
       },
-      "world": {
+      "worldview": {
         "name": "Mars · Battlefield",
         "desc": "Discard 2 non-SHOOT → pick 1 SHOOT from discard pile"
       }
@@ -503,7 +503,7 @@
       }
     },
     "dm_saturn_territory": {
-      "free_move": {
+      "worldview": {
         "name": "Saturn · Free Move",
         "desc": "While holding a bribe, move freely to a target layer"
       }

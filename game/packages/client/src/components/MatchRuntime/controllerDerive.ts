@@ -219,10 +219,10 @@ export function isShootPlay(pending: PendingPlay): boolean {
 export const SUDGER_CHARACTER_ID = 'thief_sudger_of_mind';
 
 /** 引擎的 playShootSudger 能结算的 SHOOT 类牌（与引擎里 SHOOT 类牌的判定一致）；其余牌仍走原来的 move */
-const SUDGER_SHOOT_CARDS: readonly string[] = [
+export const SUDGER_SHOOT_CARDS: readonly string[] = [
   'action_shoot',
-  'action_shoot_king',
-  'action_shoot_armor',
+  'action_shoot_assassin',
+  'action_shoot_drill',
   'action_shoot_burst',
   'action_shoot_dream_transit',
 ];

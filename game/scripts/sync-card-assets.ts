@@ -1,10 +1,18 @@
 #!/usr/bin/env npx tsx
-// 卡图素材同步脚本
-// 源：内部素材目录下的 cards/{category}/*.webp
-// 目标：game/packages/client/public/cards/{category}/*.webp
-// 策略：只同步 webp（已预压缩），jpg 忽略；不在仓库保留目标目录
+// 卡图素材同步脚本（仓库里唯一的卡图同步入口）
+//
+// 源：内部素材目录下的 cards/{category}/*.webp（不入库，只在维护者本机有；CI 上没有这个目录，不会跑本脚本）
+// 目标：game/packages/client/public/cards/{category}/*.webp（卡图随仓库入库）
+// 策略：只同步 webp（已预压缩），jpg 忽略；目标里已有且内容相同的文件跳过；
+//       只复制不删除，素材目录里删掉的卡图要手动从目标目录删
+//
+// 用法（在 game/ 下）：
+//   pnpm assets:sync
+// 它先同步卡图，再重新生成卡图清单（packages/client/src/lib/generated/cardImageManifest.ts，
+// 记录每张卡图的内容哈希、字节数与宽高；客户端据此给卡图地址加版本参数，卡图换了内容老用户才拿得到新图）。
+// 清单与卡图是否一致由客户端的单元测试守护，只改卡图没重新生成清单会让测试失败。
 
-import { readdirSync, mkdirSync, copyFileSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, mkdirSync, copyFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,10 +58,10 @@ function syncCategory(cat: string): SyncStat {
     const destPath = join(destDir, file);
     const srcStat = statSync(srcPath);
 
-    // 增量复制：目标已存在且大小一致则跳过
+    // 增量复制：目标已存在且内容完全相同则跳过
     if (existsSync(destPath)) {
       const destStat = statSync(destPath);
-      if (destStat.size === srcStat.size) {
+      if (destStat.size === srcStat.size && readFileSync(srcPath).equals(readFileSync(destPath))) {
         skipped++;
         continue;
       }

@@ -954,8 +954,8 @@ export const ARCHITECT_SKILL_ID = 'thief_architect.skill_0';
 export function isShootClassCard(cardId: CardID): boolean {
   return (
     cardId === 'action_shoot' ||
-    cardId === 'action_shoot_king' ||
-    cardId === 'action_shoot_armor' ||
+    cardId === 'action_shoot_assassin' ||
+    cardId === 'action_shoot_drill' ||
     cardId === 'action_shoot_burst' ||
     cardId === 'action_shoot_dream_transit'
   );
@@ -1751,8 +1751,8 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
   const hasShoot = player.hand.some(
     (c) =>
       c === 'action_shoot' ||
-      c === 'action_shoot_king' ||
-      c === 'action_shoot_armor' ||
+      c === 'action_shoot_assassin' ||
+      c === 'action_shoot_drill' ||
       c === 'action_shoot_burst' ||
       c === 'action_shoot_dream_transit',
   );
@@ -2373,7 +2373,7 @@ export function applyPlutoHellLostCheck(state: SetupState, playerID: string): Se
 // 已有 canSaturnFreeMove 判定；此处加 ID + 应用函数（per-turn）
 // 对照：cards-data.json dm_saturn_territory 世界观
 
-export const SATURN_FREE_MOVE_SKILL_ID = 'dm_saturn_territory.world.skill';
+export const SATURN_FREE_MOVE_SKILL_ID = 'dm_saturn_territory.worldview';
 
 /** 土星·领地世界观：盗梦者免费移动到相邻层（自己回合限 1 次） */
 export function applySaturnFreeMove(
@@ -2437,7 +2437,7 @@ export function applyUranusFirmamentMoveDiscard(state: SetupState, playerID: str
 // 玩家自己回合出牌阶段：弃 2 张非 SHOOT 类牌 → 弃牌堆取任意 1 张 SHOOT 类入手
 // 对照：cards-data.json dm_mars_battlefield 世界观
 
-export const MARS_BATTLEFIELD_WORLD_SKILL_ID = 'dm_mars_battlefield.world.skill';
+export const MARS_BATTLEFIELD_WORLD_SKILL_ID = 'dm_mars_battlefield.worldview';
 
 /** 火星·战场世界观激活 */
 export function isMarsBattlefieldWorldActive(state: SetupState): boolean {
@@ -2655,7 +2655,7 @@ export function applyVenusDouble(
 
 // === 水星·航路 逆流（被动：贿赂者对梦主出牌 → 梦主先收入） ===
 
-export const MERCURY_REVERSE_SKILL_ID = 'dm_mercury_route.skill_1';
+export const MERCURY_REVERSE_SKILL_ID = 'dm_mercury_route.skill_0';
 
 /**
  * 水星·航路 逆流技能：同层贿赂者对梦主出牌时，梦主先收入手牌再结算。
@@ -2717,7 +2717,7 @@ export function applyMercuryReverse(
 // === 皇城世界观 · 贿赂后 SHOOT（纯函数） ===
 // 对照：docs/manual/06-dream-master.md 皇城
 // 收到贿赂的玩家选一个未收到贿赂的盗梦者视为 SHOOT，掷骰结果 -3
-export const IMPERIAL_CITY_WORLD_SKILL_ID = 'dm_imperial_city.world_0';
+export const IMPERIAL_CITY_WORLD_SKILL_ID = 'dm_imperial_city.worldview';
 
 export function applyImperialCityWorldShoot(
   state: SetupState,
@@ -2840,13 +2840,13 @@ export function applyRevive(
 // === 金星·镜界世界观 · 复制效果 ===
 // 对照：docs/manual/06-dream-master.md 金星·镜界
 // 弃 2 张牌，重复执行本回合内之前用过的 SHOOT/KICK 效果
-export const VENUS_MIRROR_WORLD_SKILL_ID = 'dm_venus_mirror.world_0';
+export const VENUS_MIRROR_WORLD_SKILL_ID = 'dm_venus_mirror.worldview';
 
 // 可复制的行动牌前缀
 const MIRRORABLE_SHOOT_PREFIXES = [
   'action_shoot',
-  'action_shoot_king',
-  'action_shoot_armor',
+  'action_shoot_assassin',
+  'action_shoot_drill',
   'action_shoot_burst',
   'action_shoot_dream_transit',
 ];

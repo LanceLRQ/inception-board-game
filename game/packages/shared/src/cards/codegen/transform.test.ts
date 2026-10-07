@@ -168,7 +168,7 @@ describe('transformCards · 角色', () => {
     });
   });
 
-  it('双面盗梦者：背面技能编号 back.skill_N，带背面图与扩展标记；没有说明的面不带 analysis', () => {
+  it('双面盗梦者：背面技能编号接在正面之后，带背面图与扩展标记；没有说明的面不带 analysis', () => {
     const b = run().thiefCharacters.find((c) => c.id === 'thief_b')!;
     expect(b.doubleSided).toBe(true);
     expect(b.isExpansion).toBe(true);
@@ -176,10 +176,27 @@ describe('transformCards · 角色', () => {
     expect('analysis' in b.front).toBe(false);
     expect(b.back).toEqual({
       sideName: '乙·反',
-      skills: [{ id: 'thief_b.back.skill_0', name: '反技', description: '反技描述' }],
+      skills: [{ id: 'thief_b.skill_1', name: '反技', description: '反技描述' }],
       analysis: '乙反的说明',
     });
     expect(b.backImagePath).toBe('thief/乙反.webp');
+  });
+
+  it('双面盗梦者正面有多个技能时，背面编号从正面技能数接着往下数', () => {
+    const raw = mutate((r) => {
+      const b = r.cards.thief!.find((c) => c.id === 'thief_b')!;
+      b.sides![0]!.skills = [
+        { name: '正技一', description: '正技一描述' },
+        { name: '正技二', description: '正技二描述' },
+      ];
+      b.sides![1]!.skills = [
+        { name: '反技一', description: '反技一描述' },
+        { name: '反技二', description: '反技二描述' },
+      ];
+    });
+    const b = run(raw).thiefCharacters.find((c) => c.id === 'thief_b')!;
+    expect(b.front.skills.map((s) => s.id)).toEqual(['thief_b.skill_0', 'thief_b.skill_1']);
+    expect(b.back!.skills.map((s) => s.id)).toEqual(['thief_b.skill_2', 'thief_b.skill_3']);
   });
 
   it('梦主：技能与世界观分开，世界观 id 为 <id>.worldview，背面占位条目不算角色', () => {

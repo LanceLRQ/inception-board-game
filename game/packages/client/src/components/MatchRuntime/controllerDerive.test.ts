@@ -1,12 +1,14 @@
 // 对局界面控制层纯推导的测试：输入尽量用固定场景里引擎真实产出的视图
 
 import { describe, it, expect } from 'vitest';
-import type { MatchView, RunnerCtx } from '@icgame/game-engine';
+import { isShootClassCard, type MatchView, type RunnerCtx } from '@icgame/game-engine';
+import { ACTION_CARDS } from '@icgame/shared';
 import { buildFixtureScenario } from '../../match/fixtures/buildScenario';
 import {
   HAND_LIMIT,
   adaptPlayForCharacter,
   SUDGER_CHARACTER_ID,
+  SUDGER_SHOOT_CARDS,
   activeSkillTargetIds,
   buildActiveSkillContext,
   buildPlayArgs,
@@ -468,9 +470,19 @@ describe('意念判官：打出 SHOOT 类牌改走【定罪】', () => {
     expect(SUDGER).toBe('thief_sudger_of_mind');
   });
 
+  it('改走定罪的牌与引擎里 SHOOT 类牌的判定一致，且都是配置里的行动牌', () => {
+    const configured = ACTION_CARDS.map((c) => c.id as string);
+    for (const id of SUDGER_SHOOT_CARDS) expect(configured, id).toContain(id);
+    for (const id of configured) {
+      expect(SUDGER_SHOOT_CARDS.includes(id), id).toBe(isShootClassCard(id));
+    }
+  });
+
   it.each([
     ['action_shoot', 'playShoot'],
     ['action_shoot_burst', 'playShootBurst'],
+    ['action_shoot_assassin', 'playShootKing'],
+    ['action_shoot_drill', 'playShootArmor'],
   ])('%s：move 由 %s 换成 playShootSudger，参数顺序与宣言不变', (card, move) => {
     const base = pendingPlayFor(card)!;
     expect(base.move).toBe(move);
@@ -500,11 +512,6 @@ describe('意念判官：打出 SHOOT 类牌改走【定罪】', () => {
     ]);
     const transit = dreamTransitPending('action_shoot_dream_transit', 'transit');
     expect(adaptPlayForCharacter(transit, SUDGER)).toBe(transit);
-  });
-
-  it('引擎的定罪结算不覆盖的牌保持原来的 move', () => {
-    const assassin = pendingPlayFor('action_shoot_assassin');
-    if (assassin) expect(adaptPlayForCharacter(assassin, SUDGER)).toBe(assassin);
   });
 
   it('不是 SHOOT 类的牌不受影响', () => {

@@ -479,7 +479,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '双子·抉择',
       skills: [
         {
-          id: 'thief_gemini.back.skill_0',
+          id: 'thief_gemini.skill_1',
           name: '抉择',
           description:
             '你的出牌阶段，若梦主处于比你数字更小的层数，你可以掷2颗骰子，从牌库顶抽取掷骰结果总和的牌。效果执行后将角色牌翻面。',
@@ -512,7 +512,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '双鱼·洗礼',
       skills: [
         {
-          id: 'thief_pisces.back.skill_0',
+          id: 'thief_pisces.skill_1',
           name: '洗礼',
           description:
             '你的出牌阶段，你可以移动到数字更大的相邻层，并可以复活一位玩家。效果执行后将角色牌翻面。',
@@ -659,7 +659,7 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
       sideName: '露娜·满月',
       skills: [
         {
-          id: 'thief_luna.back.skill_0',
+          id: 'thief_luna.skill_1',
           name: '满月',
           description:
             '你的出牌阶段，可以弃掉2张非SHOOT类牌，将任意数量玩家复活至你所在层。效果执行后将角色牌翻面。',

@@ -18,8 +18,8 @@ export interface AssetManifestEntry {
   readonly id: string;
   readonly category: string;
   readonly url: string;
+  /** 文件字节数；进度按字节累计 */
   readonly bytes: number;
-  readonly sha256: string;
   readonly tier: AssetTier;
 }
 

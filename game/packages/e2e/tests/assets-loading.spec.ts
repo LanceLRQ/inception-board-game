@@ -25,6 +25,35 @@ test.describe('素材预加载', () => {
     );
   });
 
+  test('卡图地址都带版本参数；<img> 实际请求的地址与预加载取的是同一批', async ({ page }) => {
+    const requested: string[] = [];
+    page.on('request', (req) => {
+      const u = new URL(req.url());
+      if (u.pathname.startsWith('/cards/') && u.pathname.endsWith('.webp')) {
+        requested.push(u.pathname + u.search);
+      }
+    });
+    await page.goto('/game/debug');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('asset-loading-screen')).toHaveCount(0, { timeout: 25_000 });
+    expect(requested.length).toBeGreaterThan(10);
+    for (const u of requested) expect(u, u).toMatch(/\?v=[0-9a-f]{10}$/);
+    // 页面上的卡图 <img> 地址同样带版本参数，且都在已请求过的地址里（命中同一份缓存）
+    const srcs = await page.evaluate(() =>
+      [...document.images]
+        .map((img) => new URL(img.currentSrc || img.src))
+        .filter((u) => u.pathname.startsWith('/cards/'))
+        .map((u) => u.pathname + u.search),
+    );
+    expect(srcs.length).toBeGreaterThan(0);
+    const seen = new Set(requested);
+    for (const s of srcs) {
+      expect(s, s).toMatch(/\?v=[0-9a-f]{10}$/);
+      expect(seen.has(s), `${s} 没有被请求过`).toBe(true);
+    }
+  });
+
   test('进对局前取得慢：显示已加载 / 总数的真实进度，取完后放行', async ({ page }) => {
     let n = 0;
     await page.route(CARD_IMAGES, async (route) => {

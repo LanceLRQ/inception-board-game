@@ -221,13 +221,13 @@ describe('火星·战场世界观（弃 2 非SHOOT 换 SHOOT）', () => {
     s = setHand(s, 'p1', ['action_shoot' as CardID, 'action_kick' as CardID]);
     s = {
       ...s,
-      deck: { cards: [], discardPile: ['action_shoot_king'] as CardID[] },
+      deck: { cards: [], discardPile: ['action_shoot_assassin'] as CardID[] },
     };
     const r = applyMarsBattlefieldExchange(
       s,
       'p1',
       ['action_shoot', 'action_kick'],
-      'action_shoot_king',
+      'action_shoot_assassin',
     );
     expect(r).toBeNull();
   });

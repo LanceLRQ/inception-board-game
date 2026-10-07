@@ -8,11 +8,11 @@
 //   - apply 不直接施加副作用，而是挂起 pendingVirgoChoice 等待玩家选择
 //   - 三选一副作用由 game.ts 的 respondVirgoPerfect move 调用 skills.ts 的 helper 执行
 
-import { isVirgoPerfectTriggered } from '../../../skills.js';
+import { VIRGO_SKILL_ID, isVirgoPerfectTriggered } from '../../../skills.js';
 import type { AbilityContext, AbilityDefinition } from '../../types.js';
 import type { SetupState } from '../../../../setup.js';
 
-export const VIRGO_PERFECT_ID = 'thief_virgo.skill_0';
+export const VIRGO_PERFECT_ID = VIRGO_SKILL_ID;
 
 export const virgoPerfect: AbilityDefinition = {
   id: VIRGO_PERFECT_ID,

@@ -122,7 +122,7 @@ function shootKing(G: SetupState, roll: number, decreeId?: string) {
       events: {},
     },
     '1',
-    'action_shoot_king' as CardID,
+    'action_shoot_assassin' as CardID,
     decreeId as CardID | undefined,
   );
 }
@@ -173,7 +173,7 @@ describe('死亡宣言 · playShoot', () => {
 describe('死亡宣言 · 变体 playShootKing', () => {
   it('骰 4 无宣言 → 移动（king 死面 [1,2]）', () => {
     const s = makeState();
-    s.players['0']!.hand = ['action_shoot_king'] as CardID[];
+    s.players['0']!.hand = ['action_shoot_assassin'] as CardID[];
     // target on layer 1，king 移 → layer 2
     const r = shootKing(s, 4);
     expect(r.players['1']!.isAlive).toBe(true);
@@ -182,14 +182,14 @@ describe('死亡宣言 · 变体 playShootKing', () => {
 
   it('骰 4 + 展示宣言·4 → 死亡', () => {
     const s = makeState();
-    s.players['0']!.hand = ['action_shoot_king', 'action_death_decree_4'] as CardID[];
+    s.players['0']!.hand = ['action_shoot_assassin', 'action_death_decree_4'] as CardID[];
     const r = shootKing(s, 4, 'action_death_decree_4');
     expect(r.players['1']!.isAlive).toBe(false);
   });
 
   it('宣言"展示"保留手中', () => {
     const s = makeState();
-    s.players['0']!.hand = ['action_shoot_king', 'action_death_decree_4'] as CardID[];
+    s.players['0']!.hand = ['action_shoot_assassin', 'action_death_decree_4'] as CardID[];
     const r = shootKing(s, 4, 'action_death_decree_4');
     expect(r.players['0']!.hand).toEqual(['action_death_decree_4']);
   });

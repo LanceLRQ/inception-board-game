@@ -2,6 +2,15 @@
 //
 // 生成脚本（scripts/codegen.ts）读出数据文件后交给这里转换，再把结果写成 generated/cards.ts。
 // 数据对不上预期（缺字段、重复 id、行动牌不在分类表里等）一律抛错，不做默认值兜底。
+//
+// 标识规则（全仓库唯一，引擎、Bot、服务端、客户端与界面文案的键都按它取）：
+//   - 牌：id 取数据文件里的 id，原样不改
+//   - 角色技能：`<角色 id>.skill_<n>`，n 从 0 起，在整张角色牌上连续编号：先数正面的技能，
+//     双面角色的背面技能接着正面往下数（双子的「命运」是 skill_0，背面的「抉择」是 skill_1）。
+//     技能在数据里的先后顺序就是编号，数据里调整顺序会改变编号
+//   - 梦主技能：同样是 `<梦主 id>.skill_<n>`，不含世界观
+//   - 梦主世界观：`<梦主 id>.worldview`（每个梦主恰好一个）；世界观赋予的主动行动也用这个标识
+//   - 翻面：双面角色的牌 id 不变，技能标识也不因翻面而换；翻面只是运行时玩家所处的那一面
 
 import type {
   ActionCardDefinition,
@@ -182,10 +191,12 @@ function thiefCharacter(card: RawCard): CharacterDefinition {
     skills: front.skills.map((s, i) => skillOf(s, `${id}.skill_${i}`, id)),
     ...analysisOf(front.analyze, id),
   };
+  // 背面技能的编号接在正面之后
+  const frontCount = front.skills.length;
   const backSide: CharacterSideDefinition | undefined = doubleSided
     ? {
         sideName: str(back.name, id, 'back.name'),
-        skills: back.skills!.map((s, i) => skillOf(s, `${id}.back.skill_${i}`, id)),
+        skills: back.skills!.map((s, i) => skillOf(s, `${id}.skill_${frontCount + i}`, id)),
         ...analysisOf(back.analyze, id),
       }
     : undefined;

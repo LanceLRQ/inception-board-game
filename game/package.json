@@ -15,7 +15,7 @@
     "prepare": "cd .. && husky game/.husky",
     "copyright:check": "tsx scripts/copyright-check.ts",
     "kill:dev": "bash scripts/kill-dev.sh",
-    "assets:sync": "tsx scripts/sync-card-assets.ts"
+    "assets:sync": "tsx scripts/sync-card-assets.ts && pnpm --filter @icgame/client cards:manifest"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -61,7 +61,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 好友房联机对局：房主建房、其他人凭房间码加入、空位可补 Bot，开始后全体进入同一局服务端权威对局；刷新或断线后回到同一局
 - 房间等待页：成员变化、补 Bot、开始游戏由服务端经 `/rooms` 命名空间推送（只发给房间成员），推送不可用时退回每 15 秒轮询（页面不可见时暂停）；房间码一键复制、邀请链接 `/invite/房间码`（带二维码与系统分享），聊天软件抓取该链接时得到不含成员信息的分享卡片；联机倒计时按服务端给的剩余毫秒用单调时钟倒数，不受本机时钟影响；数据请求统一走 TanStack Query（`lib/queryClient.ts`）
 - 联机对局内的预设短语（只传短语 id，服务端按座位限流与校验，座位旁气泡 + 最近消息列表）、像素头像（账号上的头像种子经座位表公开，大厅与设置页可「换一个」）、局后举报（胜负覆盖层里对每位真人对手举报，接口按座位解析目标）；每条广播的短语同时记入服务端的聊天记录表（供运营审核举报时作佐证，不下发客户端，暂无读取接口）
-- 卡图分三阶段预加载（进站取关键素材、进对局前取牌种全集与本人视图里可见的牌并显示真实进度、空闲时再取其余），卡图走运行时缓存而不进预缓存，加载失败降级为卡名文字 + 类别色块
+- 卡图分三阶段预加载（进站取关键素材、进对局前取牌种全集与本人视图里可见的牌并显示真实进度、空闲时再取其余），卡图走运行时缓存而不进预缓存，加载失败降级为卡名文字 + 类别色块；卡图地址带内容哈希作版本参数（`/cards/…webp?v=<哈希>`，哈希取自入库的卡图清单 `lib/generated/cardImageManifest.ts`，同时记录字节数与宽高），预加载、`<img>` 请求与运行时缓存命中同一个地址，卡图换了内容老用户也拿得到新图；清单与 `public/cards` 是否一致由单元测试守护
 - 匿名身份（JWT + 恢复码）、房间创建与加入、新手教程、PWA 离线访问
 - 工程基建：pnpm + Turborepo monorepo、单元测试 3300+ 条、双浏览器联机端到端用例、Docker Compose 部署文件
 
@@ -124,6 +124,9 @@ pnpm typecheck                        # 类型检查
 pnpm lint                             # ESLint
 pnpm build                            # 构建
 pnpm copyright:check                  # 扫描对外产物中的内部术语 / 版权合规
+pnpm --filter @icgame/shared codegen  # 由内部卡牌数据文件重新生成卡牌配置（加 --check 只核对入库文件是否一致）
+pnpm assets:sync                      # 把内部素材目录里的卡图同步进 client/public/cards 并重新生成卡图清单（只在维护者本机跑，CI 上没有素材目录）
+pnpm --filter @icgame/client cards:manifest   # 只按 public/cards 的内容重新生成卡图清单（加 --check 只核对）
 
 ./scripts/dev.sh up                   # 本机开发：启动开发用 Postgres / Redis
 ./scripts/prod.sh init && ./scripts/prod.sh build && ./scripts/prod.sh start   # 私有部署，详见 docs/ops/
@@ -144,6 +147,22 @@ pnpm copyright:check                  # 扫描对外产物中的内部术语 / �
 | 黄金定律 | `goldenRule` | 技能 > 行动牌 > 世界观 > 梦魇 > 规则 |
 
 阵营类型：`type Faction = 'thief' | 'master';`
+
+## 牌与技能的标识（全仓库只有这一套）
+
+卡牌配置（`shared/src/cards/generated/cards.ts`）由数据文件生成，引擎、Bot、服务端、客户端与界面文案的键都按下面的规则取标识；规则也写在生成脚本 `transform.ts` 的头注释里。
+
+| 对象 | 标识 | 例 |
+|------|------|----|
+| 牌（角色、行动牌、梦魇、金库、贿赂等） | 数据文件里的 id，原样使用 | `action_shoot_assassin`、`thief_gemini` |
+| 角色技能 | `<角色 id>.skill_<n>`，n 从 0 起在整张角色牌上连续编号；双面角色的背面技能接在正面之后 | 双子·命运 `thief_gemini.skill_0`、背面·抉择 `thief_gemini.skill_1` |
+| 梦主技能 | `<梦主 id>.skill_<n>`（不含世界观） | `dm_chess.skill_0` |
+| 梦主世界观（及世界观赋予的主动行动） | `<梦主 id>.worldview` | `dm_saturn_territory.worldview` |
+| 界面文案键 | `skill.<技能或世界观标识>.name` / `.desc` | `skill.thief_athena.skill_1.name` |
+
+- 双面角色翻面后，玩家的 `characterId` 变成 `<牌 id>_back`（只是运行时「背面朝上」的状态，不是另一张牌；技能标识不随翻面改变）
+- 引擎、Bot、客户端各有一份对账测试：写死的牌 / 技能标识必须存在于卡牌配置里；配置里有而引擎没有入口的技能登记在 `engine/skillCoverage.ts`，配置里有而没进随机池的角色登记在 `characterPools.ts`，两处都要写明原因，今后数据新增而两边都没登记会让测试失败
+- 对局状态里存有这些标识（手牌、牌库、技能使用记录的键等），改标识要在 `migrations.ts` 加一步迁移并升版本号
 
 ## 代码规范
 
