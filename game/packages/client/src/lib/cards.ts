@@ -22,10 +22,12 @@ export function getCardName(id: string): string {
   return getCardById(id)?.name ?? id;
 }
 
-/** 拿角色技能摘要（首个 skill 的 name + description） */
-export function getCharacterSkillSummary(
-  characterId: string,
-): { name: string; skills: Array<{ name: string; description: string }> } | null {
+/** 角色牌的摘要：正面的技能，梦主另带世界观 */
+export function getCharacterSkillSummary(characterId: string): {
+  name: string;
+  skills: Array<{ name: string; description: string }>;
+  worldView?: { name: string; description: string };
+} | null {
   const card = getCardById(characterId);
   if (!card) return null;
   if (card.category !== 'thief_char' && card.category !== 'master_char') return null;
@@ -33,6 +35,14 @@ export function getCharacterSkillSummary(
   return {
     name: ch.name,
     skills: ch.front.skills.map((s) => ({ name: s.name, description: s.description })),
+    ...(ch.front.worldView
+      ? {
+          worldView: {
+            name: ch.front.worldView.name,
+            description: ch.front.worldView.description,
+          },
+        }
+      : {}),
   };
 }
 

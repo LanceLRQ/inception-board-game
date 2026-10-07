@@ -37,3 +37,28 @@ export function versionedCardImageUrl(imagePath: string): string {
   }
   return `${url}?${VERSION_PARAM}=${entry.hash}`;
 }
+
+/**
+ * 由卡图地址取回清单里的宽高。不是卡图地址、地址解不开、或清单里没有时返回 undefined。
+ * 界面用它按卡图的实际比例排版（梦主角色牌是横版，其余大多是竖版）。
+ */
+export function cardImageSizeOfUrl(
+  url: string | undefined,
+): { width: number; height: number } | undefined {
+  if (!url || !url.startsWith(PUBLIC_PREFIX)) return undefined;
+  const encoded = url.slice(PUBLIC_PREFIX.length).split(/[?#]/)[0] ?? '';
+  let imagePath: string;
+  try {
+    imagePath = decodeURI(encoded);
+  } catch {
+    return undefined;
+  }
+  const entry = CARD_IMAGE_MANIFEST[imagePath];
+  return entry ? { width: entry.width, height: entry.height } : undefined;
+}
+
+/** 这张卡图是不是横版（宽大于高）；取不到尺寸时按竖版处理 */
+export function isLandscapeCardImageUrl(url: string | undefined): boolean {
+  const size = cardImageSizeOfUrl(url);
+  return size !== undefined && size.width > size.height;
+}
