@@ -304,7 +304,7 @@ export function rollShootOutcome(
   }
 
   // 木星·雷霆：梦主使用 SHOOT 类，目标骰 < 梦主层 → 直接击杀
-  // cards-data.json dm_jupiter_peak 雷霆 + manual §50 "叠加 M4 -1"
+  // docs/manual/06-dream-master.md 木星·巅峰 雷霆 + manual §50 "叠加 M4 -1"
   if (
     result !== 'kill' &&
     shouldJupiterThunderKill(shooter.characterId, shooter.currentLayer, postM4Roll)

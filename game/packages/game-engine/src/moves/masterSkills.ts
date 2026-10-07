@@ -91,7 +91,7 @@ export const masterSkillMoves = {
   },
 
   // 天王星·权力：每未派发贿赂可移动 1 个盗梦者到指定层（非迷失层）
-  // 对照：cards-data.json dm_uranus_firmament
+  // 对照：docs/manual/06-dream-master.md 天王星·苍穹
   useUranusPower: {
     move: ({ G, ctx }: MoveCtx, targetPlayerID: string, targetLayer: number) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -104,7 +104,7 @@ export const masterSkillMoves = {
   },
 
   // 冥王星·业火：弃 1 → 所有手牌<2 的盗梦者抽 2
-  // 对照：cards-data.json dm_pluto_hell
+  // 对照：docs/manual/06-dream-master.md 冥王星·地狱
   usePlutoBurning: {
     move: ({ G, ctx }: MoveCtx, discardCardId: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -117,7 +117,7 @@ export const masterSkillMoves = {
   },
 
   // 火星·杀戮：弃 1 解封 → 发动指定层的梦魇牌效果（无需翻开）
-  // 对照：cards-data.json dm_mars_battlefield
+  // 对照：docs/manual/06-dream-master.md 火星·战场
   useMarsKill: {
     move: ({ G, ctx, random }: MoveCtx, layer: number, params?: Record<string, unknown>) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -137,7 +137,7 @@ export const masterSkillMoves = {
   },
 
   // 土星·领地世界观：持贿赂的盗梦者出牌阶段免费移动 1 次到相邻层
-  // 对照：cards-data.json dm_saturn_territory 世界观
+  // 对照：docs/manual/06-dream-master.md 土星·领地 世界观
   useSaturnFreeMove: {
     move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
@@ -149,7 +149,7 @@ export const masterSkillMoves = {
   },
 
   // 火星·战场世界观：弃 2 非 SHOOT → 弃牌堆取 1 SHOOT 入手
-  // 对照：cards-data.json dm_mars_battlefield 世界观
+  // 对照：docs/manual/06-dream-master.md 火星·战场 世界观
   useMarsBattlefield: {
     move: (
       { G, ctx }: MoveCtx,
@@ -171,7 +171,7 @@ export const masterSkillMoves = {
   },
 
   // 密道·传送：弃 1 穿梭剂送任一盗梦者到迷失层。回合限 2 次。
-  // 对照：cards-data.json dm_secret_passage
+  // 对照：docs/manual/06-dream-master.md 密道
   playSecretPassageTeleport: {
     move: ({ G, ctx }: MoveCtx, targetPlayerID: string, transitCardId: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;

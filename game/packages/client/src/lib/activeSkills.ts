@@ -363,7 +363,7 @@ export const LIBRA_BALANCE: ActiveSkillDescriptor = {
 };
 
 // 火星·战场世界观 —— 弃 2 张非 SHOOT 手牌 → 从弃牌堆取 1 张 SHOOT
-// 对照：cards-data.json dm_mars_battlefield 世界观 + 引擎的 useMarsBattlefield
+// 对照：docs/manual/06-dream-master.md 火星·战场 世界观 + 引擎的 useMarsBattlefield
 // 世界观激活时对所有存活玩家可用，SHOOT 类筛选交由 engine 精校
 export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
   id: 'dm_mars_battlefield.worldview',

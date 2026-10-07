@@ -1844,7 +1844,7 @@ export function checkHarborWin(state: SetupState): boolean {
 // === 盛夏 · 充盈 + 世界观 ===
 // 技能 充盈：梦主抽牌阶段，每拥有 1 张未派发贿赂牌 → 多抽 1 张
 // 世界观 盛夏：所有盗梦者抽牌阶段抽牌数 +1
-// 对照：cards-data.json dm_midsummer
+// 对照：docs/manual/06-dream-master.md 盛夏
 
 /**
  * 盛夏·充盈：梦主额外抽牌数（=未派发的贿赂牌张数，已派出的不算）
@@ -2067,7 +2067,7 @@ export function checkNeptuneWin(state: SetupState): boolean {
 // === 木星·巅峰 · 雷霆 + 世界观 ===
 // 技能 雷霆：梦主使用 SHOOT 类牌，目标掷骰 < 梦主所在层数 → 直接击杀
 // 世界观 巅峰：SHOOT 类牌可对相邻层数玩家使用
-// 对照：cards-data.json dm_jupiter_peak
+// 对照：docs/manual/06-dream-master.md 木星·巅峰
 
 /** 木星巅峰世界观激活 */
 export function isJupiterPeakWorldActive(state: SetupState): boolean {
@@ -2097,7 +2097,7 @@ export function shouldJupiterThunderKill(
 // 技能 律令：弃 1 手牌抵消 1 张同名牌效果，并从牌库顶抽 1
 // 世界观 领地：拥有贿赂的盗梦者，自己回合出牌阶段可不用行动牌移动 1 次到相邻层
 // 集成留后续（需 pending state + UI）；本批仅纯函数
-// 对照：cards-data.json dm_saturn_territory
+// 对照：docs/manual/06-dream-master.md 土星·领地
 
 export const SATURN_DECREE_SKILL_ID = 'dm_saturn_territory.skill_0';
 
@@ -2129,11 +2129,11 @@ export function canSaturnFreeMove(state: SetupState, playerID: string): boolean 
 // 梦主主动技能（4 角色 · engine 接入）
 // ============================================================================
 // 皇城·重金 / 密道·传送 / 天王星·权力 / 冥王星·业火
-// 对照：cards-data.json + docs/manual/06-dream-master.md
+// 对照：docs/manual/06-dream-master.md
 
 // === 皇城 · 重金 ===
 // 派发贿赂时，可以选取 1 张给予该盗梦者（替代随机抽取）
-// 对照：cards-data.json dm_imperial_city
+// 对照：docs/manual/06-dream-master.md 皇城
 
 export const IMPERIAL_BRIBE_SKILL_ID = 'dm_imperial_city.skill_0';
 
@@ -2165,7 +2165,7 @@ export function canImperialPickBribe(
 // === 密道 · 传送 ===
 // 你的梦境穿梭剂可以将任一盗梦者移动至迷失层。回合限 2 次。
 // 被送至迷失层的盗梦者不需要给予手牌（跳过击杀状态）
-// 对照：cards-data.json dm_secret_passage
+// 对照：docs/manual/06-dream-master.md 密道
 
 export const SECRET_PASSAGE_SKILL_ID = 'dm_secret_passage.skill_0';
 const SECRET_PASSAGE_MAX_USES_PER_TURN = 2;
@@ -2200,7 +2200,7 @@ export function applySecretPassageTeleport(
 // === 天王星·苍穹 · 权力 ===
 // 出牌阶段，每拥有 1 张未派发贿赂 → 可令一位盗梦者移动到除迷失层外指定层数
 // 必须移动到不同层；可重复对同一人
-// 对照：cards-data.json dm_uranus_firmament
+// 对照：docs/manual/06-dream-master.md 天王星·苍穹
 
 export const URANUS_POWER_SKILL_ID = 'dm_uranus_firmament.skill_0';
 
@@ -2278,7 +2278,7 @@ export function applyPlutoBurning(
 // ============================================================================
 // 梦主世界观 / 部分主动技能（火星·杀戮 / 冥王星地狱世界观 / 土星领地世界观）
 // ============================================================================
-// 对照：cards-data.json + docs/manual/06-dream-master.md
+// 对照：docs/manual/06-dream-master.md
 
 // === 火星·战场 · 杀戮 ===
 // 出牌阶段：弃 1 张解封 → 发动 1 张梦魇牌效果（无需翻开）
@@ -2362,7 +2362,7 @@ export function applyPlutoHellLostCheck(state: SetupState, playerID: string): Se
 // === 土星·领地世界观 ===
 // 拥有贿赂的盗梦者，自己回合出牌阶段可不用行动牌移动一次到相邻层
 // 已有 canSaturnFreeMove 判定；此处加 ID + 应用函数（per-turn）
-// 对照：cards-data.json dm_saturn_territory 世界观
+// 对照：docs/manual/06-dream-master.md 土星·领地 世界观
 
 export const SATURN_FREE_MOVE_SKILL_ID = 'dm_saturn_territory.worldview';
 
@@ -2388,7 +2388,7 @@ export function applySaturnFreeMove(
 // 盗梦者因行动牌效果改变梦境层数 → 牌库顶弃 1 张
 // 梦主贿赂派发完毕 → 改弃 2 张
 // 复活离开迷失层不属于行动牌效果 → 不弃
-// 对照：cards-data.json dm_uranus_firmament 世界观
+// 对照：docs/manual/06-dream-master.md 天王星·苍穹 世界观
 
 /** 天王星·苍穹世界观激活 */
 export function isUranusFirmamentWorldActive(state: SetupState): boolean {
@@ -2418,7 +2418,7 @@ export function applyUranusFirmamentMoveDiscard(state: SetupState, playerID: str
 
 // === 火星·战场世界观 ===
 // 玩家自己回合出牌阶段：弃 2 张非 SHOOT 类牌 → 弃牌堆取任意 1 张 SHOOT 类入手
-// 对照：cards-data.json dm_mars_battlefield 世界观
+// 对照：docs/manual/06-dream-master.md 火星·战场 世界观
 
 export const MARS_BATTLEFIELD_WORLD_SKILL_ID = 'dm_mars_battlefield.worldview';
 
@@ -2654,7 +2654,7 @@ export const MERCURY_REVERSE_SKILL_ID = 'dm_mercury_route.skill_0';
  * 水星·航路 逆流技能：同层贿赂者对梦主出牌时，梦主先收入手牌再结算。
  * 限制：回合限 2 次；不能获取时间风暴。
  * 触发时机：onCardPlayedAgainstMaster
- * 对照：cards-data.json dm_mercury_route 逆流
+ * 对照：docs/manual/06-dream-master.md 水星·航路 逆流
  */
 export function applyMercuryReverse(
   state: SetupState,

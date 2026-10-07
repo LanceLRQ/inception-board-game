@@ -16,13 +16,13 @@ export function matchEndIf({ G }: { G: SetupState }) {
   // 对照：docs/manual/03-game-flow.md 第 19–20 行（胜负只有「打开秘密金库」与「牌库抽完」两条）
 
   // 港口世界观：≥2 金库打开且秘密未开 → 梦主胜
-  // 对照：cards-data.json dm_harbor 世界观
+  // 对照：docs/manual/06-dream-master.md 港口 世界观
   if (checkHarborWin(G)) {
     return { winner: 'master' as Faction, reason: 'harbor_two_vaults' };
   }
 
   // 海王星·泓洋世界观：金币金库被打开 → 梦主胜
-  // 对照：cards-data.json dm_neptune_ocean 世界观
+  // 对照：docs/manual/06-dream-master.md 海王星·泓洋 世界观
   if (checkNeptuneWin(G)) {
     return { winner: 'master' as Faction, reason: 'neptune_coin_opened' };
   }
