@@ -1,5 +1,5 @@
 // 能力注册表 + 静态检查
-// 校验角色 ID 唯一性、触发时机合法性、技能 ID 唯一性
+// 校验卡牌 ID 唯一性、技能 ID 唯一性
 
 import type { CardDefinition, CharacterDefinition, SkillDefinition } from '../types/cards.js';
 import {
@@ -10,31 +10,11 @@ import {
   DREAM_CARDS,
   VAULT_CARDS,
   BRIBE_CARDS,
+  OTHER_CARDS,
 } from './generated/cards.js';
 
-const VALID_TRIGGERS = new Set<string>([
-  'onTurnStart',
-  'onDrawPhase',
-  'onActionPhase',
-  'onDiscardPhase',
-  'onTurnEnd',
-  'onBeforeShoot',
-  'onAfterShoot',
-  'onUnlock',
-  'onUnlockCanceled',
-  'onBribe',
-  'onBribeCanceled',
-  'onDeath',
-  'onRevive',
-  'onLayerChange',
-  'onCardPlayed',
-  'onPhaseEnd',
-  'onGameEnd',
-  'always',
-]);
-
 export interface ValidationError {
-  kind: 'duplicate_card_id' | 'duplicate_skill_id' | 'invalid_trigger' | 'missing_required_field';
+  kind: 'duplicate_card_id' | 'duplicate_skill_id';
   cardId: string;
   detail: string;
 }
@@ -81,14 +61,6 @@ function validateCharacterSkills(char: CharacterDefinition): ValidationError[] {
         });
       }
       skillMap.set(skill.id, skill);
-
-      if (!VALID_TRIGGERS.has(skill.trigger)) {
-        errors.push({
-          kind: 'invalid_trigger',
-          cardId: char.id,
-          detail: `技能 ${skill.id} 的触发时机不合法: ${skill.trigger}`,
-        });
-      }
     }
   }
 
@@ -105,6 +77,7 @@ export function validateAllCards(): ValidationError[] {
   allErrors.push(...registerCards(DREAM_CARDS));
   allErrors.push(...registerCards(VAULT_CARDS));
   allErrors.push(...registerCards(BRIBE_CARDS));
+  allErrors.push(...registerCards(OTHER_CARDS));
   return allErrors;
 }
 

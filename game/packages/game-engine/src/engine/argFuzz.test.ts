@@ -108,9 +108,7 @@ interface Scenario {
   onlyMoves?: readonly string[];
 }
 
-const ACTION_CARD_IDS: string[] = ACTION_CARDS.map((c) => c.id).filter(
-  (id) => id !== 'action_back',
-);
+const ACTION_CARD_IDS: string[] = ACTION_CARDS.map((c) => c.id);
 const THIEF_IDS: string[] = THIEF_CHARACTERS.map((c) => c.id);
 const MASTER_IDS: string[] = MASTER_CHARACTERS.map((c) => c.id);
 

@@ -18,35 +18,6 @@ export type TurnPhase = 'turnStart' | 'draw' | 'action' | 'discard' | 'turnEnd';
 // 游戏阶段
 export type GamePhase = 'setup' | 'playing' | 'endgame';
 
-// 技能使用域
-export type SkillUsageScope =
-  | 'ownTurnOncePerTurn'
-  | 'anyTurnOncePerTurnEach'
-  | 'ownTurnLimitN'
-  | 'perGameLimitN'
-  | 'unlimited';
-
-// 触发时机
-export type TriggerTiming =
-  | 'onTurnStart'
-  | 'onDrawPhase'
-  | 'onActionPhase'
-  | 'onDiscardPhase'
-  | 'onTurnEnd'
-  | 'onBeforeShoot'
-  | 'onAfterShoot'
-  | 'onUnlock'
-  | 'onUnlockCanceled'
-  | 'onBribe'
-  | 'onBribeCanceled'
-  | 'onDeath'
-  | 'onRevive'
-  | 'onLayerChange'
-  | 'onCardPlayed'
-  | 'onPhaseEnd'
-  | 'onGameEnd'
-  | 'always';
-
 // 卡牌类别
 export type CardCategory =
   | 'action'
@@ -55,7 +26,8 @@ export type CardCategory =
   | 'dream'
   | 'vault'
   | 'bribe'
-  | 'nightmare';
+  | 'nightmare'
+  | 'other';
 
 export type CardID = string;
 

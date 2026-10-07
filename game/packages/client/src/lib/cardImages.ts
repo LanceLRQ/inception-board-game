@@ -15,6 +15,7 @@ import {
   DREAM_CARDS,
   VAULT_CARDS,
   BRIBE_CARDS,
+  CARD_BACK_IMAGES,
 } from '@icgame/shared';
 
 const PUBLIC_PREFIX = '/cards/';
@@ -34,7 +35,17 @@ interface ImageEntry {
   readonly front: string;
   readonly back?: string;
   readonly category: CardImageCategory;
+  /** 通用背面：界面按固定 id 取图，但它不是卡牌，不参与按地址反查卡牌 */
+  readonly isGenericBack?: boolean;
 }
+
+/** 界面里按固定 id 取用的通用背面（如金库未翻开时的 vault_back）；图片路径来自 shared 的通用背面导出 */
+const GENERIC_BACK_ENTRIES: ReadonlyArray<[string, CardImageCategory, string]> = [
+  ['action_back', 'action', CARD_BACK_IMAGES.action],
+  ['nightmare_back', 'nightmare', CARD_BACK_IMAGES.nightmare],
+  ['vault_back', 'vault', CARD_BACK_IMAGES.vault],
+  ['bribe_back', 'bribe', CARD_BACK_IMAGES.bribe],
+];
 
 function buildImageMap(): ReadonlyMap<string, ImageEntry> {
   const map = new Map<string, ImageEntry>();
@@ -62,6 +73,9 @@ function buildImageMap(): ReadonlyMap<string, ImageEntry> {
       });
     }
   }
+  for (const [id, category, path] of GENERIC_BACK_ENTRIES) {
+    map.set(id, { front: PUBLIC_PREFIX + encodeURI(path), category, isGenericBack: true });
+  }
   return map;
 }
 
@@ -69,8 +83,8 @@ const IMAGE_MAP = buildImageMap();
 
 /** 通用角色背面图（未揭示身份时展示） */
 export const GENERIC_BACK_IMAGES = {
-  thief: PUBLIC_PREFIX + encodeURI('thief/盗梦都市_角色牌_盗梦者_背面.webp'),
-  master: PUBLIC_PREFIX + encodeURI('dream-master/盗梦都市_角色牌_梦主_背面.webp'),
+  thief: PUBLIC_PREFIX + encodeURI(CARD_BACK_IMAGES.thief),
+  master: PUBLIC_PREFIX + encodeURI(CARD_BACK_IMAGES.master),
 } as const;
 
 /**
@@ -111,7 +125,7 @@ export interface CardImageRecord {
   readonly backUrl?: string;
 }
 
-/** 全部已登记的卡图（不含通用背面）；顺序稳定 */
+/** 全部已登记的卡图，含界面按固定 id 取用的通用背面；顺序稳定 */
 export function getCardImageCatalog(): CardImageRecord[] {
   return [...IMAGE_MAP].map(([id, e]) => ({
     id,
@@ -124,6 +138,7 @@ export function getCardImageCatalog(): CardImageRecord[] {
 /** 卡图地址反查：卡牌 id 与分类；不是已登记的卡图返回 null（通用背面、占位等） */
 const URL_INDEX: ReadonlyMap<string, { id: string; category: CardImageCategory }> = new Map(
   [...IMAGE_MAP].flatMap(([id, e]) => {
+    if (e.isGenericBack) return [];
     const rows: Array<[string, { id: string; category: CardImageCategory }]> = [
       [e.front, { id, category: e.category }],
     ];

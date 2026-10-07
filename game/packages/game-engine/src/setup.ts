@@ -22,7 +22,7 @@ const SHUFFLE_LABEL = {
 /**
  * 构建行动牌牌库
  * 对照：docs/manual/04-action-cards.md
- * 按每张牌 quantity 字段展开，跳过扩展牌与占位的 "action_back"（背面）
+ * 按每张牌 quantity 字段展开，未启用扩展时跳过扩展牌
  */
 /**
  * 构建初始贿赂池
@@ -44,7 +44,6 @@ function buildInitialBribePool(rngSeed: string): BribeSetup[] {
 function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] {
   const cards: CardID[] = [];
   for (const def of ACTION_CARDS) {
-    if (def.id === 'action_back') continue;
     if (def.isExpansion && !expansionEnabled) continue;
     const qty = Math.max(1, def.quantity ?? 1);
     for (let i = 0; i < qty; i++) cards.push(def.id as CardID);

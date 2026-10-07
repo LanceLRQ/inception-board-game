@@ -2,12 +2,14 @@
 // Source: cards-data.json（内部素材目录，不入库）
 
 import type {
+  CardBackImages,
   CharacterDefinition,
   ActionCardDefinition,
   NightmareCardDefinition,
   DreamCardDefinition,
   VaultCardDefinition,
   BribeCardDefinition,
+  OtherCardDefinition,
 } from '../../types/cards.js';
 
 export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
@@ -24,19 +26,15 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_space_queen.skill_0',
           name: '交错',
           description: '当另一位玩家成功解锁时，你可以从牌库顶抽1张牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_space_queen.skill_1',
           name: '造物',
           description: '任意玩家的弃牌阶段，你可以把1张手牌放置到牌库顶。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【造物】可以在关键时刻控制玩家抽上来的手牌。例如将1张【梦境穿梭剂】放置到牌库顶上帮助同伴，也可以用同样的方式回报对手。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_空间女王.webp',
     isExpansion: false,
@@ -55,11 +53,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '失控',
           description:
             '如果你略过抽牌阶段，可以掷1颗骰子，抽牌数改为掷骰结果，则你在弃牌阶段必须弃掉所有手牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '掷出骰子的点数为几，就可抽几张牌，但回合结束时必须弃掉所有手牌。所以【失控】最好是在手牌少或没有手牌的情况下使用。有另一种方法则是当手中存有【移形换影】时使用【失控】，然后在弃牌阶段前使用【移形换影】换成其他角色，因为在弃牌阶段不用弃掉手牌。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_小丑.webp',
     isExpansion: false,
@@ -77,11 +74,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_shade.skill_0',
           name: '随行',
           description: '你的出牌阶段，可以随时移动到梦主的所在层。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '如果影子没有被贿赂，她是一个令梦主感到困扰的盗梦者。在她的回合出牌阶段，随时随地都能使用【随行】的效果。通过一般的方式控制她的行踪非常困难，追杀起梦主来更是无往不利。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_影子.webp',
     isExpansion: false,
@@ -100,11 +96,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '纷飞',
           description:
             '你可以略过抽牌阶段，并将所有手牌（最少1张）给予任意数量的其他盗梦者，然后从牌库顶抽取4张牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '黑天鹅可以每回合结束前都尽可能用剩1张手牌，在下回合抽牌阶段给予同伴，从而赚取更多手牌，并且得益同伴。【纷飞】的效果可以对多位玩家同时产生作用，例如将所有5张手牌给予5位玩家。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_黑天鹅.webp',
     isExpansion: false,
@@ -123,19 +118,15 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '崇拜',
           description:
             '你的出牌阶段，你可以选择一位拥有贿赂牌的盗梦者，随机抽取该盗梦者的1张牌加入你的手牌。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_apollo.skill_1',
           name: '日冕',
           description: '在你的回合，你可以视为拥有梦主的技能。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【日冕】是只有在你自己的回合你才视为拥有梦主的技能，因此某些如水星·航路被动技能除非别人在你的回合抵消你的【解封】，否则几乎无法被触发的。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_阿波罗.webp',
     isExpansion: false,
@@ -154,11 +145,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '迷宫',
           description:
             '你的出牌阶段，可以弃掉1张SHOOT类牌，令同层梦境的一位玩家在他/她的下一个回合结束前，不受到行动牌和技能的影响，且不能移动。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '凡是涉及到被迷宫影响的玩家所有技能都无效。被迷宫影响的玩家不受任何行动牌的影响，但能够发动以下行动牌：SHOOT类牌、【解封】、【梦境窥视】、【念力牵引】、【死亡宣言】、【时间风暴】、【梦魇解封】。梦魇牌对被迷宫所影响的玩家有效。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_筑梦师.webp',
     isExpansion: false,
@@ -177,22 +167,17 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '缉捕',
           description:
             '若你弃掉1张【梦境穿梭剂】和1张SHOOT类牌，可移动到任意一层梦境，然后可执行该SHOOT类牌的效果。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_green_ray.skill_1',
           name: '信念',
           description: '你的行动牌目标玩家掷骰结果-1。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '扩展角色，规则书中未收录。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_格林射线.webp',
-    isExpansion: false,
+    isExpansion: true,
   },
   {
     category: 'thief_char',
@@ -208,11 +193,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '支助',
           description:
             '你的出牌阶段，可以将所有手牌（最少1张）给予另一位玩家，然后你移动到该玩家的所在层。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '假设你现在处于第一层梦境，手牌中没有【梦境穿梭剂】，你想移动到第四层梦境，可以将所有手牌给予一位处于第四层梦境的玩家，然后移动到第四层梦境。启动技能时，最少要有1张手牌，否则无法发动此技能。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_穿行者.webp',
     isExpansion: false,
@@ -231,19 +215,15 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '星尘',
           description:
             '每当一位盗梦者被击杀时，你可翻开该玩家所在层的梦魇牌，选择发动或者弃掉该牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_aries.skill_1',
           name: '闪耀',
           description: '每有1张弃掉的梦魇牌，你的抽牌阶段可多抽1张牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【星尘】技能只能选择发动或弃掉，不能将牌保留。【闪耀】的技能可以让玩家自行选择抽取数量。如弃掉的梦魇牌为2张，则白羊抽牌阶段可自行选择抽取2-4张手牌。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_白羊.webp',
     isExpansion: false,
@@ -261,11 +241,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_lord_of_war.skill_0',
           name: '黑市',
           description: '你的出牌阶段，你可以弃掉2张手牌，然后将弃牌堆里的1张牌收为手牌。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '战争之王能够拥有任何想要的牌，但是必须时刻确保弃牌堆里的牌有些什么。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_战争之王.webp',
     isExpansion: false,
@@ -283,11 +261,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_sudger_of_mind.skill_0',
           name: '定罪',
           description: '当你使用SHOOT类牌时，目标玩家改为掷2骰子，由你选择其中1颗作为掷骰结果。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '对同伴使用【定罪】时，本身普通【SHOOT】的移动概率就为二分之一，现在将有更高的几率帮助同伴穿梭梦境。在对敌方使用【定罪】时，又能增加概率将对手赶跑或者击杀。但也难免会出现2颗骰子掷出结果一样的情况，例如两个6，意念判官将最为无奈。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_意念判官.webp',
     isExpansion: false,
@@ -305,11 +282,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_dream_interpreter.skill_0',
           name: '伏笔',
           description: '当你使用【解封】时，可以从牌库顶抽2张牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '当使用【解封】来抵消其他【解封】的解锁效果时，也视为使用【伏笔】成功。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_译梦师.webp',
     isExpansion: false,
@@ -328,19 +303,15 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '调剂',
           description:
             '你的出牌阶段，你可以弃掉1张手牌，然后将弃牌堆1张【梦境穿梭剂】收为手牌。回合限2次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_chemist.skill_1',
           name: '注射',
           description: '你的出牌阶段，可以对同层梦境的玩家使用【梦境穿梭剂】。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【调剂】可以简单理解为把1张手牌当成1张【梦境穿梭剂】。当然，必须先确定弃牌堆中是否存在【梦境穿梭剂】。任何玩家可以随时检视弃牌堆中的牌。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_药剂师.webp',
     isExpansion: false,
@@ -359,20 +330,16 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '急智',
           description:
             '每当另一同层盗梦者对你使用行动牌时，你可以先从弃牌堆选取1张牌收入手牌。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_athena.skill_1',
           name: '惊叹',
           description:
             '你的出牌阶段，展示4张手牌与1张牌库顶牌，若5张牌皆不同名，则击杀一位同层玩家，获取该玩家所有手牌。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【急智】在每个不同玩家的回合都能使用一次，一轮下来可以多次使用。注意使用时机仅限同层的盗梦者，而且是在使用时候进行检定。【SHOOT·梦境穿梭剂】视为一张【SHOOT】的同名牌，同时也视为一张【梦境穿梭剂】的同名牌，因此检定【惊叹】技能时需注意。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_雅典娜.webp',
     isExpansion: false,
@@ -391,11 +358,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '牺牲',
           description:
             '你可以略过出牌阶段，掷1颗骰子，若结果为[3点][4点][5点][6点]，则增加或减少当层梦境2个心锁。此技能结束后立即死亡，并弃掉所有手牌。心锁数不能超过原有数量。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '效果如其名，通过牺牲来直接影响游戏胜负的根本——心锁进行影响的技能。行动牌【解封】只能取消【解封】的解锁效果，所以对【牺牲】没有影响。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_殉道者.webp',
     isExpansion: false,
@@ -414,11 +380,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '突袭',
           description:
             '你可以展示抽牌阶段所抽取的牌，若其中含有【梦境穿梭剂】则再从牌库顶抽2张牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '假如展示的牌中出现【梦境穿梭剂】，再抽取2张牌是直接加入手牌的，所以不能被展示。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_先锋.webp',
     isExpansion: false,
@@ -437,11 +401,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '毒针',
           description:
             '你使用SHOOT类牌时，可让目标玩家改为掷2颗骰子，骰子结果为两个骰子的差值，0视为[1点]结算。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '若玩家投两颗骰子，若投出两个6，相减为0，这时投骰结果视为1。不会因此触发处女的【完美】技能。技能务必在使用SHOOT类牌投骰前宣布是否发动效果，不能等到玩家投了一颗骰子后才决定。技能一回合只能发动一次，但可以选择不在第一张SHOOT类牌时使用。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_天蝎.webp',
     isExpansion: false,
@@ -460,11 +423,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '平衡',
           description:
             '你的出牌阶段，可将所有手牌给予一位玩家，由该玩家选择将其手牌分为两份，你查看后选择拿取其中一份收入手牌，其余归还该玩家。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【平衡】的效果是让对方将你的手牌与自己的手牌加起来，然后分两叠。一叠可以没有手牌，另一叠则为全部手牌。然后由你自己查看两叠牌具体有什么牌后，再决定获取其中的一叠，另一叠则还给分牌的玩家。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_天秤.webp',
     isExpansion: false,
@@ -483,19 +445,14 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '凝聚',
           description:
             '你本回合内每使用过2张同名牌，便可从弃牌堆选取1张本回合内未使用过的牌收入手牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_aquarius.skill_1',
           name: '倾注',
           description: '你使用【解封】进行解锁的次数不受限制。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '金星·镜界的世界观复制的效果不被【凝聚】算作使用的同名牌数量。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_水瓶.webp',
     isExpansion: false,
@@ -514,11 +471,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '命运',
           description:
             '你的弃牌阶段，若梦主处于比你数字更大的层数，你可以掷1颗骰子，结果为[4点][5点][6点]则减少当层梦境2个心锁。效果执行后将角色牌翻面。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '【命运】发动后，无论是否减少心锁，都需要翻面。',
     },
     back: {
       sideName: '双子·抉择',
@@ -528,9 +483,6 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '抉择',
           description:
             '你的出牌阶段，若梦主处于比你数字更小的层数，你可以掷2颗骰子，从牌库顶抽取掷骰结果总和的牌。效果执行后将角色牌翻面。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
     },
@@ -552,11 +504,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '游离',
           description:
             '当你成为SHOOT类牌目标时，你可以移动到数字更小的相邻层忽略该SHOOT类牌效果。效果执行后将角色牌翻面。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '当你在第一层梦境时，同样能启动【游离】进入迷失层。',
     },
     back: {
       sideName: '双鱼·洗礼',
@@ -566,11 +516,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '洗礼',
           description:
             '你的出牌阶段，你可以移动到数字更大的相邻层，并可以复活一位玩家。效果执行后将角色牌翻面。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '可以移动到相邻数字更大的层而并不复活玩家，但要复活玩家则必须移动到数字更大的相邻层。若在第四层梦境则无法启动【洗礼】。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_双鱼·游离.webp',
     backImagePath: 'thief/盗梦都市_角色牌_盗梦者_双鱼·洗礼.webp',
@@ -590,11 +539,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '王道',
           description:
             '你的抽牌阶段，从牌库顶额外抽取与梦主手牌数量相等的牌。若梦主没有手牌则从弃牌堆中额外选取1张收入手牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '无论是从牌库顶抽取还是从弃牌堆中选取，这都是在抽牌阶段抽牌后进行的额外抽牌步骤。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_狮子.webp',
     isExpansion: false,
@@ -612,20 +559,16 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_sagittarius.skill_0',
           name: '禁足',
           description: '当玩家因你的SHOOT类牌而需要移动时，你可令其不移动。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_sagittarius.skill_1',
           name: '穿心',
           description:
             '你每击杀一位玩家，可增加或减少任意一层的1个心锁。心锁数不能超过原有数量。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【禁足】技能可在玩家掷骰结果出来之后才做决定是否启动。【穿心】技能可以在任何一层梦境对心锁进行增减。一旦心锁数减少，本回合便不能使用【解封】或其他技能进行解锁。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_射手.webp',
     isExpansion: false,
@@ -644,11 +587,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '诡计',
           description:
             '你的出牌阶段，可以抽取另一位玩家的最多2张手牌，然后把抽取量相等的手牌还给该玩家。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【诡计】的效果可以只与另一位玩家交换1张手牌。可以将抽取另一位玩家的手牌还回该玩家，因为抽取的手牌也是欺诈师的手牌。【诡计】具有窃取秘密的能力，通过交换手牌来知悉其他玩家的身份与想法，并且做到意想不到的配合，或者限制对手。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_欺诈师.webp',
     isExpansion: false,
@@ -667,11 +609,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '节奏',
           description:
             '若你手牌数大于等于所在层数字，则你使用的SHOOT类牌不受层数限制且解锁的次数不受限制。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '若你手牌数为3，在第三层梦境，即使你之前已经成功解锁一次，也可以发动【节奏】继续打出【解封】进行解锁。若依旧成功，你的手牌数为2，便不能在第3层使用【解封】，不过如果此时因为其他原因去到数字更小的层，依旧可以打出【解封】进行解锁。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_摩羯.webp',
     isExpansion: false,
@@ -689,11 +630,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_extractor.skill_0',
           name: '萃取',
           description: '当你成功解锁后，可以从牌库顶抽取与当层梦境现有心锁数相等数量的牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【萃取】的效果会随着游戏时间的推移而愈来愈弱。当层梦境现有心锁数指的是解锁后的心锁数。例如解锁前心锁数是6，成功解锁后则是5，所以此时使用技能【萃取】可以从牌库顶抽5张牌。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_梦境猎手.webp',
     isExpansion: false,
@@ -712,9 +652,6 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '月蚀',
           description:
             '你的出牌阶段，可以弃掉2张【SHOOT】，击杀任意一位同层玩家。效果执行后将角色牌翻面。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
     },
@@ -726,11 +663,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '满月',
           description:
             '你的出牌阶段，可以弃掉2张非SHOOT类牌，将任意数量玩家复活至你所在层。效果执行后将角色牌翻面。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【满月】技能可以选择任意数量玩家复活，任意数量包括0。也就是说可以启动技能而不复活任何一位玩家，仅仅是为了将角色牌翻面。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_露娜·月蚀.webp',
     backImagePath: 'thief/盗梦都市_角色牌_盗梦者_露娜·满月.webp',
@@ -750,11 +686,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '拯救',
           description:
             '你的出牌阶段，可以弃掉1张手牌，使一位在迷失层的玩家复活至你的所在层，并把该玩家的所有手牌收为自己的手牌。回合限2次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '名副其实的梦境医师，由于玩家在复活后当回合不能使用【解封】，【拯救】这处代价超低的复活方式，绝对是梦主莫大的威胁。因为黄金定律里说明了技能大于世界观，所以【拯救】是不会被梦主【密道】的世界观所影响的。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_灵魂牧师.webp',
     isExpansion: false,
@@ -773,11 +708,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '雕琢',
           description:
             '当你使用SHOOT类牌时，掷骰后，可以用该玩家的手牌数量来作为最终掷骰结果，不能被其它效果所改变。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【雕琢】的效果使用后，掷骰结果无法再被改变。例如灵雕师对梦主【要塞】使用SHOOT类牌时，灵雕师使用【雕琢】，该梦主的世界观描述的令掷骰结果-1的效果将被忽视，掷骰结果数为该梦主的手牌数。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_灵雕师.webp',
     isExpansion: false,
@@ -795,19 +729,15 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_terrorist.skill_0',
           name: '追杀',
           description: '你使用的SHOOT类牌不受层数限制。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_terrorist.skill_1',
           name: '狂热',
           description: '当你使用SHOOT类牌时，除非目标玩家在掷骰前弃掉1张手牌，否则掷骰结果-1。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '假设恐怖分子处于第一层梦境，而目标玩家正在第四层梦境，恐怖分子依然可以对目标玩家使用SHOOT类牌。恐怖分子对目标玩家使用【狂热】，目标玩家必须在掷骰前弃掉1张手牌，否则掷骰结果-1。【狂热】会被其它效果所影响。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_恐怖分子.webp',
     isExpansion: false,
@@ -825,19 +755,15 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_cancer.skill_0',
           name: '气场',
           description: '你所在层的所有玩家，抽牌阶段抽牌数量+1。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_cancer.skill_1',
           name: '庇佑',
           description: '你所在层的所有玩家，无手牌上限。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【气场】为强制性效果，因此同层玩家必须额外抽取多一张牌。【庇佑】的效果在弃牌阶段检验，若弃牌阶段与巨蟹同层则不需要为超出5张手牌上限而弃牌。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_巨蟹.webp',
     isExpansion: false,
@@ -856,11 +782,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '号角',
           description:
             '你使用【SHOOT】时，目标玩家掷骰后，你可以掷1颗骰子。若掷骰结果大于对手的掷骰结果，该玩家被你击杀，否则执行原牌效果。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '当你使用SHOOT牌后，目标投骰后才决定是否启动【号角】效果。原版《盗梦都市》中的皇城世界观影响下，同样可启动【号角】效果。对方掷骰结果-3，你掷骰结果不需要减。即该世界观下，对方掷骰为6，你掷骰为4，对方同样会被你击杀。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_金牛.webp',
     isExpansion: false,
@@ -878,11 +803,10 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_hlnino.skill_0',
           name: '降临',
           description: '你的出牌阶段，当你移动到数字更大的梦境时，可以从牌库顶抽2张牌。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '【降临】只能在数字由小到大的梦境移动中才能使用。例如从第一层到第二层可以使用，而第二层到第一层却不能。当降世神通复活自己时，从迷失层移动到任意一层梦境，视为从0移动到更大数字的梦境，亦能触发【降临】的效果。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_降世神通.webp',
     isExpansion: false,
@@ -900,20 +824,16 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_black_hole.skill_0',
           name: '吞噬',
           description: '你的抽牌阶段，可以放弃抽牌，改为令所有当层的玩家各给你1张手牌。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
         {
           id: 'thief_black_hole.skill_1',
           name: '吸纳',
           description:
             '你的出牌阶段，可指定一个相邻层梦境，该梦境内所有玩家移动到你所在层。回合限1次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '启动技能【吞噬】放弃抽牌则不受任何抽牌数增加的效果影响，如巨蟹的【气场】及原版梦主盛夏都不会令黑洞额外增加抽牌数量。【吸纳】技能指定的梦境层数务必与你相邻。迷失层(0层)虽然与1层相邻，但游戏规则规定迷失层的玩家不会受到任何技能及行动牌影响。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_黑洞.webp',
     isExpansion: false,
@@ -931,11 +851,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           id: 'thief_haley.skill_0',
           name: '冲击',
           description: '当你成功解锁时，可视为对另一位玩家使用1张【SHOOT】，掷骰结果-2。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '该技能令投骰结果-2，所以不会触发处女的【完美】技能。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_哈雷.webp',
     isExpansion: false,
@@ -954,11 +872,9 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '撼动',
           description:
             '你的出牌阶段，可以令你所在层的其余玩家移动到所在层数-1或+1的梦境，不能因此进入迷失层。回合限2次',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '【撼动】技能一旦启动，所有当层其余玩家都必须到你指定的相邻一层梦境。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_盖亚.webp',
     isExpansion: false,
@@ -977,14 +893,12 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '淘汰',
           description:
             '你的出牌阶段，你可以将牌库顶2张牌收为手牌，然后将2张手牌按任意顺序放回牌库顶。每回合仅可使用一次。',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis: '扩展角色，规则书中未收录。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_达尔文.webp',
-    isExpansion: false,
+    isExpansion: true,
   },
   {
     category: 'thief_char',
@@ -1000,31 +914,17 @@ export const THIEF_CHARACTERS: readonly CharacterDefinition[] = [
           name: '完美',
           description:
             '当有玩家掷骰结果为[6点]，则你可选择以下其中一项效果执行：复活一位玩家、从牌库顶抽2张牌、移动到任意一层梦境',
-          trigger: 'onActionPhase',
-          usageScope: 'ownTurnOncePerTurn',
-          isActive: true,
         },
       ],
+      analysis:
+        '任何玩家掷骰结果为6时候【完美】技能都可以选择发动，包括因为行动牌、技能、世界观、梦魇牌等的影响。效果3选1执行。注意由于梦主的【M4卡宾枪】效果会令SHOOT类牌的投骰结果-1，所以梦主SHOOT盗梦者是不会触发该技能。',
     },
     imagePath: 'thief/盗梦都市_角色牌_盗梦者_处女.webp',
     isExpansion: false,
   },
-] as const;
+];
 
 export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
-  {
-    category: 'master_char',
-    id: 'dm_back',
-    name: '背面',
-    faction: 'master',
-    doubleSided: false,
-    front: {
-      sideName: '背面',
-      skills: [],
-    },
-    imagePath: 'dream-master/盗梦都市_角色牌_梦主_背面.webp',
-    isExpansion: false,
-  },
   {
     category: 'master_char',
     id: 'dm_harbor',
@@ -1033,7 +933,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '港口',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_harbor.skill_0',
+          name: '海啸',
+          description:
+            '当任一金库被打开，游戏没有结束时，所有盗梦者各掷一次骰子。若结果为[1点][2点][3点][4点][5点]则该盗梦者死亡。',
+        },
+      ],
+      worldView: {
+        id: 'dm_harbor.worldview',
+        name: '港口',
+        description: '当两个金库被打开时，仍未找到秘密，则游戏结束，梦主阵营获胜。',
+      },
+      analysis:
+        '因【海啸】效果而进入迷失层的盗梦者，不能视为被梦主击杀，因为此效果不是由梦主对目标玩家使用，所以直接跳过了击杀状态，没有凶手与被害者，不用给予手牌。同样，由于不是被梦主击杀，所以不能叠加【M4卡宾枪】的效果。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_港口.webp',
     isExpansion: false,
@@ -1046,7 +960,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '皇城',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_imperial_city.skill_0',
+          name: '重金',
+          description: '当你给予盗梦者贿赂牌时，你可以选取1张给予该盗梦者。',
+        },
+      ],
+      worldView: {
+        id: 'dm_imperial_city.worldview',
+        name: '皇城',
+        description:
+          '当玩家收到贿赂牌时，该玩家选择另一位未收到贿赂牌的盗梦者视为使用1张【SHOOT】，掷骰结果-3。',
+      },
+      analysis:
+        '无论是盗梦者打开着金币的金库，或是使用了【梦境窥视】，只要是梦主选择给予该盗梦者贿赂牌，都是由梦主查看所有未派出的贿赂牌后，再选出1张交给该盗梦者。该梦主的世界观所指的【SHOOT】是普通SHOOT。该梦主的世界观会被其它效果所影响。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_皇城.webp',
     isExpansion: false,
@@ -1059,7 +987,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '棋局',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_chess.skill_0',
+          name: '易位',
+          description:
+            '当金库要被打开时，你可以把该金库与任意一层梦境未翻开的金库交换。此技能仅可使用两次。',
+        },
+      ],
+      worldView: {
+        id: 'dm_chess.worldview',
+        name: '棋局',
+        description: '使用【梦境窥视】时，从牌库顶抽2张牌。',
+      },
+      analysis:
+        '例如第一层梦境的金库即将被打开时，第二层梦境的金库还未被打开，梦主便可以不打开第一层梦境的金库，并将二层梦境的金库与第一层的交换，然后打开的是原本第二层梦境的金库。【易位】在一局游戏中最多只能使用两次。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_棋局.webp',
     isExpansion: false,
@@ -1072,7 +1014,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '黑洞',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_black_hole.skill_0',
+          name: '倒流',
+          description:
+            '你的每回合抽牌阶段，在金库没被打开的每层梦境各恢复2个心锁。心锁数不能超过原有数量。',
+        },
+      ],
+      worldView: {
+        id: 'dm_black_hole.worldview',
+        name: '黑洞',
+        description: '盗梦者每回合可以成功解锁两次。',
+      },
+      analysis:
+        '每一层梦境，只要是未被打开的金库，在梦主回合抽牌阶段都会增加2个心锁。心锁数的原有数量，指的是游戏开始时心锁的配置数量。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_黑洞.webp',
     isExpansion: false,
@@ -1085,7 +1041,20 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '盛夏',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_midsummer.skill_0',
+          name: '充盈',
+          description: '你的抽牌阶段，你每拥有1张未派发的贿赂牌则多抽1张牌。',
+        },
+      ],
+      worldView: {
+        id: 'dm_midsummer.worldview',
+        name: '盛夏',
+        description: '所有盗梦者抽牌阶段的抽牌数量加1。',
+      },
+      analysis:
+        '如开始梦主拥有3张贿赂牌则抽牌阶段抽5张牌，若派发出1张给予盗梦者则减少一张，即在抽牌阶段抽4张牌。所有盗梦者，在不使用技能的情况下，同于世界观的影响，他们在抽牌阶段都能抽3张牌。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_盛夏.webp',
     isExpansion: false,
@@ -1098,7 +1067,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '要塞',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_fortress.skill_0',
+          name: '冷酷',
+          description:
+            '你的出牌阶段，当你移动到另一层梦境时，可以视为对任一盗梦者使用1张【SHOOT】。',
+        },
+      ],
+      worldView: {
+        id: 'dm_fortress.worldview',
+        name: '要塞',
+        description: '梦主的掷骰结果-1。',
+      },
+      analysis:
+        '在梦主的回合，若梦主从第一层移动到第二层梦境时，就相当于梦主可以"免费"使用1张普通【SHOOT】，梦主不用打出任何卡牌，然后随便指定存在于任一层梦境的另一位玩家，该玩家则掷骰子进行【SHOOT】牌判定。该梦主的世界观会被其它效果所影响。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_要塞.webp',
     isExpansion: false,
@@ -1111,7 +1094,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '土星·领地',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_saturn_territory.skill_0',
+          name: '律令',
+          description: '你可以弃掉1张手牌抵消1张同名牌的效果，并从牌库顶抽1张牌。',
+        },
+      ],
+      worldView: {
+        id: 'dm_saturn_territory.worldview',
+        name: '领地',
+        description:
+          '拥有贿赂牌的盗梦者，自己的回合出牌阶段，可不用行动牌移动到相邻的另一层梦境一次。',
+      },
+      analysis:
+        '【律令】是先抵消了同名牌效果，然后再抽牌。【死亡宣言】可以被抵消然后该梦主抽1张牌，但对方使用的【死亡宣言】不会因此而弃掉。世界观的效果即为梦主优势之一，每个自己回合出牌阶段免费移动一次。可以穿插在出牌阶段。即可以出牌后再移动，然后再出牌。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_土星·领地.webp',
     isExpansion: false,
@@ -1124,7 +1121,22 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '天王星·苍穹',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_uranus_firmament.skill_0',
+          name: '权力',
+          description:
+            '你的出牌阶段，每拥有1张未派发的贿赂牌，则可令一位盗梦者移动到除迷失层外你指定的另一梦境层数。',
+        },
+      ],
+      worldView: {
+        id: 'dm_uranus_firmament.worldview',
+        name: '苍穹',
+        description:
+          '每位盗梦者因行动牌效果改变梦境层数时，从牌库顶弃掉1张牌。若梦主的贿赂牌派发完毕，则改为弃掉2张。',
+      },
+      analysis:
+        '【权力】技能务必让盗梦者移动到另外的梦境层数，不可停留不动。可以重复移动同一个人。因为世界观的缘故，盗梦者面前的梦境层数牌一旦变更一次就需要从牌库顶弃牌。复活离开迷失层不属于行动牌效果，不需要弃牌。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_天王星·苍穹.webp',
     isExpansion: false,
@@ -1137,7 +1149,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '水星·航路',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_mercury_route.skill_0',
+          name: '逆流',
+          description:
+            '另一拥有贿赂的盗梦者使用牌时，若你与他同层，则你先将该牌收入手牌，然后结算该牌效果。此技能不能获取【时间风暴】。回合限2次',
+        },
+      ],
+      worldView: {
+        id: 'dm_mercury_route.worldview',
+        name: '航路',
+        description: '当梦主角色牌翻开时，额外增加1张失败的贿赂牌。',
+      },
+      analysis:
+        '一位拥有贿赂牌的同层盗梦者对梦主使用SHOOT类牌后，无论此后梦主是否死亡，梦主都立即获得该牌，之后继续执行该牌上面的效果。由于【逆流】指定的是"另一拥有贿赂牌的盗梦者"，所以阿波罗的【日冕】自己出牌是无法获得自己出的牌的。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_水星·航路.webp',
     isExpansion: false,
@@ -1150,7 +1176,20 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '木星·巅峰',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_jupiter_peak.skill_0',
+          name: '雷霆',
+          description: '当你使用SHOOT类牌时，目标玩家的掷骰结果小于你所在层数字则直接被你击杀。',
+        },
+      ],
+      worldView: {
+        id: 'dm_jupiter_peak.worldview',
+        name: '巅峰',
+        description: 'SHOOT类牌可以对相邻层数的玩家使用。',
+      },
+      analysis:
+        '若梦主在4层，打出一张【SHOOT】攻击第3层玩家，再叠加梦主的【M4卡宾枪】投骰结果-1效果，该玩家若投骰出[1点][2点][3点][4点]都会被击杀。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_木星·巅峰.webp',
     isExpansion: false,
@@ -1163,7 +1202,21 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '冥王星·地狱',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_pluto_hell.skill_0',
+          name: '业火',
+          description: '你的回合，可以弃掉1张手牌令所有不足2张手牌的盗梦者从牌库顶抽取2张牌。',
+        },
+      ],
+      worldView: {
+        id: 'dm_pluto_hell.worldview',
+        name: '地狱',
+        description:
+          '盗梦者抽牌阶段抽牌数改为掷1颗骰子的掷骰结果。若抽牌阶段手牌数大于等于6，该盗梦者回合结束时，进入迷失层。',
+      },
+      analysis:
+        '【业火】的技能可以在自己的回合任意时间执行。世界观只会在抽牌阶段检视手牌是否大于等于6，此后的牌大于6张世界观没有效果。如果不产生任何效果的技能，将不能无故启动。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_冥王星·地狱.webp',
     isExpansion: false,
@@ -1176,7 +1229,20 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '密道',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_secret_passage.skill_0',
+          name: '传送',
+          description: '你的【梦境穿梭剂】可以将任一盗梦者移动至迷失层。回合限2次。',
+        },
+      ],
+      worldView: {
+        id: 'dm_secret_passage.worldview',
+        name: '密道',
+        description: '只能通过弃掉1张【梦境穿梭剂】才能复活。梦主优势不受影响。',
+      },
+      analysis:
+        '无论目标盗梦者在哪一层梦境，梦主只需要1张【梦境穿梭剂】便能将其移动至迷失层。被【梦境穿梭剂】送往迷失层的盗梦者，不需要给予手牌，因为他们直接跳过了击杀状态。该梦主的世界观改变了原有的复活规则，不能通过弃掉2张手牌来进行复活，而是变为必须通过弃掉1张【梦境穿梭剂】来复活自己或他人。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_密道.webp',
     isExpansion: false,
@@ -1189,7 +1255,20 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '火星·战场',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_mars_battlefield.skill_0',
+          name: '杀戮',
+          description: '你的出牌阶段，可以弃掉1张【解封】发动一张梦魇牌效果。',
+        },
+      ],
+      worldView: {
+        id: 'dm_mars_battlefield.worldview',
+        name: '战场',
+        description: '玩家可在自己回合出牌阶段丢弃2张非SHOOT类牌，换取弃牌堆内任意1张SHOOT类牌。',
+      },
+      analysis:
+        '梦魇牌一旦发动完毕，梦主可以立即补充一张未设置的梦境牌到当层梦境。【SHOOT·梦境穿梭剂】同时视为【SHOOT】及【梦境穿梭剂】，所以只能视为SHOOT类牌。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_火星·战场.webp',
     isExpansion: false,
@@ -1202,7 +1281,20 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '海王星·泓洋',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_neptune_ocean.skill_0',
+          name: '风暴',
+          description: '每当心锁数减少时或【时间风暴】效果结算后，从牌库顶弃掉5张牌。',
+        },
+      ],
+      worldView: {
+        id: 'dm_neptune_ocean.worldview',
+        name: '泓洋',
+        description: '当放着金币的金库被打开时，则游戏结束，梦主阵营获胜。',
+      },
+      analysis:
+        '心锁减少一次则从牌库顶弃掉5张牌。如双子的技能【命运】减少2个心锁也只视为一次，只从牌库顶弃掉5张牌。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_海王星·泓洋.webp',
     isExpansion: false,
@@ -1215,29 +1307,29 @@ export const MASTER_CHARACTERS: readonly CharacterDefinition[] = [
     doubleSided: false,
     front: {
       sideName: '金星·镜界',
-      skills: [],
+      skills: [
+        {
+          id: 'dm_venus_mirror.skill_0',
+          name: '重影',
+          description:
+            '你的回合出牌前，可展示牌库顶等于非死亡盗梦者数的牌，然后展示任意手牌并将所有展示的同名牌收入手牌，其余混洗放回牌顶。回合限1次',
+        },
+      ],
+      worldView: {
+        id: 'dm_venus_mirror.worldview',
+        name: '镜界',
+        description:
+          '玩家可以弃掉2张牌，重复执行本回合内之前任意1张牌的非抽牌及弃牌效果，每回合仅可一次。',
+      },
+      analysis:
+        '世界观弃掉2张牌能复制的一定是玩家自己回合内之前用过的牌。不能重复执行抽牌或弃牌效果。重复执行不等于使用一张同名牌，因此水瓶的【凝聚】技能是无法因此计算为使用两张同名牌的。',
     },
     imagePath: 'dream-master/盗梦都市_角色牌_梦主_金星·镜界.webp',
     isExpansion: false,
   },
-] as const;
+];
 
 export const ACTION_CARDS: readonly ActionCardDefinition[] = [
-  {
-    category: 'action',
-    id: 'action_back',
-    name: '背面',
-    subType: 'shoot_basic',
-    quantity: 1,
-    isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
-    imagePath: 'action/盗梦都市_行动牌_背面.webp',
-  },
   {
     category: 'action',
     id: 'action_shoot',
@@ -1245,315 +1337,298 @@ export const ACTION_CARDS: readonly ActionCardDefinition[] = [
     subType: 'shoot_basic',
     quantity: 28,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '令同层的另一位玩家掷1颗骰子，掷骰结果对应以下效果：[2点][3点][4点]：令该玩家移动到相邻的另一层梦境。[1点]：该玩家死亡。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外，与你同层梦境的另一位玩家。',
+    analysis:
+      '令目标玩家移动时，由你来选择移动方向，目标玩家必须移动。【SHOOT】除了有一定几率让目标玩家死亡，大多数情况下是通过火力压制将对方驱逐到另一层梦境。也可以对同伴使用，令同伴在危险关头激发本能以达到帮助同伴移动的目的。移动到相邻的另一层梦境的效果不会让玩家进入迷失层。',
     imagePath: 'action/盗梦都市_行动牌_SHOOT.webp',
   },
   {
     category: 'action',
     id: 'action_kick',
     name: 'KICK',
-    subType: 'shoot_basic',
+    subType: 'kick',
     quantity: 5,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '你与另一位玩家交换梦境层数。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外的另一位玩家。',
+    analysis: '你可以对同层梦境的另一玩家使用，纯粹为了消耗掉这张牌。',
     imagePath: 'action/盗梦都市_行动牌_KICK.webp',
   },
   {
     category: 'action',
     id: 'action_unlock',
     name: '解封',
-    subType: 'shoot_basic',
+    subType: 'unlock',
     quantity: 25,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '选择以下一个效果：效果①：仅盗梦者使用，对当层梦境进行一次解锁。复活后不能在当回合使用此效果。效果②：抵消1张【解封】的效果①。',
+    useTiming: '你的出牌阶段/任意玩家使用【解封】的效果①时',
+    useTarget: '你同层的心锁/另一张用于解锁的【解封】。',
+    analysis:
+      '梦主不能使用【解封】效果①。任何玩家在有人使用【解封】效果①时，都可以使用【解封】效果②。【解封】效果②是不能被抵消的。',
     imagePath: 'action/盗梦都市_行动牌_解封.webp',
   },
   {
     category: 'action',
     id: 'action_graft',
     name: '嫁接',
-    subType: 'shoot_basic',
+    subType: 'graft',
     quantity: 3,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '抽取3张牌，之后从手牌中选取2张放回牌库顶。',
+    useTiming: '你的出牌阶段',
+    useTarget: '你。',
+    analysis:
+      '注意，抽取3张牌加入手牌后，是从手牌中所有牌中选择其中2张按照你选择的顺序放回牌库顶部。',
     imagePath: 'action/盗梦都市_行动牌_嫁接.webp',
   },
   {
     category: 'action',
     id: 'action_dream_transit',
     name: '梦境穿梭剂',
-    subType: 'shoot_basic',
+    subType: 'dream_serum',
     quantity: 20,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '你移动到相邻的另一层梦境。',
+    useTiming: '你的出牌阶段',
+    useTarget: '你。',
+    analysis:
+      '第1层梦境与第4层梦境是不相连的。所以当你处于第1层梦境时，你无法移动到第4层梦境，反之亦然。移动到相邻的另一层梦境的效果不会让玩家进入迷失层。',
     imagePath: 'action/盗梦都市_行动牌_梦境穿梭剂.webp',
   },
   {
     category: 'action',
     id: 'action_resonance',
     name: '共鸣',
-    subType: 'shoot_basic',
+    subType: 'resonance',
     quantity: 3,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '获取一位玩家的所有手牌，弃牌阶段前将你的所有手牌给予该玩家。每回合仅可以使用1张。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外的另一位玩家。',
+    analysis:
+      '若你获取手牌的玩家在你的弃牌阶段前已经进入迷失层，则你可以保留所有手牌而不必将其归还该玩家。',
     imagePath: 'action/盗梦都市_行动牌_共鸣.webp',
   },
   {
     category: 'action',
     id: 'action_time_storm',
     name: '时间风暴',
-    subType: 'shoot_basic',
+    subType: 'time_storm',
     quantity: 6,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '从牌库顶弃掉10张牌。从手中使用或弃掉，同样触发效果，效果触发后将该牌移出游戏。',
+    useTiming: '你的出牌阶段',
+    useTarget: '牌库。',
+    analysis:
+      '从手中弃掉该牌，例如用于复活另一位玩家，其效果同样会发动。效果一旦结算直接移出游戏，不会进入弃牌堆。如果因为一张【时间风暴】或者其它原因从牌库顶直接弃掉的【时间风暴】是不会触发效果。但未发动效果的【时间风暴】会保留在弃牌堆。',
     imagePath: 'action/盗梦都市_行动牌_时间风暴.webp',
   },
   {
     category: 'action',
     id: 'action_creation',
     name: '凭空造物',
-    subType: 'shoot_basic',
+    subType: 'fabrication',
     quantity: 3,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '你从牌库顶抽2张牌。',
+    useTiming: '你的出牌阶段',
+    useTarget: '你。',
+    analysis: '在你赚多1张手牌的同时，也在消耗牌库，加快游戏结束的到来。',
     imagePath: 'action/盗梦都市_行动牌_凭空造物.webp',
   },
   {
     category: 'action',
     id: 'action_telekinesis',
     name: '念力牵引',
-    subType: 'shoot_basic',
+    subType: 'pull',
     quantity: 5,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '将另一位玩家移动到你的所在层。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外，任意一名玩家。',
+    analysis:
+      '无论你是哪方阵营，当你知道放置秘密的金库的所在时，能够将离你最远的同伴拉近距离，最有效地集中力量解锁或者脱离失败的危险。由于死亡的玩家是不会受到卡牌效果的影响的，所以不能被【念力牵引】所移动。',
     imagePath: 'action/盗梦都市_行动牌_念力牵引.webp',
   },
   {
     category: 'action',
     id: 'action_nightmare_unlock',
     name: '梦魇解封',
-    subType: 'shoot_basic',
+    subType: 'nightmare_unlock',
     quantity: 2,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '翻开1张梦魇牌，选择发动或弃掉该牌。',
+    useTiming: '你的出牌阶段',
+    useTarget: '任意一层梦境的梦魇牌。',
+    analysis:
+      '一旦使用，该梦魇牌只能选择发动或弃掉，不能选择保留。梦魇牌被弃掉或者效果结算后，如果还有未设置的梦魇牌，梦主可以立即补充一张至当层梦境。',
     imagePath: 'action/盗梦都市_行动牌_梦魇解封.webp',
   },
   {
     category: 'action',
     id: 'action_shift',
     name: 'EX：移形换影',
-    subType: 'shoot_basic',
+    subType: 'shapeshift',
     quantity: 5,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description: '你的任意阶段，与另一位盗梦者交换角色牌，直到回合结束。',
+    useTiming: '你的任意阶段',
+    useTarget: '除你以外，任意一名玩家。',
+    analysis:
+      '该牌为EX卡，不建议在初次游戏中加入该牌。梦主可以对盗梦者使用该牌，但盗梦者不能对梦主使用【移形换影】。一回合内可以使用多次，但当回合结束时，必须把场上的角色牌还原到本回合开始前的位置。',
     imagePath: 'action/盗梦都市_行动牌_EX：移形换影.webp',
   },
   {
     category: 'action',
     id: 'action_dream_peek',
     name: '梦境窥视',
-    subType: 'shoot_basic',
+    subType: 'dream_peek',
     quantity: 11,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '选择以下一个效果：效果①：仅盗梦者使用，梦主可以先给予你1张贿赂牌。你查看任意一层梦境的金库，且不得公布查看结果。效果②：仅梦主使用，查看一名盗梦者的所有贿赂牌。',
+    useTiming: '你的出牌阶段',
+    useTarget: '任意一层梦境的金库/一名已被贿赂的盗梦者。',
+    analysis:
+      '当盗梦者使用【梦境窥视】的效果①时，梦主先决定是否让该盗梦者抽取1张贿赂牌，然后该盗梦者再查看任意一层梦境的金库。当梦主的贿赂牌已经派完时，使用【梦境窥视】是不会收到贿赂牌的。',
     imagePath: 'action/盗梦都市_行动牌_梦境窥视.webp',
   },
   {
     category: 'action',
     id: 'action_gravity',
     name: '万有引力',
-    subType: 'shoot_basic',
+    subType: 'gravity',
     quantity: 2,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '你指定除了你以外最多两位玩家将所有手牌翻开放至桌面。从你开始，你与被指定的玩家轮流选取1张收入手牌，重复此步骤直到分配完毕。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外的另一位或另两位玩家。',
+    analysis:
+      '你指定的玩家可以没有手牌，而纯粹参与手牌的分成。注意，是从你开始按照游戏进行顺序轮流选择桌面的牌加入手牌。',
     imagePath: 'action/盗梦都市_行动牌_万有引力.webp',
   },
   {
     category: 'action',
     id: 'action_shoot_burst',
     name: 'SHOOT·炸裂弹头',
-    subType: 'shoot_basic',
+    subType: 'shoot_special',
     quantity: 3,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '令同层的另一位玩家掷1颗骰子，掷骰结果对应以下效果：[3点][4点][5点]：令该玩家展示手牌，弃掉所有SHOOT类牌，并移动到相邻的另一层梦境。[1点][2点]：该玩家死亡。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外，与你同层梦境的另一位玩家。',
+    analysis:
+      '相比【SHOOT·爆甲螺旋】显得效果较差，但往往能让目标玩家瞬间失去战斗力，有一半的几率弃掉目标玩家所有普通和特殊的SHOOT，以此在短时间内获得优势。移动到相邻的另一层梦境的效果不会让玩家进入迷失层。',
     imagePath: 'action/盗梦都市_行动牌_SHOOT·炸裂弹头.webp',
   },
   {
     category: 'action',
     id: 'action_shoot_dream_transit',
     name: 'SHOOT·梦境穿梭剂',
-    subType: 'shoot_basic',
+    subType: 'shoot_hybrid',
     quantity: 10,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '该牌同时视为【SHOOT】及【梦境穿梭剂】。使用时，选择【SHOOT】或【梦境穿梭剂】效果结算。',
+    useTiming: '你的出牌阶段',
+    useTarget: '视选择效果而定。',
+    analysis:
+      '【SHOOT·梦境穿梭剂】视为一张【SHOOT】的同名牌，同时也视为一张【梦境穿梭剂】的同名牌。因此也只能视为SHOOT类牌。在使用的时候，使用者选择其中一种效果使用。',
     imagePath: 'action/盗梦都市_行动牌_SHOOT·梦境穿梭剂.webp',
   },
   {
     category: 'action',
     id: 'action_shoot_assassin',
     name: 'SHOOT·刺客之王',
-    subType: 'shoot_basic',
+    subType: 'shoot_special',
     quantity: 3,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '令任意一层梦境的另一位玩家掷1颗骰子，掷骰结果对应以下效果：[3点][4点][5点]：令该玩家移动到相邻的另一层梦境。[1点][2点]：该玩家死亡。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外，任意一层梦境的另一位玩家。',
+    analysis:
+      '在你与其他玩家处于不同梦境的时候，它能发挥最大功效，特别是当目标玩家就在你的相邻梦境，而你手上还有其他特殊SHOOT时，即使掷骰结果不是2或1，你仍有一半机会把目标拉近身边，然后再施加火力压制。移动到相邻的另一层梦境的效果不会让玩家进入迷失层。',
     imagePath: 'action/盗梦都市_行动牌_SHOOT·刺客之王.webp',
   },
   {
     category: 'action',
     id: 'action_shoot_drill',
     name: 'SHOOT·爆甲螺旋',
-    subType: 'shoot_basic',
+    subType: 'shoot_special',
     quantity: 3,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '令同层的另一位玩家掷1颗骰子，掷骰结果对应以下效果：[3点][4点][5点]：令该玩家展示手牌，弃掉所有【解封】，并移动到相邻的另一层梦境。[1点][2点]：该玩家死亡。',
+    useTiming: '你的出牌阶段',
+    useTarget: '除你以外，与你同层梦境的另一位玩家。',
+    analysis:
+      '【解封】是《盗梦都市》里最为关键的卡牌，而【SHOOT·爆甲螺旋】正是【解封】的克星，面对它，你的目标宁可希望自己死亡，也不想让自己手上的【解封】就此离去。移动到相邻的另一层梦境的效果不会让玩家进入迷失层。',
     imagePath: 'action/盗梦都市_行动牌_SHOOT·爆甲螺旋.webp',
   },
   {
     category: 'action',
     id: 'action_death_decree_3',
     name: '死亡宣言·3',
-    subType: 'shoot_basic',
+    subType: 'death_declaration',
     quantity: 1,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '你使用SHOOT类牌时，对方掷骰前你可从手中展示该牌，若掷骰结果为[3点]则对方死亡。不得同时展示1张以上【死亡宣言】。',
+    useTiming: '你的出牌阶段',
+    useTarget: '同SHOOT类牌目标。',
+    analysis: '死亡宣言以展示的方式使用，效果结算完毕后收回手牌而不是弃掉。',
     imagePath: 'action/盗梦都市_行动牌_死亡宣言·3.webp',
   },
   {
     category: 'action',
     id: 'action_death_decree_4',
     name: '死亡宣言·4',
-    subType: 'shoot_basic',
+    subType: 'death_declaration',
     quantity: 1,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '你使用SHOOT类牌时，对方掷骰前你可从手中展示该牌，若掷骰结果为[4点]则对方死亡。不得同时展示1张以上【死亡宣言】。',
+    useTiming: '你的出牌阶段',
+    useTarget: '同SHOOT类牌目标。',
+    analysis: '死亡宣言以展示的方式使用，效果结算完毕后收回手牌而不是弃掉。',
     imagePath: 'action/盗梦都市_行动牌_死亡宣言·4.webp',
   },
   {
     category: 'action',
     id: 'action_death_decree_5',
     name: '死亡宣言·5',
-    subType: 'shoot_basic',
+    subType: 'death_declaration',
     quantity: 1,
     isExpansion: false,
-    isRemovedAfterUse: false,
-    timing: ['actionPhase'],
-    targetSpec: {
-      kind: 'otherPlayer',
-    },
-    effects: [],
+    description:
+      '你使用SHOOT类牌时，对方掷骰前你可从手中展示该牌，若掷骰结果为[5点]则对方死亡。不得同时展示1张以上【死亡宣言】。',
+    useTiming: '你的出牌阶段',
+    useTarget: '同SHOOT类牌目标。',
+    analysis: '死亡宣言以展示的方式使用，效果结算完毕后收回手牌而不是弃掉。',
     imagePath: 'action/盗梦都市_行动牌_死亡宣言·5.webp',
   },
-] as const;
+];
 
 export const NIGHTMARE_CARDS: readonly NightmareCardDefinition[] = [
-  {
-    category: 'nightmare',
-    id: 'nightmare_back',
-    name: '背面',
-    description: '',
-    imagePath: 'nightmare/盗梦都市_梦魇牌_背面.webp',
-  },
   {
     category: 'nightmare',
     id: 'nightmare_space_fall',
     name: '深空坠落',
     description:
       '梦魇牌所在层所有盗梦者各掷一次骰子，若掷骰结果为[5点][6点]或当前梦境层数则进入迷失层，否则移动至对应数字的梦境层数。',
+    quantity: 1,
+    analysis:
+      '例如如果梦魇牌所处在第三层梦境，则所有盗梦者掷骰结果为[3点][5点][6点]都需要进入迷失层。[1点][2点][4点]则去到对应的层数。该效果不会视为被梦主击杀。',
     imagePath: 'nightmare/盗梦都市_梦魇牌_深空坠落.webp',
   },
   {
@@ -1561,6 +1636,8 @@ export const NIGHTMARE_CARDS: readonly NightmareCardDefinition[] = [
     id: 'nightmare_despair_storm',
     name: '绝望风暴',
     description: '从牌库顶弃掉10张牌，如果此时每有一个其它金库已被打开，则再多弃掉5张牌。',
+    quantity: 1,
+    analysis: '如果梦魇牌翻开时候，仅有对应的梦境金库被打开，则从牌库顶弃掉10张牌。',
     imagePath: 'nightmare/盗梦都市_梦魇牌_绝望风暴.webp',
   },
   {
@@ -1568,6 +1645,8 @@ export const NIGHTMARE_CARDS: readonly NightmareCardDefinition[] = [
     id: 'nightmare_hunger_bite',
     name: '饥饿撕咬',
     description: '梦魇牌所在层所有玩家必须弃掉3张手牌，若手牌不足3张，则改为该玩家进入迷失层。',
+    quantity: 1,
+    analysis: '若玩家只有2张手牌，则保留自己的手牌，直接进入迷失层。注意，玩家包含梦主。',
     imagePath: 'nightmare/盗梦都市_梦魇牌_饥饿撕咬.webp',
   },
   {
@@ -1575,6 +1654,9 @@ export const NIGHTMARE_CARDS: readonly NightmareCardDefinition[] = [
     id: 'nightmare_echo',
     name: '回音萦绕',
     description: '梦主选择一层梦境，恢复该层所有原有心锁或在该层增加1个心锁。',
+    quantity: 1,
+    analysis:
+      '若在4人局，现在心锁数是4、1、2、1。梦魇牌发动时，梦主可以选择让第二层梦境心锁数回复到3，也可以让第一层梦境心锁数增加1达到5，超过原有游戏开始时的设置数。',
     imagePath: 'nightmare/盗梦都市_梦魇牌_回音萦绕.webp',
   },
   {
@@ -1583,6 +1665,9 @@ export const NIGHTMARE_CARDS: readonly NightmareCardDefinition[] = [
     name: '邪念瘟疫',
     description:
       '梦主可以派发任意数量的贿赂牌给予梦魇牌所在层盗梦者，没有贿赂牌的该层盗梦者进入迷失层。',
+    quantity: 1,
+    analysis:
+      '即使梦主已经没有贿赂牌，也可令该梦魇牌所在层没有贿赂牌的盗梦者进入迷失层。该效果不会视为被梦主击杀。',
     imagePath: 'nightmare/盗梦都市_梦魇牌_邪念瘟疫.webp',
   },
   {
@@ -1590,9 +1675,11 @@ export const NIGHTMARE_CARDS: readonly NightmareCardDefinition[] = [
     id: 'nightmare_vortex',
     name: '致命漩涡',
     description: '梦魇牌所在层的玩家进入迷失层，所有其余玩家移动到当层梦境，并弃掉所有手牌。',
+    quantity: 1,
+    analysis: '当层梦境的玩家不必弃掉手牌，直接进入迷失层。不在该层的玩家移动到该层弃掉所有手牌。',
     imagePath: 'nightmare/盗梦都市_梦魇牌_致命漩涡.webp',
   },
-] as const;
+];
 
 export const DREAM_CARDS: readonly DreamCardDefinition[] = [
   {
@@ -1644,21 +1731,15 @@ export const DREAM_CARDS: readonly DreamCardDefinition[] = [
     description: '梦主位置标记',
     imagePath: 'dream/盗梦都市_梦境牌_梦主.webp',
   },
-] as const;
+];
 
 export const VAULT_CARDS: readonly VaultCardDefinition[] = [
-  {
-    category: 'vault',
-    id: 'vault_back',
-    name: '背面',
-    description: '',
-    imagePath: 'vault/盗梦都市_金库牌_背面.webp',
-  },
   {
     category: 'vault',
     id: 'vault_gold',
     name: '金币',
     description: '金库中放置金币。打开时梦主可以让该盗梦者抽取1张贿赂牌。',
+    quantity: 3,
     imagePath: 'vault/盗梦都市_金库牌_金币.webp',
   },
   {
@@ -1666,23 +1747,26 @@ export const VAULT_CARDS: readonly VaultCardDefinition[] = [
     id: 'vault_secret',
     name: '秘密',
     description: '金库中放置秘密。打开时游戏结束，盗梦者阵营获胜。',
+    quantity: 1,
     imagePath: 'vault/盗梦都市_金库牌_秘密.webp',
   },
-] as const;
+];
 
 export const BRIBE_CARDS: readonly BribeCardDefinition[] = [
-  {
-    category: 'bribe',
-    id: 'bribe_back',
-    name: '背面',
-    description: '',
-    imagePath: 'bribe/盗梦都市_贿赂牌_背面.webp',
-  },
   {
     category: 'bribe',
     id: 'bribe_success',
     name: '成功(DEAL)',
     description: '贿赂成功，该盗梦者成为背叛者，叛变为梦主阵营。',
+    quantityByPlayerCount: {
+      '4': 1,
+      '5': 1,
+      '6': 1,
+      '7': 2,
+      '8': 2,
+      '9': 2,
+      '10': 3,
+    },
     imagePath: 'bribe/盗梦都市_贿赂牌_成功.webp',
   },
   {
@@ -1690,9 +1774,66 @@ export const BRIBE_CARDS: readonly BribeCardDefinition[] = [
     id: 'bribe_fail',
     name: '失败',
     description: '贿赂失败，无任何效果。',
+    quantityByPlayerCount: {
+      '4': 1,
+      '5': 2,
+      '6': 2,
+      '7': 1,
+      '8': 1,
+      '9': 1,
+      '10': 2,
+    },
     imagePath: 'bribe/盗梦都市_贿赂牌_失败.webp',
   },
-] as const;
+];
 
-// 合计 95 张卡牌定义
-export const ALL_CARD_COUNT = 95 as const;
+export const OTHER_CARDS: readonly OtherCardDefinition[] = [
+  {
+    category: 'other',
+    id: 'other_master_advantage',
+    name: '梦主优势',
+    description:
+      '游戏中始终拥有【M4卡宾枪】，将它置于你的面前。你的出牌阶段可以移动到相邻的另一层梦境，每回合仅可使用一次。你的回合，如果你处于迷失层，则立刻在被击杀的所在层复活。当盗梦者打开放有金币的金库，你可以让该盗梦者抽取1张贿赂牌。',
+    imagePath: 'other/盗梦都市_梦主优势.webp',
+  },
+  {
+    category: 'other',
+    id: 'other_m4_carbine',
+    name: 'M4卡宾枪',
+    description: '当你使用SHOOT类牌时，目标玩家的掷骰结果-1。',
+    imagePath: 'other/盗梦都市_M4卡宾枪.webp',
+  },
+  {
+    category: 'other',
+    id: 'other_ten_commandments',
+    name: '盗梦十诫',
+    description:
+      '1、轮到自己时，从牌库顶抽2张牌。2、盗梦者每回合只能成功解锁一次。3、心锁为0时打开同层梦境的金库。4、玩家死亡时，被害者选出2张手牌给予凶手，不足2张则全部给予。5、死亡的玩家不能发动技能及使用行动牌，同时也不能受到其他人技能、行动牌及梦魇牌的影响，且不能复活他人。6、梦主的世界观在任何情况下都有效。7、弃掉2张手牌可以复活自己或他人。8、复活自己，自己移动到第一层梦境。9、复活他人，被复活的玩家移动到自己的所在层。在迷失层不能复活他人。10、手牌上限为5张。',
+    imagePath: 'other/盗梦都市_盗梦十诫.webp',
+  },
+  {
+    category: 'other',
+    id: 'other_config_table',
+    name: '配置表',
+    description:
+      '心锁数量配置：Lv1: 4人→4, 5人→5, 6人→5, 7人→5, 8人→6, 9人→6, 10人→6; Lv2: 4人→3, 5人→4, 6人→4, 7人→4, 8人→5, 9人→5, 10人→5; Lv3: 4人→2, 5人→3, 6人→3, 7人→3, 8人→4, 9人→4, 10人→4; Lv4: 4人→1, 5人→2, 6人→2, 7人→2, 8人→3, 9人→3, 10人→3。贿赂牌数：成功: 4人→1, 5人→1, 6人→1, 7人→2, 8人→2, 9人→2, 10人→3; 失败: 4人→1, 5人→2, 6人→2, 7人→1, 8人→1, 9人→1, 10人→2。',
+    imagePath: 'other/盗梦都市_配置表.webp',
+  },
+];
+
+// 各类牌的通用背面图（路径相对卡图根目录）。背面不是卡牌，不在上面任何一张牌表里
+export const CARD_BACK_IMAGES: CardBackImages = {
+  thief: 'thief/盗梦都市_角色牌_盗梦者_背面.webp',
+  master: 'dream-master/盗梦都市_角色牌_梦主_背面.webp',
+  action: 'action/盗梦都市_行动牌_背面.webp',
+  bribe: 'bribe/盗梦都市_贿赂牌_背面.webp',
+  vault: 'vault/盗梦都市_金库牌_背面.webp',
+  nightmare: 'nightmare/盗梦都市_梦魇牌_背面.webp',
+};
+
+// 牌种定义的条数：上面八张牌表的条目总数，不含背面
+export const CARD_DEFINITION_COUNT = 94;
+
+// 数据明确给出张数的实体牌张数：角色牌（每种 1 张）、行动牌、梦魇牌、金库牌。
+// 不含梦境牌与其他牌（数据没给张数）和贿赂牌（张数随人数变化，见 quantityByPlayerCount）
+export const CARD_COPY_COUNT = 203;

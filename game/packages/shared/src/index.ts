@@ -8,8 +8,6 @@ export type {
   BotLevel,
   TurnPhase,
   GamePhase,
-  SkillUsageScope,
-  TriggerTiming,
   CardCategory,
   CardID,
   ActionSubType,
@@ -18,17 +16,17 @@ export type {
 
 // 卡牌类型
 export type {
-  TargetSpec,
-  EffectDescriptor,
   ActionCardDefinition,
   SkillDefinition,
-  SkillCost,
+  WorldViewDefinition,
   CharacterSideDefinition,
   CharacterDefinition,
   NightmareCardDefinition,
   DreamCardDefinition,
   VaultCardDefinition,
   BribeCardDefinition,
+  OtherCardDefinition,
+  CardBackImages,
   CardDefinition,
 } from './types/cards.js';
 
@@ -66,7 +64,10 @@ export {
   DREAM_CARDS,
   VAULT_CARDS,
   BRIBE_CARDS,
-  ALL_CARD_COUNT,
+  OTHER_CARDS,
+  CARD_BACK_IMAGES,
+  CARD_DEFINITION_COUNT,
+  CARD_COPY_COUNT,
 } from './cards/generated/cards.js';
 
 // 聊天预设短语
