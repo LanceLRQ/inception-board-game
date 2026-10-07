@@ -12,7 +12,7 @@ import {
   recordCardPlayed,
 } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase, isAdjacent } from './common.js';
-import { applyShootVariant } from './shootResolution.js';
+import { applyShootByCard } from './shootResolution.js';
 
 export const shootMoves = {
   playShoot: {
@@ -28,11 +28,7 @@ export const shootMoves = {
       // 射手·禁足：仅射手角色可阻止移动
       const shooter = G.players[ctx.currentPlayer];
       const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
-      const r = applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
-        sameLayerRequired: true,
-        deathFaces: [1],
-        moveFaces: [2, 3, 4],
-        extraOnMove: null,
+      const r = applyShootByCard(G, ctx, random, targetPlayerID, cardId, {
         decreeId,
         preventMove: canPrevent,
       });
@@ -62,13 +58,7 @@ export const shootMoves = {
       if (mode === 'shoot') {
         // 目标为玩家 ID
         if (typeof targetOrLayer !== 'string') return INVALID_MOVE;
-        const r = applyShootVariant(G, ctx, random, targetOrLayer, cardId, {
-          sameLayerRequired: true,
-          deathFaces: [1],
-          moveFaces: [2, 3, 4],
-          extraOnMove: null,
-          decreeId,
-        });
+        const r = applyShootByCard(G, ctx, random, targetOrLayer, cardId, { decreeId });
         return r === INVALID_MOVE ? r : recordCardPlayed(r, cardId);
       } else if (mode === 'transit') {
         // 自己移动到相邻层
@@ -94,13 +84,7 @@ export const shootMoves = {
     ) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playShootKing', cardId)) return INVALID_MOVE;
-      return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
-        sameLayerRequired: false,
-        deathFaces: [1, 2],
-        moveFaces: [3, 4, 5],
-        extraOnMove: null,
-        decreeId,
-      });
+      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },
@@ -115,13 +99,7 @@ export const shootMoves = {
     ) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playShootArmor', cardId)) return INVALID_MOVE;
-      return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
-        sameLayerRequired: true,
-        deathFaces: [1, 2],
-        moveFaces: [3, 4, 5],
-        extraOnMove: 'discard_unlocks',
-        decreeId,
-      });
+      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },
@@ -136,13 +114,7 @@ export const shootMoves = {
     ) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playShootBurst', cardId)) return INVALID_MOVE;
-      return applyShootVariant(G, ctx, random, targetPlayerID, cardId, {
-        sameLayerRequired: true,
-        deathFaces: [1, 2],
-        moveFaces: [3, 4, 5],
-        extraOnMove: 'discard_shoots',
-        decreeId,
-      });
+      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },

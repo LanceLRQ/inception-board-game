@@ -23,12 +23,8 @@ import {
   recordCardPlayed,
 } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
-import {
-  type ShootVariantOpts,
-  applyShootVariant,
-  validateDecree,
-  violatesShootLayerLimit,
-} from './shootResolution.js';
+import { getShootProfile } from './shootProfiles.js';
+import { applyShootByCard, validateDecree, violatesShootLayerLimit } from './shootResolution.js';
 
 export const thiefAttackSkillMoves = {
   // 意念判官·定罪（两步 move 第 1 步）：掷双骰 → 存 pending
@@ -48,47 +44,16 @@ export const thiefAttackSkillMoves = {
       if (!isShootClassCard(cardId)) return INVALID_MOVE;
       const target = G.players[targetPlayerID];
       if (!target || !target.isAlive || targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+      // 死亡面 / 移动面 / 附带弃牌 / 是否要求同层取自 SHOOT 参数表
+      const opts = getShootProfile(cardId);
+      if (!opts) return INVALID_MOVE;
       // 与普通路径同一套层数限制：只有刺客之王不要求同层（意念判官不具备摩羯 / 恐怖分子的豁免）
-      if (violatesShootLayerLimit(G, self, target, cardId !== 'action_shoot_assassin'))
-        return INVALID_MOVE;
+      if (violatesShootLayerLimit(G, self, target, opts.sameLayerRequired)) return INVALID_MOVE;
 
       // 死亡宣言校验
       const decreeCheck = validateDecree(G, ctx.currentPlayer, decreeId);
       if (decreeCheck === 'INVALID') return INVALID_MOVE;
 
-      // 根据卡牌类型确定 deathFaces/moveFaces/extraOnMove
-      const optsMap: Record<
-        string,
-        {
-          deathFaces: number[];
-          moveFaces: number[];
-          extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
-        }
-      > = {
-        action_shoot: { deathFaces: [1], moveFaces: [2, 3, 4], extraOnMove: null },
-        action_shoot_dream_transit: {
-          deathFaces: [1],
-          moveFaces: [2, 3, 4],
-          extraOnMove: null,
-        },
-        action_shoot_assassin: {
-          deathFaces: [1, 2],
-          moveFaces: [3, 4, 5],
-          extraOnMove: null,
-        },
-        action_shoot_drill: {
-          deathFaces: [1, 2],
-          moveFaces: [3, 4, 5],
-          extraOnMove: 'discard_unlocks',
-        },
-        action_shoot_burst: {
-          deathFaces: [1, 2],
-          moveFaces: [3, 4, 5],
-          extraOnMove: 'discard_shoots',
-        },
-      };
-      const opts = optsMap[cardId];
-      if (!opts) return INVALID_MOVE;
       const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
 
       const rollA = random.D6();
@@ -179,42 +144,8 @@ export const thiefAttackSkillMoves = {
       let s = discardCard(G, ctx.currentPlayer, transitCard);
       // 2) 移到目标层
       s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer as Layer);
-      // 3) 根据卡牌类型映射 SHOOT opts → 复用 applyShootVariant
-      const optsMap: Record<string, ShootVariantOpts> = {
-        action_shoot: {
-          sameLayerRequired: true,
-          deathFaces: [1],
-          moveFaces: [2, 3, 4],
-          extraOnMove: null,
-        },
-        action_shoot_dream_transit: {
-          sameLayerRequired: true,
-          deathFaces: [1],
-          moveFaces: [2, 3, 4],
-          extraOnMove: null,
-        },
-        action_shoot_assassin: {
-          sameLayerRequired: false,
-          deathFaces: [1, 2],
-          moveFaces: [3, 4, 5],
-          extraOnMove: null,
-        },
-        action_shoot_drill: {
-          sameLayerRequired: true,
-          deathFaces: [1, 2],
-          moveFaces: [3, 4, 5],
-          extraOnMove: 'discard_unlocks',
-        },
-        action_shoot_burst: {
-          sameLayerRequired: true,
-          deathFaces: [1, 2],
-          moveFaces: [3, 4, 5],
-          extraOnMove: 'discard_shoots',
-        },
-      };
-      const opts = optsMap[shootCardId];
-      if (!opts) return INVALID_MOVE;
-      const r = applyShootVariant(s, ctx, random, targetPlayerID, shootCardId, opts);
+      // 3) 按牌取 SHOOT 参数表 → 复用 SHOOT 结算
+      const r = applyShootByCard(s, ctx, random, targetPlayerID, shootCardId);
       return r === INVALID_MOVE ? r : recordCardPlayed(r, shootCardId);
     },
     client: false,

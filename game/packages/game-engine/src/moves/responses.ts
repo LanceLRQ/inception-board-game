@@ -15,9 +15,9 @@ import {
 } from '../engine/skills.js';
 import type { SetupState } from '../setup.js';
 import { discardCard, incrementMoveCounter } from '../stateOps.js';
-import type { BGIOCtx, MoveCtx } from './common.js';
+import type { MoveCtx } from './common.js';
 import { applyNightmareEffect } from './nightmareEffects.js';
-import { applyShootVariant } from './shootResolution.js';
+import { resumeShootAfterResponse } from './shootResolution.js';
 
 export const responseMoves = {
   // 双鱼·闪避（skill_0）· SHOOT 响应窗口
@@ -62,25 +62,7 @@ export const responseMoves = {
       // 重入 applyShootVariant：复用原 SHOOT 参数 + skipPiscesCheck=true
       // Terrorist 检查仍可触发（如 Pisces 同时被 Terrorist SHOOT，pass 后进入 Terrorist 窗）
       const cleared = { ...G, pendingShootResponse: null };
-      const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
-      const result = applyShootVariant(
-        cleared,
-        shooterCtx,
-        random,
-        pending.targetPlayerID,
-        pending.cardId,
-        {
-          sameLayerRequired: pending.sameLayerRequired,
-          deathFaces: pending.deathFaces,
-          moveFaces: pending.moveFaces,
-          extraOnMove: pending.extraOnMove,
-          decreeId: pending.decreeId,
-          preventMove: pending.preventMove,
-          skipPiscesCheck: true,
-        },
-      );
-      if (result === INVALID_MOVE) return INVALID_MOVE;
-      return result;
+      return resumeShootAfterResponse(cleared, ctx, random, pending, { skipPiscesCheck: true });
     },
     client: false,
   },
@@ -106,27 +88,11 @@ export const responseMoves = {
       let s = discardCard(G, pending.targetPlayerID, cardId);
       // 2) 清空 pending + 重入 SHOOT（无惩罚）
       s = { ...s, pendingShootResponse: null };
-      const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
-      const result = applyShootVariant(
-        s,
-        shooterCtx,
-        random,
-        pending.targetPlayerID,
-        pending.cardId,
-        {
-          sameLayerRequired: pending.sameLayerRequired,
-          deathFaces: pending.deathFaces,
-          moveFaces: pending.moveFaces,
-          extraOnMove: pending.extraOnMove,
-          decreeId: pending.decreeId,
-          preventMove: pending.preventMove,
-          skipPiscesCheck: true,
-          skipTerroristCheck: true,
-          terroristPenalty: false,
-        },
-      );
-      if (result === INVALID_MOVE) return INVALID_MOVE;
-      return result;
+      return resumeShootAfterResponse(s, ctx, random, pending, {
+        skipPiscesCheck: true,
+        skipTerroristCheck: true,
+        terroristPenalty: false,
+      });
     },
     client: false,
   },
@@ -141,27 +107,11 @@ export const responseMoves = {
 
       // 清空 pending + 重入 SHOOT（terroristPenalty=true）
       const cleared = { ...G, pendingShootResponse: null };
-      const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
-      const result = applyShootVariant(
-        cleared,
-        shooterCtx,
-        random,
-        pending.targetPlayerID,
-        pending.cardId,
-        {
-          sameLayerRequired: pending.sameLayerRequired,
-          deathFaces: pending.deathFaces,
-          moveFaces: pending.moveFaces,
-          extraOnMove: pending.extraOnMove,
-          decreeId: pending.decreeId,
-          preventMove: pending.preventMove,
-          skipPiscesCheck: true,
-          skipTerroristCheck: true,
-          terroristPenalty: true,
-        },
-      );
-      if (result === INVALID_MOVE) return INVALID_MOVE;
-      return result;
+      return resumeShootAfterResponse(cleared, ctx, random, pending, {
+        skipPiscesCheck: true,
+        skipTerroristCheck: true,
+        terroristPenalty: true,
+      });
     },
     client: false,
   },
