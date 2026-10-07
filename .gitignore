@@ -156,3 +156,6 @@ AGENTS.md
 # Playwright
 **/playwright-report/
 **/test-results/
+
+# Turborepo 本地缓存
+.turbo/
