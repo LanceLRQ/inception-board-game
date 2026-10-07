@@ -129,7 +129,43 @@ original board game's assets.
 不使用任何原版桌游的素材。
 
 --------------------------------------------------------------------------------
-  5. ACCEPTANCE / 接受条款
+  5. THIRD-PARTY FONTS AND SOUNDS / 随产物分发的第三方字体与音效
+--------------------------------------------------------------------------------
+
+The built client bundles the following third-party works. They are NOT
+covered by this project's MIT license; each stays under its own license.
+构建出的客户端里带有下列第三方作品。它们不适用本项目的 MIT 协议，
+各自沿用原协议。
+
+Fonts (SIL Open Font License 1.1, https://openfontlicense.org):
+字体（SIL Open Font License 1.1）：
+
+  - Noto Sans SC / 思源黑体       Noto project (Google, Adobe)
+    via @fontsource-variable/noto-sans-sc
+  - Noto Serif SC / 思源宋体      Noto project (Google, Adobe)
+    via @fontsource-variable/noto-serif-sc
+  - IBM Plex Mono                 Copyright 2017 IBM Corp.
+    via @fontsource/ibm-plex-mono
+  - LXGW WenKai Screen / 霞鹜文楷 by LXGW; web font packaging (MIT)
+    via lxgw-wenkai-screen-webfont      Copyright (c) 2022 Chawye Hsu
+
+  The fonts are redistributed unmodified as web font files. Under the OFL
+  they may be bundled with software but must not be sold by themselves,
+  and derivative fonts must not use the reserved font names. The full
+  license text ships inside each npm package listed above.
+  字体以网页字体文件的形式原样分发。按 OFL，字体可以随软件一同分发，
+  但不得单独出售；修改后的字体不得沿用保留字体名。协议全文随上述
+  各 npm 包一同提供。
+
+Sound effects (CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/):
+音效（CC0 1.0）：
+
+  - Casino Audio, Music Jingles   by Kenney Vleugels (https://kenney.nl)
+    Per-file sources: game/packages/client/public/sfx/CREDITS.md
+    逐文件来源见 game/packages/client/public/sfx/CREDITS.md
+
+--------------------------------------------------------------------------------
+  6. ACCEPTANCE / 接受条款
 --------------------------------------------------------------------------------
 
 By using, playing, deploying, modifying, or distributing this project

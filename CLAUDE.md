@@ -84,7 +84,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 旁观、公开匹配、自由输入的聊天（目前只有预设短语）、回放播放器、多实例部署
 - 联机对局没有事件驱动的动画，状态变化直接刷新
 - 启发式 Bot、渗透测试、动画音效、完整的无障碍支持与英文本地化
-- 持续集成流水线已编写，尚未实际运行
 
 ## 仓库结构
 
