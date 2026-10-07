@@ -607,6 +607,56 @@ describe('对局视图 · 待结算', () => {
   });
 });
 
+describe('对局视图 · 没有实体牌的 SHOOT（哈雷·冲击）', () => {
+  const haleyWindow: SetupState = {
+    ...G,
+    pendingShootResponse: {
+      shooterID: a,
+      targetPlayerID: c,
+      cardId: null,
+      sameLayerRequired: false,
+      deathFaces: [1],
+      moveFaces: [2, 3, 4],
+      extraOnMove: null,
+      responseType: 'pisces',
+      skill: 'haley_impact',
+    },
+    pendingShootMove: {
+      shooterID: a,
+      targetPlayerID: c,
+      cardId: null,
+      extraOnMove: null,
+      choices: [1, 3],
+    },
+  };
+
+  it('牌为 null 与技能来源原样给出；双鱼类型仍只给应答者', () => {
+    for (const viewer of [a, b, c, master, null]) {
+      const r = v(haleyWindow, viewer).pendingShootResponse!;
+      expect(r.cardId).toBeNull();
+      expect(r.skill).toBe('haley_impact');
+      expect(r.responseType).toBe(viewer === c ? 'pisces' : null);
+      expect(v(haleyWindow, viewer).pendingShootMove!.cardId).toBeNull();
+    }
+  });
+
+  it('普通出牌的窗口没有技能来源', () => {
+    const state: SetupState = {
+      ...G,
+      pendingShootResponse: {
+        shooterID: a,
+        targetPlayerID: c,
+        cardId: 'action_shoot',
+        sameLayerRequired: true,
+        deathFaces: [1],
+        moveFaces: [2],
+        extraOnMove: null,
+      },
+    };
+    expect(v(state, c).pendingShootResponse!.skill).toBeNull();
+  });
+});
+
 describe('对局视图 · 天秤分出的两堆牌', () => {
   const split: SetupState = {
     ...G,

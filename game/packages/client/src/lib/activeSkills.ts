@@ -233,7 +233,7 @@ export const MARS_KILL: ActiveSkillDescriptor = {
 };
 
 // 棋局·易位：不在技能面板里选参数，点了之后由对局界面打开金库交换弹窗（见 useMatchController 的 invoke）
-// 对照：docs/manual/06-dream-master.md 棋局 + engine/game.ts useChessTranspose
+// 对照：docs/manual/06-dream-master.md 棋局 + 引擎的 useChessTranspose
 export const CHESS_TRANSPOSE: ActiveSkillDescriptor = {
   id: 'dm_chess.skill_0',
   characterId: 'dm_chess',
@@ -258,7 +258,7 @@ export const PLUTO_BURNING: ActiveSkillDescriptor = {
 };
 
 // 哈雷·冲击 —— 每成功解封 1 次可触发 1 次，掷骰击杀 / 位移目标
-// 对照：docs/manual/05-dream-thieves.md 哈雷 + engine/game.ts playHaleyImpact
+// 对照：docs/manual/05-dream-thieves.md 哈雷 + 引擎的 playHaleyImpact
 export const HALEY_IMPACT: ActiveSkillDescriptor = {
   id: 'thief_haley.skill_0',
   characterId: 'thief_haley',
@@ -275,7 +275,7 @@ export const HALEY_IMPACT: ActiveSkillDescriptor = {
 };
 
 // 露娜·月蚀 —— 弃 2 张 SHOOT → 击杀同层任意玩家 → 翻面
-// 对照：docs/manual/05-dream-thieves.md 露娜 + engine/game.ts playLunaEclipse
+// 对照：docs/manual/05-dream-thieves.md 露娜 + 引擎的 playLunaEclipse
 export const LUNA_ECLIPSE: ActiveSkillDescriptor = {
   id: 'thief_luna.skill_0',
   characterId: 'thief_luna',
@@ -288,7 +288,7 @@ export const LUNA_ECLIPSE: ActiveSkillDescriptor = {
 };
 
 // 雅典娜·惊叹 —— 展示 4 张手牌 + 1 牌库顶 → 5 张同名击杀同层玩家
-// 对照：docs/manual/05-dream-thieves.md 雅典娜 + engine/game.ts playAthenaAwe
+// 对照：docs/manual/05-dream-thieves.md 雅典娜 + 引擎的 playAthenaAwe
 export const ATHENA_AWE: ActiveSkillDescriptor = {
   id: 'thief_athena.skill_1',
   characterId: 'thief_athena',
@@ -301,7 +301,7 @@ export const ATHENA_AWE: ActiveSkillDescriptor = {
 };
 
 // 欺诈师·盗心（单机盲抽版）—— 选 target + 选 1 张手牌还回
-// 对照：docs/manual/05-dream-thieves.md 欺诈师 + engine/game.ts playForgerExchangeSingle
+// 对照：docs/manual/05-dream-thieves.md 欺诈师 + 引擎的 playForgerExchangeSingle
 // 从 target 抽取的卡由服务端 Random.Die 随机挑，保护隐藏信息；回合限 1 次。
 export const FORGER_EXCHANGE: ActiveSkillDescriptor = {
   id: 'thief_forger.skill_0',
@@ -317,7 +317,7 @@ export const FORGER_EXCHANGE: ActiveSkillDescriptor = {
 };
 
 // 天秤·平衡 step 1 —— bonder 选 target；后续 split + pick 由 worker 自动补完
-// 对照：docs/manual/05-dream-thieves.md 天秤 + engine/game.ts playLibraBalance
+// 对照：docs/manual/05-dream-thieves.md 天秤 + 引擎的 playLibraBalance
 // 单机模式简化：engine 放宽 ctx.currentPlayer guard，worker 自动代 target 对半分
 // + 代 bonder 挑大堆（包括人类 bonder）；保证流程不卡死。
 export const LIBRA_BALANCE: ActiveSkillDescriptor = {
@@ -335,7 +335,7 @@ export const LIBRA_BALANCE: ActiveSkillDescriptor = {
 };
 
 // 火星·战场世界观 —— 弃 2 张非 SHOOT 手牌 → 从弃牌堆取 1 张 SHOOT
-// 对照：cards-data.json dm_mars_battlefield 世界观 + engine/game.ts useMarsBattlefield
+// 对照：cards-data.json dm_mars_battlefield 世界观 + 引擎的 useMarsBattlefield
 // 世界观激活时对所有存活玩家可用，SHOOT 类筛选交由 engine 精校
 export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
   id: 'dm_mars_battlefield.worldview',
@@ -351,7 +351,7 @@ export const MARS_BATTLEFIELD_EXCHANGE: ActiveSkillDescriptor = {
 };
 
 // 战争之王·黑市 —— 弃 2 张手牌 → 从弃牌堆取 1 张
-// 对照：docs/manual/05-dream-thieves.md 战争之王 + engine/game.ts playLordOfWarBlackMarket
+// 对照：docs/manual/05-dream-thieves.md 战争之王 + 引擎的 playLordOfWarBlackMarket
 export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
   id: 'thief_lord_of_war.skill_0',
   characterId: 'thief_lord_of_war',
@@ -368,7 +368,7 @@ export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
 };
 
 // 盖亚·大地 —— 使同层其他玩家各自 +1 / -1 层（限 2 次/回合）
-// 对照：docs/manual/05-dream-thieves.md 盖亚 + engine/game.ts playGaiaShift
+// 对照：docs/manual/05-dream-thieves.md 盖亚 + 引擎的 playGaiaShift
 export const GAIA_SHIFT: ActiveSkillDescriptor = {
   id: 'thief_gaia.skill_0',
   characterId: 'thief_gaia',

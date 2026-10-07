@@ -170,7 +170,8 @@ export interface SetupState {
   pendingShootMove?: {
     shooterID: string;
     targetPlayerID: string;
-    cardId: CardID;
+    /** 结算这次 SHOOT 的牌；null 表示没有实体牌（哈雷·冲击把技能视为一张 SHOOT） */
+    cardId: CardID | null;
     extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
     choices: number[];
   } | null;
@@ -218,7 +219,8 @@ export interface SetupState {
   pendingShootResponse: {
     shooterID: string;
     targetPlayerID: string;
-    cardId: CardID;
+    /** 被应答的 SHOOT 用的牌；null 表示没有实体牌（哈雷·冲击），此时 skill 必为 'haley_impact' */
+    cardId: CardID | null;
     sameLayerRequired: boolean;
     deathFaces: number[];
     moveFaces: number[];
@@ -231,6 +233,13 @@ export interface SetupState {
      *   - 'terrorist'：恐怖分子·狂热（target 必须弃 1 张否则骰 -1）
      */
     responseType?: 'pisces' | 'terrorist';
+    /**
+     * 这次 SHOOT 由哪个技能改写了结算：应答结束后重入结算时据此还原。
+     *   - 'sudger_verdict'：意念判官·定罪，目标改掷 2 颗骰、由射手挑 1 颗
+     *   - 'haley_impact'：哈雷·冲击，没有实体牌，掷骰结果 -2
+     * 缺省为普通出牌。
+     */
+    skill?: 'sudger_verdict' | 'haley_impact';
   } | null;
   winner: Faction | null;
   winReason: string | null;

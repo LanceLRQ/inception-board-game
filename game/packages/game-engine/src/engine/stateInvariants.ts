@@ -398,7 +398,7 @@ function checkPending(c: Collector, G: Rec): void {
   c.optional('pendingShootMove', G.pendingShootMove, (o) => {
     c.player('pendingShootMove.shooterID', o.shooterID);
     c.player('pendingShootMove.targetPlayerID', o.targetPlayerID);
-    c.card('pendingShootMove.cardId', o.cardId);
+    c.cardOrNull('pendingShootMove.cardId', o.cardId);
     checkExtraOnMove(c, 'pendingShootMove.extraOnMove', o.extraOnMove);
     checkIntArray(c, 'pendingShootMove.choices', o.choices, 0, LAYER_MAX);
   });
@@ -419,7 +419,7 @@ function checkPending(c: Collector, G: Rec): void {
   c.optional('pendingShootResponse', G.pendingShootResponse, (o) => {
     c.player('pendingShootResponse.shooterID', o.shooterID);
     c.player('pendingShootResponse.targetPlayerID', o.targetPlayerID);
-    c.card('pendingShootResponse.cardId', o.cardId);
+    c.cardOrNull('pendingShootResponse.cardId', o.cardId);
     c.bool('pendingShootResponse.sameLayerRequired', o.sameLayerRequired);
     checkIntArray(c, 'pendingShootResponse.deathFaces', o.deathFaces, 1, 6);
     checkIntArray(c, 'pendingShootResponse.moveFaces', o.moveFaces, 1, 6);
@@ -428,6 +428,13 @@ function checkPending(c: Collector, G: Rec): void {
     if (o.preventMove !== undefined) c.bool('pendingShootResponse.preventMove', o.preventMove);
     if (o.responseType !== undefined) {
       c.oneOf('pendingShootResponse.responseType', o.responseType, ['pisces', 'terrorist']);
+    }
+    if (o.skill !== undefined) {
+      c.oneOf('pendingShootResponse.skill', o.skill, ['sudger_verdict', 'haley_impact']);
+    }
+    // 没有实体牌的 SHOOT 只有哈雷·冲击；其余来源都有一张牌
+    if ((o.cardId === null) !== (o.skill === 'haley_impact')) {
+      c.add('pendingShootResponse.cardId', '没有实体牌当且仅当技能来源为哈雷·冲击');
     }
   });
 }

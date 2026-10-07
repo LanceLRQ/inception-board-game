@@ -27,6 +27,22 @@ describe('awaitedCopy', () => {
     expect(cannot.notes).toEqual([{ key: 'awaited.shootEvade.cannot' }]);
   });
 
+  it('哈雷·冲击没有实体牌：改用不带牌名的说明', () => {
+    const copy = awaitedCopy(
+      {
+        mine: true,
+        kind: 'shoot-evade',
+        shooterID: '2',
+        cardId: null,
+        canEvade: true,
+        evadeLayer: 1,
+      },
+      deps,
+    );
+    expect(copy.bodyKey).toBe('awaited.shootEvade.bodyNoCard');
+    expect(copy.bodyParams).toEqual({ name: '玩家2', card: 'SHOOT' });
+  });
+
   it('狂热没有手牌时提示无牌可弃', () => {
     const copy = awaitedCopy(
       { mine: true, kind: 'shoot-zealot', shooterID: '1', cardId: 'a', hand: [] },

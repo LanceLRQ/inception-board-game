@@ -43,6 +43,23 @@ describe('computeShooterLayerPickerState', () => {
     expect(r.choices).toEqual([1, 3]);
   });
 
+  it('哈雷·冲击没有实体牌：cardId 为 null，仍弹出选层', () => {
+    const s = makeState({
+      pendingShootMove: {
+        shooterID: '0',
+        targetPlayerID: '1',
+        cardId: null,
+        extraOnMove: null,
+        choices: [1, 3],
+      },
+    } as unknown as Partial<MatchView>);
+    expect(computeShooterLayerPickerState(s, '0')).toMatchObject({
+      visible: true,
+      cardId: null,
+      choices: [1, 3],
+    });
+  });
+
   it('L3 目标 choices=[2,4]', () => {
     const s = makeState({
       pendingShootMove: {

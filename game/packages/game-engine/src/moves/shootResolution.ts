@@ -1,4 +1,5 @@
 // SHOOT 的共同结算：层数限制、死亡宣言、双鱼与恐怖分子的应答挂起、骰值修正链、命中后的处理。
+// 意念判官·定罪与哈雷·冲击只改掷骰这一步，其余也走这里。
 
 import type { CardID } from '@icgame/shared';
 import { type ShootOutcome, resolveShootCustom } from '../dice.js';
@@ -6,9 +7,11 @@ import { killPlayer } from '../engine/death.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import {
   SCORPIUS_SKILL_ID,
+  applyHaleyImpact,
   applyM4CarbineModifier,
   applyMercuryReverse,
   applyScorpiusPoison,
+  applySudgerVerdict,
   applySoulSculptorCarve,
   applyTaurusHorn,
   canAriesStardustTrigger,
@@ -57,6 +60,14 @@ export function validateDecree(
   return face;
 }
 
+/**
+ * 改写了 SHOOT 结算的角色技能：只改掷骰这一步，其余与普通 SHOOT 完全相同。
+ *   - sudger_verdict：意念判官·定罪，目标改掷 2 颗骰、由射手挑 1 颗
+ *   - haley_impact：哈雷·冲击，没有实体牌，掷骰结果 -2
+ * 对照：docs/manual/05-dream-thieves.md 意念判官 261 行、哈雷 145 行
+ */
+export type ShootSkillSource = NonNullable<PendingShootResponse['skill']>;
+
 export interface ShootVariantOpts {
   sameLayerRequired: boolean;
   deathFaces: number[];
@@ -81,6 +92,8 @@ export interface ShootVariantOpts {
    * 仅在 respondTerroristAccept 重入时设为 true
    */
   terroristPenalty?: boolean;
+  /** 本次 SHOOT 由哪个技能改写了掷骰；缺省为普通出牌 */
+  skill?: ShootSkillSource;
 }
 
 /**
@@ -124,14 +137,14 @@ export interface ShootRollOutcome {
 }
 
 /**
- * 前置校验：射手 / 目标 / 手里有牌 / 层数限制 / 死亡宣言。
+ * 前置校验：射手 / 目标 / 手里有牌（哈雷·冲击没有牌） / 层数限制 / 死亡宣言。
  * 通过时返回射手、目标，以及附加死亡宣言后的死亡骰面。
  */
 function validateShootRequest(
   G: SetupState,
   shooterID: string,
   targetPlayerID: string,
-  cardId: CardID,
+  cardId: CardID | null,
   opts: ShootVariantOpts,
 ): { shooter: PlayerSetup; target: PlayerSetup; deathFaces: number[] } | typeof INVALID_MOVE {
   const shooter = G.players[shooterID];
@@ -139,7 +152,9 @@ function validateShootRequest(
   if (!shooter || !target) return INVALID_MOVE;
   if (targetPlayerID === shooterID) return INVALID_MOVE;
   if (!target.isAlive) return INVALID_MOVE;
-  if (!shooter.hand.includes(cardId)) return INVALID_MOVE;
+  // 没有实体牌的 SHOOT 只有哈雷·冲击；其余都要从手里出一张牌
+  if ((cardId === null) !== (opts.skill === 'haley_impact')) return INVALID_MOVE;
+  if (cardId !== null && !shooter.hand.includes(cardId)) return INVALID_MOVE;
   if (violatesShootLayerLimit(G, shooter, target, opts.sameLayerRequired)) return INVALID_MOVE;
 
   // 死亡宣言校验 + 附加死亡面
@@ -173,7 +188,7 @@ export function pendingResponseKind(
 export function buildPendingShootResponse(
   shooterID: string,
   targetPlayerID: string,
-  cardId: CardID,
+  cardId: CardID | null,
   opts: ShootVariantOpts,
   responseType: 'pisces' | 'terrorist',
 ): PendingShootResponse {
@@ -188,6 +203,7 @@ export function buildPendingShootResponse(
     decreeId: opts.decreeId,
     preventMove: opts.preventMove,
     responseType,
+    skill: opts.skill,
   };
 }
 
@@ -200,6 +216,7 @@ export function shootOptsFromPending(pending: PendingShootResponse): ShootVarian
     extraOnMove: pending.extraOnMove,
     decreeId: pending.decreeId,
     preventMove: pending.preventMove,
+    skill: pending.skill,
   };
 }
 
@@ -212,10 +229,11 @@ export function rollShootOutcome(
   G: SetupState,
   shooterID: string,
   targetPlayerID: string,
-  cardId: CardID,
+  cardId: CardID | null,
   faces: { deathFaces: number[]; moveFaces: number[] },
   random: BGIORandom,
   terroristPenalty?: boolean,
+  haleyImpact?: boolean,
 ): ShootRollOutcome {
   const shooter = G.players[shooterID]!;
   const target = G.players[targetPlayerID]!;
@@ -223,7 +241,12 @@ export function rollShootOutcome(
 
   const rawD6 = random.D6();
   // 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1，点数修正最低为 1（与 M4、要塞、哈雷等修正一致）
-  const baseRoll = terroristPenalty ? Math.max(1, rawD6 - 1) : rawD6;
+  // 哈雷·冲击：掷骰结果 -2，最低为 1（对照：docs/manual/05-dream-thieves.md 哈雷 145 行）
+  const baseRoll = haleyImpact
+    ? applyHaleyImpact(rawD6)
+    : terroristPenalty
+      ? Math.max(1, rawD6 - 1)
+      : rawD6;
   // M4 卡宾枪全局化 —— 梦主使用 SHOOT 时目标骰 -1（基线梦主优势）
   // 对照：docs/manual/03-game-flow.md §80-81 M4 卡宾枪道具；§111 印证 M4 先于效果处理
   // 仅在"未被角色技能重写骰值"的通用路径生效，不影响灵雕师 override / 天蝎毒针等特殊处理
@@ -249,7 +272,11 @@ export function rollShootOutcome(
     settledRoll = applyScorpiusPoison(baseRoll, random.D6());
     result = resolveShootCustom(settledRoll, deathFaces, moveFaces);
     state = markSkillUsed(state, shooterID, SCORPIUS_SKILL_ID);
-  } else if (shooter.characterId === 'thief_taurus' && isTaurusHornCard(cardId)) {
+  } else if (
+    shooter.characterId === 'thief_taurus' &&
+    cardId !== null &&
+    isTaurusHornCard(cardId)
+  ) {
     // 金牛：先按 target 骰算 base result；若非 kill 再掷 self 骰看是否 override 为 kill
     // 号角只对【SHOOT】生效，刺客之王 / 爆甲螺旋 / 炸裂弹头不触发（docs/manual/05-dream-thieves.md 金牛 75 行）
     settledRoll = baseRoll;
@@ -304,8 +331,8 @@ function applyShootMove(
   s: SetupState,
   shooterID: string,
   targetPlayerID: string,
-  cardId: CardID,
-  opts: ShootVariantOpts,
+  cardId: CardID | null,
+  opts: SettleOpts,
 ): { state: SetupState; awaitingLayerChoice: boolean } {
   let next = s;
   // on-move 副作用：弃目标特定手牌
@@ -350,17 +377,27 @@ function applyShootMove(
   return { state: next, awaitingLayerChoice: false };
 }
 
-/** 结果落地：弃牌、水星·逆流，再按击杀 / 移动 / 未命中处理，最后检查处女·完美 */
-function settleShootResult(
+/** 结果落地需要的选项：命中「移动」时的附带弃牌与射手·禁足 */
+type SettleOpts = Pick<ShootVariantOpts, 'extraOnMove' | 'preventMove'>;
+
+/**
+ * 结果落地：弃牌、水星·逆流，再按击杀 / 移动 / 未命中处理，最后检查处女·完美。
+ * 普通 SHOOT、意念判官选骰后、哈雷·冲击都从这里落地；cardId 为 null（哈雷）时没有牌可弃，
+ * 也不触发水星·逆流。
+ */
+export function settleShootResult(
   rolled: ShootRollOutcome,
   shooterID: string,
   targetPlayerID: string,
-  cardId: CardID,
-  opts: ShootVariantOpts,
+  cardId: CardID | null,
+  opts: SettleOpts,
 ): SetupState {
-  let s = discardCard(rolled.state, shooterID, cardId);
-  // 水星·逆流：贿赂者对梦主出牌 → 梦主先收入
-  s = applyMercuryReverse(s, shooterID, cardId, targetPlayerID) ?? s;
+  let s = rolled.state;
+  if (cardId !== null) {
+    s = discardCard(s, shooterID, cardId);
+    // 水星·逆流：贿赂者对梦主出牌 → 梦主先收入
+    s = applyMercuryReverse(s, shooterID, cardId, targetPlayerID) ?? s;
+  }
 
   if (rolled.result === 'kill') {
     s = applyShootKill(s, shooterID, targetPlayerID);
@@ -386,7 +423,7 @@ export function applyShootVariant(
   ctx: BGIOCtx,
   random: BGIORandom,
   targetPlayerID: string,
-  cardId: CardID,
+  cardId: CardID | null,
   rawOpts: ShootVariantOpts,
 ): SetupState | typeof INVALID_MOVE {
   // 客户端用 null 表示「没传」：统一成 undefined，免得 null 被写进待结算状态
@@ -413,6 +450,24 @@ export function applyShootVariant(
     };
   }
 
+  // 意念判官·定罪：目标改掷 2 颗骰，挂起等射手挑 1 颗；之后由 resolveSudgerPick 落地
+  if (opts.skill === 'sudger_verdict' && cardId !== null) {
+    const rollA = random.D6();
+    const rollB = random.D6();
+    return {
+      ...G,
+      pendingSudgerRolls: {
+        rollA,
+        rollB,
+        targetPlayerID,
+        cardId,
+        deathFaces: checked.deathFaces,
+        moveFaces: opts.moveFaces,
+        extraOnMove: opts.extraOnMove,
+      },
+    };
+  }
+
   const rolled = rollShootOutcome(
     G,
     shooterID,
@@ -421,8 +476,32 @@ export function applyShootVariant(
     { deathFaces: checked.deathFaces, moveFaces: opts.moveFaces },
     random,
     opts.terroristPenalty,
+    opts.skill === 'haley_impact',
   );
   return settleShootResult(rolled, shooterID, targetPlayerID, cardId, opts);
+}
+
+/**
+ * 意念判官选骰后的结算：按选中的那颗得出结果，再走与普通 SHOOT 同一个结果落地。
+ * 选中的那颗写入 lastShootRoll；骰面取自挂起时记下的参数表与死亡宣言。
+ * 对照：docs/manual/05-dream-thieves.md 意念判官 261 行
+ */
+export function settleSudgerPick(
+  G: SetupState,
+  shooterID: string,
+  pick: 'A' | 'B',
+): SetupState | typeof INVALID_MOVE {
+  const pending = G.pendingSudgerRolls;
+  if (!pending) return INVALID_MOVE;
+  const chosenRoll = applySudgerVerdict(pending.rollA, pending.rollB, pick);
+  const rolled: ShootRollOutcome = {
+    state: { ...G, pendingSudgerRolls: null, lastShootRoll: chosenRoll },
+    result: resolveShootCustom(chosenRoll, pending.deathFaces, pending.moveFaces),
+    settledRoll: chosenRoll,
+  };
+  return settleShootResult(rolled, shooterID, pending.targetPlayerID, pending.cardId, {
+    extraOnMove: pending.extraOnMove,
+  });
 }
 
 /**
@@ -435,7 +514,7 @@ export function applyShootByCard(
   random: BGIORandom,
   targetPlayerID: string,
   cardId: CardID,
-  extra: Pick<ShootVariantOpts, 'decreeId' | 'preventMove'> = {},
+  extra: Pick<ShootVariantOpts, 'decreeId' | 'preventMove' | 'skill'> = {},
 ): SetupState | typeof INVALID_MOVE {
   const profile = getShootProfile(cardId);
   if (!profile) return INVALID_MOVE;

@@ -328,6 +328,56 @@ describe('nextAutoAction · 判定顺序', () => {
     });
   });
 
+  describe('7b. 没有实体牌的 SHOOT（哈雷·冲击）', () => {
+    function haleyResponseState(): State {
+      const s = playingState();
+      const target = othersOf(s, 1)[0]!;
+      return withG(s, {
+        pendingShootResponse: {
+          shooterID: s.ctx.currentPlayer,
+          targetPlayerID: target,
+          cardId: null,
+          sameLayerRequired: false,
+          deathFaces: [1],
+          moveFaces: [2, 3, 4],
+          extraOnMove: null,
+          responseType: 'pisces',
+          skill: 'haley_impact',
+        },
+      });
+    }
+
+    it('目标是 Bot：以目标本人的名义放弃闪避，经运行器执行后窗口被清空', () => {
+      const s = haleyResponseState();
+      const action = nextAutoAction(s, NO_HUMAN)!;
+      expect(action).toMatchObject({
+        playerID: s.G.pendingShootResponse!.targetPlayerID,
+        move: 'respondShootPass',
+      });
+      const res = applyMove(game, s, action);
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.state.G.pendingShootResponse).toBeNull();
+    });
+
+    it('挂起选层时发动方是 Bot：由它自己选层', () => {
+      const s = playingState();
+      const target = othersOf(s, 1)[0]!;
+      const state = withG(s, {
+        turnPhase: 'action',
+        pendingShootMove: {
+          shooterID: s.ctx.currentPlayer,
+          targetPlayerID: target,
+          cardId: null,
+          extraOnMove: null,
+          choices: [1, 3],
+        },
+      });
+      const action = nextAutoAction(state, NO_HUMAN)!;
+      expect(action).toMatchObject({ playerID: s.ctx.currentPlayer, move: 'resolveShootMove' });
+      expect(action.args).toEqual([1]);
+    });
+  });
+
   describe('8. 处女·完美', () => {
     function virgoState(): State {
       const s = playingState();

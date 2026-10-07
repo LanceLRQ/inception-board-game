@@ -170,7 +170,8 @@ export interface PendingSudgerRollsView {
 export interface PendingShootMoveView {
   shooterID: string;
   targetPlayerID: string;
-  cardId: CardID;
+  /** null 表示没有实体牌（哈雷·冲击） */
+  cardId: CardID | null;
   extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
   choices: number[];
 }
@@ -197,7 +198,8 @@ export interface PendingVirgoChoiceView {
 export interface PendingShootResponseView {
   shooterID: string;
   targetPlayerID: string;
-  cardId: CardID;
+  /** null 表示没有实体牌（哈雷·冲击） */
+  cardId: CardID | null;
   sameLayerRequired: boolean;
   deathFaces: number[];
   moveFaces: number[];
@@ -206,6 +208,8 @@ export interface PendingShootResponseView {
   preventMove: boolean;
   /** 响应类型会暴露目标的角色，只有目标本人（和对局结束后）可见 */
   responseType: 'pisces' | 'terrorist' | null;
+  /** 改写了这次 SHOOT 的技能（意念判官·定罪 / 哈雷·冲击），普通出牌为 null；发动技能本身是公开的 */
+  skill: 'sudger_verdict' | 'haley_impact' | null;
 }
 
 /** 某个观察者能看到的对局状态。字段是白名单：这里没有的，观察者就看不到 */
@@ -579,6 +583,7 @@ function viewShootResponse(
     decreeId: r.decreeId ?? null,
     preventMove: r.preventMove ?? false,
     responseType: responder ? (r.responseType ?? 'pisces') : null,
+    skill: r.skill ?? null,
   };
 }
 

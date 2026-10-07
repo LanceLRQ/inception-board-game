@@ -39,8 +39,8 @@ export const responseMoves = {
       // 1) 执行闪避（移层 + 翻面 + 标记技能已用）
       let s = applyPiscesEvade(G, pending.targetPlayerID);
       if (s === null) return INVALID_MOVE;
-      // 2) shooter 弃 SHOOT 卡（避免免费再用）
-      s = discardCard(s, pending.shooterID, pending.cardId);
+      // 2) shooter 弃 SHOOT 卡（避免免费再用）；哈雷·冲击没有实体牌，无牌可弃
+      if (pending.cardId !== null) s = discardCard(s, pending.shooterID, pending.cardId);
       // 3) 清空 pending；躲开没有掷骰，处女·完美不触发
       s = { ...s, pendingShootResponse: null };
       // void random 防止未使用警告（保持签名一致）

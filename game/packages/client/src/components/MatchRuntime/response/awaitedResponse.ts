@@ -28,7 +28,8 @@ export interface ShootEvadeAwaited {
   readonly mine: true;
   readonly kind: 'shoot-evade';
   readonly shooterID: string;
-  readonly cardId: string;
+  /** 被打出的牌；哈雷·冲击没有实体牌，此时为 null */
+  readonly cardId: string | null;
   /** 能否闪避：双鱼要在第 2 层及以上才能移到更小的相邻层 */
   readonly canEvade: boolean;
   /** 闪避后到达的层（0 为迷失层）；不能闪避时为 null */
@@ -40,7 +41,7 @@ export interface ShootZealotAwaited {
   readonly mine: true;
   readonly kind: 'shoot-zealot';
   readonly shooterID: string;
-  readonly cardId: string;
+  readonly cardId: string | null;
   /** 本人手牌，每张都可以弃 */
   readonly hand: readonly string[];
 }

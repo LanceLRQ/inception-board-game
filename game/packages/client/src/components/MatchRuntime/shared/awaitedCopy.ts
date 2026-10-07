@@ -16,21 +16,34 @@ export interface AwaitedCopyDeps {
   readonly cardNameOf: (cardId: string) => string;
 }
 
+/** SHOOT 用的牌名；没有实体牌（哈雷·冲击）时按「视为一张 SHOOT」写 SHOOT */
+function shootCardName(cardId: string | null, cardNameOf: (cardId: string) => string): string {
+  return cardId === null ? 'SHOOT' : cardNameOf(cardId);
+}
+
 export function awaitedCopy(awaited: MineAwaited, deps: AwaitedCopyDeps): AwaitedCopy {
   const { nicknameOf, cardNameOf } = deps;
   switch (awaited.kind) {
     case 'shoot-evade':
       return {
         titleKey: 'awaited.shootEvade.title',
-        bodyKey: 'awaited.shootEvade.body',
-        bodyParams: { name: nicknameOf(awaited.shooterID), card: cardNameOf(awaited.cardId) },
+        // 哈雷·冲击没有实体牌：改用不带牌名的文案
+        bodyKey:
+          awaited.cardId === null ? 'awaited.shootEvade.bodyNoCard' : 'awaited.shootEvade.body',
+        bodyParams: {
+          name: nicknameOf(awaited.shooterID),
+          card: shootCardName(awaited.cardId, cardNameOf),
+        },
         notes: awaited.canEvade ? [] : [{ key: 'awaited.shootEvade.cannot' }],
       };
     case 'shoot-zealot':
       return {
         titleKey: 'awaited.zealot.title',
         bodyKey: 'awaited.zealot.body',
-        bodyParams: { name: nicknameOf(awaited.shooterID), card: cardNameOf(awaited.cardId) },
+        bodyParams: {
+          name: nicknameOf(awaited.shooterID),
+          card: shootCardName(awaited.cardId, cardNameOf),
+        },
         notes: awaited.hand.length === 0 ? [{ key: 'awaited.zealot.noHand' }] : [],
       };
     case 'libra-split':

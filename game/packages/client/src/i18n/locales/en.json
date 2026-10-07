@@ -435,7 +435,7 @@
     "thief_haley": {
       "skill_0": {
         "name": "Haley · Impact",
-        "desc": "Target + roll to kill or shift (once per successful unlock)"
+        "desc": "Counts as playing a SHOOT on another player, roll -2 (once per successful unlock)"
       }
     },
     "thief_luna": {
@@ -693,6 +693,7 @@
     "shootEvade": {
       "title": "Targeted by SHOOT",
       "body": "{{name}} uses [{{card}}] on you. Before the roll you may use [Drift].",
+      "bodyNoCard": "{{name}} uses [Impact] and counts as playing a SHOOT on you, roll -2. Before the roll you may use [Drift].",
       "evade": "Drift · move to layer {{layer}}",
       "pass": "Don't evade",
       "cannot": "You are on layer 1 and cannot use [Drift]."

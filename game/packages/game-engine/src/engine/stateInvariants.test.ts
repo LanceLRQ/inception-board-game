@@ -56,6 +56,29 @@ describe('checkStateInvariants', () => {
     expect(checkStateInvariants({ playerOrder: ['0'], players: 3 }).length).toBeGreaterThan(0);
   });
 
+  it('没有实体牌的哈雷·冲击：应答窗口与选层挂起都合法', () => {
+    const issues = inject((G, a, b) => {
+      G.pendingShootResponse = {
+        shooterID: a,
+        targetPlayerID: b,
+        cardId: null,
+        sameLayerRequired: false,
+        deathFaces: [1],
+        moveFaces: [2, 3, 4],
+        extraOnMove: null,
+        skill: 'haley_impact',
+      };
+      G.pendingShootMove = {
+        shooterID: a,
+        targetPlayerID: b,
+        cardId: null,
+        extraOnMove: null,
+        choices: [1, 3],
+      };
+    });
+    expect(issues).toEqual([]);
+  });
+
   describe('迷失层与死亡、层内名单的一致性', () => {
     it('在迷失层却还活着', () => {
       const issues = inject((G, a) => {
@@ -292,6 +315,47 @@ describe('checkStateInvariants', () => {
           deathFaces: [],
           moveFaces: [],
           extraOnMove: null,
+        }),
+    ],
+    [
+      '没有实体牌的射击响应窗口缺少技能来源',
+      'pendingShootResponse.cardId',
+      (G, a, b) =>
+        (G.pendingShootResponse = {
+          shooterID: a,
+          targetPlayerID: b,
+          cardId: null,
+          sameLayerRequired: false,
+          deathFaces: [1],
+          moveFaces: [2],
+          extraOnMove: null,
+        }),
+    ],
+    [
+      '射击响应窗口的技能来源不认识',
+      'pendingShootResponse.skill',
+      (G, a, b) =>
+        (G.pendingShootResponse = {
+          shooterID: a,
+          targetPlayerID: b,
+          cardId: 'action_shoot' as never,
+          sameLayerRequired: false,
+          deathFaces: [1],
+          moveFaces: [2],
+          extraOnMove: null,
+          skill: 'x' as never,
+        }),
+    ],
+    [
+      '射击后移动的牌既不是 null 也不是字符串',
+      'pendingShootMove.cardId',
+      (G, a, b) =>
+        (G.pendingShootMove = {
+          shooterID: a,
+          targetPlayerID: b,
+          cardId: 3 as never,
+          extraOnMove: null,
+          choices: [1],
         }),
     ],
     ['换位快照里有数字牌', 'shiftSnapshot', (G, a) => (G.shiftSnapshot = { [a]: 3 as never })],

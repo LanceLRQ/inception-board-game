@@ -59,11 +59,14 @@ function viewWith(patch: Partial<MatchView> = {}): MatchView {
   } as unknown as MatchView;
 }
 
-const shootResponse = (responseType: 'pisces' | 'terrorist' | null) =>
+const shootResponse = (
+  responseType: 'pisces' | 'terrorist' | null,
+  cardId: string | null = 'action_shoot',
+) =>
   ({
     shooterID: '0',
     targetPlayerID: '1',
-    cardId: 'action_shoot',
+    cardId,
     sameLayerRequired: true,
     deathFaces: [1],
     moveFaces: [2],
@@ -95,6 +98,16 @@ describe('awaitedResponse · SHOOT 响应', () => {
       canEvade: true,
       evadeLayer: 2,
     });
+  });
+
+  it('哈雷·冲击没有实体牌：窗口照常给出闪避与放弃，牌为 null', () => {
+    const a = mine(viewWith({ pendingShootResponse: shootResponse('pisces', null) }), '1');
+    expect(a).toMatchObject({ kind: 'shoot-evade', shooterID: '0', cardId: null, canEvade: true });
+    expect(awaitedActions(a).map((x) => x.effect)).toEqual([
+      { type: 'move', move: 'respondShootEvade', args: [] },
+      { type: 'move', move: 'respondShootPass', args: [] },
+    ]);
+    expect(awaitedKey(a, 3)).toBe('shoot-evade|3|0|null');
   });
 
   it('双鱼在第 1 层：不能闪避（引擎守卫），只能放弃', () => {
