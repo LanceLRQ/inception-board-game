@@ -32,12 +32,15 @@ describe('applyMercuryRouteExtraFailBribe（水星世界观）', () => {
     const before = s.bribePool.length;
     const r = applyMercuryRouteExtraFailBribe(s, 'dm_mercury_route' as CardID);
     expect(r.bribePool.length).toBe(before + 1);
-    const added = r.bribePool[r.bribePool.length - 1]!;
-    expect(added.kind).toBe('fail');
-    expect(added.id).toMatch(/^bribe-\d+$/);
-    expect(added.status).toBe('inPool');
-    expect(added.heldBy).toBeNull();
-    expect(added.originalOwnerId).toBeNull();
+    expect(r.bribePool.filter((b) => b.kind === 'fail').length).toBe(
+      s.bribePool.filter((b) => b.kind === 'fail').length + 1,
+    );
+    for (const b of r.bribePool) {
+      expect(b.id).toMatch(/^bribe-\d+$/);
+      expect(b.status).toBe('inPool');
+      expect(b.heldBy).toBeNull();
+      expect(b.originalOwnerId).toBeNull();
+    }
   });
 
   it('水星梦主 → fail 计数相对 +1（不影响 deal 计数）', () => {
@@ -153,8 +156,8 @@ describe('playJokerGamble move', () => {
   });
 });
 
-describe('小丑罚则 · 下回合 discard 强制全弃', () => {
-  it('同回合 discard（armed===turnNumber）→ 不强制，允许部分弃', () => {
+describe('小丑罚则 · 发动当回合 discard 强制全弃', () => {
+  it('后续回合 discard（armed<turnNumber）→ 不强制，允许部分弃', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
@@ -166,29 +169,29 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
         p1: {
           ...s.players.p1!,
           hand: ['action_unlock' as CardID, 'action_shoot' as CardID],
-          forcedDiscardArmedAtTurn: 5, // 同回合设防
+          forcedDiscardArmedAtTurn: 4, // 旧回合设防，已失效
         },
       },
     };
     const r = callMove(s, 'doDiscard', [['action_unlock' as CardID]]);
     expectMoveOk(r);
-    // 未过期 → armed 保留
-    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBe(5);
+    // 失效标记不被动
+    expect(r.players.p1!.forcedDiscardArmedAtTurn).toBe(4);
   });
 
-  it('下回合 discard + 仅弃部分 → INVALID_MOVE', () => {
+  it('当回合 discard + 仅弃部分 → INVALID_MOVE', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
           ...s.players.p1!,
           hand: ['action_unlock' as CardID, 'action_shoot' as CardID, 'action_shift' as CardID],
-          forcedDiscardArmedAtTurn: 5, // 上回合设防
+          forcedDiscardArmedAtTurn: 5, // 当回合设防
         },
       },
     };
@@ -196,13 +199,13 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('下回合 discard + 弃全部 → 成功 + armed 清除', () => {
+  it('当回合 discard + 弃全部 → 成功 + armed 清除', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
@@ -218,13 +221,13 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
     expect(r.players.p1!.forcedDiscardArmedAtTurn).toBeNull();
   });
 
-  it('下回合 skipDiscard 但手牌 > 0 → INVALID_MOVE（不得跳过）', () => {
+  it('当回合 skipDiscard 但手牌 > 0 → INVALID_MOVE（不得跳过）', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
@@ -238,13 +241,13 @@ describe('小丑罚则 · 下回合 discard 强制全弃', () => {
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('下回合 skipDiscard + 手牌=0 → 允许（已自然满足全弃）', () => {
+  it('当回合 skipDiscard + 手牌=0 → 允许（已自然满足全弃）', () => {
     let s = scenarioStartOfGame3p();
     s = {
       ...s,
       turnPhase: 'discard',
       currentPlayerID: 'p1',
-      turnNumber: 6,
+      turnNumber: 5,
       players: {
         ...s.players,
         p1: {
@@ -585,10 +588,11 @@ describe('applyMercuryReverse 纯函数', () => {
       players: {
         ...s.players,
         pM: { ...s.players.pM!, characterId: 'dm_mercury_route' as CardID, currentLayer: 1 },
-        // p1 设为贿赂者（faction=master），与梦主同层
+        // p1 设为贿赂者（收到过贿赂牌、faction=master），与梦主同层
         p1: {
           ...s.players.p1!,
           faction: 'master' as const,
+          bribeReceived: 1,
           currentLayer: 1,
           hand: ['action_shoot' as CardID],
         },
@@ -627,9 +631,15 @@ describe('applyMercuryReverse 纯函数', () => {
     expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'p2')).toBeNull();
   });
 
-  it('出牌者不是贿赂者（faction=thief）→ null', () => {
+  it('出牌者没有贿赂牌 → null', () => {
     let s = setupMercuryReverse();
-    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, faction: 'thief' as const } } };
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, faction: 'thief' as const, bribeReceived: 0 },
+      },
+    };
     expect(applyMercuryReverse(s, 'p1', 'action_shoot', 'pM')).toBeNull();
   });
 
@@ -696,6 +706,7 @@ describe('playShoot 水星·逆流集成', () => {
         p1: {
           ...s.players.p1!,
           faction: 'master' as const,
+          bribeReceived: 1,
           currentLayer: 1,
           hand: ['action_shoot' as CardID],
         },
@@ -732,7 +743,13 @@ describe('playShoot 水星·逆流集成', () => {
   it('非贿赂者 SHOOT 梦主 → 正常结算', () => {
     let s = setupShootScenario();
     // p1 恢复为 thief 阵营
-    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, faction: 'thief' as const } } };
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, faction: 'thief' as const, bribeReceived: 0 },
+      },
+    };
     const r = callMove(s, 'playShoot', ['pM', 'action_shoot'], { currentPlayer: 'p1' });
     expectMoveOk(r);
     expect(r.deck.discardPile).toContain('action_shoot');
@@ -758,6 +775,7 @@ describe('playKick 水星·逆流集成', () => {
         p1: {
           ...s.players.p1!,
           faction: 'master' as const,
+          bribeReceived: 1,
           currentLayer: 1,
           hand: ['action_kick' as CardID],
         },

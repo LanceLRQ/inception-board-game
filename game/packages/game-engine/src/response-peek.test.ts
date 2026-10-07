@@ -442,13 +442,20 @@ describe('OOT-03 · 梦境窥视效果② 梦主查看贿赂牌（F10 red test�
       expect(r).toBe('INVALID_MOVE');
     });
 
-    it('target faction 已转为 master（DEAL 背叛者）→ INVALID_MOVE', () => {
+    it('target 是 DEAL 背叛者：对外仍是盗梦者，与普通盗梦者一样被接受', () => {
       const s0 = sceneMasterPeek();
       const s = {
         ...s0,
         players: { ...s0.players, p2: { ...s0.players.p2!, faction: 'master' as const } },
       };
       const r = callMove(s, 'playPeekMaster', [PEEK_CARD, 'p2'], { currentPlayer: 'pM' });
+      expect(r).not.toBe('INVALID_MOVE');
+    });
+
+    it('target 是梦主本人 → INVALID_MOVE', () => {
+      const r = callMove(sceneMasterPeek(), 'playPeekMaster', [PEEK_CARD, 'pM'], {
+        currentPlayer: 'pM',
+      });
       expect(r).toBe('INVALID_MOVE');
     });
 

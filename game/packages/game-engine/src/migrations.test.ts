@@ -3,7 +3,7 @@ import {
   migrateGameState,
   getSchemaVersion,
   CURRENT_SCHEMA_VERSION,
-  RENAMED_IDS_V10,
+  RENAMED_IDS,
   renameIdsDeep,
 } from './migrations.js';
 import { createInitialState } from './setup.js';
@@ -191,6 +191,96 @@ describe('migrations', () => {
     expect(state.players['1']!.successfulUnlocksThisTurn).toBe(2);
   });
 
+  describe('v10 → v11 · 来源层与皇城机会', () => {
+    const player = (over: Record<string, unknown>) => ({
+      id: 'x',
+      isAlive: true,
+      deathTurn: null,
+      currentLayer: 2,
+      ...over,
+    });
+
+    it('已在迷失层的玩家补第 1 层作为来源层，其余补 null', () => {
+      const state = migrateGameState({
+        schemaVersion: 10,
+        players: {
+          dead: player({ id: 'dead', isAlive: false, deathTurn: 3, currentLayer: 0 }),
+          live: player({ id: 'live' }),
+        },
+      });
+      expect(state.players.dead!.layerBeforeLimbo).toBe(1);
+      expect(state.players.live!.layerBeforeLimbo).toBeNull();
+    });
+
+    it('已有的来源层不被覆盖，皇城机会补 0', () => {
+      const state = migrateGameState({
+        schemaVersion: 10,
+        players: {
+          a: player({
+            id: 'a',
+            isAlive: false,
+            currentLayer: 0,
+            layerBeforeLimbo: 3,
+            imperialShootCharges: 2,
+          }),
+          b: player({ id: 'b' }),
+        },
+      });
+      expect(state.players.a!.layerBeforeLimbo).toBe(3);
+      expect(state.players.a!.imperialShootCharges).toBe(2);
+      expect(state.players.b!.imperialShootCharges).toBe(0);
+    });
+
+    it('缺少 players 时不抛异常，版本号升到当前', () => {
+      const state = migrateGameState({ schemaVersion: 10 });
+      expect(state.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    });
+  });
+
+  describe('v9 → v10 · 迷失层即死亡', () => {
+    const player = (over: Record<string, unknown>) => ({
+      id: 'x',
+      isAlive: true,
+      deathTurn: null,
+      currentLayer: 1,
+      ...over,
+    });
+
+    it('在迷失层却标着存活的玩家被规范为已死亡，deathTurn 取当时的回合数', () => {
+      const state = migrateGameState({
+        schemaVersion: 9,
+        turnNumber: 12,
+        players: { a: player({ id: 'a', currentLayer: 0 }) },
+      });
+      expect(state.players.a!.isAlive).toBe(false);
+      expect(state.players.a!.deathTurn).toBe(12);
+    });
+
+    it('已死亡的玩家保持原来的死亡回合；不在迷失层的存活玩家不动', () => {
+      const state = migrateGameState({
+        schemaVersion: 9,
+        turnNumber: 12,
+        players: {
+          dead: player({ id: 'dead', isAlive: false, deathTurn: 4, currentLayer: 0 }),
+          live: player({ id: 'live', currentLayer: 3 }),
+        },
+      });
+      expect(state.players.dead!.deathTurn).toBe(4);
+      expect(state.players.live!.isAlive).toBe(true);
+      expect(state.players.live!.deathTurn).toBeNull();
+    });
+
+    it('缺少 players 或回合数时不抛异常', () => {
+      expect(() => migrateGameState({ schemaVersion: 9 })).not.toThrow();
+      const state = migrateGameState({
+        schemaVersion: 9,
+        players: { a: player({ id: 'a', currentLayer: 0 }) },
+      });
+      expect(state.players.a!.isAlive).toBe(false);
+      expect(state.players.a!.deathTurn).toBe(0);
+    });
+  });
+
   describe('v8 → v9 · 贿赂池', () => {
     // 旧状态：成功牌在前，标识带成败前缀；有两张已派出
     function legacyState(seed: unknown): Record<string, unknown> {
@@ -306,7 +396,7 @@ describe('migrations', () => {
     });
   });
 
-  describe('v9 → v10 · 牌与技能标识统一', () => {
+  describe('v12 → v13 · 牌与技能标识统一', () => {
     function legacyState(): Record<string, unknown> {
       const fresh = createInitialState({
         playerCount: 5,
@@ -317,7 +407,7 @@ describe('migrations', () => {
       const players = fresh.players as Record<string, Record<string, unknown>>;
       return {
         ...fresh,
-        schemaVersion: 9,
+        schemaVersion: 12,
         players: {
           ...players,
           '0': {
@@ -373,7 +463,7 @@ describe('migrations', () => {
 
     it('迁移后的状态里不再出现任何旧标识', () => {
       const text = JSON.stringify(migrateGameState(legacyState()));
-      for (const old of Object.keys(RENAMED_IDS_V10)) expect(text).not.toContain(old);
+      for (const old of Object.keys(RENAMED_IDS)) expect(text).not.toContain(old);
     });
 
     it('不改入参，已经是新标识的状态原样通过', () => {
@@ -381,19 +471,19 @@ describe('migrations', () => {
       const before = JSON.stringify(raw);
       const once = migrateGameState(raw);
       expect(JSON.stringify(raw)).toBe(before);
-      expect(migrateGameState({ ...once, schemaVersion: 9 } as Record<string, unknown>)).toEqual(
+      expect(migrateGameState({ ...once, schemaVersion: 12 } as Record<string, unknown>)).toEqual(
         once,
       );
     });
 
     it('改写表里没有旧 → 新互相接龙的项（重复迁移不会二次改写）', () => {
-      const olds = new Set(Object.keys(RENAMED_IDS_V10));
-      for (const next of Object.values(RENAMED_IDS_V10)) expect(olds.has(next)).toBe(false);
+      const olds = new Set(Object.keys(RENAMED_IDS));
+      for (const next of Object.values(RENAMED_IDS)) expect(olds.has(next)).toBe(false);
     });
 
     it('renameIdsDeep 只改整串相等的值，不动含有旧标识的长文本', () => {
       expect(
-        renameIdsDeep({ a: 'action_shoot_king', b: 'x action_shoot_king y' }, RENAMED_IDS_V10),
+        renameIdsDeep({ a: 'action_shoot_king', b: 'x action_shoot_king y' }, RENAMED_IDS),
       ).toEqual({
         a: 'action_shoot_assassin',
         b: 'x action_shoot_king y',

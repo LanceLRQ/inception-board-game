@@ -74,7 +74,7 @@ export function scenarioThiefNearWin(): SetupState {
   };
 }
 
-/** 梦主获胜：全部盗梦者死亡 */
+/** 梦主获胜：牌库抽完时秘密金库未开（盗梦者已全部在迷失层） */
 export function scenarioMasterWin(): SetupState {
   const base = scenarioStartOfGame3p();
   const dead = (id: string) => ({
@@ -94,7 +94,7 @@ export function scenarioMasterWin(): SetupState {
       p2: dead('p2'),
     },
     winner: 'master',
-    winReason: 'all_thieves_dead',
+    winReason: 'deck_exhausted',
   };
 }
 

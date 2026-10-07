@@ -116,6 +116,12 @@ export interface AbilityContext {
   d6: () => number;
   /** SHOOT 上下文（如果当前在 SHOOT 结算链中） */
   pendingShoot?: PendingShootContext;
+  /**
+   * 刚结算完的这一次 SHOOT 的最终点数（经 M4、狂热、雕琢、毒针等修正之后）。
+   * 只有实际掷了骰的结算才有；躲开（双鱼·游离）等没有掷骰的结算不给。
+   * 与 G.lastShootRoll 不同：后者是原始 D6，只供骰子动画使用。
+   */
+  shootRoll?: number;
 }
 
 // === SHOOT 上下文 ===

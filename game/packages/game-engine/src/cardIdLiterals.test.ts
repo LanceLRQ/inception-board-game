@@ -17,13 +17,16 @@ import {
   VAULT_CARDS,
 } from '@icgame/shared';
 import { DUAL_FACED_CARD_IDS, DUAL_FACED_CHARS } from './engine/abilities/dual-faced.js';
-import { RENAMED_IDS_V10 } from './migrations.js';
+import { RENAMED_IDS } from './migrations.js';
 
 /** 与牌 id 同形、但不是牌 id 的字符串，每条写明用途 */
 const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   action_unlock_effect_1: '【解封】两种效果之一，出牌 move 的参数值',
   action_unlock_effect_2: '【解封】两种效果之一，出牌 move 的参数值',
   bribe_dealt: '领域事件类型：贿赂牌派发',
+  'thief_sagittarius.kills': '技能使用记录里的内部计数键：射手本回合的击杀数，不是技能标识',
+  'dm_pluto_hell.world.marked':
+    '技能使用记录里的内部标记键：冥王星已在本回合抽牌阶段检视过手牌，不是技能标识',
   nightmare_discarded: '领域事件类型：梦魇牌被弃',
   nightmare_revealed: '领域事件类型：梦魇牌被翻开',
   vault_opened: '领域事件类型：金库被打开',
@@ -119,7 +122,7 @@ describe('引擎源码里的牌 / 技能标识字面量', () => {
 describe('状态迁移的标识改写表', () => {
   it('改写后的新标识都存在于卡牌配置里，旧标识都已不存在', () => {
     const known = knownIds();
-    for (const [oldId, newId] of Object.entries(RENAMED_IDS_V10)) {
+    for (const [oldId, newId] of Object.entries(RENAMED_IDS)) {
       expect(known.has(newId), `${newId} 不在配置里`).toBe(true);
       expect(known.has(oldId), `${oldId} 仍在配置里`).toBe(false);
     }

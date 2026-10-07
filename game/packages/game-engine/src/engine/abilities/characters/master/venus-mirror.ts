@@ -27,7 +27,7 @@ export const venusDouble: AbilityDefinition = {
   canActivate(state: SetupState, ctx: AbilityContext) {
     const player = state.players[ctx.invokerID];
     if (!player) return { ok: false, reason: 'invalid_player' };
-    if (player.faction !== 'master') return { ok: false, reason: 'not_master' };
+    if (ctx.invokerID !== state.dreamMasterID) return { ok: false, reason: 'not_master' };
     return { ok: false, reason: 'not_implemented' };
   },
 

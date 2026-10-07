@@ -6,8 +6,12 @@ import type { CardID } from '@icgame/shared';
 import { scenarioStartOfGame3p } from './testing/scenarios.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 import { SAGITTARIUS_HEART_LOCK_SKILL_ID } from './engine/skills.js';
+import { sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './engine/death.js';
+import { beginTurn } from './moves.js';
 
-function setupSagittarius() {
+/** killed=true：本回合已击杀过一位玩家（穿心的发动前提），其余场景都需要它 */
+function setupSagittarius(opts: { killed?: boolean } = {}) {
+  const killed = opts.killed ?? true;
   let s = scenarioStartOfGame3p();
   s = {
     ...s,
@@ -19,6 +23,7 @@ function setupSagittarius() {
       p1: {
         ...s.players.p1!,
         characterId: 'thief_sagittarius' as CardID,
+        skillUsedThisTurn: killed ? { [SAGITTARIUS_KILLS_THIS_TURN_KEY]: 1 } : {},
         currentLayer: 1,
         hand: ['action_shoot' as CardID, 'action_unlock' as CardID],
       },
@@ -152,7 +157,13 @@ describe('射手·穿心（useSagittariusHeartLock）', () => {
       ...s,
       players: {
         ...s.players,
-        p1: { ...s.players.p1!, skillUsedThisTurn: { [SAGITTARIUS_HEART_LOCK_SKILL_ID]: 1 } },
+        p1: {
+          ...s.players.p1!,
+          skillUsedThisTurn: {
+            [SAGITTARIUS_KILLS_THIS_TURN_KEY]: 1,
+            [SAGITTARIUS_HEART_LOCK_SKILL_ID]: 1,
+          },
+        },
       },
     };
     const r = callMove(s, 'useSagittariusHeartLock', [1, 1], { currentPlayer: 'p1' });
@@ -162,6 +173,47 @@ describe('射手·穿心（useSagittariusHeartLock）', () => {
   it('非法层号 → INVALID_MOVE', () => {
     const s = setupSagittarius();
     const r = callMove(s, 'useSagittariusHeartLock', [5, 1], { currentPlayer: 'p1' });
+    expect(r).toBe('INVALID_MOVE');
+  });
+});
+
+describe('射手·穿心：每击杀一位玩家才有一次机会（回合限 1 次）', () => {
+  // 对照：docs/manual/05-dream-thieves.md 射手 136 行「你每击杀1位玩家，可增加或减少任意一层的1个心锁。回合限1次」
+  const killWithShoot = (s: ReturnType<typeof setupSagittarius>) => {
+    const r = callMove(s, 'playShoot', ['p2', 'action_shoot'], { currentPlayer: 'p1', rolls: [1] });
+    expectMoveOk(r);
+    expect(r.players.p2!.isAlive).toBe(false);
+    return r;
+  };
+
+  it('本回合没有击杀过玩家 → 发动被拒', () => {
+    const r = callMove(setupSagittarius({ killed: false }), 'useSagittariusHeartLock', [1, 1], {
+      currentPlayer: 'p1',
+    });
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('击杀一次后可以发动一次，第二次被拒', () => {
+    const killed = killWithShoot(setupSagittarius({ killed: false }));
+    const first = callMove(killed, 'useSagittariusHeartLock', [1, -1], { currentPlayer: 'p1' });
+    expectMoveOk(first);
+    expect(first.layers[1]!.heartLockValue).toBe(2);
+    const second = callMove(first, 'useSagittariusHeartLock', [1, -1], { currentPlayer: 'p1' });
+    expect(second).toBe('INVALID_MOVE');
+  });
+
+  it('击杀发生在上一回合：新回合开始后不可发动', () => {
+    const killed = killWithShoot(setupSagittarius({ killed: false }));
+    const nextTurn = beginTurn(killed, 'p1');
+    const r = callMove({ ...nextTurn, turnPhase: 'action' }, 'useSagittariusHeartLock', [1, 1], {
+      currentPlayer: 'p1',
+    });
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('别人被梦魇送进迷失层不算射手的击杀', () => {
+    const limbo = sendToLimbo(setupSagittarius({ killed: false }), 'p2');
+    const r = callMove(limbo, 'useSagittariusHeartLock', [1, 1], { currentPlayer: 'p1' });
     expect(r).toBe('INVALID_MOVE');
   });
 });

@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CardID } from '@icgame/shared';
 import type { SetupState } from './setup.js';
-import { LIBRA_SKILL_ID, ARCHITECT_SKILL_ID } from './engine/skills.js';
+import { LIBRA_SKILL_ID } from './engine/skills.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
 
@@ -180,7 +180,6 @@ describe('筑梦师 · 迷宫（mazeState）', () => {
     });
     expect(r.deck.discardPile).toContain('action_shoot');
     expect(r.players.p1!.hand).toEqual(['action_unlock']);
-    expect(r.players.p1!.skillUsedThisTurn[ARCHITECT_SKILL_ID]).toBe(1);
   });
 
   it('拒绝：非筑梦师', () => {
@@ -221,12 +220,16 @@ describe('筑梦师 · 迷宫（mazeState）', () => {
     expect(callMove(s, 'playArchitectMaze', ['action_shoot' as CardID, 'p1'])).toBe('INVALID_MOVE');
   });
 
-  it('限制：本回合 1 次', () => {
+  it('不限次数：每次弃 1 张 SHOOT 类牌，同一回合可连续发动（卡面无「限一次」）', () => {
     let s = setupMazeScenario();
     s = setHand(s, 'p1', ['action_shoot', 'action_shoot'] as CardID[]);
     const r1 = callMove(s, 'playArchitectMaze', ['action_shoot' as CardID, 'p2']);
     expectMoveOk(r1);
-    expect(callMove(r1, 'playArchitectMaze', ['action_shoot' as CardID, 'p2'])).toBe(
+    const r2 = callMove(r1, 'playArchitectMaze', ['action_shoot' as CardID, 'p2']);
+    expectMoveOk(r2);
+    expect(r2.players.p1!.hand).toEqual([]);
+    // 代价仍在：没有 SHOOT 类牌就不能再发动
+    expect(callMove(r2, 'playArchitectMaze', ['action_shoot' as CardID, 'p2'])).toBe(
       'INVALID_MOVE',
     );
   });

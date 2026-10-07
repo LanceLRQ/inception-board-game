@@ -393,7 +393,7 @@
     "thief_tourist": {
       "skill_0": {
         "name": "Tourist · Assist",
-        "desc": "Assist a chosen player (1/turn)"
+        "desc": "Assist a chosen player"
       }
     },
     "thief_martyr": {

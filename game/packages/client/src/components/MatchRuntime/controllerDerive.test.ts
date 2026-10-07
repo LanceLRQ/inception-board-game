@@ -1,14 +1,12 @@
 // 对局界面控制层纯推导的测试：输入尽量用固定场景里引擎真实产出的视图
 
 import { describe, it, expect } from 'vitest';
-import { isShootClassCard, type MatchView, type RunnerCtx } from '@icgame/game-engine';
-import { ACTION_CARDS } from '@icgame/shared';
+import type { MatchView, RunnerCtx } from '@icgame/game-engine';
 import { buildFixtureScenario } from '../../match/fixtures/buildScenario';
 import {
   HAND_LIMIT,
   adaptPlayForCharacter,
   SUDGER_CHARACTER_ID,
-  SUDGER_SHOOT_CARDS,
   activeSkillTargetIds,
   buildActiveSkillContext,
   buildPlayArgs,
@@ -468,14 +466,6 @@ describe('意念判官：打出 SHOOT 类牌改走【定罪】', () => {
 
   it('角色 id 与引擎一致', () => {
     expect(SUDGER).toBe('thief_sudger_of_mind');
-  });
-
-  it('改走定罪的牌与引擎里 SHOOT 类牌的判定一致，且都是配置里的行动牌', () => {
-    const configured = ACTION_CARDS.map((c) => c.id as string);
-    for (const id of SUDGER_SHOOT_CARDS) expect(configured, id).toContain(id);
-    for (const id of configured) {
-      expect(SUDGER_SHOOT_CARDS.includes(id), id).toBe(isShootClassCard(id));
-    }
   });
 
   it.each([

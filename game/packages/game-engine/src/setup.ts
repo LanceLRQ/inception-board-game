@@ -26,12 +26,19 @@ const SHUFFLE_LABEL = {
  */
 /**
  * 构建初始贿赂池
- * 对照：docs/manual/03-game-flow.md 贿赂&背叛者
- * 3 张成功 + 3 张失败；先按种子洗乱，再按下标给不透明标识 `bribe-N`，
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者；docs/manual/02-game-setup.md 人数配置表（贿赂牌数成功 / 失败）
+ * 成功 / 失败张数按人数配置；先按种子洗乱，再按下标给不透明标识 `bribe-N`，
  * 这样标识和池内顺序都推不出成败，成败只记在 kind 字段里（由视图过滤掉）
  */
-function buildInitialBribePool(rngSeed: string): BribeSetup[] {
-  const kinds: BribeSetup['kind'][] = ['deal', 'deal', 'deal', 'fail', 'fail', 'fail'];
+function buildInitialBribePool(
+  rngSeed: string,
+  dealCount: number,
+  shatterCount: number,
+): BribeSetup[] {
+  const kinds: BribeSetup['kind'][] = [
+    ...Array<BribeSetup['kind']>(dealCount).fill('deal'),
+    ...Array<BribeSetup['kind']>(shatterCount).fill('fail'),
+  ];
   return seededShuffle(kinds, rngSeed, SHUFFLE_LABEL.bribe).map((kind, i) => ({
     id: `bribe-${i}`,
     kind,
@@ -50,6 +57,9 @@ function buildInitialDeck(expansionEnabled: boolean, rngSeed: string): CardID[] 
   }
   return seededShuffle(cards, rngSeed, SHUFFLE_LABEL.deck);
 }
+
+/** 金币金库打开后梦主的三个选项：派贿赂并弃梦魇 / 翻开并发动梦魇 / 弃梦魇 */
+export type VaultDecisionChoice = 'bribe' | 'nightmare' | 'discard';
 
 export interface SetupState {
   matchId: string;
@@ -112,6 +122,15 @@ export interface SetupState {
   pendingPeekDecision: {
     peekerID: string;
     targetLayer: number;
+  } | null;
+  // 金币金库打开 · 梦主三选一等待态
+  //   规则：盗梦者（含背叛者）打开放有金币的金库时，梦主在这三项里选一项：
+  //     派发 1 张贿赂牌并弃掉该层梦魇 / 翻开并发动该层梦魇 / 弃掉该层梦魇、不派贿赂牌
+  //   对照：docs/manual/03-game-flow.md 金库（33-36 行）、梦魇牌（94-103 行）
+  //   生命周期：解封结算或技能把心锁减到 0 翻开金币金库时挂起 → masterVaultDecision 清空
+  pendingVaultDecision: {
+    layer: number;
+    openerID: string;
   } | null;
   // 梦境窥视 · 私密展示态（对局视图按授权分支消费）
   //   revealKind='vault'：效果①（盗梦者使用），仅对 peekerID 视角透传 vaultLayer 对应的 vault 内容
@@ -177,7 +196,7 @@ export interface SetupState {
    * 处女·完美：任意玩家骰出 6 时挂起处女的"三选一"决策窗口
    *   3 个选项：复活己方死者 / 抽 2 张 / 传送任一层
    * 对照：docs/manual/05-dream-thieves.md 处女
-   * 生命周期：dispatchPassives(onAfterShoot) 检测到处女且骰=6 时挂起；
+   * 生命周期：dispatchPassives(onAfterShoot) 检测到处女且该次 SHOOT 的最终结算点数=6 时挂起；
    *           respondVirgoPerfect(choice, params) 消费并清空。
    * 与 pendingShootMove 关系：pendingShootMove 优先（先选层），关闭后 onAfterShoot 触发本窗。
    */
@@ -248,6 +267,17 @@ export interface PlayerSetup {
   hand: CardID[];
   isAlive: boolean;
   deathTurn: number | null;
+  /**
+   * 进入迷失层之前所在的层（1-4）；不在迷失层时为 null。
+   * 梦主回合开始时的自动复活按它落点，缺失则回落第 1 层。
+   * 对照：docs/manual/03-game-flow.md 复活；docs/manual/08-appendix.md 梦主优势
+   */
+  layerBeforeLimbo?: Layer | null;
+  /**
+   * 皇城世界观：尚未用掉的「视为 SHOOT」机会数。每收到 1 张贿赂牌 +1，发动一次 -1。
+   * 对照：docs/manual/06-dream-master.md 皇城
+   */
+  imperialShootCharges?: number;
   unlockCount: number;
   shootCount: number;
   bribeReceived: number;
@@ -255,9 +285,9 @@ export interface PlayerSetup {
   skillUsedThisGame: Record<string, number>;
   successfulUnlocksThisTurn: number;
   /**
-   * 小丑·赌博：下一次本玩家回合 discard 阶段强制清空手牌。
-   * 记录设防时的 turnNumber；discard 检查时若 `armedAtTurn < G.turnNumber` 则触发后清空标记。
-   * 这样保证本回合 discard 不会误触发（本回合 armed===turnNumber，不满足 <）。
+   * 小丑·失控：发动当回合的 discard 阶段强制清空手牌。
+   * 记录发动时的 turnNumber；discard 检查时 `armedAtTurn === G.turnNumber` 才强制，弃光后清空标记；
+   * 回合号前进后旧值自然失效。
    */
   forcedDiscardArmedAtTurn?: number | null;
 }
@@ -331,6 +361,8 @@ export function createInitialState(options: {
       hand: [],
       isAlive: true,
       deathTurn: null,
+      layerBeforeLimbo: null,
+      imperialShootCharges: 0,
       unlockCount: 0,
       shootCount: 0,
       bribeReceived: 0,
@@ -401,7 +433,7 @@ export function createInitialState(options: {
     expansionEnabled: options.expansionEnabled ?? false,
     layers,
     vaults,
-    bribePool: buildInitialBribePool(rngSeed),
+    bribePool: buildInitialBribePool(rngSeed, config.dealCount, config.shatterCount),
     deck: {
       cards: buildInitialDeck(options.expansionEnabled ?? false, rngSeed),
       discardPile: [],
@@ -418,6 +450,7 @@ export function createInitialState(options: {
     shiftSnapshot: null,
     pendingResponseWindow: null,
     pendingPeekDecision: null,
+    pendingVaultDecision: null,
     peekReveal: null,
     pendingLibra: null,
     pendingSudgerRolls: null,

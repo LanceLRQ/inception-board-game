@@ -16,7 +16,7 @@ function setupImperialCity() {
     players: {
       ...s.players,
       p1: { ...s.players.p1!, currentLayer: 1, bribeReceived: 0 },
-      p2: { ...s.players.p2!, currentLayer: 1, bribeReceived: 1 },
+      p2: { ...s.players.p2!, currentLayer: 1, bribeReceived: 1, imperialShootCharges: 1 },
       pM: { ...s.players.pM!, characterId: 'dm_imperial_city' as CardID, currentLayer: 1 },
     },
     layers: {

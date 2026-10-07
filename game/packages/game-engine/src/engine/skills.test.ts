@@ -178,7 +178,6 @@ describe('译梦师 · 伏笔 (Dream Interpreter)', () => {
 
     const result = applyInterpreterForeshadow(s, 'p0');
     expect(result.players.p0!.hand).toHaveLength(2);
-    expect(result.players.p0!.skillUsedThisTurn[INTERPRETER_SKILL_ID]).toBe(1);
   });
 
   it('does not trigger for non-interpreter', () => {
@@ -191,7 +190,7 @@ describe('译梦师 · 伏笔 (Dream Interpreter)', () => {
     expect(result.players.p0!.hand).toHaveLength(0);
   });
 
-  it('does not trigger twice per turn', () => {
+  it('triggers on every unlock, no per-turn limit', () => {
     const state = makeStateWithPlayer({
       characterId: 'thief_dream_interpreter',
       hand: [],
@@ -199,7 +198,7 @@ describe('译梦师 · 伏笔 (Dream Interpreter)', () => {
     });
     const s = { ...state, deck: { cards: ['a', 'b'], discardPile: [] } };
     const result = applyInterpreterForeshadow(s, 'p0');
-    expect(result.players.p0!.hand).toHaveLength(0);
+    expect(result.players.p0!.hand).toHaveLength(2);
   });
 });
 

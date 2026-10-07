@@ -15,17 +15,16 @@ export const MOVES_BY_PHASE: Record<string, string[]> = {
     // 响应类 / 梦境窥视三段式中间态 move 不放进 action 白名单
     //   原因：本名单是 pickBotMove 的合法 move 来源；若包含响应类，
     //         Bot 会主动选中 → 引擎判定非法 move，污染日志。
-    //   正确路径：响应窗口 / pendingPeekDecision / peekReveal 由自动行动判定
+    //   正确路径：响应窗口 / pendingPeekDecision / pendingVaultDecision / peekReveal 由自动行动判定
     //         （autoAction）以响应者本人的名义发出，不经过 pickBotMove。
     //   被排除的 move（仅由自动行动判定发起，不参与 pickBotMove）：
     //     - respondCancelUnlock / passResponse / resolveUnlock
-    //     - masterPeekBribeDecision / peekerAcknowledge
+    //     - masterPeekBribeDecision / masterVaultDecision / peekerAcknowledge
     'playDreamTransit',
     'playCreation',
     'playKick',
     'playTelekinesis',
     'useChessTranspose',
-    'masterDealBribe',
     'playPeek',
     'playPeekMaster',
     'playGraft',
@@ -44,11 +43,9 @@ export const MOVES_BY_PHASE: Record<string, string[]> = {
     'resolveShootMove',
     'useSagittariusHeartLock',
     'playShift',
-    'masterRevealNightmare',
     'masterDiscardNightmare',
     'masterActivateNightmare',
     'playNightmareUnlock',
-    'masterDealBribeImperial',
     'playSecretPassageTeleport',
     'useUranusPower',
     'usePlutoBurning',
@@ -56,7 +53,6 @@ export const MOVES_BY_PHASE: Record<string, string[]> = {
     'useSaturnFreeMove',
     'useMarsBattlefield',
     'useVenusDouble',
-    'masterDiscardHiddenNightmare',
     'playLibraBalance',
     'resolveLibraSplit',
     'resolveLibraPick',
@@ -85,7 +81,6 @@ export const MOVE_PRIORITY: Record<string, number> = {
   playKick: 95,
   playTelekinesis: 96,
   useChessTranspose: 97,
-  masterDealBribe: 98,
   playPeek: 99,
   playPeekMaster: 230, // 梦主效果② 默认低优先（Bot L0 不主动使用）
   playGraft: 100,
@@ -103,18 +98,15 @@ export const MOVE_PRIORITY: Record<string, number> = {
   resolveShootMove: 0, // 必须优先结算 pendingShootMove（发动方选层）
   useSagittariusHeartLock: 112,
   playShift: 108,
-  masterRevealNightmare: 200, // 梦主低优先：Bot L0 默认不主动触发
   masterDiscardNightmare: 201,
   masterActivateNightmare: 202,
   playNightmareUnlock: 110,
-  masterDealBribeImperial: 210,
   playSecretPassageTeleport: 211,
   useUranusPower: 212,
   usePlutoBurning: 213,
   useMarsKill: 214,
   useSaturnFreeMove: 115, // 盗梦者主动技能（中优先级）
   useMarsBattlefield: 116,
-  masterDiscardHiddenNightmare: 215, // 梦主低优先：Bot L0 默认不主动触发
   useVenusDouble: 216, // 金星·重影（梦主低优先，避免 Bot 无手牌时误发）
   playJokerGamble: 220, // 小丑·赌博：draw 阶段替代 doDraw（Bot L0 不主动选）
   playBlackSwanTour: 221, // 黑天鹅·巡演：draw 阶段替代 doDraw（Bot L0 不主动选）
@@ -128,6 +120,7 @@ export const MOVE_PRIORITY: Record<string, number> = {
   passResponse: 0,
   resolveUnlock: 0,
   masterPeekBribeDecision: 0,
+  masterVaultDecision: 0,
   peekerAcknowledge: 0,
   playLibraBalance: 117, // 天秤入口（盗梦者主动技能，中优先级）
   playForgerExchangeSingle: 118, // 欺诈师入口（同上）

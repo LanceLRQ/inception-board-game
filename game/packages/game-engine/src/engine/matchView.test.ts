@@ -682,6 +682,19 @@ describe('对局视图 · 移形换影的角色快照', () => {
     expect(Object.keys(forMaster).sort()).toEqual([master, d].sort());
   });
 
+  it('已翻开玩家换牌前的角色此刻在未翻开的别人身上时，该条目不给无关观察者', () => {
+    // d 已翻开，他换牌前的角色现在在未翻开的 a 手上
+    const swapped: SetupState = {
+      ...snapshot,
+      shiftSnapshot: { [d]: G.players[a]!.characterId },
+    };
+    expect(v(swapped, b).shiftSnapshot).toEqual({});
+    expect(v(swapped, null).shiftSnapshot).toEqual({});
+    // 持有者本人与对局结束后的视图不受影响
+    expect(Object.keys(v(swapped, a).shiftSnapshot!)).toEqual([d]);
+    expect(Object.keys(v(swapped, null, true).shiftSnapshot!)).toEqual([d]);
+  });
+
   it('对局结束后全部公开', () => {
     expect(Object.keys(v(snapshot, null, true).shiftSnapshot!).sort()).toEqual(
       [master, a, b, c, d].sort(),

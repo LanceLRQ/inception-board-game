@@ -155,6 +155,7 @@ describe('嫁接 · 直接调用 move 函数（纯单元）', () => {
       endTurn: null,
       pendingResponseWindow: null,
       pendingPeekDecision: null,
+      pendingVaultDecision: null,
       peekReveal: null,
       pendingLibra: null,
       mazeState: null,

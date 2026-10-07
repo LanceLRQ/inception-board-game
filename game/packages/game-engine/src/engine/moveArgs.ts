@@ -82,12 +82,13 @@ const nightmareParams: ArgCheck = optional(
     optional(playerList)(v.bribedTargets, G, args),
 );
 
-/** 欺诈师·盗心的交换内容 */
-const forgerExchange: ArgCheck = (v, G, args) =>
-  isRecord(v) &&
-  player(v.targetID, G, args) &&
-  cardList(v.takenFromTarget, G, args) &&
-  cardList(v.returnedToTarget, G, args);
+/** 金库三选一的附加参数：梦魇效果的参数，外加皇城·重金指定贿赂牌用的 poolIndex */
+const vaultDecisionParams: ArgCheck = optional(
+  (v, G, args) =>
+    isRecord(v) &&
+    nightmareParams(v, G, args) &&
+    optional(indexOf((state) => state.bribePool.length))(v.poolIndex, G, args),
+);
 
 const virgoParams: ArgCheck = optional(
   (v, G, args) =>
@@ -128,8 +129,6 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   playShootSudger: [player, card, optional(card)],
   resolveSudgerPick: [oneOf('A', 'B')],
   playNightmareUnlock: [card, layer],
-  masterRevealNightmare: [layer],
-  masterDiscardHiddenNightmare: [layer],
   masterDiscardNightmare: [layer],
   masterActivateNightmare: [layer, nightmareParams],
   playShift: [card, player],
@@ -151,10 +150,9 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   playKick: [card, player],
   playTelekinesis: [card, player],
   playPeek: [card, layer],
-  masterPeekBribeDecision: [bool],
+  masterPeekBribeDecision: [bool, optional(indexOf((G) => G.bribePool.length))],
+  masterVaultDecision: [oneOf('bribe', 'nightmare', 'discard'), vaultDecisionParams],
   playPeekMaster: [card, player],
-  masterDealBribe: [player],
-  masterDealBribeImperial: [player, indexOf((G) => G.bribePool.length)],
   playSecretPassageTeleport: [player, card],
   useVenusDouble: [cardList],
   useUranusPower: [player, layer],
@@ -179,7 +177,6 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   respondVirgoPerfect: [oneOf('revive', 'draw_two', 'teleport', 'skip'), virgoParams],
   playGaiaShift: [recordByPlayer(oneOf(-1, 1))],
   playDarwinEvolution: [cardList],
-  playForgerExchange: [forgerExchange],
   playForgerExchangeSingle: [player, card],
   playLibraBalance: [player],
   resolveLibraSplit: [cardList, cardList],

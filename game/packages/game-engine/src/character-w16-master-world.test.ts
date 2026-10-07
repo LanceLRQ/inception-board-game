@@ -8,6 +8,7 @@ import {
   applyMarsKillDiscardUnlock,
   isPlutoHellWorldActive,
   applyPlutoHellLostCheck,
+  endDrawPhase,
   applySaturnFreeMove,
   canUseSaturnFreeMoveThisTurn,
   findMasterID,
@@ -135,62 +136,67 @@ describe('冥王星·地狱世界观', () => {
     expect(isPlutoHellWorldActive(s)).toBe(true);
   });
 
-  it('applyPlutoHellLostCheck：手牌≥6 → 入迷失', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+  /** 抽牌阶段结束后的局面：p1 为当前玩家，手牌 n 张 */
+  function afterDrawPhase(master: string, playerID: string, n: number) {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), master);
+    s = { ...s, turnPhase: 'draw', currentPlayerID: playerID };
     s = setHand(
       s,
-      'p1',
-      Array.from({ length: 6 }, () => 'action_unlock' as CardID),
+      playerID,
+      Array.from({ length: n }, () => 'action_unlock' as CardID),
     );
+    return endDrawPhase(s);
+  }
+
+  it('抽牌阶段结束手牌≥6 → 回合结束入迷失', () => {
+    const s = afterDrawPhase('dm_pluto_hell', 'p1', 6);
+    expect(s.players.p1!.currentLayer).toBe(1);
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
+    expect(r.players.p1!.isAlive).toBe(false);
   });
 
-  it('applyPlutoHellLostCheck：手牌<6 → 不入迷失', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
+  it('抽牌阶段结束手牌<6 → 不入迷失，之后手牌变多也不追加', () => {
+    let s = afterDrawPhase('dm_pluto_hell', 'p1', 5);
     s = setHand(
       s,
       'p1',
-      Array.from({ length: 5 }, () => 'action_unlock' as CardID),
+      Array.from({ length: 8 }, () => 'action_unlock' as CardID),
     );
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(1);
   });
 
-  it('applyPlutoHellLostCheck：非冥王星梦主 → 不触发', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
-    s = setHand(
-      s,
-      'p1',
-      Array.from({ length: 6 }, () => 'action_unlock' as CardID),
-    );
-    const r = applyPlutoHellLostCheck(s, 'p1');
-    expect(r.players.p1!.currentLayer).toBe(1);
-  });
-
-  it('applyPlutoHellLostCheck：已死亡盗梦者 → 不触发', () => {
+  it('没有抽牌阶段标记（回合结束时才看手牌）→ 不触发', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setHand(
       s,
       'p1',
       Array.from({ length: 6 }, () => 'action_unlock' as CardID),
     );
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(1);
+  });
+
+  it('非冥王星梦主 → 不触发', () => {
+    const s = afterDrawPhase('dm_fortress', 'p1', 6);
+    const r = applyPlutoHellLostCheck(s, 'p1');
+    expect(r.players.p1!.currentLayer).toBe(1);
+  });
+
+  it('已死亡盗梦者 → 不触发', () => {
+    let s = afterDrawPhase('dm_pluto_hell', 'p1', 6);
     s = {
       ...s,
       players: { ...s.players, p1: { ...s.players.p1!, isAlive: false, deathTurn: 1 } },
     };
     const r = applyPlutoHellLostCheck(s, 'p1');
-    // 已死则不再"入迷失"逻辑层面也可不变（由其他流程处理），验证至少不出错
     expect(r.players.p1!.isAlive).toBe(false);
+    expect(r.players.p1!.deathTurn).toBe(1);
   });
 
-  it('applyPlutoHellLostCheck：梦主自己不触发', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
-    s = setHand(
-      s,
-      'pM',
-      Array.from({ length: 8 }, () => 'action_unlock' as CardID),
-    );
+  it('梦主自己不触发', () => {
+    const s = afterDrawPhase('dm_pluto_hell', 'pM', 8);
     const r = applyPlutoHellLostCheck(s, 'pM');
     expect(r.players.pM!.currentLayer).toBe(1);
   });

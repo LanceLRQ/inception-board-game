@@ -104,6 +104,13 @@ const RIGHTS_RULES: readonly RightsRule[] = [
     actors: (G) => (G.pendingPeekDecision ? [G.dreamMasterID] : null),
   },
   {
+    // 金币金库打开：梦主三选一（派贿赂 / 发动梦魇 / 弃梦魇），回合主人与其他人都等着
+    field: 'pendingVaultDecision',
+    blocking: true,
+    moves: ['masterVaultDecision'],
+    actors: (G) => (G.pendingVaultDecision ? [G.dreamMasterID] : null),
+  },
+  {
     field: 'peekReveal',
     blocking: true,
     moves: ['peekerAcknowledge'],

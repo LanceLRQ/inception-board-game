@@ -4,17 +4,17 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 13;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
 /**
- * 第 10 版统一牌与技能标识时改掉的旧写法（旧 → 新）。
+ * 统一牌与技能标识时改掉的旧写法（旧 → 新），由第 13 版的迁移使用。
  * 状态里这些标识出现在手牌、牌库、弃牌堆、出牌记录等牌 id 的位置，
  * 也出现在玩家的技能使用记录（skillUsedThisTurn / skillUsedThisGame）的键上，
  * 按阶段计数的键带 `:<阶段>` 后缀。
  */
-export const RENAMED_IDS_V10: Readonly<Record<string, string>> = {
+export const RENAMED_IDS: Readonly<Record<string, string>> = {
   action_shoot_king: 'action_shoot_assassin',
   action_shoot_armor: 'action_shoot_drill',
   'dm_saturn_territory.world.skill': 'dm_saturn_territory.worldview',
@@ -173,8 +173,66 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       };
     },
   ],
-  // v9 → v10：牌与技能标识统一成一套（见 RENAMED_IDS_V10），状态里的旧写法一并改过来
-  [10, (state) => renameIdsDeep(state, RENAMED_IDS_V10) as Record<string, unknown>],
+  // v9 → v10：迷失层与死亡合为同一个状态（对照 docs/manual/08-appendix.md 迷失层条目）。
+  //   旧版本里梦魇、世界观、密道等只把人挪进迷失层而不置死亡，这些人无法被复活，却仍被当作活人。
+  //   把「在迷失层却标着存活」的玩家规范为已死亡，死亡回合取快照当时的回合数
+  [
+    10,
+    (state) => {
+      const players = state.players;
+      if (typeof players !== 'object' || players === null) return state;
+      const turn = typeof state.turnNumber === 'number' ? state.turnNumber : 0;
+      return {
+        ...state,
+        players: Object.fromEntries(
+          Object.entries(players as Record<string, Record<string, unknown>>).map(([id, p]) => [
+            id,
+            p && p.currentLayer === 0 && p.isAlive === true
+              ? { ...p, isAlive: false, deathTurn: turn }
+              : p,
+          ]),
+        ),
+      };
+    },
+  ],
+  // v10 → v11：玩家新增两个字段
+  //   - layerBeforeLimbo：进入迷失层之前所在的层，梦主回合开始的自动复活按它落点。
+  //     旧状态没有记录：已在迷失层的玩家补 1（旧行为就是回第 1 层），其余补 null
+  //   - imperialShootCharges：皇城世界观下尚未用掉的 SHOOT 机会数，旧状态补 0
+  [
+    11,
+    (state) => {
+      const players = state.players;
+      if (typeof players !== 'object' || players === null) return state;
+      return {
+        ...state,
+        players: Object.fromEntries(
+          Object.entries(players as Record<string, Record<string, unknown>>).map(([id, p]) => [
+            id,
+            p && typeof p === 'object'
+              ? {
+                  ...p,
+                  layerBeforeLimbo:
+                    p.layerBeforeLimbo ?? (p.currentLayer === 0 && p.isAlive === false ? 1 : null),
+                  imperialShootCharges: p.imperialShootCharges ?? 0,
+                }
+              : p,
+          ]),
+        ),
+      };
+    },
+  ],
+  // v11 → v12：新增 pendingVaultDecision（金币金库打开后梦主三选一的等待态），旧存档补 null。
+  //   对照：docs/manual/03-game-flow.md 金库、梦魇牌
+  [
+    12,
+    (state) => ({
+      ...state,
+      pendingVaultDecision: state.pendingVaultDecision ?? null,
+    }),
+  ],
+  // v12 → v13：牌与技能标识统一成一套（见 RENAMED_IDS），状态里的旧写法一并改过来
+  [13, (state) => renameIdsDeep(state, RENAMED_IDS) as Record<string, unknown>],
 ]);
 
 // 错误信息里展示收到的值：字符串带引号以区分 '3' 与 3，数组、null 等用 JSON 表示

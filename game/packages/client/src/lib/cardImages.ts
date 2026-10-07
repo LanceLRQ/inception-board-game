@@ -19,6 +19,8 @@ import {
   BRIBE_CARDS,
   CARD_BACK_IMAGES,
 } from '@icgame/shared';
+import { getBaseCharacterId, getCharacterFace } from '@icgame/game-engine';
+import type { CardID } from '@icgame/shared';
 import { cardImageInfo, versionedCardImageUrl } from './cardImageVersion';
 
 /** 卡图在 public/cards 下的分类目录；与素材目录的分类一致 */
@@ -119,6 +121,11 @@ export const GENERIC_BACK_BYTES = {
  */
 export function getCardImageUrl(cardId: string | null | undefined): string | undefined {
   if (!cardId) return undefined;
+  // 双面角色翻到背面后 id 是 `*_back`：卡图取基础角色的背面图
+  if (getCharacterFace(cardId as CardID) === 'back') {
+    const entry = IMAGE_MAP.get(getBaseCharacterId(cardId as CardID));
+    return entry?.back ?? entry?.front;
+  }
   return IMAGE_MAP.get(cardId)?.front;
 }
 
@@ -128,13 +135,17 @@ export function getCardImageUrl(cardId: string | null | undefined): string | und
  */
 export function getCardBackImageUrl(cardId: string | null | undefined): string | undefined {
   if (!cardId) return undefined;
+  // 背面朝上时，翻面预览看到的另一面是正面
+  if (getCharacterFace(cardId as CardID) === 'back') {
+    return IMAGE_MAP.get(getBaseCharacterId(cardId as CardID))?.front;
+  }
   return IMAGE_MAP.get(cardId)?.back;
 }
 
 /** 判断一张卡是否为双面（有背面图） */
 export function hasCardBackImage(cardId: string | null | undefined): boolean {
   if (!cardId) return false;
-  return !!IMAGE_MAP.get(cardId)?.back;
+  return !!IMAGE_MAP.get(getBaseCharacterId(cardId as CardID))?.back;
 }
 
 /** 已登记的卡牌总数（测试/诊断用） */

@@ -36,6 +36,8 @@ export interface PlayerState {
   // 存活
   readonly isAlive: boolean;
   readonly deathTurn: number | null;
+  /** 进入迷失层之前所在的层；不在迷失层时为 null */
+  readonly layerBeforeLimbo?: Layer | null;
 
   // 统计
   readonly unlockCount: number;

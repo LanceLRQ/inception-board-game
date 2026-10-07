@@ -1,6 +1,6 @@
 // 双鱼 · 闪避（thief_pisces.skill_0，双面）
 // 对照：docs/manual/05-dream-thieves.md 双鱼
-// 被 SHOOT 时可移到上一层并翻面，回合限 1 次
+// 被 SHOOT 时可移到数字更小的相邻层（第 1 层则进入迷失层）并翻面，回合限 1 次
 //
 // abilities registry 接入：onBeforeShoot — target 响应窗口
 // 定义 + canActivate；apply 调用 applyPiscesEvade 纯函数

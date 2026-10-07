@@ -75,6 +75,9 @@ const unlockOnly: Partial<SetupState> = {
 const peekDecision: Partial<SetupState> = {
   pendingPeekDecision: { peekerID: 'p2', targetLayer: 2 },
 };
+const vaultDecision: Partial<SetupState> = {
+  pendingVaultDecision: { layer: 2, openerID: 'p2' },
+};
 const peekReveal: Partial<SetupState> = {
   peekReveal: { peekerID: 'p3', revealKind: 'vault', vaultLayer: 2 },
 };
@@ -161,6 +164,13 @@ const blockingRows: BlockingRow[] = [
     patch: peekDecision,
     actor: 'pM',
     moves: ['masterPeekBribeDecision'],
+    other: 'p2',
+  },
+  {
+    name: 'pendingVaultDecision',
+    patch: vaultDecision,
+    actor: 'pM',
+    moves: ['masterVaultDecision'],
     other: 'p2',
   },
   { name: 'peekReveal', patch: peekReveal, actor: 'p3', moves: ['peekerAcknowledge'], other: 'p2' },
@@ -351,6 +361,7 @@ describe('listAwaiting', () => {
       ...libraBefore,
       ...unlockOnly,
       ...peekDecision,
+      ...vaultDecision,
       ...peekReveal,
       ...virgo,
       ...shootResponse,
@@ -388,6 +399,7 @@ describe('行动权表 · 一致性', () => {
           ...sudger,
           ...libraBefore,
           ...peekDecision,
+          ...vaultDecision,
           ...peekReveal,
           ...virgo,
           ...shootResponse,
@@ -412,6 +424,7 @@ describe('行动权表 · 一致性', () => {
       ...sudger,
       ...libraBefore,
       ...peekDecision,
+      ...vaultDecision,
       ...peekReveal,
       ...virgo,
       ...shootResponse,

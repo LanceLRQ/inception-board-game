@@ -36,6 +36,7 @@ export { InceptionCityGame } from './game.js';
 export { INVALID_MOVE } from './engine/invalidMove.js';
 export type { SetupState } from './game.js';
 export { createInitialState } from './setup.js';
+export type { VaultDecisionChoice } from './setup.js';
 export {
   drawCards,
   discardCard,
@@ -76,12 +77,12 @@ export type {
 export {
   LOST_LAYER,
   canAct,
-  applyDeath,
-  allThievesDead,
+  sendToLimbo,
+  killPlayer,
+  KILL_HANDOVER_COUNT,
   getAlivePlayers,
   getAliveInLayer,
 } from './engine/death.js';
-export type { DeathCause, DeathEvent } from './engine/death.js';
 
 export {
   RESPONSE_WINDOW_MS,
@@ -92,6 +93,16 @@ export {
   shouldForceDisconnect,
 } from './engine/timeout.js';
 export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
+
+// 双面角色
+export {
+  getCharacterFace,
+  getBaseCharacterId,
+  isCharacterFace,
+  getDualFacedConfig,
+  flipCharacter,
+} from './engine/abilities/dual-faced.js';
+export type { CharacterFace } from './engine/abilities/dual-faced.js';
 
 // 规则不变量
 export { checkInvariants, assertInvariants } from './invariants.js';
@@ -238,6 +249,7 @@ export type {
 
 // 行动权：此刻在等谁、等什么（服务端据此决定计时与提示）
 export { listAwaiting } from './engine/actionRights.js';
+export { PLAY_MOVE_CARD_IDS, isCardForPlayMove } from './engine/playCardKinds.js';
 export type { Awaiting } from './engine/actionRights.js';
 
 // 白名单式对局视图：服务端发给每个观察者的状态
@@ -257,6 +269,7 @@ export type {
   BribeView,
   DeckView,
   ResponseWindowView,
+  PendingVaultDecisionView,
 } from './engine/matchView.js';
 
 // 联机对局消息协议

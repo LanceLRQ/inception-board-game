@@ -1,8 +1,9 @@
 // 对局状态的类型与取值范围检查
 //
 // 只查「状态里每个位置放的值对不对」：玩家 id 是不是对局里的人、牌 id 是不是字符串、
-// 层号和计数是不是该有的整数……不查规则层面的一致性（那是 invariants.ts 的事，
-// 例如层内名单与玩家所在层是否吻合、手牌上限）。
+// 层号和计数是不是该有的整数……规则层面的一致性（手牌上限等）是 invariants.ts 的事。
+// 唯一的例外是迷失层这一组跨字段关系：在迷失层与已死亡是同一个状态，层内名单与玩家所在层互为镜像；
+// 它们写进每步校验，是为了让「只挪层不置死亡」这类漏写立刻暴露。
 // 这里的输入按「可能被写坏」对待：不假定任何字段类型正确，也不会因为坏值而抛异常，
 // 所以可以放心地对任意 move 之后的状态调用。
 
@@ -160,6 +161,7 @@ export function checkStateInvariants(G: unknown): string[] {
 
   checkPlayers(c, G, orderIds);
   checkLayers(c, G.layers);
+  checkLimboAndRosters(c, G);
   checkVaultsAndBribes(c, G);
   checkCards(c, G);
   checkPending(c, G);
@@ -187,6 +189,12 @@ function checkPlayers(c: Collector, G: Rec, orderIds: readonly string[]): void {
     c.bool(`${at}.isAlive`, p.isAlive);
     c.bool(`${at}.isRevealed`, p.isRevealed);
     if (p.deathTurn !== null) c.nonNegInt(`${at}.deathTurn`, p.deathTurn);
+    if (p.layerBeforeLimbo !== null && p.layerBeforeLimbo !== undefined) {
+      c.layer(`${at}.layerBeforeLimbo`, p.layerBeforeLimbo);
+    }
+    if (p.imperialShootCharges !== undefined) {
+      c.nonNegInt(`${at}.imperialShootCharges`, p.imperialShootCharges);
+    }
     for (const field of [
       'unlockCount',
       'shootCount',
@@ -221,6 +229,50 @@ function checkLayers(c: Collector, layers: unknown): void {
     c.cardOrNull(`${at}.nightmareId`, layer.nightmareId);
     c.bool(`${at}.nightmareRevealed`, layer.nightmareRevealed);
     c.bool(`${at}.nightmareTriggered`, layer.nightmareTriggered);
+  }
+}
+
+/**
+ * 迷失层（currentLayer 为 0）当且仅当已死亡（isAlive 为 false）；
+ * 层内名单与各玩家的 currentLayer 互为镜像（没有迷失层条目时，迷失层的人没有名单可查，跳过）。
+ * 对照：docs/manual/08-appendix.md 迷失层「表示玩家正处于死亡状态」
+ */
+function checkLimboAndRosters(c: Collector, G: Rec): void {
+  if (!isRec(G.players) || !isRec(G.layers)) return;
+  const players = G.players;
+  const layers = G.layers;
+  for (const [id, p] of Object.entries(players)) {
+    if (!isRec(p) || typeof p.isAlive !== 'boolean' || !isNonNegInt(p.currentLayer)) continue;
+    const inLimbo = p.currentLayer === 0;
+    if (inLimbo !== !p.isAlive) {
+      c.add(
+        `players.${id}`,
+        inLimbo
+          ? '在迷失层（currentLayer=0）但 isAlive 为 true'
+          : '已死亡（isAlive=false）但不在迷失层',
+      );
+    }
+    const roster = isRec(layers[String(p.currentLayer)])
+      ? (layers[String(p.currentLayer)] as Rec).playersInLayer
+      : undefined;
+    if (Array.isArray(roster) && !roster.includes(id)) {
+      c.add(
+        `layers.${p.currentLayer}.playersInLayer`,
+        `缺少所在层为 ${p.currentLayer} 的玩家 ${JSON.stringify(id)}`,
+      );
+    }
+  }
+  for (const [key, layer] of Object.entries(layers)) {
+    if (!isRec(layer) || !Array.isArray(layer.playersInLayer)) continue;
+    for (const id of layer.playersInLayer) {
+      const p = typeof id === 'string' ? players[id] : undefined;
+      if (isRec(p) && String(p.currentLayer) !== key) {
+        c.add(
+          `layers.${key}.playersInLayer`,
+          `列出了 ${JSON.stringify(id)}，其 currentLayer 是 ${describe(p.currentLayer)}`,
+        );
+      }
+    }
   }
 }
 
@@ -316,6 +368,10 @@ function checkPending(c: Collector, G: Rec): void {
   c.optional('pendingPeekDecision', G.pendingPeekDecision, (o) => {
     c.player('pendingPeekDecision.peekerID', o.peekerID);
     c.layer('pendingPeekDecision.targetLayer', o.targetLayer);
+  });
+  c.optional('pendingVaultDecision', G.pendingVaultDecision, (o) => {
+    c.layer('pendingVaultDecision.layer', o.layer);
+    c.player('pendingVaultDecision.openerID', o.openerID);
   });
   c.optional('peekReveal', G.peekReveal, (o) => {
     c.player('peekReveal.peekerID', o.peekerID);

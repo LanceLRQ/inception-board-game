@@ -2,10 +2,21 @@
 // MVP 4 角色：先锋（突袭）/ 译梦师（伏笔）/ 要塞（冷酷）/ 棋局（易位）
 // 对照：docs/manual/05-dream-thieves.md / docs/manual/06-dream-master.md
 
-import type { SetupState, PlayerSetup } from '../setup.js';
-import { drawCards, movePlayerToLayer, incrementMoveCounter } from '../moves.js';
+import type { SetupState, PlayerSetup, BribeSetup } from '../setup.js';
+import { seededShuffle } from '../prng.js';
+import {
+  drawCards,
+  movePlayerToLayer,
+  incrementMoveCounter,
+  discardCard,
+  discardCards,
+  setLayerHeartLock,
+  setTurnPhase,
+  HEART_LOCK_REDUCED_BY_SKILL_KEY,
+} from '../moves.js';
+import { killPlayer, sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './death.js';
 import { resolveShootCustom } from '../dice.js';
-import { flipCharacter } from './abilities/dual-faced.js';
+import { flipCharacter, isCharacterFace } from './abilities/dual-faced.js';
 import type { CardID, Layer } from '@icgame/shared';
 
 // === 技能使用前检查 ===
@@ -86,7 +97,7 @@ export function applyPointmanAssault(
 // === 穿行者 · 支助 ===
 // 对照：docs/manual/05-dream-thieves.md 穿行者
 // 出牌阶段：可将所有手牌（最少 1 张）给另一位玩家，然后移动到该玩家所在层
-// 限制：本回合 1 次
+// 次数：卡面与说明书都没有「限一次」，不限次数；代价是交出全部手牌（至少 1 张）
 
 export const TOURIST_SKILL_ID = 'thief_tourist.skill_0';
 
@@ -99,7 +110,6 @@ export function canUseTouristAssist(state: SetupState, selfID: string, targetID:
   if (self.characterId !== 'thief_tourist') return false;
   if (!self.isAlive || !target.isAlive) return false;
   if (self.hand.length < 1) return false;
-  if (!canUseSkill(self, TOURIST_SKILL_ID, 'ownTurnOncePerTurn')) return false;
   return true;
 }
 
@@ -113,16 +123,15 @@ export function applyTouristAssist(
   const self = state.players[selfID]!;
   const target = state.players[targetID]!;
 
-  let s = markSkillUsed(state, selfID, TOURIST_SKILL_ID);
   // 转移手牌
-  s = {
-    ...s,
+  let s: SetupState = {
+    ...state,
     players: {
-      ...s.players,
-      [selfID]: { ...s.players[selfID]!, hand: [] },
+      ...state.players,
+      [selfID]: { ...state.players[selfID]!, hand: [] },
       [targetID]: {
-        ...s.players[targetID]!,
-        hand: [...s.players[targetID]!.hand, ...self.hand],
+        ...state.players[targetID]!,
+        hand: [...state.players[targetID]!.hand, ...self.hand],
       },
     },
   };
@@ -134,7 +143,7 @@ export function applyTouristAssist(
 // === 狮子 · 王道 ===
 // 对照：docs/manual/05-dream-thieves.md 狮子
 // 抽牌阶段：从牌库顶额外抽 = 梦主手牌数；梦主无手牌则从弃牌堆中额外选取 1 张
-// 限制：本回合 1 次
+// 次数：卡面没有「限一次」，不限次数（每个抽牌阶段触发一次）
 //
 // MVP 简化：弃牌堆挑选自动取顶 1 张（不进入 pending 中间态）
 
@@ -144,13 +153,12 @@ export const LEO_SKILL_ID = 'thief_leo.skill_0';
 export function applyLeoKingdom(state: SetupState, playerID: string): SetupState {
   const player = state.players[playerID];
   if (!player || player.characterId !== 'thief_leo') return state;
-  if (!canUseSkill(player, LEO_SKILL_ID, 'ownTurnOncePerTurn')) return state;
 
   const masterID = state.dreamMasterID;
   const master = state.players[masterID];
   if (!master) return state;
 
-  let s = markSkillUsed(state, playerID, LEO_SKILL_ID);
+  let s = state;
   const masterHandCount = master.hand.length;
 
   if (masterHandCount > 0) {
@@ -170,7 +178,7 @@ export function applyLeoKingdom(state: SetupState, playerID: string): SetupState
       },
     };
   }
-  // 弃牌堆也无 → 无效果，但技能算已使用
+  // 弃牌堆也无 → 无效果
   return s;
 }
 
@@ -216,26 +224,26 @@ export function applyChemistRefine(
   if (!canUseSkill(player, CHEMIST_SKILL_ID, 'ownTurnLimitN', CHEMIST_LIMIT_PER_TURN)) return null;
 
   // 弃牌必须在手中
-  const handIdx = player.hand.indexOf(discardCardId);
-  if (handIdx === -1) return null;
+  if (!player.hand.includes(discardCardId)) return null;
 
   // 弃牌堆必须含 action_dream_transit
   const transitIdx = state.deck.discardPile.lastIndexOf('action_dream_transit' as CardID);
   if (transitIdx === -1) return null;
 
   let s = markSkillUsed(state, selfID, CHEMIST_SKILL_ID);
-  // 移除手牌 + 加入弃牌堆
-  const newHand = [...player.hand];
-  newHand.splice(handIdx, 1);
-  // 取出梦境穿梭剂
+  // 先付代价：从手中弃牌（弃的是时间风暴则触发效果；弃牌堆只会追加，原有下标不变）
+  s = discardCard(s, selfID, discardCardId);
+  // 取出梦境穿梭剂加入手牌
   const newDiscard = [...s.deck.discardPile];
   newDiscard.splice(transitIdx, 1);
-  // 加入手牌
-  newHand.push('action_dream_transit' as CardID);
+  const self = s.players[selfID]!;
   s = {
     ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: newHand } },
-    deck: { ...s.deck, discardPile: [...newDiscard, discardCardId] },
+    players: {
+      ...s.players,
+      [selfID]: { ...self, hand: [...self.hand, 'action_dream_transit' as CardID] },
+    },
+    deck: { ...s.deck, discardPile: newDiscard },
   };
   return s;
 }
@@ -266,20 +274,10 @@ export function applyChemistInject(
   // 穿梭剂只能移到相邻层（从 target 当前层出发）
   if (Math.abs(target.currentLayer - toLayer) !== 1) return null;
   // 手牌必须有 action_dream_transit
-  const idx = player.hand.indexOf('action_dream_transit' as CardID);
-  if (idx === -1) return null;
+  if (!player.hand.includes('action_dream_transit' as CardID)) return null;
 
   // 弃穿梭剂
-  const newHand = [...player.hand];
-  newHand.splice(idx, 1);
-  let s: SetupState = {
-    ...state,
-    players: { ...state.players, [selfID]: { ...player, hand: newHand } },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, 'action_dream_transit' as CardID],
-    },
-  };
+  let s = discardCard(state, selfID, 'action_dream_transit' as CardID);
   // target 移动
   s = movePlayerToLayer(s, targetID, toLayer);
   return s;
@@ -317,13 +315,15 @@ export function applyLordOfWarBlackMarket(
   if (pickIdx === -1) return null;
 
   let s = markSkillUsed(state, selfID, LORD_OF_WAR_SKILL_ID);
+  // 先付代价：从手中弃 2 张（弃牌堆只会追加，原有下标不变）
+  s = discardCards(s, selfID, discardIds);
   const newDiscard = [...s.deck.discardPile];
   newDiscard.splice(pickIdx, 1);
-  newHand.push(pickFromDiscard);
+  const self = s.players[selfID]!;
   s = {
     ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: newHand } },
-    deck: { ...s.deck, discardPile: [...newDiscard, ...discardIds] },
+    players: { ...s.players, [selfID]: { ...self, hand: [...self.hand, pickFromDiscard] } },
+    deck: { ...s.deck, discardPile: newDiscard },
   };
   return s;
 }
@@ -354,13 +354,11 @@ export function applyPaprikSalvation(
   if (selfID === targetID) return null;
 
   // 弃牌必须在手中
-  const handIdx = player.hand.indexOf(discardCardId);
-  if (handIdx === -1) return null;
+  if (!player.hand.includes(discardCardId)) return null;
 
   let s = markSkillUsed(state, selfID, PAPRIK_SKILL_ID);
-  // 弃手牌
-  const newHand = [...player.hand];
-  newHand.splice(handIdx, 1);
+  // 弃手牌（弃的是时间风暴则触发效果）
+  s = discardCard(s, selfID, discardCardId);
   // 复活 target：isAlive=true、deathTurn=null、迁移到 self.currentLayer
   // target 的所有手牌转给 self（先收手牌，再清 target.hand）
   const targetHand = [...target.hand];
@@ -368,15 +366,15 @@ export function applyPaprikSalvation(
     ...s,
     players: {
       ...s.players,
-      [selfID]: { ...s.players[selfID]!, hand: [...newHand, ...targetHand] },
+      [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...targetHand] },
       [targetID]: {
         ...s.players[targetID]!,
         isAlive: true,
         deathTurn: null,
+        layerBeforeLimbo: null,
         hand: [],
       },
     },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, discardCardId] },
   };
   // 移动 target 到 self 所在层
   s = movePlayerToLayer(s, targetID, player.currentLayer);
@@ -473,11 +471,8 @@ export const INTERPRETER_SKILL_ID = 'thief_dream_interpreter.skill_0';
 export function applyInterpreterForeshadow(state: SetupState, playerID: string): SetupState {
   const player = state.players[playerID];
   if (!player || player.characterId !== 'thief_dream_interpreter') return state;
-  if (!canUseSkill(player, INTERPRETER_SKILL_ID, 'ownTurnOncePerTurn')) return state;
-
-  let s = markSkillUsed(state, playerID, INTERPRETER_SKILL_ID);
-  s = drawCards(s, playerID, 2);
-  return s;
+  // 卡面没有「限一次」：每次使用【解封】都抽 2 张
+  return drawCards(state, playerID, 2);
 }
 
 // === 要塞 · 冷酷 ===
@@ -514,11 +509,11 @@ export function applyFortressColdness(
   const target = state.players[targetPlayerID];
   if (!master || !target) return state;
   if (master.characterId !== 'dm_fortress') return state;
-  if (!canUseSkill(master, FORTRESS_SKILL_ID, 'ownTurnOncePerTurn')) return state;
   if (!target.isAlive) return state;
-  if (target.faction !== 'thief') return state;
+  if (!isOutwardThief(state, targetPlayerID)) return state;
 
-  let s = markSkillUsed(state, masterID, FORTRESS_SKILL_ID);
+  // 卡面没有「限一次」：每次移动到另一层梦境都可以触发
+  let s = state;
 
   // 免费掷骰（受世界观 -1 影响）
   const rawRoll = d6();
@@ -527,25 +522,7 @@ export function applyFortressColdness(
   // SHOOT 基础：1 点 = 击杀
   if (modifiedRoll === 1) {
     // 击杀目标
-    const handover = target.hand.slice(0, 2);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetPlayerID]: {
-          ...target,
-          isAlive: false,
-          deathTurn: s.turnNumber,
-          hand: target.hand.slice(2),
-        },
-        [masterID]: {
-          ...s.players[masterID]!,
-          hand: [...s.players[masterID]!.hand, ...handover],
-          shootCount: s.players[masterID]!.shootCount + 1,
-        },
-      },
-    };
-    s = movePlayerToLayer(s, targetPlayerID, 0);
+    s = killPlayer(s, targetPlayerID, masterID);
   } else if (modifiedRoll >= 2 && modifiedRoll <= 5) {
     // 强制移动
     const currentLayer = target.currentLayer;
@@ -643,7 +620,7 @@ export function applyApolloWorship(
   const target = state.players[targetID];
   if (!target || !target.isAlive) return null;
   // target 必须是盗梦者且拥有贿赂牌（bribeReceived > 0）
-  if (target.faction !== 'thief') return null;
+  if (!isOutwardThief(state, targetID)) return null;
   if (target.bribeReceived <= 0) return null;
   if (target.hand.length === 0) return null;
 
@@ -689,43 +666,14 @@ export function applyMartyrSacrifice(
 
   const layer = state.layers[player.currentLayer];
   if (!layer) return null;
+  // 减少心锁算本回合的成功解锁（R-23）：本回合已经解锁过就不能选减少
+  if (direction === 'decrease' && !canMakeSuccessfulUnlock(state, player)) return null;
 
   let s = markSkillUsed(state, selfID, MARTYR_SKILL_ID);
 
-  // 自杀 + 弃手牌（无论骰值）
-  const handToDiscard = [...player.hand];
-  s = {
-    ...s,
-    players: {
-      ...s.players,
-      [selfID]: {
-        ...s.players[selfID]!,
-        isAlive: false,
-        deathTurn: s.turnNumber,
-        hand: [],
-        currentLayer: 0,
-      },
-    },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...handToDiscard] },
-    layers: {
-      ...s.layers,
-      [player.currentLayer]: {
-        ...layer,
-        playersInLayer: layer.playersInLayer.filter((id) => id !== selfID),
-      },
-      0: s.layers[0]
-        ? { ...s.layers[0]!, playersInLayer: [...s.layers[0]!.playersInLayer, selfID] }
-        : {
-            layer: 0,
-            dreamCardId: null,
-            nightmareId: null,
-            nightmareRevealed: false,
-            nightmareTriggered: false,
-            playersInLayer: [selfID],
-            heartLockValue: 0,
-          },
-    },
-  };
+  // 自杀 + 弃手牌（无论骰值）：自己进迷失层，不是被击杀，没有凶手，手牌进弃牌堆
+  s = discardCards(s, selfID, [...player.hand]);
+  s = sendToLimbo(s, selfID);
 
   let heartLockChanged = false;
   if (roll >= 3 && roll <= 6) {
@@ -735,13 +683,7 @@ export function applyMartyrSacrifice(
     next = Math.max(0, Math.min(originalHeartLockCap, next));
     if (next !== cur) {
       heartLockChanged = true;
-      s = {
-        ...s,
-        layers: {
-          ...s.layers,
-          [player.currentLayer]: { ...s.layers[player.currentLayer]!, heartLockValue: next },
-        },
-      };
+      s = setLayerHeartLock(s, player.currentLayer, next, { actorID: selfID, bySkill: true });
     }
   }
 
@@ -807,7 +749,7 @@ export function applyAthenaAwe(
   if (!target || !target.isAlive) return null;
   if (target.currentLayer !== player.currentLayer) return null;
 
-  let s = markSkillUsed(state, selfID, ATHENA_AWE_SKILL_ID);
+  const s = markSkillUsed(state, selfID, ATHENA_AWE_SKILL_ID);
 
   // 5 张牌名是否全不同
   const all5 = [...shownHandIds, deckTop];
@@ -819,46 +761,7 @@ export function applyAthenaAwe(
   }
 
   // 成功：击杀 target，取其全部手牌
-  const targetHand = [...target.hand];
-  s = {
-    ...s,
-    players: {
-      ...s.players,
-      [selfID]: {
-        ...s.players[selfID]!,
-        hand: [...s.players[selfID]!.hand, ...targetHand],
-        shootCount: s.players[selfID]!.shootCount + 1,
-      },
-      [targetID]: {
-        ...s.players[targetID]!,
-        isAlive: false,
-        deathTurn: s.turnNumber,
-        hand: [],
-        currentLayer: 0,
-      },
-    },
-    layers: {
-      ...s.layers,
-      [player.currentLayer]: {
-        ...s.layers[player.currentLayer]!,
-        playersInLayer: s.layers[player.currentLayer]!.playersInLayer.filter(
-          (id) => id !== targetID,
-        ),
-      },
-      0: s.layers[0]
-        ? { ...s.layers[0]!, playersInLayer: [...s.layers[0]!.playersInLayer, targetID] }
-        : {
-            layer: 0,
-            dreamCardId: null,
-            nightmareId: null,
-            nightmareRevealed: false,
-            nightmareTriggered: false,
-            playersInLayer: [targetID],
-            heartLockValue: 0,
-          },
-    },
-  };
-  return s;
+  return killPlayer(s, targetID, selfID, Number.POSITIVE_INFINITY);
 }
 
 // ============================================================================
@@ -878,11 +781,13 @@ export function isVirgoPerfectTriggered(rawRoll: number): boolean {
 }
 
 /**
- * 处女·完美 · 选项一：复活一位己方阵营死亡角色
+ * 处女·完美 · 选项一：复活一位玩家
+ * 对照：docs/manual/05-dream-thieves.md 处女「复活一位玩家」；
+ *       docs/manual/08-appendix.md 盗梦十诫（复活他人：被复活者移动到自己所在层）
  *  - virgo 必须存活
- *  - target 必须死亡且阵营=thief（己方）
- *  - target 复活到 L1（梦境入口）+ deathTurn=null + isAlive=true
- *  - target 复活后手牌清空（与 paprik 复活时把手牌交给救援者不同；处女只是单纯复活）
+ *  - target 必须死亡，不限阵营（含梦主、背叛者）
+ *  - target 复活到处女所在层 + deathTurn=null + isAlive=true
+ *  - target 的手牌保留
  */
 export function applyVirgoResurrect(
   state: SetupState,
@@ -897,9 +802,8 @@ export function applyVirgoResurrect(
   const target = state.players[targetID];
   if (!target) return null;
   if (target.isAlive) return null;
-  if (target.faction !== 'thief') return null;
 
-  let s: SetupState = {
+  const s: SetupState = {
     ...state,
     players: {
       ...state.players,
@@ -907,13 +811,11 @@ export function applyVirgoResurrect(
         ...target,
         isAlive: true,
         deathTurn: null,
-        hand: [],
+        layerBeforeLimbo: null,
       },
     },
   };
-  // 复活到 L1（梦境入口）
-  s = movePlayerToLayer(s, targetID, 1 as Layer);
-  return s;
+  return movePlayerToLayer(s, targetID, virgo.currentLayer);
 }
 
 /**
@@ -950,15 +852,23 @@ export function applyVirgoTeleport(
 // 弃 1 SHOOT 类牌；同层 1 玩家在其下回合结束前不受行动牌+技能影响、不能移动
 export const ARCHITECT_SKILL_ID = 'thief_architect.skill_0';
 
-/** 是否 SHOOT 类牌（迷宫弃牌门禁） */
+/**
+ * SHOOT 类牌的 id（与牌库配置一致：SHOOT / 刺客之王 / 爆甲螺旋 / 炸裂弹头 / 梦境穿梭剂）。
+ * 引擎里所有「SHOOT 类」的判断都复用 isShootClassCard，不要各自再列清单。
+ * 死亡宣言只作为附加牌随 SHOOT 打出、不单独出，不在此列。
+ * 对照：docs/manual/04-action-cards.md；docs/manual/06-dream-master.md 梦境穿梭剂视为 SHOOT 类
+ */
+const SHOOT_CLASS_CARD_IDS: ReadonlySet<string> = new Set([
+  'action_shoot',
+  'action_shoot_assassin',
+  'action_shoot_drill',
+  'action_shoot_burst',
+  'action_shoot_dream_transit',
+]);
+
+/** 是否 SHOOT 类牌（迷宫弃牌门禁、炸裂弹头弃牌等） */
 export function isShootClassCard(cardId: CardID): boolean {
-  return (
-    cardId === 'action_shoot' ||
-    cardId === 'action_shoot_assassin' ||
-    cardId === 'action_shoot_drill' ||
-    cardId === 'action_shoot_burst' ||
-    cardId === 'action_shoot_dream_transit'
-  );
+  return SHOOT_CLASS_CARD_IDS.has(cardId);
 }
 
 // 迷宫允许的行动牌（对照：docs/manual/05-dream-thieves.md 筑梦师）
@@ -982,6 +892,33 @@ export function isMazeBlocked(state: SetupState, targetID: string, moveName: str
   if (!state.mazeState) return false;
   if (state.mazeState.mazedPlayerID !== targetID) return false;
   return !MAZE_ALLOWED_MOVES.has(moveName);
+}
+
+/**
+ * KICK 的效果：与目标玩家交换梦境层；双方各自按天王星·苍穹世界观结算（同层互换不算改变层数）。
+ * 出牌路径（playKick）与金星·镜界复制路径共用。目标不合法或被筑梦师·迷宫困住时返回 null。
+ * 对照：docs/manual/04-action-cards.md KICK；docs/manual/05-dream-thieves.md 筑梦师
+ */
+export function applyKickEffect(
+  state: SetupState,
+  selfID: string,
+  targetID: string,
+): SetupState | null {
+  if (isMazeBlocked(state, targetID, 'playKick')) return null;
+  const self = state.players[selfID];
+  const target = state.players[targetID];
+  if (!self || !target) return null;
+  if (selfID === targetID) return null;
+  if (!self.isAlive || !target.isAlive) return null;
+  const sameLayer = self.currentLayer === target.currentLayer;
+  let s = movePlayerToLayer(state, selfID, target.currentLayer);
+  s = movePlayerToLayer(s, targetID, self.currentLayer);
+  // 天王星·苍穹世界观：每位因行动牌改变层数的盗梦者各触发一次（同层 KICK 不算改变）
+  if (!sameLayer) {
+    s = applyUranusFirmamentMoveDiscard(s, selfID);
+    s = applyUranusFirmamentMoveDiscard(s, targetID);
+  }
+  return s;
 }
 
 // === 雅典娜 · 急智 ===
@@ -1044,6 +981,24 @@ export function applyHlninoFlow(
   if (toLayer <= fromLayer) return state;
   // 抽 2 张（不计 skillUsed，因被动且每次移动都触发）
   return drawCards(state, playerID, 2);
+}
+
+/**
+ * 降世神通·降临的统一收口：一个 move 结算完后，对比回合主人的层数。
+ * 条件：回合主人是活着的降世神通，处于自己的出牌阶段，且这一个 move 让他到达了数字更大的梦境
+ * （迷失层按 0 算，复活自己即 0 → 1）。梦境穿梭剂、SHOOT·梦境穿梭剂、KICK 换层、复活、
+ * 各类技能与世界观造成的上移都由此触发，不必在每个 move 里各接一次；别人回合里被移动不算。
+ * 对照：docs/manual/05-dream-thieves.md 降世神通；docs/manual/08-appendix.md「移动」词条
+ */
+export function applyHlninoAscent(before: SetupState, after: SetupState): SetupState {
+  if (before.turnPhase !== 'action' || after.turnPhase !== 'action') return after;
+  const pid = before.currentPlayerID;
+  if (after.currentPlayerID !== pid) return after;
+  const prev = before.players[pid];
+  const next = after.players[pid];
+  if (!prev || !next || prev.characterId !== 'thief_hlnino') return after;
+  if (!next.isAlive) return after;
+  return applyHlninoFlow(after, pid, prev.isAlive ? prev.currentLayer : 0, next.currentLayer);
 }
 
 // === 梦境猎手 · 满载 ===
@@ -1256,7 +1211,7 @@ export function applyBlackSwanTour(
   for (const recvId of Object.keys(distribution)) {
     if (recvId === selfID) return null;
     const recv = state.players[recvId];
-    if (!recv || !recv.isAlive || recv.faction !== 'thief') return null;
+    if (!recv || !recv.isAlive || !isOutwardThief(state, recvId)) return null;
   }
 
   let s = markSkillUsed(state, selfID, BLACK_SWAN_SKILL_ID);
@@ -1316,6 +1271,11 @@ export function applySpaceQueenStashTop(
 // === 双子 · 协同 ===
 // 弃牌阶段：梦主层数 > self 层数时，可掷骰 → 4 / 5 / 6 → 当层 -2 心锁 → 翻面
 // 对照：docs/manual/05-dream-thieves.md 双子·命运（卡面为三个骰面 4、5、6）
+/** 双面角色的正面 id；按面区分技能靠 isCharacterFace */
+const GEMINI_FRONT_ID = 'thief_gemini' as CardID;
+const PISCES_FRONT_ID = 'thief_pisces' as CardID;
+const LUNA_FRONT_ID = 'thief_luna' as CardID;
+
 export const GEMINI_SKILL_ID = 'thief_gemini.skill_0';
 
 export function applyGeminiSync(
@@ -1324,22 +1284,23 @@ export function applyGeminiSync(
   roll: number,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_gemini') return null;
+  if (!player || !isCharacterFace(player.characterId, GEMINI_FRONT_ID, 'front')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1) return null;
   const master = state.players[state.dreamMasterID];
   if (!master) return null;
   if (master.currentLayer <= player.currentLayer) return null;
   if (!canUseSkill(player, GEMINI_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+  // 减少心锁算本回合的成功解锁（R-23）：本回合已经解锁过就不能发动
+  if (!canMakeSuccessfulUnlock(state, player)) return null;
 
   let s = markSkillUsed(state, selfID, GEMINI_SKILL_ID);
   if (roll >= 4 && roll <= 6) {
     const layerInfo = s.layers[player.currentLayer]!;
-    const nextHL = Math.max(0, layerInfo.heartLockValue - 2);
-    s = {
-      ...s,
-      layers: { ...s.layers, [player.currentLayer]: { ...layerInfo, heartLockValue: nextHL } },
-    };
+    s = setLayerHeartLock(s, player.currentLayer, layerInfo.heartLockValue - 2, {
+      actorID: selfID,
+      bySkill: true,
+    });
   }
   // 翻面（无论骰值）
   s = flipCharacter(s, selfID);
@@ -1358,7 +1319,7 @@ export function applyGeminiChoice(
   roll2: number,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_gemini') return null;
+  if (!player || !isCharacterFace(player.characterId, GEMINI_FRONT_ID, 'back')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1) return null;
   const master = state.players[state.dreamMasterID];
@@ -1382,16 +1343,20 @@ export function applyGeminiChoice(
 // 接入：在 applyShootVariant 前置 hook 检查（被动）
 export const PISCES_SKILL_ID = 'thief_pisces.skill_0';
 
-/** 双鱼是否可发动（是 thief_pisces 且未翻面 + 当前层 > 1） */
+/**
+ * 双鱼·游离是否可发动（正面朝上 + 活着在 1-4 层）。
+ * 第 1 层同样能发动：移到「数字更小的相邻层」即进入迷失层。
+ * 对照：docs/manual/05-dream-thieves.md 双鱼（详述第一层仍可启动游离）
+ */
 export function canPiscesEvade(player: PlayerSetup): boolean {
-  if (player.characterId !== 'thief_pisces') return false;
+  if (!isCharacterFace(player.characterId, PISCES_FRONT_ID, 'front')) return false;
   if (!player.isAlive) return false;
-  if (player.currentLayer <= 1) return false;
+  if (player.currentLayer < 1) return false;
   if (!canUseSkill(player, PISCES_SKILL_ID, 'ownTurnOncePerTurn')) return false;
   return true;
 }
 
-/** 执行双鱼闪避：移到 currentLayer-1 + 翻面 */
+/** 执行双鱼闪避：移到 currentLayer-1（第 1 层则进入迷失层，不算被击杀）+ 翻面 */
 export function applyPiscesEvade(state: SetupState, selfID: string): SetupState | null {
   const player = state.players[selfID];
   if (!player || !canPiscesEvade(player)) return null;
@@ -1413,7 +1378,7 @@ export function applyPiscesBlessing(
   reviveID: string | null,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_pisces') return null;
+  if (!player || !isCharacterFace(player.characterId, PISCES_FRONT_ID, 'back')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1 || player.currentLayer >= 4) return null;
   if (!canUseSkill(player, PISCES_BLESSING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
@@ -1431,7 +1396,7 @@ export function applyPiscesBlessing(
       ...s,
       players: {
         ...s.players,
-        [reviveID]: { ...target, isAlive: true, deathTurn: null },
+        [reviveID]: { ...target, isAlive: true, deathTurn: null, layerBeforeLimbo: null },
       },
     };
     s = movePlayerToLayer(s, reviveID, newLayer);
@@ -1452,7 +1417,7 @@ export function applyLunaEclipse(
   targetID: string,
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_luna') return null;
+  if (!player || !isCharacterFace(player.characterId, LUNA_FRONT_ID, 'front')) return null;
   if (!player.isAlive) return null;
   if (selfID === targetID) return null;
   if (!canUseSkill(player, LUNA_SKILL_ID, 'ownTurnOncePerTurn')) return null;
@@ -1474,31 +1439,9 @@ export function applyLunaEclipse(
 
   let s = markSkillUsed(state, selfID, LUNA_SKILL_ID);
   // 弃 2 张 SHOOT 到弃牌堆
-  s = {
-    ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...shootCardIds] },
-  };
+  s = discardCards(s, selfID, shootCardIds);
   // 击杀 target
-  const targetHand = [...target.hand];
-  s = {
-    ...s,
-    players: {
-      ...s.players,
-      [selfID]: {
-        ...s.players[selfID]!,
-        hand: [...s.players[selfID]!.hand, ...targetHand.slice(0, 2)],
-        shootCount: s.players[selfID]!.shootCount + 1,
-      },
-      [targetID]: {
-        ...s.players[targetID]!,
-        isAlive: false,
-        deathTurn: s.turnNumber,
-        hand: targetHand.slice(2),
-      },
-    },
-  };
-  s = movePlayerToLayer(s, targetID, 0);
+  s = killPlayer(s, targetID, selfID);
   // 翻面
   s = flipCharacter(s, selfID);
   return s;
@@ -1517,7 +1460,7 @@ export function applyLunaFullMoon(
   reviveIDs: readonly string[],
 ): SetupState | null {
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_luna') return null;
+  if (!player || !isCharacterFace(player.characterId, LUNA_FRONT_ID, 'back')) return null;
   if (!player.isAlive) return null;
   if (player.currentLayer < 1) return null;
   if (!canUseSkill(player, LUNA_FULL_MOON_SKILL_ID, 'ownTurnOncePerTurn')) return null;
@@ -1544,18 +1487,17 @@ export function applyLunaFullMoon(
   }
 
   let s = markSkillUsed(state, selfID, LUNA_FULL_MOON_SKILL_ID);
-  // 弃 2 张非 SHOOT
-  s = {
-    ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
-    deck: { ...s.deck, discardPile: [...s.deck.discardPile, ...discardCardIds] },
-  };
+  // 弃 2 张非 SHOOT（弃的是时间风暴则触发效果）
+  s = discardCards(s, selfID, discardCardIds);
   // 逐个复活到自己所在层
   for (const rid of reviveIDs) {
     const rp = s.players[rid]!;
     s = {
       ...s,
-      players: { ...s.players, [rid]: { ...rp, isAlive: true, deathTurn: null } },
+      players: {
+        ...s.players,
+        [rid]: { ...rp, isAlive: true, deathTurn: null, layerBeforeLimbo: null },
+      },
     };
     s = movePlayerToLayer(s, rid, player.currentLayer as Layer);
   }
@@ -1656,21 +1598,36 @@ export function ariesExtraDrawCount(state: SetupState): number {
 export const SAGITTARIUS_NO_MOVE_SKILL_ID = 'thief_sagittarius.skill_0';
 export const SAGITTARIUS_HEART_LOCK_SKILL_ID = 'thief_sagittarius.skill_1';
 
+/**
+ * 射手·穿心能否发动：本回合击杀过玩家（每次击杀换一次机会），且本回合还没发动过（回合限 1 次）。
+ * 「击杀」只算射手作为凶手的击杀（killPlayer），别人被梦魇 / 世界观送进迷失层不算。
+ * 对照：docs/manual/05-dream-thieves.md 射手 136 行
+ */
+export function canUseSagittariusHeartLock(state: SetupState, selfID: string): boolean {
+  const self = state.players[selfID];
+  if (!self || !self.isAlive || self.characterId !== 'thief_sagittarius') return false;
+  if (!canUseSkill(self, SAGITTARIUS_HEART_LOCK_SKILL_ID, 'ownTurnOncePerTurn')) return false;
+  const kills = self.skillUsedThisTurn[SAGITTARIUS_KILLS_THIS_TURN_KEY] ?? 0;
+  const used = self.skillUsedThisTurn[SAGITTARIUS_HEART_LOCK_SKILL_ID] ?? 0;
+  return kills > used;
+}
+
 /** 射手心锁修改：±1，受 cap 限制 */
 export function applySagittariusHeartLock(
   state: SetupState,
+  selfID: string,
   layer: number,
   delta: -1 | 1,
   cap: number,
 ): SetupState | null {
   const layerInfo = state.layers[layer];
   if (!layerInfo) return null;
+  const actor = state.players[selfID];
+  if (!actor) return null;
+  // 减少心锁算本回合的成功解锁（R-23）：本回合已经解锁过就不能减少
+  if (delta < 0 && !canMakeSuccessfulUnlock(state, actor)) return null;
   const next = Math.max(0, Math.min(cap, layerInfo.heartLockValue + delta));
-  if (next === layerInfo.heartLockValue) return state;
-  return {
-    ...state,
-    layers: { ...state.layers, [layer]: { ...layerInfo, heartLockValue: next } },
-  };
+  return setLayerHeartLock(state, layer, next, { actorID: selfID, bySkill: true });
 }
 
 // === 水瓶 · 同流（纯函数） ===
@@ -1748,14 +1705,7 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
   if (player.characterId !== 'thief_green_ray') return false;
   if (!player.isAlive) return false;
   const hasTransit = player.hand.some((c) => c === 'action_dream_transit');
-  const hasShoot = player.hand.some(
-    (c) =>
-      c === 'action_shoot' ||
-      c === 'action_shoot_assassin' ||
-      c === 'action_shoot_drill' ||
-      c === 'action_shoot_burst' ||
-      c === 'action_shoot_dream_transit',
-  );
+  const hasShoot = player.hand.some(isShootClassCard);
   return hasTransit && hasShoot;
 }
 
@@ -1765,13 +1715,30 @@ export function canGreenRayActivate(player: PlayerSetup): boolean {
 // 港口 / 盛夏 / 黑洞·DM / 海王星·泓洋 / 木星·巅峰 / 土星·领地
 // 对照：docs/manual/06-dream-master.md
 
-/** 找当前梦主玩家 ID（faction === 'master'，alive 优先） */
+/**
+ * 找当前梦主玩家 ID。以 dreamMasterID 为准：盗梦者收到成功贿赂牌后 faction 也会变成 master，
+ * 按阵营扫描会把座次靠前的背叛者认成梦主。
+ */
 export function findMasterID(state: SetupState): string | null {
-  for (const pid of state.playerOrder) {
-    const p = state.players[pid];
-    if (p?.faction === 'master') return pid;
-  }
-  return null;
+  const id = state.dreamMasterID;
+  return id && state.players[id] ? id : null;
+}
+
+/**
+ * 是不是梦主本人。背叛者的 faction 虽已转为 master，但他不是梦主；
+ * 梦主是谁是公开信息，守卫与效果凡是「梦主专属」都以此为准。
+ */
+export function isDreamMaster(state: SetupState, playerID: string): boolean {
+  return !!state.players[playerID] && state.dreamMasterID === playerID;
+}
+
+/**
+ * 对外是不是盗梦者：存在且不是梦主本人。背叛者的身份对其他人保密、对外仍是盗梦者，
+ * 所以凡是「对盗梦者合法 / 对盗梦者生效 / 只有盗梦者能做」的判断都以此为准，不读真实阵营。
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者（43 行）
+ */
+export function isOutwardThief(state: SetupState, playerID: string): boolean {
+  return !!state.players[playerID] && state.dreamMasterID !== playerID;
 }
 
 /** 找当前梦主角色 ID */
@@ -1800,7 +1767,7 @@ export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupSta
   // 收集存活盗梦者（按 playerOrder 排序）
   const aliveThieves = state.playerOrder.filter((pid) => {
     const p = state.players[pid];
-    return p && p.faction === 'thief' && p.isAlive;
+    return p && isOutwardThief(state, pid) && p.isAlive;
   });
   if (aliveThieves.length === 0) return state;
 
@@ -1812,18 +1779,7 @@ export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupSta
       // 死亡 → 直接迷失层；不交手牌（跳过击杀状态）
       const target = s.players[pid];
       if (!target || !target.isAlive) continue;
-      s = {
-        ...s,
-        players: {
-          ...s.players,
-          [pid]: {
-            ...target,
-            isAlive: false,
-            deathTurn: s.turnNumber,
-          },
-        },
-      };
-      s = movePlayerToLayer(s, pid, 0);
+      s = sendToLimbo(s, pid);
     }
   }
   return s;
@@ -1848,10 +1804,13 @@ export function checkHarborWin(state: SetupState): boolean {
 // 世界观 盛夏：所有盗梦者抽牌阶段抽牌数 +1
 // 对照：cards-data.json dm_midsummer
 
-/** 盛夏·充盈：梦主额外抽牌数（=未派发贿赂池剩余张数） */
+/**
+ * 盛夏·充盈：梦主额外抽牌数（=未派发的贿赂牌张数，已派出的不算）
+ * 对照：docs/manual/06-dream-master.md 盛夏「每拥有1张未派发的贿赂牌则多抽牌1张」
+ */
 export function getMidsummerExtraDraws(state: SetupState): number {
   if (getMasterCharacterID(state) !== 'dm_midsummer') return 0;
-  return state.bribePool?.length ?? 0;
+  return (state.bribePool ?? []).filter((b) => b.status === 'inPool').length;
 }
 
 /** 盛夏世界观：盗梦者抽牌额外 +N（默认 +1） */
@@ -1994,13 +1953,7 @@ export function applyBlackHoleReverse(
     const cap = originalHeartLocks[layerNum] ?? layerInfo.heartLockValue;
     const next = Math.min(cap, layerInfo.heartLockValue + BLACK_HOLE_HEART_LOCK_REGEN);
     if (next === layerInfo.heartLockValue) continue;
-    s = {
-      ...s,
-      layers: {
-        ...s.layers,
-        [layerNum]: { ...layerInfo, heartLockValue: next },
-      },
-    };
+    s = setLayerHeartLock(s, layerNum, next);
   }
   return s;
 }
@@ -2008,6 +1961,19 @@ export function applyBlackHoleReverse(
 /** 黑洞世界观：解封次数上限改为 2 */
 export function isBlackHoleWorldActive(state: SetupState): boolean {
   return getMasterCharacterID(state) === 'dm_black_hole';
+}
+
+/**
+ * 本回合还能不能再做一次「成功解锁」：解封成功与技能减少心锁共用同一份次数（R-23）。
+ * 摩羯·节奏、水瓶·同流豁免次数上限。
+ * 对照：docs/manual/03-game-flow.md:26-28
+ */
+export function canMakeSuccessfulUnlock(state: SetupState, player: PlayerSetup): boolean {
+  if (isCapricornusRhythmActive(player) || isAquariusUnlimitedActive(player)) return true;
+  const used =
+    player.successfulUnlocksThisTurn +
+    (player.skillUsedThisTurn[HEART_LOCK_REDUCED_BY_SKILL_KEY] ?? 0);
+  return used < getEffectiveMaxUnlockPerTurn(state, state.maxUnlockPerTurn);
 }
 
 /** 获取当前实际解封次数上限（黑洞世界观时为 2，否则用 G.maxUnlockPerTurn） */
@@ -2091,23 +2057,9 @@ export function applySaturnDecree(
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_saturn_territory') return null;
   if (!master.isAlive) return null;
-  const idx = master.hand.indexOf(discardCardId);
-  if (idx === -1) return null;
+  if (!master.hand.includes(discardCardId)) return null;
 
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, discardCardId],
-    },
-  };
+  let s = discardCard(state, masterID, discardCardId);
   s = drawCards(s, masterID, 1);
   return s;
 }
@@ -2116,7 +2068,7 @@ export function applySaturnDecree(
 export function canSaturnFreeMove(state: SetupState, playerID: string): boolean {
   if (getMasterCharacterID(state) !== 'dm_saturn_territory') return false;
   const p = state.players[playerID];
-  if (!p || p.faction !== 'thief' || !p.isAlive) return false;
+  if (!p || !isOutwardThief(state, playerID) || !p.isAlive) return false;
   return p.bribeReceived > 0;
 }
 
@@ -2132,6 +2084,19 @@ export function canSaturnFreeMove(state: SetupState, playerID: string): boolean 
 
 export const IMPERIAL_BRIBE_SKILL_ID = 'dm_imperial_city.skill_0';
 
+/** 皇城·重金：梦主是皇城、且指定的是池里还没派出的牌（不看收牌的人） */
+export function canImperialPickFromPool(
+  state: SetupState,
+  masterID: string,
+  poolIndex: number,
+): boolean {
+  const master = state.players[masterID];
+  if (!master || master.characterId !== 'dm_imperial_city') return false;
+  if (!master.isAlive) return false;
+  const bribe = state.bribePool[poolIndex];
+  return bribe !== undefined && bribe.status === 'inPool';
+}
+
 /** 皇城·重金：是否可以使用（梦主为皇城且目标合法） */
 export function canImperialPickBribe(
   state: SetupState,
@@ -2139,14 +2104,9 @@ export function canImperialPickBribe(
   targetID: string,
   poolIndex: number,
 ): boolean {
-  const master = state.players[masterID];
-  if (!master || master.characterId !== 'dm_imperial_city') return false;
-  if (!master.isAlive) return false;
   const target = state.players[targetID];
-  if (!target || !target.isAlive || target.faction !== 'thief') return false;
-  const pool = state.bribePool;
-  if (poolIndex < 0 || poolIndex >= pool.length) return false;
-  return pool[poolIndex]!.status === 'inPool';
+  if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return false;
+  return canImperialPickFromPool(state, masterID, poolIndex);
 }
 
 // === 密道 · 传送 ===
@@ -2168,7 +2128,7 @@ export function applySecretPassageTeleport(
   if (!master || master.characterId !== 'dm_secret_passage') return null;
   if (!master.isAlive) return null;
   const target = state.players[targetID];
-  if (!target || !target.isAlive || target.faction !== 'thief') return null;
+  if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return null;
   if (transitCardId !== 'action_dream_transit') return null;
   if (!master.hand.includes(transitCardId)) return null;
   if (
@@ -2177,23 +2137,10 @@ export function applySecretPassageTeleport(
     return null;
 
   // 弃掉穿梭剂
-  const idx = master.hand.indexOf(transitCardId);
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, transitCardId],
-    },
-  };
+  let s = discardCard(state, masterID, transitCardId);
   s = markSkillUsed(s, masterID, SECRET_PASSAGE_SKILL_ID);
   // 直接送到迷失层（跳过击杀状态，保留手牌）
-  s = movePlayerToLayer(s, targetID, 0);
+  s = sendToLimbo(s, targetID);
   return s;
 }
 
@@ -2222,7 +2169,7 @@ export function applyUranusPower(
   if (!master || master.characterId !== 'dm_uranus_firmament') return null;
   if (!master.isAlive) return null;
   const target = state.players[targetID];
-  if (!target || !target.isAlive || target.faction !== 'thief') return null;
+  if (!target || !target.isAlive || !isOutwardThief(state, targetID)) return null;
   // 必须移动到不同层
   if (target.currentLayer === targetLayer) return null;
   // 不能送迷失层
@@ -2249,8 +2196,8 @@ export function getUranusPowerUsesLeft(state: SetupState, player: PlayerSetup): 
 
 // === 冥王星·地狱 · 业火 ===
 // 弃 1 张手牌 → 让所有手牌不足 2 张的盗梦者从牌库顶各抽 2 张
-// 回合限 1 次（以技能定义为准；规则未明确次数，保守 ownTurnOncePerTurn）
-// 对照：cards-data.json dm_pluto_hell
+// 发动次数无限制，但必须有盗梦者手牌不足 2 张才能发动
+// 对照：docs/manual/06-dream-master.md 冥王星·地狱（详述：【业火】发动的次数无限制）
 
 export const PLUTO_BURNING_SKILL_ID = 'dm_pluto_hell.skill_0';
 const PLUTO_DRAW_THRESHOLD = 2;
@@ -2265,38 +2212,24 @@ export function applyPlutoBurning(
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_pluto_hell') return null;
   if (!master.isAlive) return null;
-  if (!canUseSkill(master, PLUTO_BURNING_SKILL_ID, 'ownTurnOncePerTurn')) return null;
-  const idx = master.hand.indexOf(discardCardId);
-  if (idx === -1) return null;
+  if (!master.hand.includes(discardCardId)) return null;
 
   // 前置检查：必须存在至少 1 名手牌<2 的存活盗梦者（manual §30 "不产生效果的技能不能无故启动"）
   // 对照：docs/manual/06-dream-master.md 冥王星·地狱 详述
   const preTargets = state.playerOrder.filter((pid) => {
     const p = state.players[pid];
-    return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;
+    return p && p.isAlive && isOutwardThief(state, pid) && p.hand.length < PLUTO_DRAW_THRESHOLD;
   });
   if (preTargets.length === 0) return null;
 
   // 弃 1
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, discardCardId],
-    },
-  };
-  s = markSkillUsed(s, masterID, PLUTO_BURNING_SKILL_ID);
+  // 发动次数无限制（docs/manual/06-dream-master.md 冥王星·地狱 详述），受上面的前置检查约束
+  let s = discardCard(state, masterID, discardCardId);
 
   // 所有手牌<2 的存活盗梦者抽 2（再次快照防止中途状态漂移）
   const targets = s.playerOrder.filter((pid) => {
     const p = s.players[pid];
-    return p && p.isAlive && p.faction === 'thief' && p.hand.length < PLUTO_DRAW_THRESHOLD;
+    return p && p.isAlive && isOutwardThief(s, pid) && p.hand.length < PLUTO_DRAW_THRESHOLD;
   });
   for (const pid of targets) {
     s = drawCards(s, pid, PLUTO_DRAW_AMOUNT);
@@ -2328,44 +2261,64 @@ export function applyMarsKillDiscardUnlock(state: SetupState, masterID: string):
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_mars_battlefield') return null;
   if (!master.isAlive) return null;
-  const idx = master.hand.indexOf('action_unlock');
-  if (idx === -1) return null;
+  if (!master.hand.includes('action_unlock')) return null;
 
-  const newHand = [...master.hand];
-  newHand.splice(idx, 1);
-  return {
-    ...state,
-    players: {
-      ...state.players,
-      [masterID]: { ...master, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, 'action_unlock' as CardID],
-    },
-  };
+  return discardCard(state, masterID, 'action_unlock' as CardID);
 }
 
 // === 冥王星·地狱世界观 ===
 // 盗梦者抽牌阶段抽牌数 = 1 颗骰子的掷骰结果
-// 抽牌阶段后手牌 ≥ 6 → 该盗梦者回合结束时进入迷失层
-// 对照：cards-data.json dm_pluto_hell 世界观
+// 抽牌阶段结束的那一刻手牌 ≥ 6 → 该盗梦者本回合照常行动，回合结束时进入迷失层；
+// 此后手牌再变多不追加（只在抽牌阶段检视一次）。进迷失层不是被击杀，不交手牌。
+// 对照：docs/manual/06-dream-master.md 冥王星·地狱（世界观与详述）
 
 const PLUTO_LOST_HAND_THRESHOLD = 6;
+
+/** 抽牌阶段结束时检视手牌后打下的标记；记在每回合自动清零的 skillUsedThisTurn 里 */
+export const PLUTO_HELL_MARK_KEY = 'dm_pluto_hell.world.marked';
 
 /** 冥王星地狱世界观激活 */
 export function isPlutoHellWorldActive(state: SetupState): boolean {
   return getMasterCharacterID(state) === 'dm_pluto_hell';
 }
 
-/** 冥王星世界观：本回合结束时检查盗梦者手牌≥6 → 入迷失层 */
+/**
+ * 抽牌阶段结束 → 进入行动阶段。
+ * 所有把 turnPhase 从 draw 切到 action 的路径（正常抽牌、跳过、小丑·赌博、黑天鹅·巡演、黑洞·吞噬）都走这里，
+ * 冥王星世界观在这一刻检视当前玩家的手牌数。
+ */
+export function endDrawPhase(state: SetupState): SetupState {
+  const s = setTurnPhase(state, 'action');
+  if (!isPlutoHellWorldActive(s)) return s;
+  const playerID = s.currentPlayerID;
+  const p = s.players[playerID];
+  if (!p || !p.isAlive || !isOutwardThief(s, playerID)) return s;
+  if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return s;
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      [playerID]: {
+        ...p,
+        skillUsedThisTurn: { ...p.skillUsedThisTurn, [PLUTO_HELL_MARK_KEY]: 1 },
+      },
+    },
+  };
+}
+
+/** 冥王星世界观：回合结束时，抽牌阶段打过标记的盗梦者进入迷失层（不算击杀） */
 export function applyPlutoHellLostCheck(state: SetupState, playerID: string): SetupState {
-  if (!isPlutoHellWorldActive(state)) return state;
   const p = state.players[playerID];
-  if (!p || !p.isAlive || p.faction !== 'thief') return state;
-  if (p.hand.length < PLUTO_LOST_HAND_THRESHOLD) return state;
-  if (p.currentLayer === 0) return state;
-  return movePlayerToLayer(state, playerID, 0);
+  if (!p || (p.skillUsedThisTurn[PLUTO_HELL_MARK_KEY] ?? 0) < 1) return state;
+  const rest = { ...p.skillUsedThisTurn };
+  delete rest[PLUTO_HELL_MARK_KEY];
+  const cleared: SetupState = {
+    ...state,
+    players: { ...state.players, [playerID]: { ...p, skillUsedThisTurn: rest } },
+  };
+  if (!isPlutoHellWorldActive(cleared)) return cleared;
+  if (!p.isAlive || !isOutwardThief(cleared, playerID) || p.currentLayer === 0) return cleared;
+  return sendToLimbo(cleared, playerID);
 }
 
 // === 土星·领地世界观 ===
@@ -2416,7 +2369,7 @@ export function isUranusFirmamentWorldActive(state: SetupState): boolean {
 export function applyUranusFirmamentMoveDiscard(state: SetupState, playerID: string): SetupState {
   if (!isUranusFirmamentWorldActive(state)) return state;
   const p = state.players[playerID];
-  if (!p || p.faction !== 'thief') return state;
+  if (!p || !isOutwardThief(state, playerID)) return state;
   // 梦主未派发贿赂为 0 → 弃 2，否则弃 1
   const inPool = state.bribePool.filter((b) => b.status === 'inPool').length;
   const discardCount = inPool === 0 ? 2 : 1;
@@ -2448,10 +2401,10 @@ export function isMarsBattlefieldWorldActive(state: SetupState): boolean {
 // 梦魇触发时机辅助（auto-detect + un-revealed discard）
 // ============================================================================
 // 对照：docs/manual/03-game-flow.md 第 94-102 行 / docs/manual/07-nightmare-cards.md
-// 触发：盗梦者打开放有金币的金库 → 同层有未翻开梦魇 → 梦主 3 选 1
-//   1. 派发贿赂牌然后弃掉梦魇（masterDealBribe + masterDiscardHiddenNightmare）
-//   2. 翻开梦魇并发动效果（masterRevealNightmare + masterActivateNightmare）
-//   3. 弃掉梦魇且不派发贿赂（masterDiscardHiddenNightmare）
+// 触发：盗梦者打开放有金币的金库 → 梦主三选一（move masterVaultDecision）
+//   1. 派发贿赂牌，然后弃掉该层梦魇
+//   2. 翻开该层梦魇并发动效果，不派发贿赂牌
+//   3. 弃掉该层梦魇，不派发贿赂牌
 
 /** 找出所有「金币金库已开 + 同层有未翻开梦魇」的层（待梦主决策） */
 export function findCoinVaultsWithHiddenNightmare(state: SetupState): number[] {
@@ -2469,12 +2422,10 @@ export function findCoinVaultsWithHiddenNightmare(state: SetupState): number[] {
   return result;
 }
 
-/** 弃掉指定层的未翻开梦魇（用于梦主选择"不发动"流程） */
-export function applyDiscardHiddenNightmare(state: SetupState, layer: number): SetupState | null {
+/** 弃掉指定层的梦魇（不发动）：离开棋盘、记为已发动并计入已用梦魇；该层没有梦魇时原样返回 */
+export function discardNightmareOnLayer(state: SetupState, layer: number): SetupState {
   const ls = state.layers[layer];
-  if (!ls) return null;
-  if (!ls.nightmareId) return null;
-  if (ls.nightmareRevealed) return null; // 已翻开走 masterDiscardNightmare
+  if (!ls || !ls.nightmareId) return state;
   const discardedId = ls.nightmareId;
   return {
     ...state,
@@ -2489,6 +2440,13 @@ export function applyDiscardHiddenNightmare(state: SetupState, layer: number): S
     },
     usedNightmareIds: [...state.usedNightmareIds, discardedId],
   };
+}
+
+/** 弃掉指定层的未翻开梦魇；该层没有梦魇或梦魇已翻开时返回 null（已翻开的走 masterDiscardNightmare） */
+export function applyDiscardHiddenNightmare(state: SetupState, layer: number): SetupState | null {
+  const ls = state.layers[layer];
+  if (!ls || !ls.nightmareId || ls.nightmareRevealed) return null;
+  return discardNightmareOnLayer(state, layer);
 }
 
 /** 火星·战场世界观：弃 2 非 SHOOT 换 1 SHOOT */
@@ -2554,24 +2512,29 @@ export function applyMercuryRouteExtraFailBribe(
   masterCharacterID: CardID | null,
 ): SetupState {
   if (masterCharacterID !== 'dm_mercury_route') return state;
-  // 新牌的标识沿用不透明的编号：取池里现有最大编号加一
-  const maxIndex = state.bribePool.reduce((max, b) => {
-    const m = /^bribe-(\d+)$/.exec(b.id);
-    return m ? Math.max(max, Number(m[1])) : max;
-  }, -1);
-  const newId = `bribe-${maxIndex + 1}`;
+  const extra: BribeSetup = {
+    id: '',
+    kind: 'fail',
+    status: 'inPool',
+    heldBy: null,
+    originalOwnerId: null,
+  };
+  const allInPool = state.bribePool.every((b) => b.status === 'inPool');
+  if (!allInPool) {
+    // 已有牌派出时不能重编号（编号已被对方看见）：沿用旧办法，取最大编号加一
+    const maxIndex = state.bribePool.reduce((max, b) => {
+      const m = /^bribe-(\d+)$/.exec(b.id);
+      return m ? Math.max(max, Number(m[1])) : max;
+    }, -1);
+    return { ...state, bribePool: [...state.bribePool, { ...extra, id: `bribe-${maxIndex + 1}` }] };
+  }
+  // 追加后整池重新洗乱并重新编号：编号与池内顺序都推不出成败（视图对所有人公开编号）。
+  // 按种子洗，同一局可重放。
+  const merged = [...state.bribePool, extra];
+  const shuffled = seededShuffle(merged, state.rngSeed, 'bribe-mercury');
   return {
     ...state,
-    bribePool: [
-      ...state.bribePool,
-      {
-        id: newId,
-        kind: 'fail',
-        status: 'inPool',
-        heldBy: null,
-        originalOwnerId: null,
-      },
-    ],
+    bribePool: shuffled.map((b, i) => ({ ...b, id: `bribe-${i}` })),
   };
 }
 
@@ -2620,8 +2583,8 @@ export function applyVenusDouble(
   }
 
   // N = 非死亡盗梦者数
-  const aliveThievesCount = Object.values(state.players).filter(
-    (p) => p.faction === 'thief' && p.isAlive,
+  const aliveThievesCount = Object.entries(state.players).filter(
+    ([id, p]) => isOutwardThief(state, id) && p.isAlive,
   ).length;
   if (aliveThievesCount <= 0) return null;
 
@@ -2682,8 +2645,10 @@ export function applyMercuryReverse(
   const cardPlayer = state.players[cardPlayerID];
   if (!cardPlayer || !cardPlayer.isAlive) return null;
 
-  // 出牌者是贿赂者（faction 已转为 master 但不是梦主本人）
-  if (cardPlayer.faction !== 'master') return null;
+  // 出牌者是另一位拥有贿赂牌的盗梦者：收到过贿赂牌即算（不论成败，张数公开），
+  // 不读真实阵营，背叛者与持有失败贿赂牌的盗梦者一视同仁
+  // 对照：docs/manual/06-dream-master.md 水星·航路 逆流
+  if (!isOutwardThief(state, cardPlayerID) || cardPlayer.bribeReceived <= 0) return null;
 
   // 同层
   if (cardPlayer.currentLayer !== master.currentLayer) return null;
@@ -2717,42 +2682,125 @@ export function applyMercuryReverse(
 // === 皇城世界观 · 贿赂后 SHOOT（纯函数） ===
 // 对照：docs/manual/06-dream-master.md 皇城
 // 收到贿赂的玩家选一个未收到贿赂的盗梦者视为 SHOOT，掷骰结果 -3
+// 每收到 1 张贿赂牌获得 1 次机会（imperialShootCharges），发动即消耗 1 次
 export const IMPERIAL_CITY_WORLD_SKILL_ID = 'dm_imperial_city.worldview';
 
+/**
+ * 收到 1 张贿赂牌时调用：皇城世界观下，该玩家获得 1 次视为 SHOOT 的发动机会。
+ * 对照：docs/manual/06-dream-master.md 皇城「当玩家收到贿赂牌时」
+ */
+export function grantImperialShootCharge(state: SetupState, playerID: string): SetupState {
+  if (getMasterCharacterID(state) !== 'dm_imperial_city') return state;
+  const p = state.players[playerID];
+  if (!p) return state;
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerID]: { ...p, imperialShootCharges: (p.imperialShootCharges ?? 0) + 1 },
+    },
+  };
+}
+
+/** 贿赂池里还没派出的牌在池中的下标（保持池内顺序） */
+export function inPoolBribeIndexes(state: SetupState): number[] {
+  const indexes: number[] = [];
+  state.bribePool.forEach((b, i) => {
+    if (b.status === 'inPool') indexes.push(i);
+  });
+  return indexes;
+}
+
+/**
+ * 把贿赂池里第 poolIndex 张牌派给 targetID：成功的牌（DEAL）使其转为梦主阵营，
+ * 失败的牌无任何效果；记收到的张数，皇城世界观下再给 1 次视为 SHOOT 的机会。
+ * 该位置不是池中未派出的牌、或目标不存在时返回 null。
+ * 贿赂牌只在金币金库打开与【梦境窥视】效果①时派发，其余路径不得直接调用。
+ * 对照：docs/manual/03-game-flow.md 贿赂&背叛者（38-45 行）
+ */
+export function dealBribeCard(
+  state: SetupState,
+  targetID: string,
+  poolIndex: number,
+): SetupState | null {
+  const target = state.players[targetID];
+  const bribe = state.bribePool[poolIndex];
+  if (!target || !bribe || bribe.status !== 'inPool') return null;
+  const isDeal = bribe.kind === 'deal';
+  return grantImperialShootCharge(
+    {
+      ...state,
+      bribePool: state.bribePool.map((b, i) =>
+        i === poolIndex
+          ? {
+              ...b,
+              status: isDeal ? ('deal' as const) : ('dealt' as const),
+              heldBy: targetID,
+              originalOwnerId: targetID,
+            }
+          : b,
+      ),
+      players: {
+        ...state.players,
+        [targetID]: {
+          ...target,
+          bribeReceived: target.bribeReceived + 1,
+          faction: isDeal ? ('master' as const) : target.faction,
+        },
+      },
+    },
+    targetID,
+  );
+}
+
+/**
+ * 皇城世界观：收到贿赂牌的玩家视为使用 1 张【SHOOT】，对方掷骰结果 -3。
+ * 发起者是金牛时同样可以启动号角：金牛自己的骰不减；rollHorn 在对方未被击杀时才掷。
+ * 对照：docs/manual/05-dream-thieves.md 金牛 79 行
+ */
 export function applyImperialCityWorldShoot(
   state: SetupState,
   shooterID: string,
   targetID: string,
   roll: number,
+  rollHorn?: () => number,
 ): SetupState | null {
   const shooter = state.players[shooterID];
   const target = state.players[targetID];
   if (!shooter || !target) return null;
   if (!shooter.isAlive || !target.isAlive) return null;
   if (shooterID === targetID) return null;
-  if (target.faction !== 'thief') return null;
+  if (!isOutwardThief(state, targetID)) return null;
   if (target.bribeReceived > 0) return null;
+  // 发起者必须有未用掉的机会
+  const charges = shooter.imperialShootCharges ?? 0;
+  if (charges <= 0) return null;
+  const spent: SetupState = {
+    ...state,
+    players: {
+      ...state.players,
+      [shooterID]: { ...shooter, imperialShootCharges: charges - 1 },
+    },
+  };
   // 普通 SHOOT：deathFaces=[1], moveFaces=[2,3,4]（规则 docs/manual/04-action-cards.md SHOOT 章）
   const modifiedRoll = Math.max(1, roll - 3);
-  const result = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
+  const baseResult = resolveShootCustom(modifiedRoll, [1], [2, 3, 4]);
+  const hornKills =
+    baseResult !== 'kill' &&
+    shooter.characterId === 'thief_taurus' &&
+    rollHorn !== undefined &&
+    applyTaurusHorn(modifiedRoll, rollHorn()) === 'kill';
+  const result = hornKills ? 'kill' : baseResult;
   if (result === 'kill') {
-    let s = movePlayerToLayer(state, targetID, 0);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetID]: { ...s.players[targetID]!, isAlive: false, deathTurn: s.turnNumber },
-      },
-    };
-    return s;
+    return killPlayer(spent, targetID, shooterID);
   }
   if (result === 'move') {
-    const cur = state.players[targetID]!.currentLayer;
+    const cur = spent.players[targetID]!.currentLayer;
     const newLayer = cur >= 4 ? cur - 1 : cur + 1;
-    return movePlayerToLayer(state, targetID, newLayer as Layer);
+    return movePlayerToLayer(spent, targetID, newLayer as Layer);
   }
   // miss
-  return { ...state };
+  return spent;
 }
 
 // === 复活机制 ===
@@ -2768,6 +2816,13 @@ export function isSecretPassageWorldActive(state: SetupState): boolean {
  * 基础复活：弃 2 张手牌复活自己或他人
  * 密道世界观变体：弃 1 张【梦境穿梭剂】复活
  */
+/**
+ * 本回合自己复活过自己的标记，记在每回合自动清零的 skillUsedThisTurn 里。
+ * 带标记的玩家当回合不能用【解封】的效果①，效果②（抵消别人的解封）不受影响。
+ * 对照：docs/manual/04-action-cards.md 解封（效果①「复活后不能在当回合使用此效果」）
+ */
+export const REVIVED_SELF_THIS_TURN_KEY = 'revive.self';
+
 export function applyRevive(
   state: SetupState,
   selfID: string,
@@ -2807,33 +2862,38 @@ export function applyRevive(
     if (!self.hand.includes(cid)) return null;
   }
 
-  // 弃牌
-  const newHand = [...self.hand];
-  for (const cid of discardedCardIds) {
-    const idx = newHand.indexOf(cid);
-    if (idx < 0) return null;
-    newHand.splice(idx, 1);
-  }
+  // 弃牌：代价从复活者手里扣掉（弃的是时间风暴则触发效果）。
+  // 复活自己时必须先弃牌再改写自己的状态，否则弃牌后的手牌会被旧快照覆盖
+  let s = discardCards(state, selfID, discardedCardIds);
 
   // 复活目标：isAlive=true, deathTurn=null
   const reviveLayer = effectiveTarget === selfID ? 1 : self.currentLayer;
-  let s: SetupState = {
-    ...state,
+  s = {
+    ...s,
     players: {
-      ...state.players,
-      [selfID]: { ...self, hand: newHand },
+      ...s.players,
       [effectiveTarget]: {
-        ...state.players[effectiveTarget]!,
+        ...s.players[effectiveTarget]!,
         isAlive: true,
         deathTurn: null,
+        layerBeforeLimbo: null,
       },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, ...discardedCardIds],
     },
   };
   s = movePlayerToLayer(s, effectiveTarget, reviveLayer as Layer);
+  if (isSelfRevive) {
+    const revived = s.players[selfID]!;
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        [selfID]: {
+          ...revived,
+          skillUsedThisTurn: { ...revived.skillUsedThisTurn, [REVIVED_SELF_THIS_TURN_KEY]: 1 },
+        },
+      },
+    };
+  }
   return s;
 }
 
@@ -2842,18 +2902,11 @@ export function applyRevive(
 // 弃 2 张牌，重复执行本回合内之前用过的 SHOOT/KICK 效果
 export const VENUS_MIRROR_WORLD_SKILL_ID = 'dm_venus_mirror.worldview';
 
-// 可复制的行动牌前缀
-const MIRRORABLE_SHOOT_PREFIXES = [
-  'action_shoot',
-  'action_shoot_assassin',
-  'action_shoot_drill',
-  'action_shoot_burst',
-  'action_shoot_dream_transit',
-];
+// 可复制的行动牌：SHOOT 类 + KICK
 const MIRRORABLE_KICK = 'action_kick';
 
 function isMirrorableCard(cardId: CardID): boolean {
-  return MIRRORABLE_SHOOT_PREFIXES.includes(cardId) || cardId === MIRRORABLE_KICK;
+  return isShootClassCard(cardId) || cardId === MIRRORABLE_KICK;
 }
 
 export function applyVenusMirrorWorld(
@@ -2884,56 +2937,28 @@ export function applyVenusMirrorWorld(
   if (!target || !target.isAlive) return null;
   if (selfID === targetID) return null;
 
-  // 弃牌
-  const newHand = [...self.hand];
+  // 弃牌（弃的是时间风暴则触发效果）
+  const handCopy = [...self.hand];
   for (const cid of discardedCardIds) {
-    const idx = newHand.indexOf(cid);
+    const idx = handCopy.indexOf(cid);
     if (idx < 0) return null;
-    newHand.splice(idx, 1);
+    handCopy.splice(idx, 1);
   }
 
   const lastCard = mirrorable[mirrorable.length - 1]!;
-  let s: SetupState = {
-    ...state,
-    players: {
-      ...state.players,
-      [selfID]: { ...self, hand: newHand },
-    },
-    deck: {
-      ...state.deck,
-      discardPile: [...state.deck.discardPile, ...discardedCardIds],
-    },
-  };
+  let s = discardCards(state, selfID, discardedCardIds);
   s = markSkillUsed(s, selfID, VENUS_MIRROR_WORLD_SKILL_ID);
 
   if (lastCard === MIRRORABLE_KICK) {
-    // KICK 效果：目标击杀 + 拿 2 张手牌
-    const tp = s.players[targetID]!;
-    const handover = tp.hand.slice(0, 2);
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [targetID]: { ...tp, isAlive: false, deathTurn: s.turnNumber, hand: tp.hand.slice(2) },
-        [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...handover] },
-      },
-    };
-    s = movePlayerToLayer(s, targetID, 0);
+    // 重复执行 KICK 的效果：与目标交换梦境层（对照 docs/manual/04-action-cards.md KICK）
+    const kicked = applyKickEffect(s, selfID, targetID);
+    if (kicked === null) return null;
+    s = kicked;
   } else {
     // SHOOT 效果：普通骰面 [1] 死 [2-4] 移 [5-6] miss
     const result = resolveShootCustom(roll, [1], [2, 3, 4]);
     if (result === 'kill') {
-      const tp = s.players[targetID]!;
-      const handover = tp.hand.slice(0, 2);
-      s = {
-        ...s,
-        players: {
-          ...s.players,
-          [targetID]: { ...tp, isAlive: false, deathTurn: s.turnNumber, hand: tp.hand.slice(2) },
-          [selfID]: { ...s.players[selfID]!, hand: [...s.players[selfID]!.hand, ...handover] },
-        },
-      };
-      s = movePlayerToLayer(s, targetID, 0);
+      s = killPlayer(s, targetID, selfID);
     } else if (result === 'move') {
       const cur = s.players[targetID]!.currentLayer;
       const newLayer = cur >= 4 ? cur - 1 : cur + 1;

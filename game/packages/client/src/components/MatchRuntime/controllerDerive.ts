@@ -1,6 +1,7 @@
 // 对局界面控制层的纯推导：不依赖 React，输入是按座位裁剪过的视图，输出是界面要用的数据与参数。
 // useMatchController 只负责把这些函数接到状态与回调上。
 
+import { isShootClassCard } from '@icgame/game-engine';
 import type { MatchView, MatchViewState, PlayerView, RunnerCtx } from '@icgame/game-engine';
 import { actionMoveFor, getCardName } from '../../lib/cards';
 import { getCardImageUrl } from '../../lib/cardImages';
@@ -218,15 +219,6 @@ export function isShootPlay(pending: PendingPlay): boolean {
 /** 意念判官的角色 id */
 export const SUDGER_CHARACTER_ID = 'thief_sudger_of_mind';
 
-/** 引擎的 playShootSudger 能结算的 SHOOT 类牌（与引擎里 SHOOT 类牌的判定一致）；其余牌仍走原来的 move */
-export const SUDGER_SHOOT_CARDS: readonly string[] = [
-  'action_shoot',
-  'action_shoot_assassin',
-  'action_shoot_drill',
-  'action_shoot_burst',
-  'action_shoot_dream_transit',
-];
-
 /**
  * 角色技能改变出牌方式时，把出牌意图换成该角色要走的 move。
  * 意念判官【定罪】：使用 SHOOT 类牌时，目标改为掷 2 颗骰子，由判官选 1 颗做结果（docs/manual/05-dream-thieves.md）。
@@ -239,7 +231,8 @@ export function adaptPlayForCharacter(
   characterId: string,
 ): PendingPlay | null {
   if (!pending || characterId !== SUDGER_CHARACTER_ID) return pending;
-  if (!SUDGER_SHOOT_CARDS.includes(pending.card)) return pending;
+  // SHOOT 类牌以引擎的判定为准；其余牌仍走原来的 move
+  if (!isShootClassCard(pending.card)) return pending;
   if (pending.dreamMode === 'shoot' && pending.move === 'playShootDreamTransit') {
     return {
       card: pending.card,

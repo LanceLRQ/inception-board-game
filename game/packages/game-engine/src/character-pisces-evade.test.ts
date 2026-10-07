@@ -86,7 +86,7 @@ describe('双鱼 · 闪避 · pendingShootResponse 挂起', () => {
     expect(next.players.p1!.hand.length).toBe(handBefore);
   });
 
-  it('双鱼在 L1（无更小相邻层）→ 不挂起，正常 SHOOT', () => {
+  it('双鱼在 L1 同样挂起（游离可进入迷失层）', () => {
     let s = sceneShooterVsPisces();
     s = {
       ...s,
@@ -103,11 +103,11 @@ describe('双鱼 · 闪避 · pendingShootResponse 挂起', () => {
     };
     const result = callMove(s, 'playShoot', ['p2', SHOOT], {
       currentPlayer: 'p1',
-      rolls: [4], // miss
+      rolls: [4], // 不会被消费（pre-roll 拦截）
     });
     expect(result).not.toBe('INVALID_MOVE');
     const next = result as SetupState;
-    expect(next.pendingShootResponse).toBeNull();
+    expect(next.pendingShootResponse?.targetPlayerID).toBe('p2');
   });
 
   it('双鱼本回合已用闪避 → 不挂起', () => {

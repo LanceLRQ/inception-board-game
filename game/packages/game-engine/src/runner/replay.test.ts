@@ -351,7 +351,8 @@ describe('事件流', () => {
       }
     }
     expect(checked).toBeGreaterThan(1000);
-    expect(withFlip).toBeGreaterThan(0);
+    // 时间风暴翻开的牌进弃牌堆，移出游戏的只有风暴自己，所以不会再有「被翻开移出」的牌
+    expect(withFlip).toBe(0);
     expect(withDeckDiscard).toBeGreaterThan(0);
     expect(withReturn).toBeGreaterThan(0);
   });

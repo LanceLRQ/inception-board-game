@@ -46,6 +46,10 @@ export interface PlayerView {
   currentLayer: Layer;
   isAlive: boolean;
   deathTurn: number | null;
+  /** 进入迷失层之前所在的层；能从公开的移动推出，与 deathTurn 同样公开 */
+  layerBeforeLimbo: Layer | null;
+  /** 皇城世界观下尚未用掉的 SHOOT 机会；来自公开的收贿与发动，与 bribeReceived 同样公开 */
+  imperialShootCharges: number;
   unlockCount: number;
   shootCount: number;
   bribeReceived: number;
@@ -129,6 +133,12 @@ export interface PendingGravityView {
 export interface PendingPeekDecisionView {
   peekerID: string;
   targetLayer: number;
+}
+
+/** 金币金库打开后等梦主三选一：只有层与打开者，不带任何梦魇或贿赂内容 */
+export interface PendingVaultDecisionView {
+  layer: number;
+  openerID: string;
 }
 
 export type PeekRevealView =
@@ -236,6 +246,7 @@ export interface MatchView {
   shiftSnapshot: Record<string, CardID> | null;
   pendingResponseWindow: ResponseWindowView | null;
   pendingPeekDecision: PendingPeekDecisionView | null;
+  pendingVaultDecision: PendingVaultDecisionView | null;
   peekReveal: PeekRevealView | null;
   pendingLibra: PendingLibraView | null;
   pendingSudgerRolls: PendingSudgerRollsView | null;
@@ -294,6 +305,7 @@ export const FIELD_DISPOSITION: Record<keyof SetupState, Disposition> = {
   shiftSnapshot: 'conditional',
   pendingResponseWindow: 'public',
   pendingPeekDecision: 'public',
+  pendingVaultDecision: 'public',
   peekReveal: 'public',
   pendingLibra: 'conditional',
   pendingSudgerRolls: 'public',
@@ -324,6 +336,8 @@ export const PLAYER_FIELD_DISPOSITION: Record<keyof PlayerSetup, Disposition> = 
   hand: 'conditional',
   isAlive: 'public',
   deathTurn: 'public',
+  layerBeforeLimbo: 'public',
+  imperialShootCharges: 'public',
   unlockCount: 'public',
   shootCount: 'public',
   bribeReceived: 'public',
@@ -406,6 +420,8 @@ function viewPlayer(id: string, p: PlayerSetup, who: Audience): PlayerView {
     currentLayer: p.currentLayer,
     isAlive: p.isAlive,
     deathTurn: p.deathTurn,
+    layerBeforeLimbo: p.layerBeforeLimbo ?? null,
+    imperialShootCharges: p.imperialShootCharges ?? 0,
     unlockCount: p.unlockCount,
     shootCount: p.shootCount,
     bribeReceived: p.bribeReceived,
@@ -528,8 +544,17 @@ function viewShiftSnapshot(
   G: SetupState,
   who: Audience,
 ): Record<string, CardID> {
+  // 已翻开玩家的条目记着他换牌前的角色；该角色此刻若落在一个未翻开的别人身上，
+  // 带着这条就等于告诉观察者那人的角色，所以这种条目只给本人和对局结束后的视图
+  const heldHiddenByOther = (character: CardID): boolean =>
+    Object.values(G.players).some(
+      (p) => p.characterId === character && !p.isRevealed && p.id !== who.who,
+    );
   const kept = Object.keys(snapshot).filter(
-    (id) => who.open || who.who === id || G.players[id]?.isRevealed === true,
+    (id) =>
+      who.open ||
+      who.who === id ||
+      (G.players[id]?.isRevealed === true && !heldHiddenByOther(snapshot[id]!)),
   );
   return Object.fromEntries(kept.map((id) => [id, snapshot[id]!]));
 }
@@ -568,6 +593,7 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
   const pendingResonance = G.pendingResonance;
   const pendingGravity = G.pendingGravity;
   const pendingPeekDecision = G.pendingPeekDecision;
+  const pendingVaultDecision = G.pendingVaultDecision;
   const sudger = G.pendingSudgerRolls ?? null;
   const shootMove = G.pendingShootMove ?? null;
   const maze = G.mazeState;
@@ -629,6 +655,9 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
     pendingResponseWindow: G.pendingResponseWindow ? viewWindow(G.pendingResponseWindow) : null,
     pendingPeekDecision: pendingPeekDecision
       ? { peekerID: pendingPeekDecision.peekerID, targetLayer: pendingPeekDecision.targetLayer }
+      : null,
+    pendingVaultDecision: pendingVaultDecision
+      ? { layer: pendingVaultDecision.layer, openerID: pendingVaultDecision.openerID }
       : null,
     peekReveal: G.peekReveal ? viewPeekReveal(G.peekReveal) : null,
     pendingLibra: G.pendingLibra ? viewLibra(G.pendingLibra, who) : null,

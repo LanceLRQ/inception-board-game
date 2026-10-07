@@ -17,7 +17,7 @@ import {
 describe('checkInvariants - happy path', () => {
   it('returns empty for a freshly created test state', () => {
     const state = createTestState();
-    // setup 阶段对 master_count 宽容
+    // setup 阶段不检查梦主身份
     const v = checkInvariants(state);
     // 默认 fixture 是 setup 阶段且 5 人（4 thief + 1 master）
     expect(v).toEqual([]);
@@ -39,8 +39,8 @@ describe('checkInvariants - happy path', () => {
   });
 });
 
-describe('checkInvariants - rule 1: master count', () => {
-  it('flags when no master in playing phase', () => {
+describe('checkInvariants - rule 1: master identity', () => {
+  it('flags when the declared dream master is not on the master faction', () => {
     const base = createTestState({ phase: 'playing' });
     const noMaster = {
       ...base,
@@ -49,10 +49,16 @@ describe('checkInvariants - rule 1: master count', () => {
       ),
     };
     const violations = checkInvariants(noMaster);
-    expect(violations.some((v) => v.rule === 'master_count')).toBe(true);
+    expect(violations.some((v) => v.rule === 'master_id')).toBe(true);
   });
 
-  it('flags when multiple masters in playing phase', () => {
+  it('flags when dreamMasterID points at a missing player in playing phase', () => {
+    const base = createTestState({ phase: 'playing' });
+    const v = checkInvariants({ ...base, dreamMasterID: 'ghost' });
+    expect(v.some((x) => x.rule === 'master_id')).toBe(true);
+  });
+
+  it('flags a non-master player on the master faction without a successful bribe', () => {
     const base = createTestState({ phase: 'playing' });
     const twoMasters = {
       ...base,
@@ -62,10 +68,38 @@ describe('checkInvariants - rule 1: master count', () => {
       },
     };
     const v = checkInvariants(twoMasters);
-    expect(v.some((x) => x.rule === 'master_count')).toBe(true);
+    expect(v.some((x) => x.rule === 'betrayer_without_deal')).toBe(true);
   });
 
-  it('does not flag master_count during setup phase', () => {
+  it('accepts a betrayer who holds a successful bribe', () => {
+    const base = createTestState({ phase: 'playing' });
+    const withBetrayer = withBribes(
+      {
+        ...base,
+        players: {
+          ...base.players,
+          p1: { ...base.players.p1!, faction: 'master' as const, bribeReceived: 1 },
+        },
+      },
+      [{ id: 'b-deal', kind: 'deal', status: 'deal', heldBy: 'p1', originalOwnerId: 'p1' }],
+    );
+    const v = checkInvariants(withBetrayer);
+    expect(v).toEqual([]);
+  });
+
+  it('does not accept a failed bribe as the reason for a master-faction player', () => {
+    const base = createTestState({ phase: 'playing' });
+    const s = withBribes(
+      {
+        ...base,
+        players: { ...base.players, p1: { ...base.players.p1!, faction: 'master' as const } },
+      },
+      [{ id: 'b-fail', kind: 'fail', status: 'dealt', heldBy: 'p1', originalOwnerId: 'p1' }],
+    );
+    expect(checkInvariants(s).some((x) => x.rule === 'betrayer_without_deal')).toBe(true);
+  });
+
+  it('does not flag master identity during setup phase', () => {
     const s = createTestState({
       phase: 'setup',
       players: Object.fromEntries(
@@ -76,7 +110,7 @@ describe('checkInvariants - rule 1: master count', () => {
       ),
     });
     const v = checkInvariants(s);
-    expect(v.some((x) => x.rule === 'master_count')).toBe(false);
+    expect(v.some((x) => x.rule === 'master_id' || x.rule === 'betrayer_without_deal')).toBe(false);
   });
 });
 
@@ -202,10 +236,10 @@ describe('checkInvariants - rule 6: dead + deathTurn', () => {
   });
 });
 
-describe('checkInvariants - rule 7: dead no hand', () => {
-  it('flags dead player still holding cards', () => {
+describe('checkInvariants - dead players may hold cards', () => {
+  it('does not flag a dead player still holding cards', () => {
     const s = scenarioStartOfGame3p();
-    const bad = {
+    const dead = {
       ...s,
       players: {
         ...s.players,
@@ -217,8 +251,8 @@ describe('checkInvariants - rule 7: dead no hand', () => {
         },
       },
     };
-    const v = checkInvariants(bad);
-    expect(v.some((x) => x.rule === 'dead_no_hand')).toBe(true);
+    const v = checkInvariants(dead);
+    expect(v.some((x) => x.rule === 'dead_no_hand')).toBe(false);
   });
 });
 
@@ -232,6 +266,33 @@ describe('checkInvariants - rule 8: layer membership consistency', () => {
     };
     const v = checkInvariants(bad);
     expect(v.some((x) => x.rule === 'layer_membership')).toBe(true);
+  });
+
+  it('flags a dead player missing from the lost layer roster', () => {
+    const s = scenarioStartOfGame3p();
+    const bad = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, isAlive: false, deathTurn: 2, hand: [], currentLayer: 0 as Layer },
+      },
+      layers: { ...s.layers, 0: { ...s.layers[1]!, playersInLayer: [] } },
+    };
+    const v = checkInvariants(bad);
+    expect(v.some((x) => x.rule === 'layer_membership')).toBe(true);
+  });
+
+  it('flags a dead player still listed in a dream layer roster', () => {
+    const s = scenarioStartOfGame3p();
+    const bad = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, isAlive: false, deathTurn: 2, hand: [], currentLayer: 0 as Layer },
+      },
+    };
+    const v = checkInvariants(bad);
+    expect(v.some((x) => x.rule === 'layer_membership_reverse')).toBe(true);
   });
 
   it('flags layer.playersInLayer vs player.currentLayer mismatch (reverse)', () => {

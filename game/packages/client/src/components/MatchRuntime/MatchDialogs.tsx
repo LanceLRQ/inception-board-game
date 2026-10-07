@@ -28,7 +28,7 @@ interface MatchDialogsProps {
 
 export function MatchDialogs({ controller }: MatchDialogsProps) {
   const { t } = useTranslation();
-  const { view, viewerSeat, viewerLayer, dreamMasterID, makeMove, nicknameOf } = controller;
+  const { view, viewerSeat, viewerLayer, makeMove, nicknameOf } = controller;
   const { play, gravity, chess, graft } = controller;
   const { decree } = play;
 
@@ -46,8 +46,8 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
       {/* 响应类 Dialog 群（互斥业务保证同时只会有一个 open） */}
       <MasterNightmareDecisionDialog
         G={view}
-        currentPlayerID={controller.turn.currentSeat}
-        dreamMasterID={dreamMasterID}
+        viewerPlayerID={viewerSeat}
+        nicknameOf={nicknameOf}
         makeMove={makeMove}
       />
       <MasterPeekBribeDialog

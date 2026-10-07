@@ -6,14 +6,14 @@
 //   A. 贿赂 + 阵营切换：DEAL 命中即时 faction='master'
 //   B. 皇城·重金（指定派发）+ DEAL → 立即转阵营
 //   C. 皇城世界观 SHOOT-3：贿赂触发 → 收到贿赂者对未收贿赂者掷骰 -3
-//   D. 贿赂池耗尽：masterDealBribe 在池空时拒绝
+//   D. 贿赂池耗尽：masterVaultDecision('bribe') 在池空时拒绝
 //   E. 转阵营后再受贿赂：重复转阵营仍计 bribeReceived
 //   F. 转阵营盗梦者 + 梦魇：转阵营后仍可被梦魇影响（faction 与梦魇触发独立）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Faction, Layer } from '@icgame/shared';
 import type { SetupState } from './setup.js';
-import { callMove, createTestState, makePlayer } from './testing/fixtures.js';
+import { callMove, createTestState, makePlayer, type CallMoveOptions } from './testing/fixtures.js';
 import { applyImperialCityWorldShoot, canImperialPickBribe } from './engine/skills.js';
 
 /**
@@ -43,6 +43,7 @@ function sceneCrossSystem(): SetupState {
         faction: 'thief',
         characterId: 'thief_aquarius' as CardID,
         currentLayer: 1 as Layer,
+        imperialShootCharges: 1,
       }),
       p2: makePlayer({
         id: 'p2',
@@ -82,18 +83,32 @@ function sceneCrossSystem(): SetupState {
   };
 }
 
+/** p 打开了第 1 层的金币金库，梦主在三选一里选择派贿赂；poolIndex 是皇城·重金指定的池内下标 */
+function callVaultBribe(
+  G: SetupState,
+  opener: string,
+  poolIndex?: number,
+  opts: CallMoveOptions = { currentPlayer: 'pM' },
+) {
+  return callMove(
+    { ...G, pendingVaultDecision: { layer: 1, openerID: opener } },
+    'masterVaultDecision',
+    ['bribe', poolIndex === undefined ? undefined : { poolIndex }],
+    opts,
+  );
+}
+
+const keepOrder = { currentPlayer: 'pM', shuffleStrategy: <T>(arr: T[]) => arr };
+
 // ============================================================================
 // A. 贿赂 + 阵营切换
 // ============================================================================
 
 describe('跨系统 · 贿赂 × 阵营切换', () => {
-  it('masterDealBribe 命中 deal-* → 立即 faction=master + bribeReceived+1', () => {
+  it('金库三选一派贿赂：命中 deal-* → 立即 faction=master + bribeReceived+1', () => {
     const s = sceneCrossSystem();
     // shuffleStrategy 强制取第一个（deal-0），保证命中 DEAL
-    const r = callMove(s, 'masterDealBribe', ['p1'], {
-      currentPlayer: 'pM',
-      shuffleStrategy: <T>(arr: T[]) => arr, // 不洗，按原顺序
-    });
+    const r = callVaultBribe(s, 'p1', undefined, keepOrder);
     expect(r).not.toBe('INVALID_MOVE');
     const next = r as SetupState;
     expect(next.players.p1!.faction).toBe('master');
@@ -104,17 +119,14 @@ describe('跨系统 · 贿赂 × 阵营切换', () => {
     expect(dealtBribe!.status).toBe('deal');
   });
 
-  it('masterDealBribe 命中 fail-* → faction 不变 + bribeReceived+1', () => {
+  it('金库三选一派贿赂：命中 fail-* → faction 不变 + bribeReceived+1', () => {
     let s = sceneCrossSystem();
     // 把贿赂池清空 deal，只留 fail
     s = {
       ...s,
       bribePool: s.bribePool.filter((b) => b.kind === 'fail'),
     };
-    const r = callMove(s, 'masterDealBribe', ['p1'], {
-      currentPlayer: 'pM',
-      shuffleStrategy: <T>(arr: T[]) => arr,
-    });
+    const r = callVaultBribe(s, 'p1', undefined, keepOrder);
     expect(r).not.toBe('INVALID_MOVE');
     const next = r as SetupState;
     expect(next.players.p1!.faction).toBe('thief'); // 未转阵营
@@ -146,9 +158,9 @@ describe('跨系统 · 皇城·重金（指定派发）× 阵营切换', () => {
     expect(canImperialPickBribe(s, 'pM', 'p1', 0)).toBe(false);
   });
 
-  it('masterDealBribeImperial 指定 deal-0 → p1 立即转阵营 + bribePool 状态正确', () => {
+  it('指定 deal-0 派发 → p1 立即转阵营 + bribePool 状态正确', () => {
     const s = sceneCrossSystem();
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1', 0);
     expect(r).not.toBe('INVALID_MOVE');
     const next = r as SetupState;
     expect(next.players.p1!.faction).toBe('master');
@@ -156,9 +168,9 @@ describe('跨系统 · 皇城·重金（指定派发）× 阵营切换', () => {
     expect(next.bribePool[0]!.heldBy).toBe('p1');
   });
 
-  it('masterDealBribeImperial 指定 fail-0（poolIndex=3）→ faction 不变', () => {
+  it('指定 fail-0（poolIndex=3）派发 → faction 不变', () => {
     const s = sceneCrossSystem();
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 3], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1', 3);
     expect(r).not.toBe('INVALID_MOVE');
     const next = r as SetupState;
     expect(next.players.p1!.faction).toBe('thief');
@@ -236,7 +248,7 @@ describe('跨系统 · 皇城世界观 × 贿赂触发 SHOOT-3', () => {
 // ============================================================================
 
 describe('跨系统 · 贿赂池耗尽', () => {
-  it('masterDealBribe 池为空 → INVALID_MOVE', () => {
+  it('金库三选一派贿赂：池为空 → INVALID_MOVE', () => {
     let s = sceneCrossSystem();
     s = {
       ...s,
@@ -246,17 +258,17 @@ describe('跨系统 · 贿赂池耗尽', () => {
         heldBy: 'p3',
       })),
     };
-    const r = callMove(s, 'masterDealBribe', ['p1'], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1');
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('masterDealBribeImperial 索引超界 → INVALID_MOVE', () => {
+  it('指定的下标超界 → INVALID_MOVE', () => {
     const s = sceneCrossSystem();
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 99], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1', 99);
     expect(r).toBe('INVALID_MOVE');
   });
 
-  it('masterDealBribeImperial 指定的牌已派发（status≠inPool）→ INVALID_MOVE', () => {
+  it('指定的牌已派发（status≠inPool）→ INVALID_MOVE', () => {
     let s = sceneCrossSystem();
     s = {
       ...s,
@@ -264,7 +276,7 @@ describe('跨系统 · 贿赂池耗尽', () => {
         i === 0 ? { ...b, status: 'dealt' as const, heldBy: 'p3' } : b,
       ),
     };
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1', 0);
     expect(r).toBe('INVALID_MOVE');
   });
 });
@@ -281,18 +293,12 @@ describe('跨系统 · 重复贿赂累计', () => {
       ...s,
       bribePool: s.bribePool.filter((b) => b.kind === 'fail'),
     };
-    const r1 = callMove(s, 'masterDealBribe', ['p1'], {
-      currentPlayer: 'pM',
-      shuffleStrategy: <T>(arr: T[]) => arr,
-    });
+    const r1 = callVaultBribe(s, 'p1', undefined, keepOrder);
     const after1 = r1 as SetupState;
     expect(after1.players.p1!.bribeReceived).toBe(1);
     expect(after1.players.p1!.faction).toBe('thief');
 
-    const r2 = callMove(after1, 'masterDealBribe', ['p1'], {
-      currentPlayer: 'pM',
-      shuffleStrategy: <T>(arr: T[]) => arr,
-    });
+    const r2 = callVaultBribe(after1, 'p1', undefined, keepOrder);
     const after2 = r2 as SetupState;
     expect(after2.players.p1!.bribeReceived).toBe(2);
     expect(after2.players.p1!.faction).toBe('thief');
@@ -311,7 +317,7 @@ describe('跨系统 · 重复贿赂累计', () => {
         i === 3 ? { ...b, status: 'dealt' as const, heldBy: 'p1' } : b,
       ),
     };
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1', 0);
     expect(r).not.toBe('INVALID_MOVE');
     const next = r as SetupState;
     expect(next.players.p1!.faction).toBe('master');
@@ -326,7 +332,7 @@ describe('跨系统 · 重复贿赂累计', () => {
 describe('跨系统 · 贿赂 × 梦魇 联动', () => {
   it('转阵营后玩家 faction=master，但角色 characterId 不变', () => {
     const s = sceneCrossSystem();
-    const r = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
+    const r = callVaultBribe(s, 'p1', 0);
     const next = r as SetupState;
     // 转阵营后角色卡牌不变
     expect(next.players.p1!.characterId).toBe('thief_aquarius');
@@ -338,9 +344,9 @@ describe('跨系统 · 贿赂 × 梦魇 联动', () => {
   it('贿赂池中 inPool/dealt/deal 三种 status 的快照对照', () => {
     let s = sceneCrossSystem();
     // 派一张 deal、一张 fail
-    const r1 = callMove(s, 'masterDealBribeImperial', ['p1', 0], { currentPlayer: 'pM' });
+    const r1 = callVaultBribe(s, 'p1', 0);
     s = r1 as SetupState;
-    const r2 = callMove(s, 'masterDealBribeImperial', ['p2', 3], { currentPlayer: 'pM' });
+    const r2 = callVaultBribe(s, 'p2', 3);
     s = r2 as SetupState;
 
     const inPoolCount = s.bribePool.filter((b) => b.status === 'inPool').length;

@@ -6,13 +6,13 @@
 //
 // 返回："" 表示无违规；否则返回人类可读违规条目数组。
 // 检查项：
-//   1. 恰好 1 名梦主（且在 players 里）
+//   1. dreamMasterID 指向的玩家存在且为梦主阵营；其余梦主阵营玩家（背叛者）必须持有成功的贿赂牌
 //   2. currentPlayerID 必须在 playerOrder 中（除非 phase=setup）
 //   3. 所有玩家的 currentLayer 在 [0, 4]（0=迷失层）
 //   4. 心锁值非负
 //   5. 手牌上限（turnEnd 时 <= HAND_LIMIT）
 //   6. 死亡玩家必须有 deathTurn
-//   7. isAlive=false 时不应有手牌
+//   7. （已删除：死亡玩家可以持有手牌）
 //   8. layers[].playersInLayer 与 players[].currentLayer 一致
 //   9. 金库：isOpened=true 时必须有 openedBy
 //   10. winner 合法（null | 'thief' | 'master'）
@@ -36,16 +36,23 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     out.push({ rule, message });
   };
 
-  // ---------- 1. 恰好 1 名梦主 ----------
-  const masters = Object.values(state.players).filter((p) => p.faction === 'master');
+  // ---------- 1. 梦主身份 ----------
+  // 梦主以 dreamMasterID 为准；盗梦者抽到成功的贿赂牌后 faction 也会变成 master（背叛者），
+  // 所以不能数 faction。其余 master 阵营的玩家必须持有一张成功的贿赂牌。
+  // 对照：docs/manual/03-game-flow.md 贿赂&背叛者
   if (state.phase !== 'setup') {
-    if (masters.length !== 1) {
-      push('master_count', `Expected 1 master, got ${masters.length}`);
+    const declared = state.dreamMasterID ? state.players[state.dreamMasterID] : undefined;
+    if (!declared || declared.faction !== 'master') {
+      push('master_id', `dreamMasterID=${state.dreamMasterID} not a valid master`);
     }
-    if (state.dreamMasterID) {
-      const declared = state.players[state.dreamMasterID];
-      if (!declared || declared.faction !== 'master') {
-        push('master_id', `dreamMasterID=${state.dreamMasterID} not a valid master`);
+    for (const p of Object.values(state.players)) {
+      if (p.id === state.dreamMasterID || p.faction !== 'master') continue;
+      const holdsDeal = state.bribePool.some((b) => b.heldBy === p.id && b.kind === 'deal');
+      if (!holdsDeal) {
+        push(
+          'betrayer_without_deal',
+          `Player ${p.id} is on the master faction without holding a successful bribe`,
+        );
       }
     }
   }
@@ -96,16 +103,12 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
-  // ---------- 7. 死亡玩家不应有手牌 ----------
-  for (const p of Object.values(state.players)) {
-    if (!p.isAlive && p.hand.length > 0) {
-      push('dead_no_hand', `Player ${p.id} is dead but hand=${p.hand.length}`);
-    }
-  }
+  // 7. 已删除：死亡玩家可以持有手牌——被击杀只交 2 张，非击杀进入迷失层手牌全留，
+  //    复活还要从手里弃 2 张（对照：docs/manual/03-game-flow.md 死亡 / 复活）
 
   // ---------- 8. layer.playersInLayer 与 player.currentLayer 一致 ----------
+  // 死亡玩家也要查：他们在迷失层（0）的名单里，进出迷失层漏改名单会从这里暴露
   for (const p of Object.values(state.players)) {
-    if (!p.isAlive) continue;
     const targetLayer = state.layers[p.currentLayer];
     if (targetLayer && !targetLayer.playersInLayer.includes(p.id)) {
       push(
@@ -119,7 +122,7 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     const layerNum = Number(numStr);
     for (const pid of layer.playersInLayer) {
       const p = state.players[pid];
-      if (p && p.isAlive && p.currentLayer !== layerNum) {
+      if (p && p.currentLayer !== layerNum) {
         push(
           'layer_membership_reverse',
           `Layer ${layerNum} lists ${pid} but player.currentLayer=${p.currentLayer}`,

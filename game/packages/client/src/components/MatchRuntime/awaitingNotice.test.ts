@@ -13,6 +13,9 @@ function viewWith(patch: Partial<MatchView>): MatchView {
     pendingShootResponse: null,
     pendingSudgerRolls: null,
     pendingResonance: null,
+    pendingVaultDecision: null,
+    pendingPeekDecision: null,
+    dreamMasterID: '9',
     ...patch,
   } as MatchView;
 }
@@ -112,5 +115,28 @@ describe('awaitingNotice', () => {
       pendingLibra: { bonderPlayerID: '0', targetPlayerID: '2', split: null },
     });
     expect(awaitingNotice(view, null)).toEqual({ mine: false });
+  });
+
+  it('金币金库三选一：等梦主；梦主有自己的弹窗，不再叠一条提示', () => {
+    const view = viewWith({ pendingVaultDecision: { layer: 2, openerID: '1' } });
+    expect(awaitingNotice(view, '9')).toEqual({ mine: true, hasOwnUi: true });
+    expect(awaitingNotice(view, '1')).toEqual({ mine: false });
+    expect(awaitingNotice(view, '3')).toEqual({ mine: false });
+    expect(awaitingNotice(view, null)).toEqual({ mine: false });
+  });
+
+  it('金币金库三选一挡住全局，白羊的选择不挡人：两者并存时先等梦主', () => {
+    const view = viewWith({
+      pendingVaultDecision: { layer: 2, openerID: '1' },
+      pendingAriesChoice: { ariesID: '3', victimLayer: 1, victimID: '4' },
+    });
+    expect(awaitingNotice(view, '9')).toEqual({ mine: true, hasOwnUi: true });
+    expect(awaitingNotice(view, '3')).toEqual({ mine: false });
+  });
+
+  it('梦境窥视等梦主决定是否派贿赂：其他人看到等待，梦主有自己的弹窗', () => {
+    const view = viewWith({ pendingPeekDecision: { peekerID: '1', targetLayer: 2 } });
+    expect(awaitingNotice(view, '9')).toEqual({ mine: true, hasOwnUi: true });
+    expect(awaitingNotice(view, '1')).toEqual({ mine: false });
   });
 });

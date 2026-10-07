@@ -85,6 +85,7 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
     endTurn: null,
     pendingResponseWindow: null,
     pendingPeekDecision: null,
+    pendingVaultDecision: null,
     peekReveal: null,
     pendingLibra: null,
     mazeState: null,
@@ -161,26 +162,16 @@ describe('setup 梦魇派发', () => {
   });
 });
 
-describe('masterRevealNightmare', () => {
-  it('梦主翻开 L1 梦魇 → revealed=true', () => {
-    const r = call('masterRevealNightmare', makeState(), 1);
-    expect(r).not.toBe('INVALID_MOVE');
-    expect(r.layers[1]!.nightmareRevealed).toBe(true);
+describe('梦主不能在自己回合翻开未翻开的梦魇', () => {
+  // 梦魇只在金币金库打开（masterVaultDecision）与被技能 / 行动牌翻开后才发动
+  it('不再有凭空翻开梦魇的 move', () => {
+    expect(Object.keys(moves)).not.toContain('masterRevealNightmare');
+    expect(Object.keys(moves)).not.toContain('masterDiscardHiddenNightmare');
   });
 
-  it('非梦主调用 → 拒绝', () => {
-    const s = makeState({ currentPlayerID: '0' });
-    expect(call('masterRevealNightmare', s, 1)).toBe('INVALID_MOVE');
-  });
-
-  it('该层无梦魇 → 拒绝', () => {
-    expect(call('masterRevealNightmare', makeState(), 3)).toBe('INVALID_MOVE');
-  });
-
-  it('已翻开 → 拒绝', () => {
-    const s = makeState();
-    s.layers[1]!.nightmareRevealed = true;
-    expect(call('masterRevealNightmare', s, 1)).toBe('INVALID_MOVE');
+  it('未翻开的梦魇不能直接发动或弃掉', () => {
+    expect(call('masterActivateNightmare', makeState(), 1)).toBe('INVALID_MOVE');
+    expect(call('masterDiscardNightmare', makeState(), 1)).toBe('INVALID_MOVE');
   });
 });
 

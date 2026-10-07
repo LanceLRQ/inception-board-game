@@ -1,7 +1,7 @@
 // 自动行动判定测试：状态在真实对局建出的局面上改写，保证结构与引擎一致
 
 import { describe, it, expect } from 'vitest';
-import { InceptionCityGame } from '@icgame/game-engine';
+import { InceptionCityGame, sendToLimbo } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
 import { nextAutoAction } from './autoAction.js';
@@ -102,6 +102,76 @@ describe('nextAutoAction · 判定顺序', () => {
       const peeker = othersOf(s, 1)[0]!;
       const pending = withG(s, { pendingPeekDecision: { peekerID: peeker, targetLayer: 1 } });
       expect(nextAutoAction(pending, { humanPlayerIDs: [s.G.dreamMasterID] })).toBeNull();
+    });
+  });
+
+  describe('4b. 金币金库打开后的梦主三选一', () => {
+    const waiting = (s: State, opener: string): State =>
+      withG(s, { pendingVaultDecision: { layer: 2, openerID: opener } });
+
+    it('梦主是 Bot 且池里有可派的牌：选派贿赂牌，运行器接受', () => {
+      const s = playingState();
+      const opener = othersOf(s, 1)[0]!;
+      const pending = waiting(s, opener);
+      expect(pending.G.bribePool.some((b) => b.status === 'inPool')).toBe(true);
+      const action = nextAutoAction(pending, NO_HUMAN);
+      expect(action).toMatchObject({
+        playerID: s.G.dreamMasterID,
+        move: 'masterVaultDecision',
+        args: ['bribe'],
+      });
+      const res = applyMove(game, pending, action!);
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.state.G.players[opener]!.bribeReceived).toBe(1);
+        expect(res.state.G.pendingVaultDecision).toBeNull();
+      }
+    });
+
+    it('梦主是 Bot 且池里没有可派的牌：选弃掉梦魇，运行器接受', () => {
+      const s = playingState();
+      const opener = othersOf(s, 1)[0]!;
+      const emptied = withG(waiting(s, opener), {
+        bribePool: s.G.bribePool.map((b) => ({ ...b, status: 'dealt' as const, heldBy: opener })),
+      });
+      const action = nextAutoAction(emptied, NO_HUMAN);
+      expect(action).toMatchObject({
+        playerID: s.G.dreamMasterID,
+        move: 'masterVaultDecision',
+        args: ['discard'],
+      });
+      expect(applyMove(game, emptied, action!).ok).toBe(true);
+    });
+
+    it('全 Bot 的 4–10 人局：挂起后 Bot 梦主一步就清掉等待状态，对局继续', () => {
+      for (let n = 4; n <= 10; n++) {
+        const s = playingState(n, `vault-${n}`);
+        const pending = waiting(s, othersOf(s, 1)[0]!);
+        const action = nextAutoAction(pending, NO_HUMAN);
+        expect(action?.move, `${n} 人`).toBe('masterVaultDecision');
+        const res = applyMove(game, pending, action!);
+        expect(res.ok, `${n} 人`).toBe(true);
+        if (res.ok) {
+          expect(res.state.G.pendingVaultDecision).toBeNull();
+          expect(nextAutoAction(res.state, NO_HUMAN)?.move).not.toBe('masterVaultDecision');
+        }
+      }
+    });
+
+    it('梦主是真人：返回 null', () => {
+      const s = playingState();
+      const pending = waiting(s, othersOf(s, 1)[0]!);
+      expect(nextAutoAction(pending, { humanPlayerIDs: [s.G.dreamMasterID] })).toBeNull();
+    });
+
+    it('有真人盗梦者、梦主是 Bot：Bot 梦主照样应答', () => {
+      const s = playingState();
+      const [opener, human] = s.ctx.playOrder.filter((id) => id !== s.G.dreamMasterID) as [
+        string,
+        string,
+      ];
+      const action = nextAutoAction(waiting(s, opener), { humanPlayerIDs: [human] });
+      expect(action).toMatchObject({ move: 'masterVaultDecision' });
     });
   });
 
@@ -346,5 +416,39 @@ describe('nextAutoAction · 判定顺序', () => {
       },
     });
     expect(nextAutoAction(pending, NO_HUMAN)?.move).toBe('passResponse');
+  });
+});
+
+describe('nextAutoAction · 盗梦者全部在迷失层', () => {
+  /** 把所有盗梦者送进迷失层，回合交给第一个盗梦者的抽牌阶段 */
+  function allThievesInLimbo(): State {
+    const s = playingState(5, 'limbo-all');
+    let G = s.G;
+    const thieves = G.playerOrder.filter((id) => id !== G.dreamMasterID);
+    for (const id of thieves) G = sendToLimbo(G, id);
+    const first = thieves[0]!;
+    return {
+      ...s,
+      G: { ...G, currentPlayerID: first, turnPhase: 'draw' },
+      ctx: { ...s.ctx, currentPlayer: first, playOrderPos: s.ctx.playOrder.indexOf(first) },
+    };
+  }
+
+  it('迷失层玩家的回合一路推进到回合结束，每一步都被运行器接受，不返回 null', () => {
+    let s = allThievesInLimbo();
+    const owner = s.ctx.currentPlayer;
+    const seen: string[] = [];
+    for (let i = 0; i < 6 && s.ctx.currentPlayer === owner; i++) {
+      const action = nextAutoAction(s, NO_HUMAN);
+      expect(action, `第 ${i + 1} 步不应为 null`).not.toBeNull();
+      seen.push(action!.move);
+      const res = applyMove(game, s, action!);
+      expect(res.ok, `${action!.move} 应被接受`).toBe(true);
+      if (!res.ok) return;
+      s = res.state;
+    }
+    expect(s.ctx.currentPlayer).not.toBe(owner);
+    expect(s.ctx.gameover).toBeUndefined();
+    expect(seen[0]).toBe('doDraw');
   });
 });

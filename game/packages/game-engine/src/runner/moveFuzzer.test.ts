@@ -74,7 +74,7 @@ describe('fuzzCandidate · 小丑罚则下的弃牌', () => {
       G: {
         ...base.G,
         turnPhase: 'discard',
-        turnNumber: 10,
+        turnNumber: 4,
         players: {
           ...base.G.players,
           [pid]: { ...player, hand: hand as never, forcedDiscardArmedAtTurn: 4 },

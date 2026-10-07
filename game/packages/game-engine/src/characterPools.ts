@@ -67,13 +67,11 @@ export const THIEF_POOL: readonly CardID[] = [
   'thief_aquarius',
   'thief_green_ray',
   'thief_darwin',
+  'thief_cancer',
 ];
 
 /**
  * 卡牌配置里有、但没进随机池的角色，每条写明原因。
  * 角色进池后要从这里删掉；数据新增角色时，要么进池要么登记到这里。
  */
-export const CHARACTERS_OUTSIDE_POOL: Readonly<Record<string, string>> = {
-  thief_cancer:
-    '技能（气场、庇佑）已在抽牌与弃牌阶段接入并有测试，只是登记池时漏了；放进池会改变所有固定种子下的角色分配，需要单独决定',
-};
+export const CHARACTERS_OUTSIDE_POOL: Readonly<Record<string, string>> = {};

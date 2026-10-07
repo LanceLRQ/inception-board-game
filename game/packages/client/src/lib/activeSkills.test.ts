@@ -11,16 +11,13 @@ import {
   GEMINI_SYNC,
   getAvailableActiveSkills,
   HALEY_IMPACT,
-  IMPERIAL_DEAL_BRIBE,
   LIBRA_BALANCE,
   LORD_OF_WAR_BLACK_MARKET,
   LUNA_ECLIPSE,
   MARS_BATTLEFIELD_EXCHANGE,
   MARS_KILL,
   MARTYR_SACRIFICE,
-  MASTER_DEAL_BRIBE,
   MASTER_DISCARD_NIGHTMARE,
-  MASTER_REVEAL_NIGHTMARE,
   PLUTO_BURNING,
   SATURN_FREE_MOVE,
   SHADE_FOLLOW,
@@ -120,19 +117,27 @@ describe('描述符元数据', () => {
   });
 });
 
-describe('getAvailableActiveSkills · 穿行者·支助（回合限 1）', () => {
-  it('穿行者 + 未用过 → 含', () => {
-    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_tourist' }));
+describe('getAvailableActiveSkills · 穿行者·支助（不限次数，需要至少 1 张手牌）', () => {
+  it('穿行者 + 有手牌 → 含', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_tourist', hand: ['action_kick'] }),
+    );
     expect(list).toContain(TOURIST_ASSIST);
   });
 
-  it('穿行者 + 已用过 1 次 → 不含', () => {
+  it('穿行者 + 本回合已用过 + 又有手牌 → 仍含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
         characterId: 'thief_tourist',
+        hand: ['action_kick'],
         skillUsedThisTurn: { 'thief_tourist.skill_0': 1 },
       }),
     );
+    expect(list).toContain(TOURIST_ASSIST);
+  });
+
+  it('穿行者 + 没有手牌 → 不含', () => {
+    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_tourist' }));
     expect(list).not.toContain(TOURIST_ASSIST);
   });
 });
@@ -234,26 +239,38 @@ describe('getAvailableActiveSkills · 土星·自由移动（贿赂持有者）'
 });
 
 describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
-  it('梦主 → 含 4 个通用梦魇操作（REVEAL/DISCARD/HIDDEN/ACTIVATE）', async () => {
+  it('梦主 → 含 2 个通用梦魇操作（DISCARD/ACTIVATE，处理已被翻开的梦魇）', async () => {
     const mod = await import('./activeSkills.js');
     const list = getAvailableActiveSkills(
       baseCtx({ faction: 'master', characterId: 'dm_fortress' }),
     );
-    expect(list).toContain(MASTER_REVEAL_NIGHTMARE);
     expect(list).toContain(MASTER_DISCARD_NIGHTMARE);
-    expect(list).toContain(mod.MASTER_DISCARD_HIDDEN_NIGHTMARE);
     expect(list).toContain(mod.MASTER_ACTIVATE_NIGHTMARE);
   });
 
   it('盗梦者 → 不含', () => {
     const list = getAvailableActiveSkills(baseCtx({ faction: 'thief' }));
-    expect(list).not.toContain(MASTER_REVEAL_NIGHTMARE);
     expect(list).not.toContain(MASTER_DISCARD_NIGHTMARE);
   });
 
-  it('MASTER_REVEAL move = masterRevealNightmare / argKind = targetLayer', () => {
-    expect(MASTER_REVEAL_NIGHTMARE.move).toBe('masterRevealNightmare');
-    expect(MASTER_REVEAL_NIGHTMARE.argKind).toBe('targetLayer');
+  it('已删除的 move 不再有主动技能入口', () => {
+    const removed = [
+      'masterRevealNightmare',
+      'masterDiscardHiddenNightmare',
+      'masterDealBribe',
+      'masterDealBribeImperial',
+    ];
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        faction: 'master',
+        characterId: 'dm_imperial_city',
+        bribePoolAvailable: true,
+        bribePoolItems: [{ index: 0, id: 'bribe-0' }],
+      }),
+    );
+    for (const move of removed) {
+      expect(list.map((s) => s.move)).not.toContain(move);
+    }
   });
 });
 
@@ -464,27 +481,6 @@ describe('getAvailableActiveSkills · 哈雷·冲击', () => {
   });
 });
 
-describe('getAvailableActiveSkills · 梦主·贿赂派发（已从常驻主动技能移除）', () => {
-  // 规则：贿赂派发不能由梦主主动发起，只能在盗梦者【梦境窥视】/打开金币金库时触发。
-  // 因此 MASTER_DEAL_BRIBE 已从 ALL_DESCRIPTORS 注册表移除，但常量定义保留供响应窗口复用。
-  // 对照：docs/manual/03-game-flow.md §贿赂&背叛者
-  it('梦主 + 池中有可派发项 → 不再出现在主动技能列表', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'dm_fortress',
-        faction: 'master',
-        bribePoolAvailable: true,
-      }),
-    );
-    expect(list).not.toContain(MASTER_DEAL_BRIBE);
-  });
-
-  it('常量定义仍保留（供后续响应窗口复用）', () => {
-    expect(MASTER_DEAL_BRIBE.argKind).toBe('targetPlayer');
-    expect(MASTER_DEAL_BRIBE.move).toBe('masterDealBribe');
-  });
-});
-
 describe('getAvailableActiveSkills · 露娜·月蚀', () => {
   it('露娜 + 手牌 ≥2 → 含', () => {
     const list = getAvailableActiveSkills(
@@ -654,28 +650,6 @@ describe('getAvailableActiveSkills · 战争之王·黑市', () => {
   });
 });
 
-describe('getAvailableActiveSkills · 皇城·重金（已从常驻主动技能移除）', () => {
-  // 规则：重金是"派贿赂时可指定 1 张牌"的修饰能力（替代随机抽），
-  // 本质仍属于派贿赂响应流程，不能由梦主主动发起。
-  // 本次修复移除其常驻主动面板；响应窗口的"指定派发"交互留待后续迭代。
-  // 对照：docs/manual/06-dream-master.md 皇城·重金
-  it('皇城梦主 + 贿赂池有项 → 不再出现在主动技能列表', () => {
-    const list = getAvailableActiveSkills(
-      baseCtx({
-        characterId: 'dm_imperial_city',
-        faction: 'master',
-        bribePoolItems: [{ index: 0, id: 'bribe-0' }],
-      }),
-    );
-    expect(list).not.toContain(IMPERIAL_DEAL_BRIBE);
-  });
-
-  it('常量定义仍保留（供后续响应窗口复用）', () => {
-    expect(IMPERIAL_DEAL_BRIBE.argKind).toBe('playerAndBribeIndex');
-    expect(IMPERIAL_DEAL_BRIBE.move).toBe('masterDealBribeImperial');
-  });
-});
-
 describe('getAvailableActiveSkills · 火星·战场世界观', () => {
   it('世界观激活 + 手牌≥2 + 弃牌堆非空 → 含（任意阵营）', () => {
     const list1 = getAvailableActiveSkills(
@@ -802,5 +776,26 @@ describe('getAvailableActiveSkills · 欺诈师·盗心（盲抽）', () => {
 
   it('argKind = playerAndCard', () => {
     expect(FORGER_EXCHANGE.argKind).toBe('playerAndCard');
+  });
+});
+
+describe('getAvailableActiveSkills · 双面角色按面出现', () => {
+  it('双子背面朝上时不出现正面技能·命运', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({
+        characterId: 'thief_gemini_back',
+        turnPhase: 'discard',
+        humanLayer: 1,
+        masterLayer: 3,
+      }),
+    );
+    expect(list).not.toContain(GEMINI_SYNC);
+  });
+
+  it('露娜背面朝上时不出现正面技能·月蚀', () => {
+    const list = getAvailableActiveSkills(
+      baseCtx({ characterId: 'thief_luna_back', hand: ['action_shoot', 'action_shoot'] }),
+    );
+    expect(list).not.toContain(LUNA_ECLIPSE);
   });
 });

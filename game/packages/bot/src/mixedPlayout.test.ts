@@ -144,6 +144,7 @@ describe('混合对局 · 随机真人 + 自动行动', () => {
       'resolveLibraPick',
       'respondVirgoPerfect',
       'masterPeekBribeDecision',
+      'masterVaultDecision',
       'peekerAcknowledge',
     ];
     const seen = settleMoves.filter((m) => (totals[m] ?? 0) > 0);

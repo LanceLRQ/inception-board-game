@@ -65,6 +65,19 @@ export function nextAutoAction(
     };
   }
 
+  // 金币金库打开：梦主三选一。Bot 梦主池里有可派的牌就派贿赂牌（并弃掉该层梦魇），池空了就弃掉梦魇；
+  // 不主动发动梦魇，避免需要附加参数的效果出错而卡住对局。梦主是真人就等他选择。
+  if (G.pendingVaultDecision) {
+    if (isHuman(G.dreamMasterID)) return null;
+    const canDeal = G.bribePool.some((b) => b.status === 'inPool');
+    return {
+      playerID: G.dreamMasterID,
+      move: 'masterVaultDecision',
+      args: [canDeal ? 'bribe' : 'discard'],
+      why: canDeal ? `梦主 ${G.dreamMasterID} 派贿赂牌` : `梦主 ${G.dreamMasterID} 弃掉梦魇`,
+    };
+  }
+
   // 梦境窥视：看牌者确认
   if (G.peekReveal) {
     const { peekerID } = G.peekReveal;

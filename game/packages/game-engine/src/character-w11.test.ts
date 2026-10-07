@@ -71,7 +71,7 @@ describe('穿行者 · 支助（thief_tourist）', () => {
     expect(next.players.p1!.hand).toEqual([]);
     expect(next.players.p2!.hand).toEqual(['action_unlock', 'action_kick']);
     expect(next.players.p1!.currentLayer).toBe(3);
-    expect(next.players.p1!.skillUsedThisTurn[TOURIST_SKILL_ID]).toBe(1);
+    expect(next.players.p1!.skillUsedThisTurn[TOURIST_SKILL_ID]).toBeUndefined();
     expect(next.layers[3]!.playersInLayer).toContain('p1');
   });
 
@@ -105,13 +105,15 @@ describe('穿行者 · 支助（thief_tourist）', () => {
     expect(applyTouristAssist(s, 'p1', 'p2')).toBeNull();
   });
 
-  it('拒绝：本回合已使用过', () => {
+  it('不限次数：本回合用过之后手牌不为空仍可再次发动（docs/manual/03-game-flow.md「限一次」）', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_tourist' as CardID);
     s = setHand(s, 'p1', ['action_unlock', 'action_kick'] as CardID[]);
     const once = applyTouristAssist(s, 'p1', 'p2');
     expect(once).not.toBeNull();
-    expect(canUseTouristAssist(once!, 'p1', 'p2')).toBe(false);
+    expect(canUseTouristAssist(once!, 'p1', 'p2')).toBe(false); // 手牌已交空
+    const refilled = setHand(once!, 'p1', ['action_kick'] as CardID[]);
+    expect(canUseTouristAssist(refilled, 'p1', 'p2')).toBe(true);
   });
 
   it('move 接入：playTouristAssist 与纯函数等价', () => {
@@ -154,7 +156,7 @@ describe('狮子 · 王道（thief_leo）', () => {
     const r = applyLeoKingdom(s, 'p1');
     expect(r.players.p1!.hand).toEqual(['action_creation', 'action_peek', 'action_unlock']);
     expect(r.deck.cards).toEqual(['action_kick']);
-    expect(r.players.p1!.skillUsedThisTurn[LEO_SKILL_ID]).toBe(1);
+    expect(r.players.p1!.skillUsedThisTurn[LEO_SKILL_ID]).toBeUndefined();
   });
 
   it('梦主无手牌但弃牌堆有牌：取弃牌堆顶 1 张', () => {
@@ -172,12 +174,11 @@ describe('狮子 · 王道（thief_leo）', () => {
     expect(r.deck.discardPile).toEqual(['action_unlock']);
   });
 
-  it('梦主无手牌且弃牌堆为空：技能消耗但无效果', () => {
+  it('梦主无手牌且弃牌堆为空：无效果', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_leo' as CardID);
     const r = applyLeoKingdom(s, 'p1');
     expect(r.players.p1!.hand).toEqual([]);
-    expect(r.players.p1!.skillUsedThisTurn[LEO_SKILL_ID]).toBe(1);
   });
 
   it('非狮子角色：不触发', () => {
@@ -186,7 +187,7 @@ describe('狮子 · 王道（thief_leo）', () => {
     expect(r).toBe(s);
   });
 
-  it('本回合已使用：不重复触发', () => {
+  it('不限次数：再次触发照常结算（docs/manual/05-dream-thieves.md 狮子 无「限一次」）', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_leo' as CardID);
     s = {
@@ -199,8 +200,11 @@ describe('狮子 · 王道（thief_leo）', () => {
     };
     const once = applyLeoKingdom(s, 'p1');
     expect(once.players.p1!.hand).toEqual(['action_creation']);
-    const twice = applyLeoKingdom(once, 'p1');
-    expect(twice).toBe(once); // 第二次直接返回原 state
+    const twice = applyLeoKingdom(
+      { ...once, deck: { cards: ['action_peek'] as CardID[], discardPile: [] } },
+      'p1',
+    );
+    expect(twice.players.p1!.hand).toEqual(['action_creation', 'action_peek']);
   });
 });
 

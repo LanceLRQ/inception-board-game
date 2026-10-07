@@ -18,6 +18,7 @@ import {
   applyLunaEclipse,
   shouldJupiterThunderKill,
   applyPlutoHellLostCheck,
+  endDrawPhase,
   isPlutoHellWorldActive,
   applyFortressDiceModifier,
   applyExtractorBounty,
@@ -163,7 +164,7 @@ describe('胜利条件优先级仲裁', () => {
     expect(result?.reason).toBe('neptune_coin_opened');
   });
 
-  it('all_thieves_dead 优先于港口 / 海王星', () => {
+  it('盗梦者全部死亡不算终局：港口两个金库已开仍判梦主胜（港口原因）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const coinIdxs = s.vaults
       .map((v, i) => (v.contentType === 'coin' ? i : -1))
@@ -180,7 +181,7 @@ describe('胜利条件优先级仲裁', () => {
     };
     const result = ENDIF({ G: s });
     expect(result?.winner).toBe('master');
-    expect(result?.reason).toBe('all_thieves_dead');
+    expect(result?.reason).toBe('harbor_two_vaults');
   });
 
   it('正常对局：无胜利条件 → undefined', () => {
@@ -369,7 +370,7 @@ describe('冥王星·地狱世界观（doDraw + onEnd 联动）', () => {
 // 聚焦子集：胜利条件更多边界 / 雷霆层差闭包 / 冥王星手牌边界 / 多梦主联动
 // ============================================================================
 describe('胜利优先级更多边界', () => {
-  it('秘密金库已开 + all_thieves_dead → thief 仍胜（秘密优先级最高）', () => {
+  it('秘密金库已开 + 盗梦者全部死亡 → thief 仍胜（秘密优先级最高）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
     const secretIdx = s.vaults.findIndex((v) => v.contentType === 'secret');
     s = setVaultOpened(s, secretIdx, 'p1');
@@ -466,11 +467,20 @@ describe('木星雷霆层差矩阵', () => {
 });
 
 describe('冥王星·地狱手牌边界', () => {
-  // applyPlutoHellLostCheck 返回 SetupState：hand<阈值 / 无世界观 / 已在迷失 → 返回原状态
-  // hand>=阈值 且在非迷失层 → 返回新状态（currentLayer=0）
+  // 抽牌阶段结束时（endDrawPhase）检视手牌打标记，回合结束时（applyPlutoHellLostCheck）兑现。
+  // 对照：docs/manual/06-dream-master.md 冥王星·地狱
+  /** 当前玩家 p1 抽牌阶段结束时手牌 n 张 */
+  function drawPhaseEnded(s: SetupState, n: number): SetupState {
+    const withHand = setHand(
+      { ...s, turnPhase: 'draw', currentPlayerID: 'p1' },
+      'p1',
+      Array(n).fill('action_unlock') as CardID[],
+    );
+    return endDrawPhase(withHand);
+  }
+
   it('手牌 = 5（阈值-1）→ currentLayer 不变（非迷失层）', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
-    s = setHand(s, 'p1', Array(5).fill('action_unlock') as CardID[]);
+    const s = drawPhaseEnded(setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell'), 5);
     const beforeLayer = s.players.p1!.currentLayer;
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(beforeLayer);
@@ -479,23 +489,21 @@ describe('冥王星·地狱手牌边界', () => {
   it('手牌 = 6（阈值）→ currentLayer 变为 0（迷失层）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setLayer(s, 'p1', 2 as Layer);
-    s = setHand(s, 'p1', Array(6).fill('action_unlock') as CardID[]);
-    const r = applyPlutoHellLostCheck(s, 'p1');
+    const r = applyPlutoHellLostCheck(drawPhaseEnded(s, 6), 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
   });
 
   it('手牌 = 7（阈值+1）→ currentLayer 变为 0', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     s = setLayer(s, 'p1', 3 as Layer);
-    s = setHand(s, 'p1', Array(7).fill('action_unlock') as CardID[]);
-    const r = applyPlutoHellLostCheck(s, 'p1');
+    const r = applyPlutoHellLostCheck(drawPhaseEnded(s, 7), 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
   });
 
   it('非冥王星梦主 + 手牌 8 → currentLayer 不变', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
     s = setLayer(s, 'p1', 2 as Layer);
-    s = setHand(s, 'p1', Array(8).fill('action_unlock') as CardID[]);
+    s = drawPhaseEnded(s, 8);
     expect(isPlutoHellWorldActive(s)).toBe(false);
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(2);
@@ -508,7 +516,17 @@ describe('冥王星·地狱手牌边界', () => {
       ...s,
       players: { ...s.players, p1: { ...s.players.p1!, currentLayer: 0 as Layer } },
     };
-    s = setHand(s, 'p1', Array(6).fill('action_unlock') as CardID[]);
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1!,
+          hand: Array(6).fill('action_unlock') as CardID[],
+          skillUsedThisTurn: { 'dm_pluto_hell.world.marked': 1 },
+        },
+      },
+    };
     const r = applyPlutoHellLostCheck(s, 'p1');
     expect(r.players.p1!.currentLayer).toBe(0);
   });
@@ -1049,11 +1067,11 @@ describe('角色被动触发守卫', () => {
     expect(canPiscesEvade(s.players.p1!)).toBe(true);
   });
 
-  it('canPiscesEvade：双鱼 + L1 → false（无法下一层）', () => {
+  it('canPiscesEvade：双鱼 + L1 → true（从第一层游离即进入迷失层）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_pisces');
     // p1 默认在 L1
-    expect(canPiscesEvade(s.players.p1!)).toBe(false);
+    expect(canPiscesEvade(s.players.p1!)).toBe(true);
   });
 
   it('canPiscesEvade：非双鱼 → false', () => {
@@ -1315,7 +1333,7 @@ describe('穿行者·支助 happy path', () => {
     expect(r!.players.p1!.currentLayer).toBe(3);
   });
 
-  it('技能限 1 次/回合：第二次 apply → null', () => {
+  it('不限次数：手牌补回后第二次 apply 仍可发动', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_tourist');
     s = setHand(s, 'p1', ['action_unlock' as CardID]);
@@ -1324,7 +1342,7 @@ describe('穿行者·支助 happy path', () => {
     // 第二次从 r1 继续发动（但 p1 无手牌，也会 fail）
     s = setHand(r1!, 'p1', ['action_shoot' as CardID]);
     const r2 = applyTouristAssist(s, 'p1', 'p2');
-    expect(r2).toBeNull();
+    expect(r2).not.toBeNull();
   });
 });
 
@@ -1368,7 +1386,7 @@ describe('狮子·王道触发分支', () => {
     expect(r.deck.discardPile.length).toBe(1);
   });
 
-  it('狮子 + 梦主手牌=0 + 弃牌堆空 → 无效果但技能标记已用', () => {
+  it('狮子 + 梦主手牌=0 + 弃牌堆空 → 无效果', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_leo');
     s = setHand(s, 'p1', []);
@@ -1377,10 +1395,9 @@ describe('狮子·王道触发分支', () => {
     s = { ...s, deck: { cards: [], discardPile: [] } };
     const r = applyLeoKingdom(s, 'p1');
     expect(r.players.p1!.hand.length).toBe(0);
-    expect(r.players.p1!.skillUsedThisTurn['thief_leo.skill_0']).toBe(1);
   });
 
-  it('狮子 + 技能已用过 → 直接返回原状态', () => {
+  it('狮子 + 本回合有使用记录 → 仍然触发（不限次数）', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_leo');
     s = setHand(s, 'p1', []);
@@ -1395,7 +1412,7 @@ describe('狮子·王道触发分支', () => {
     s = setHand(s, mid, Array(3).fill('action_shoot') as CardID[]);
     s = { ...s, deck: { cards: Array(5).fill('action_unlock') as CardID[], discardPile: [] } };
     const r = applyLeoKingdom(s, 'p1');
-    expect(r.players.p1!.hand.length).toBe(0); // 不触发
+    expect(r.players.p1!.hand.length).toBe(3);
   });
 });
 
@@ -1572,10 +1589,11 @@ describe('冥王星·业火 apply 分支', () => {
     expect(r).toBeNull();
   });
 
-  it('冥王星梦主 + 已用过一次 → null（限 1 次/回合）', () => {
+  it('冥王星梦主 + 已用过一次 → 仍可发动（业火不限次数）', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_pluto_hell');
     const mid = findMasterID(s)!;
     s = setHand(s, mid, ['action_unlock' as CardID]);
+    s = setHand(s, 'p1', []);
     s = {
       ...s,
       players: {
@@ -1587,7 +1605,7 @@ describe('冥王星·业火 apply 分支', () => {
       },
     };
     const r = applyPlutoBurning(s, mid, 'action_unlock' as CardID);
-    expect(r).toBeNull();
+    expect(r).not.toBeNull();
   });
 });
 

@@ -46,6 +46,29 @@ export function isDualFaced(characterId: CardID): boolean {
   return getDualFacedConfig(characterId) !== undefined;
 }
 
+/** 双面角色当前朝上的一面 */
+export type CharacterFace = 'front' | 'back';
+
+/** 当前是哪一面；非双面角色返回 null */
+export function getCharacterFace(characterId: CardID): CharacterFace | null {
+  const config = getDualFacedConfig(characterId);
+  if (!config) return null;
+  return characterId === config.backId ? 'back' : 'front';
+}
+
+/** 取角色的基础（正面）id：双面角色的背面 id 归到正面，其余原样返回 */
+export function getBaseCharacterId(characterId: CardID): CardID {
+  return getDualFacedConfig(characterId)?.frontId ?? characterId;
+}
+
+/**
+ * 判断「当前角色是 baseId 这个角色，并且朝上的是 face 这一面」。
+ * 技能按面区分：正面技能传 'front'，背面技能传 'back'。
+ */
+export function isCharacterFace(characterId: CardID, baseId: CardID, face: CharacterFace): boolean {
+  return getBaseCharacterId(characterId) === baseId && getCharacterFace(characterId) === face;
+}
+
 /** 获取翻面后的角色 ID */
 export function getFlippedId(characterId: CardID): CardID | null {
   const config = getDualFacedConfig(characterId);

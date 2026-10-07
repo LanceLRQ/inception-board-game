@@ -171,6 +171,13 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
       });
     }
   }
+  // 击杀者：只有被击杀才有（击杀结算会让凶手的击杀计数 +1），凶手不一定是这一步的发起者
+  // （例如被 SHOOT 者放弃响应后结算）；梦魇、世界观、密道传送、港口海啸、殉道者自尽等
+  // 非击杀进入迷失层没有凶手，cause 为 null
+  const killerThisStep =
+    order.find(
+      (id) => (after.players[id]?.shootCount ?? 0) > (before.players[id]?.shootCount ?? 0),
+    ) ?? null;
   for (const id of order) {
     const was = before.players[id];
     const now = after.players[id];
@@ -178,7 +185,11 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
       events.push({
         kind: 'player_died',
         actor: mover,
-        data: { player: id, layer: was.currentLayer, cause: mover === id ? null : mover },
+        data: {
+          player: id,
+          layer: was.currentLayer,
+          cause: killerThisStep !== id ? killerThisStep : null,
+        },
       });
     }
   }
@@ -246,11 +257,23 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     }
   }
 
+  // 梦主选择「翻开并发动」金库层的梦魇：翻开与发动在同一步完成，状态里看不到翻开的中间态，
+  // 这里按等待状态与参数补上公开的翻开事件
+  const activatedLayer =
+    request.move === 'masterVaultDecision' &&
+    request.args[0] === 'nightmare' &&
+    before.pendingVaultDecision !== null &&
+    after.pendingVaultDecision === null
+      ? before.pendingVaultDecision.layer
+      : null;
+
   // nightmare_revealed
   for (const layer of layerKeys(after)) {
     const was = before.layers[layer];
     const now = after.layers[layer];
-    if (was && now && !was.nightmareRevealed && now.nightmareRevealed) {
+    const activatedHere =
+      layer === activatedLayer && !!was?.nightmareId && !was.nightmareRevealed && !now?.nightmareId;
+    if (was && now && ((!was.nightmareRevealed && now.nightmareRevealed) || activatedHere)) {
       events.push({
         kind: 'nightmare_revealed',
         actor: mover,
@@ -262,7 +285,8 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   // nightmare_discarded：已用梦魇增加。没翻开过的，是哪张只给梦主
   for (const id of addedCards(before.usedNightmareIds, after.usedNightmareIds)) {
     const layer = layerKeys(before).find((l) => before.layers[l]!.nightmareId === id) ?? null;
-    const wasRevealed = layer !== null && before.layers[layer]!.nightmareRevealed;
+    const wasRevealed =
+      layer !== null && (before.layers[layer]!.nightmareRevealed || layer === activatedLayer);
     const nowRevealed = layer !== null && (after.layers[layer]?.nightmareRevealed ?? false);
     const ev: DescribedEvent = { kind: 'nightmare_discarded', actor: mover, data: { layer } };
     if (!wasRevealed && !nowRevealed) {

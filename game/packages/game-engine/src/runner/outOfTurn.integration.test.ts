@@ -265,11 +265,11 @@ describe('回合外响应 · 恐怖分子狂热', () => {
     expect(after.G.players.p1!.hand).not.toContain(SHOOT);
   });
 
-  it('目标选择接受惩罚：骰值 -1，掷出 1 变成 0 而未命中，手牌保留', () => {
+  it('目标选择接受惩罚：骰值 -1 最低为 1，掷出 1 仍被击杀，手牌交给发动者', () => {
     const after = mustApply(afterTerroristShoot(), 'p2', 'respondTerroristAccept', [], dice(1));
     expect(after.G.pendingShootResponse).toBeNull();
-    expect(after.G.players.p2!.isAlive).toBe(true);
-    expect(after.G.players.p2!.hand).toContain(KICK);
+    expect(after.G.players.p2!.isAlive).toBe(false);
+    expect(after.G.players.p1!.hand).toContain(KICK);
     expect(after.G.lastShootRoll).toBe(1);
     expect(after.G.players.p1!.hand).not.toContain(SHOOT);
   });

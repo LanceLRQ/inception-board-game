@@ -3,7 +3,8 @@
 // 供 UI 把 card ID 渲染为中文名 / 图标 / 可用行动
 
 import { getCardById, ensureRegistered } from '@icgame/shared';
-import type { CardDefinition, ActionCardDefinition } from '@icgame/shared';
+import type { CardDefinition, ActionCardDefinition, CardID } from '@icgame/shared';
+import { getBaseCharacterId, getCharacterFace } from '@icgame/game-engine';
 
 // 首次 import 时静态注册所有卡牌
 const regErrors = ensureRegistered();
@@ -22,26 +23,26 @@ export function getCardName(id: string): string {
   return getCardById(id)?.name ?? id;
 }
 
-/** 角色牌的摘要：正面的技能，梦主另带世界观 */
+/**
+ * 角色牌的摘要：当前这一面的名字与技能，梦主另带世界观。
+ * 双面角色翻到背面后 characterId 是 `*_back`，这里回到基础角色定义，取背面那一面的名字与技能。
+ */
 export function getCharacterSkillSummary(characterId: string): {
   name: string;
   skills: Array<{ name: string; description: string }>;
   worldView?: { name: string; description: string };
 } | null {
-  const card = getCardById(characterId);
+  const card = getCardById(getBaseCharacterId(characterId as CardID));
   if (!card) return null;
   if (card.category !== 'thief_char' && card.category !== 'master_char') return null;
   const ch = card as import('@icgame/shared').CharacterDefinition;
+  const isBack = getCharacterFace(characterId as CardID) === 'back' && !!ch.back;
+  const side = isBack ? ch.back! : ch.front;
   return {
-    name: ch.name,
-    skills: ch.front.skills.map((s) => ({ name: s.name, description: s.description })),
-    ...(ch.front.worldView
-      ? {
-          worldView: {
-            name: ch.front.worldView.name,
-            description: ch.front.worldView.description,
-          },
-        }
+    name: isBack ? side.sideName : ch.name,
+    skills: side.skills.map((s) => ({ name: s.name, description: s.description })),
+    ...(side.worldView
+      ? { worldView: { name: side.worldView.name, description: side.worldView.description } }
       : {}),
   };
 }
@@ -114,8 +115,5 @@ export function actionMoveFor(id: string): ActionMoveSpec | null {
   if (action.id === 'action_death_decree_3') return null;
   if (action.id === 'action_death_decree_4') return null;
   if (action.id === 'action_death_decree_5') return null;
-  if (action.subType?.startsWith('shoot_')) {
-    return { move: 'playShoot', needsTarget: 'player', argOrder: 'target_first' };
-  }
   return null;
 }
