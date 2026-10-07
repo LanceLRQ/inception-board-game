@@ -4,6 +4,7 @@
 
 import type { SetupState, PlayerSetup, BribeSetup } from '../setup.js';
 import { seededShuffle } from '../prng.js';
+import { PLAYER_COUNT_CONFIGS } from '../config.js';
 import {
   drawCards,
   movePlayerToLayer,
@@ -482,9 +483,20 @@ export function applyInterpreterForeshadow(state: SetupState, playerID: string):
 
 export const FORTRESS_SKILL_ID = 'dm_fortress.skill_0';
 
-/** 要塞世界观：掷骰结果 -1 */
+/** 要塞世界观：掷骰结果 -1（点数最低为 1） */
 export function applyFortressDiceModifier(roll: number): number {
   return Math.max(1, roll - 1);
+}
+
+/**
+ * 要塞世界观的接入点：掷骰的人是梦主本人、且当前梦主是要塞时，结果 -1，否则原样返回。
+ * 背叛者不是梦主，不吃这条。灵雕师·雕琢覆盖的点数不经过这里（「不能被其它效果所改变」）。
+ * 对照：docs/manual/06-dream-master.md 要塞 123 行；docs/manual/05-dream-thieves.md 灵雕师 300 行
+ */
+export function applyFortressWorldRoll(state: SetupState, rollerID: string, roll: number): number {
+  if (rollerID !== state.dreamMasterID) return roll;
+  if (state.players[rollerID]?.characterId !== 'dm_fortress') return roll;
+  return applyFortressDiceModifier(roll);
 }
 
 /**
@@ -542,6 +554,7 @@ export function applyFortressColdness(
 
 export const CHESS_SKILL_ID = 'dm_chess.skill_0';
 const CHESS_MAX_USES = 2;
+const CHESS_WORLD_PEEK_DRAW = 2;
 
 /** 棋局技能：交换两个金库位置 */
 export function applyChessTranspose(
@@ -579,12 +592,16 @@ export function applyChessTranspose(
   return s;
 }
 
-/** 棋局世界观：使用梦境窥视时抽 2 张 */
-export function applyChessWorldViewPeek(state: SetupState, masterID: string): SetupState {
-  const master = state.players[masterID];
-  if (!master || master.characterId !== 'dm_chess') return state;
+/**
+ * 棋局世界观：使用【梦境窥视】时，使用者从牌库顶抽 2 张牌。
+ * 世界观对所有玩家生效：谁使用梦境窥视（效果①盗梦者、效果②梦主）谁抽，playerID 是使用者，
+ * 只有当前梦主是棋局时才有效果。
+ * 对照：docs/manual/06-dream-master.md 棋局 108-115 行「每当使用【梦境窥视】，都必须从牌库顶抽2张牌」
+ */
+export function applyChessWorldViewPeek(state: SetupState, playerID: string): SetupState {
+  if (getMasterCharacterID(state) !== 'dm_chess') return state;
   // 世界观效果不走技能使用计数，是被动效果
-  return drawCards(state, masterID, 2);
+  return drawCards(state, playerID, CHESS_WORLD_PEEK_DRAW);
 }
 
 // ============================================================================
@@ -1799,35 +1816,37 @@ export function getMasterCharacterID(state: SetupState): CardID | null {
 //   1-5 → 该盗梦者死亡（直接迷失层，跳过击杀状态，不给手牌）
 //   6   → 躲过
 // 世界观 港口：当 2 个金库被打开仍未找到秘密，则梦主胜
-// 对照：cards-data.json dm_harbor
+// 对照：docs/manual/06-dream-master.md 港口
 
 export const HARBOR_TSUNAMI_SKILL_ID = 'dm_harbor.skill_0';
 
-/** 港口·海啸：金库打开后触发；rolls 顺序对应 alive thieves 的 playerOrder 排序 */
-export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupState {
+/**
+ * 海啸要掷骰的人：按座位顺序的存活盗梦者。
+ * 「盗梦者」按对外身份算：已被贿赂转阵营但身份未公开的人也要掷，否则不掷骰本身就泄露阵营。
+ * 当前梦主不是港口时为空。
+ * 对照：docs/manual/06-dream-master.md 港口 149 行「所有盗梦者必须按游戏顺序各掷一次骰子」
+ */
+export function harborTsunamiTargets(state: SetupState): string[] {
   const mid = findMasterID(state);
-  if (!mid) return state;
-  const master = state.players[mid];
-  if (!master || master.characterId !== 'dm_harbor') return state;
-
-  // 收集存活盗梦者（按 playerOrder 排序）
-  const aliveThieves = state.playerOrder.filter((pid) => {
+  if (!mid || state.players[mid]?.characterId !== 'dm_harbor') return [];
+  return state.playerOrder.filter((pid) => {
     const p = state.players[pid];
     return p && isOutwardThief(state, pid) && p.isAlive;
   });
-  if (aliveThieves.length === 0) return state;
+}
 
+/**
+ * 港口·海啸：rolls 按 harborTsunamiTargets 的顺序一一对应，结果 1-5 死亡，6 躲过。
+ * 死亡走 sendToLimbo：不是被梦主击杀，没有凶手与被害者，不交手牌（也不叠加 M4）。
+ * 触发时机由 moves/settlement.ts 的金库打开结算负责（游戏没有结束时才结算）。
+ */
+export function applyHarborTsunami(state: SetupState, rolls: number[]): SetupState {
+  const targets = harborTsunamiTargets(state);
   let s = state;
-  for (let i = 0; i < aliveThieves.length; i++) {
-    const pid = aliveThieves[i]!;
+  targets.forEach((pid, i) => {
     const roll = rolls[i] ?? 6;
-    if (roll >= 1 && roll <= 5) {
-      // 死亡 → 直接迷失层；不交手牌（跳过击杀状态）
-      const target = s.players[pid];
-      if (!target || !target.isAlive) continue;
-      s = sendToLimbo(s, pid);
-    }
-  }
+    if (roll >= 1 && roll <= 5) s = sendToLimbo(s, pid);
+  });
   return s;
 }
 
@@ -1975,7 +1994,7 @@ export function isCancerShelterActive(state: SetupState, playerID: string): bool
 // === 黑洞 (梦主版) · 倒流 + 世界观 ===
 // 技能 倒流：梦主每回合抽牌阶段，每未开金库的层 +2 心锁，不超过原始数
 // 世界观 黑洞：盗梦者每回合可成功解封 2 次
-// 对照：cards-data.json dm_black_hole
+// 对照：docs/manual/06-dream-master.md 黑洞
 
 export const BLACK_HOLE_REVERSE_SKILL_ID = 'dm_black_hole.skill_0';
 const BLACK_HOLE_HEART_LOCK_REGEN = 2;
@@ -2004,6 +2023,30 @@ export function applyBlackHoleReverse(
   return s;
 }
 
+/**
+ * 各层的原有心锁数（游戏开始时的配置数量，层号 1-4），倒流恢复心锁时以它为上限。
+ * 对照：docs/manual/06-dream-master.md 黑洞 137 行「心锁数的原有数量，指的是游戏开始时心锁的配置数量」
+ */
+export function getOriginalHeartLocks(state: SetupState): Record<number, number> {
+  const tuple = PLAYER_COUNT_CONFIGS[state.playerOrder.length]?.heartLocks;
+  const caps: Record<number, number> = {};
+  if (!tuple) return caps;
+  tuple.forEach((n, i) => {
+    caps[i + 1] = n;
+  });
+  return caps;
+}
+
+/**
+ * 黑洞·倒流的结算点：梦主自己回合的抽牌阶段（抽牌与略过抽牌都算，抽牌阶段照常经过）调用一次。
+ * 非梦主回合、梦主不是黑洞时原样返回；与梦主是否存活无关。
+ * 对照：docs/manual/06-dream-master.md 黑洞 133 行「无论梦主此前死亡与否，都可以增加 2 个心锁」
+ */
+export function settleBlackHoleReverse(state: SetupState): SetupState {
+  if (state.currentPlayerID !== state.dreamMasterID) return state;
+  return applyBlackHoleReverse(state, getOriginalHeartLocks(state));
+}
+
 /** 黑洞世界观：解封次数上限改为 2 */
 export function isBlackHoleWorldActive(state: SetupState): boolean {
   return getMasterCharacterID(state) === 'dm_black_hole';
@@ -2030,26 +2073,13 @@ export function getEffectiveMaxUnlockPerTurn(state: SetupState, base: number): n
 // === 海王星·泓洋 · 风暴 + 世界观 ===
 // 技能 风暴：每当心锁数减少时 / 时间风暴效果结算后 → 牌库顶弃 5 张
 // 世界观 泓洋：当放着金币的金库被打开 → 梦主胜
-// 对照：cards-data.json dm_neptune_ocean
+// 对照：docs/manual/06-dream-master.md 海王星·泓洋
 
 export const NEPTUNE_STORM_SKILL_ID = 'dm_neptune_ocean.skill_0';
-const NEPTUNE_STORM_DISCARD = 5;
 
-/** 海王星·风暴：心锁减少 / 时间风暴后触发，弃 5 张 */
-export function applyNeptuneStorm(state: SetupState): SetupState {
-  if (getMasterCharacterID(state) !== 'dm_neptune_ocean') return state;
-  const n = Math.min(NEPTUNE_STORM_DISCARD, state.deck.cards.length);
-  if (n === 0) return state;
-  const dropped = state.deck.cards.slice(0, n);
-  return {
-    ...state,
-    deck: {
-      ...state.deck,
-      cards: state.deck.cards.slice(n),
-      discardPile: [...state.deck.discardPile, ...dropped],
-    },
-  };
-}
+// 风暴的实现与触发点（心锁减少、时间风暴结算）都在 stateOps.ts：
+// skills.ts 依赖 stateOps，反过来引用会形成环，所以实现放在底层，这里再导出供外部沿用原路径取用
+export { applyNeptuneStorm } from '../stateOps.js';
 
 /** 海王星泓洋胜利判定：金币金库被打开 → 梦主胜 */
 export function checkNeptuneWin(state: SetupState): boolean {

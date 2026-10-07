@@ -2,7 +2,7 @@
 //   - 引擎里登记的每个技能标识都存在于配置里
 //   - 配置里有、引擎没有入口的技能，必须登记在 skillCoverage.ts 的两张表里（含原因），不多不少
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MASTER_CHARACTERS, THIEF_CHARACTERS } from '@icgame/shared';
 import * as skillsModule from './skills.js';
@@ -60,39 +60,24 @@ describe('技能标识 · 引擎与卡牌配置对账', () => {
     }
   });
 
-  it('清单里写明「只有没人调用的纯函数」的条目，那个函数确实存在于 skills.ts 且没有被对局引用', () => {
-    const claims: Record<string, string> = {
-      'dm_chess.worldview': 'applyChessWorldViewPeek',
-      'dm_fortress.worldview': 'applyFortressDiceModifier',
+  it('已内联实现且点名了函数的世界观条目，那个函数存在于 skills.ts 且被对局代码引用', () => {
+    // 键：配置标识；值：[函数名, 应当引用它的源文件（相对 src）]
+    const claims: Record<string, [string, string]> = {
+      'dm_chess.worldview': ['applyChessWorldViewPeek', join('moves', 'peek.ts')],
+      'dm_fortress.worldview': ['applyFortressWorldRoll', join('moves', 'shootResolution.ts')],
     };
     const srcDir = join(__dirname, '..');
-    const referencing: string[] = [];
-    const walk = (dir: string): void => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const path = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          if (entry.name !== 'testing') walk(path);
-        } else if (/\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) {
-          const rel = path.slice(srcDir.length + 1);
-          if (
-            rel === join('engine', 'skills.ts') ||
-            rel === join('engine', 'skillCoverage.ts') ||
-            rel === 'index.ts'
-          ) {
-            continue;
-          }
-          const text = readFileSync(path, 'utf8');
-          for (const fn of Object.values(claims)) {
-            if (new RegExp(`\\b${fn}\\b`).test(text)) referencing.push(`${rel}:${fn}`);
-          }
-        }
-      }
-    };
-    walk(srcDir);
-    for (const [id, fn] of Object.entries(claims)) {
-      expect(id in SKILLS_NOT_IMPLEMENTED, id).toBe(true);
+    for (const [id, [fn, file]] of Object.entries(claims)) {
+      expect(id in SKILLS_IMPLEMENTED_WITHOUT_ID, id).toBe(true);
       expect(typeof (skillsModule as Record<string, unknown>)[fn], fn).toBe('function');
+      const text = readFileSync(join(srcDir, file), 'utf8');
+      expect(new RegExp(`\\b${fn}\\b`).test(text), `${file} 没有引用 ${fn}`).toBe(true);
     }
-    expect(referencing, '已被对局引用，请把对应条目从未实现表里删掉').toEqual([]);
+  });
+
+  it('未实现表里的条目没有被对局代码悄悄接上：不再出现「只有没人调用的纯函数」', () => {
+    for (const reason of Object.values(SKILLS_NOT_IMPLEMENTED)) {
+      expect(reason).not.toMatch(/没人调用/);
+    }
   });
 });

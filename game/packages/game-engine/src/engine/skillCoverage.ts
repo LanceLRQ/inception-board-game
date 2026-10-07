@@ -10,10 +10,6 @@
 export const SKILLS_NOT_IMPLEMENTED: Readonly<Record<string, string>> = {
   'thief_apollo.skill_1': '日冕：引擎里没有任何实现，只有崇拜（skill_0）',
   'thief_green_ray.skill_1': '信念：引擎里没有任何实现，只有缉捕（skill_0）',
-  'dm_chess.worldview':
-    '棋局世界观：只有没人调用的纯函数 applyChessWorldViewPeek，梦境窥视不会多抽牌',
-  'dm_fortress.worldview':
-    '要塞世界观（梦主掷骰结果 -1）：只有没人调用的纯函数 applyFortressDiceModifier，结算骰值时不生效',
 };
 
 /** 效果已在引擎里生效，但以梦主 / 角色 id 内联判断，没有以配置标识登记的入口 */
@@ -35,4 +31,8 @@ export const SKILLS_IMPLEMENTED_WITHOUT_ID: Readonly<Record<string, string>> = {
     '地狱世界观：抽牌数改为掷骰、手牌过多进迷失层（applyPlutoHellLostCheck）',
   'dm_secret_passage.worldview': '密道世界观：复活只能弃 1 张梦境穿梭剂（applyRevive）',
   'dm_neptune_ocean.worldview': '泓洋世界观：金币金库被打开则梦主胜（checkNeptuneWin）',
+  'dm_chess.worldview':
+    '棋局世界观：moves/peek.ts 的 playPeek / playPeekMaster 在使用梦境窥视后由 applyChessWorldViewPeek 令使用者抽 2 张',
+  'dm_fortress.worldview':
+    '要塞世界观：SHOOT 结算里梦主作为目标掷骰时由 applyFortressWorldRoll 把结果 -1（moves/shootResolution.ts）',
 };

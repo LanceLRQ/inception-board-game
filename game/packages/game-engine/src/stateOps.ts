@@ -35,6 +35,29 @@ export function drawCards(
   };
 }
 
+// === 海王星·泓洋 · 风暴 ===
+// 每当心锁数减少时，或【时间风暴】效果结算后，从牌库顶弃掉 5 张牌（不足则弃到空）。
+// 触发点在本文件的两个唯一入口：setLayerHeartLock（所有心锁减少）与 discardCard（时间风暴结算），
+// 所以解封、技能、梦魇等路径都不需要各自再调用。
+// 对照：docs/manual/06-dream-master.md 海王星·泓洋 32-39 行
+const NEPTUNE_MASTER_ID = 'dm_neptune_ocean';
+const NEPTUNE_STORM_DISCARD = 5;
+
+/** 海王星·风暴：当前梦主是海王星·泓洋时，从牌库顶弃 5 张到弃牌堆；否则原样返回 */
+export function applyNeptuneStorm(state: SetupState): SetupState {
+  if (state.players[state.dreamMasterID]?.characterId !== NEPTUNE_MASTER_ID) return state;
+  const n = Math.min(NEPTUNE_STORM_DISCARD, state.deck.cards.length);
+  if (n === 0) return state;
+  return {
+    ...state,
+    deck: {
+      ...state.deck,
+      cards: state.deck.cards.slice(n),
+      discardPile: [...state.deck.discardPile, ...state.deck.cards.slice(0, n)],
+    },
+  };
+}
+
 // === 时间风暴 ===
 const TIME_STORM_ID = 'action_time_storm' as CardID;
 const TIME_STORM_FLIP_COUNT = 10;
@@ -42,6 +65,7 @@ const TIME_STORM_FLIP_COUNT = 10;
 /**
  * 时间风暴的效果：从牌库顶弃掉 10 张牌（进弃牌堆，不足则全弃），然后风暴自己移出游戏。
  * 调用时风暴牌已在弃牌堆顶（刚从手中弃出）。牌库被翻空后的胜负由终局判定处理。
+ * 海王星·风暴在效果结算后接着触发，见 discardCard。
  * 对照：docs/manual/04-action-cards.md 时间风暴（发动效果与解析）
  */
 function resolveTimeStorm(state: SetupState): SetupState {
@@ -89,7 +113,7 @@ export function discardCard(state: SetupState, playerID: string, cardId: CardID)
       discardPile: [...state.deck.discardPile, cardId],
     },
   };
-  return cardId === TIME_STORM_ID ? resolveTimeStorm(discarded) : discarded;
+  return cardId === TIME_STORM_ID ? applyNeptuneStorm(resolveTimeStorm(discarded)) : discarded;
 }
 
 /** 从手中依次弃掉多张牌，每张时间风暴各触发一次 */
@@ -203,7 +227,7 @@ export function incrementMoveCounter(state: SetupState): SetupState {
 // 减少到 0 时翻开该层第一个未开金库并记录 openedBy。
 // 对照：docs/manual/03-game-flow.md:34 当某一层的心锁全部被解开时，该层的金库便被打开
 //
-// 只管心锁与金库；金库打开后的结算（金币给贿赂牌、秘密判胜）由调用方在其后处理，
+// 只管心锁与金库（以及海王星·风暴随心锁减少触发的弃牌）；金库打开后的结算（金币给贿赂牌、秘密判胜）由调用方在其后处理，
 // 「解封成功」才触发的被动（译梦师·伏笔、梦境猎手·满载、空间女王·监察）也不在这里。
 //
 // actorID：减少心锁的发动者，翻开的金库记在他名下。
@@ -250,12 +274,14 @@ export function setLayerHeartLock(
     };
   }
 
-  return {
+  const updated: SetupState = {
     ...state,
     layers: { ...state.layers, [layer]: { ...layerState, heartLockValue: next } },
     vaults,
     players,
   };
+  // 海王星·风暴：一次减少事件只触发一次（一次减 2 个也只弃 5 张），增加不触发
+  return reduced ? applyNeptuneStorm(updated) : updated;
 }
 
 // === 解封成功结算 ===

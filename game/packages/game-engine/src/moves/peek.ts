@@ -3,7 +3,12 @@
 import type { CardID } from '@icgame/shared';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import { isCardForPlayMove } from '../engine/playCardKinds.js';
-import { dealBribeCard, isDreamMaster, isOutwardThief } from '../engine/skills.js';
+import {
+  applyChessWorldViewPeek,
+  dealBribeCard,
+  isDreamMaster,
+  isOutwardThief,
+} from '../engine/skills.js';
 import type { SetupState } from '../setup.js';
 import { discardCard, incrementMoveCounter } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
@@ -28,7 +33,8 @@ export const peekMoves = {
       const hasVault = G.vaults.some((v) => v.layer === targetLayer);
       if (!hasVault) return INVALID_MOVE;
 
-      let s = discardCard(G, ctx.currentPlayer, cardId);
+      // 棋局世界观：使用梦境窥视的人从牌库顶抽 2 张（对照：docs/manual/06-dream-master.md 棋局 112-113 行）
+      let s = applyChessWorldViewPeek(discardCard(G, ctx.currentPlayer, cardId), ctx.currentPlayer);
       const hasInPoolBribe = s.bribePool.some((b) => b.status === 'inPool');
       if (hasInPoolBribe) {
         // 挂起等梦主 masterPeekBribeDecision 决策
@@ -113,7 +119,8 @@ export const peekMoves = {
       const hasBribe = G.bribePool.some((b) => b.heldBy === targetThiefID);
       if (!hasBribe) return INVALID_MOVE;
 
-      let s = discardCard(G, ctx.currentPlayer, cardId);
+      // 棋局世界观对效果②同样生效：梦主使用梦境窥视也抽 2 张
+      let s = applyChessWorldViewPeek(discardCard(G, ctx.currentPlayer, cardId), ctx.currentPlayer);
       s = {
         ...s,
         peekReveal: {

@@ -40,7 +40,7 @@ export const thiefBoardSkillMoves = {
   // 射手·穿心：本回合击杀过玩家时，修改任意一层心锁 ±1（回合限 1 次）
   // 对照：docs/manual/05-dream-thieves.md 射手
   useSagittariusHeartLock: {
-    move: ({ G, ctx }: MoveCtx, layer: number, delta: -1 | 1) => {
+    move: ({ G, ctx, random }: MoveCtx, layer: number, delta: -1 | 1) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const self = G.players[ctx.currentPlayer];
       if (!self || !self.isAlive) return INVALID_MOVE;
@@ -52,7 +52,7 @@ export const thiefBoardSkillMoves = {
       const cap = heartLocksTuple?.[layer - 1] ?? 3;
       const result = applySagittariusHeartLock(G, ctx.currentPlayer, layer, delta, cap);
       if (result === null) return INVALID_MOVE;
-      const settled = settleVaultOpened(G, result);
+      const settled = settleVaultOpened(G, result, random);
       return markSkillUsed(settled, ctx.currentPlayer, SAGITTARIUS_HEART_LOCK_SKILL_ID);
     },
     client: false,
@@ -67,7 +67,7 @@ export const thiefBoardSkillMoves = {
       const roll = random.D6();
       const next = applyGeminiSync(G, ctx.currentPlayer, roll);
       if (next === null) return INVALID_MOVE;
-      return settleVaultOpened(G, next);
+      return settleVaultOpened(G, next, random);
     },
     client: false,
   },
@@ -206,7 +206,7 @@ export const thiefBoardSkillMoves = {
       const roll = random.D6();
       const r = applyMartyrSacrifice(G, ctx.currentPlayer, roll, direction, cap);
       if (r === null) return INVALID_MOVE;
-      return setTurnPhase(settleVaultOpened(G, r.state), 'discard');
+      return setTurnPhase(settleVaultOpened(G, r.state, random), 'discard');
     },
     client: false,
   },

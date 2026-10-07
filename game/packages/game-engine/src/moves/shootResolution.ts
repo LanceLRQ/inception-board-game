@@ -7,6 +7,7 @@ import { killPlayer } from '../engine/death.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import {
   SCORPIUS_SKILL_ID,
+  applyFortressWorldRoll,
   applyHaleyImpact,
   applyM4CarbineModifier,
   applyMercuryReverse,
@@ -255,6 +256,13 @@ export function rollShootOutcome(
   const shooterIsMaster = shooterID === G.dreamMasterID;
   const postM4Roll = applyM4CarbineModifier(shooterIsMaster, baseRoll);
 
+  // 要塞世界观：目标是梦主本人时，目标这一次的掷骰结果 -1（最低为 1）。
+  // 先后关系：恐怖分子惩罚 / 哈雷（已并入 baseRoll）→ 要塞 → 处女·完美按最终点数判断；
+  // 灵雕师·雕琢直接用手牌数作最终点数，不被要塞改变；天蝎毒针对两颗骰取差值后的结果再 -1；
+  // 金牛号角拿修正后的点数与自己的骰比大小。M4 属于梦主射手，目标是梦主时不会同时生效。
+  // 对照：docs/manual/06-dream-master.md 要塞 123 行；docs/manual/05-dream-thieves.md 灵雕师 300 行
+  const forMasterTarget = (roll: number): number => applyFortressWorldRoll(G, targetPlayerID, roll);
+
   // 记录原始骰值供客户端骰子动画使用（展示未修饰的真实 D6 结果）
   let state: SetupState = { ...G, lastShootRoll: rawD6 };
   let result: ShootOutcome;
@@ -269,7 +277,7 @@ export function rollShootOutcome(
     canUseSkill(shooter, SCORPIUS_SKILL_ID, 'ownTurnOncePerTurn')
   ) {
     // 天蝎·毒针：再掷一颗取差值
-    settledRoll = applyScorpiusPoison(baseRoll, random.D6());
+    settledRoll = forMasterTarget(applyScorpiusPoison(baseRoll, random.D6()));
     result = resolveShootCustom(settledRoll, deathFaces, moveFaces);
     state = markSkillUsed(state, shooterID, SCORPIUS_SKILL_ID);
   } else if (
@@ -279,16 +287,17 @@ export function rollShootOutcome(
   ) {
     // 金牛：先按 target 骰算 base result；若非 kill 再掷 self 骰看是否 override 为 kill
     // 号角只对【SHOOT】生效，刺客之王 / 爆甲螺旋 / 炸裂弹头不触发（docs/manual/05-dream-thieves.md 金牛 75 行）
-    settledRoll = baseRoll;
-    const baseResult = resolveShootCustom(baseRoll, deathFaces, moveFaces);
+    const targetRoll = forMasterTarget(baseRoll);
+    settledRoll = targetRoll;
+    const baseResult = resolveShootCustom(targetRoll, deathFaces, moveFaces);
     result = baseResult;
-    if (baseResult !== 'kill' && applyTaurusHorn(baseRoll, random.D6()) === 'kill') {
+    if (baseResult !== 'kill' && applyTaurusHorn(targetRoll, random.D6()) === 'kill') {
       result = 'kill';
     }
   } else {
-    // 通用路径：使用 M4 修饰后骰值（梦主 SHOOT 时 -1，盗梦者 SHOOT 时恒等）
-    settledRoll = postM4Roll;
-    result = resolveShootCustom(postM4Roll, deathFaces, moveFaces);
+    // 通用路径：使用 M4 修饰后骰值（梦主 SHOOT 时 -1，盗梦者 SHOOT 时恒等），目标是梦主时再按要塞 -1
+    settledRoll = forMasterTarget(postM4Roll);
+    result = resolveShootCustom(settledRoll, deathFaces, moveFaces);
   }
 
   // 木星·雷霆：梦主使用 SHOOT 类，目标骰 < 梦主层 → 直接击杀
@@ -494,10 +503,12 @@ export function settleSudgerPick(
   const pending = G.pendingSudgerRolls;
   if (!pending) return INVALID_MOVE;
   const chosenRoll = applySudgerVerdict(pending.rollA, pending.rollB, pick);
+  // 目标是梦主时，要塞世界观对选中的那颗再 -1（两颗骰同减，不改变挑哪颗更有利）
+  const settledRoll = applyFortressWorldRoll(G, pending.targetPlayerID, chosenRoll);
   const rolled: ShootRollOutcome = {
     state: { ...G, pendingSudgerRolls: null, lastShootRoll: chosenRoll },
-    result: resolveShootCustom(chosenRoll, pending.deathFaces, pending.moveFaces),
-    settledRoll: chosenRoll,
+    result: resolveShootCustom(settledRoll, pending.deathFaces, pending.moveFaces),
+    settledRoll,
   };
   return settleShootResult(rolled, shooterID, pending.targetPlayerID, pending.cardId, {
     extraOnMove: pending.extraOnMove,

@@ -16,6 +16,7 @@ import {
   applyRevive,
   endDrawPhase,
   settleAriesExtraDraw,
+  settleBlackHoleReverse,
 } from '../engine/skills.js';
 import { discardToLimit, drawCards, incrementMoveCounter, setTurnPhase } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
@@ -39,6 +40,8 @@ export const turnFlowMoves = {
       s = applyLeoKingdom(s, G.currentPlayerID);
       // 白羊·弃梦魇加成：抽牌阶段额外抽牌
       s = settleAriesExtraDraw(s);
+      // 黑洞·倒流：梦主自己的抽牌阶段恢复心锁
+      s = settleBlackHoleReverse(s);
       s = endDrawPhase(s);
       return s;
     },
@@ -48,7 +51,8 @@ export const turnFlowMoves = {
   skipDraw: {
     move: ({ G, ctx }: MoveCtx) => {
       if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
-      return endDrawPhase(G);
+      // 略过抽牌仍经过抽牌阶段：黑洞·倒流照常恢复心锁（对照：docs/manual/06-dream-master.md 黑洞 133 行）
+      return endDrawPhase(settleBlackHoleReverse(G));
     },
     client: false,
   },

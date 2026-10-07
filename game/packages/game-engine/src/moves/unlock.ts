@@ -24,7 +24,7 @@ export const unlockMoves = {
   // playUnlock 成功后即刻打开响应窗口（对照：§解封 使用时机②
   //   "任意玩家使用【解封】的效果①时"），允许其他玩家出效果②抵消
   playUnlock: {
-    move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+    move: ({ G, ctx, random }: MoveCtx, cardId: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playUnlock', cardId)) return INVALID_MOVE;
       const player = G.players[ctx.currentPlayer];
@@ -70,7 +70,7 @@ export const unlockMoves = {
         return s;
       }
       // 没有可响应者：不开窗口，直接结算，避免 pendingUnlock 悬空卡住对局
-      return resolveUnlockFull(s);
+      return resolveUnlockFull(s, random);
     },
     client: false,
   },
@@ -79,13 +79,13 @@ export const unlockMoves = {
   // 正常流程下由 passResponse 在"全员 pass"时自动触发 resolveUnlockFull。
   //   该 move 仍保留：供 bot/无响应窗口场景 fallback；会强制关闭可能残留的窗口。
   resolveUnlock: {
-    move: ({ G }: MoveCtx) => {
+    move: ({ G, random }: MoveCtx) => {
       if (!G.pendingUnlock) return INVALID_MOVE;
       // 强制退栈：若仍挂着响应窗口（兜底路径），回退到父窗口或 null
       let s: SetupState = G.pendingResponseWindow
         ? { ...G, pendingResponseWindow: G.pendingResponseWindow.parentWindow ?? null }
         : G;
-      s = resolveUnlockFull(s);
+      s = resolveUnlockFull(s, random);
       return s;
     },
     client: false,
@@ -124,7 +124,7 @@ export const unlockMoves = {
   // 校验 responder 合法 & 未重复 pass；全员 pass 时自动进入 resolveUnlockFull。
   //   无参数：响应者就是发起者（同 respondCancelUnlock）。
   passResponse: {
-    move: ({ G, ctx }: MoveCtx) => {
+    move: ({ G, ctx, random }: MoveCtx) => {
       const rid = ctx.currentPlayer;
       const w = G.pendingResponseWindow;
       if (!w) return INVALID_MOVE;
@@ -135,7 +135,7 @@ export const unlockMoves = {
       let s = passOnResponse(G, rid);
       // 全员 pass 且源是解封效果① → 自动结算为"解封成功"（含译梦师/M4-4 等副作用）
       if (isLastPass && w.sourceAbilityID === 'action_unlock_effect_1' && s.pendingUnlock) {
-        s = resolveUnlockFull(s);
+        s = resolveUnlockFull(s, random);
       }
       return s;
     },
