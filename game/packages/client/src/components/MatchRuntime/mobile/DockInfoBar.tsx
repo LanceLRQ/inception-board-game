@@ -4,6 +4,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
+import type { PlayRole } from '../../../lib/cards';
 import type { HandCardItem } from '../controllerTypes';
 import { cardCategoryOf, cardTargetKind, type CardVerdict } from '../model/handDerive';
 
@@ -11,12 +12,20 @@ interface DockInfoBarProps {
   /** 正在读的牌；没有为 null */
   readonly item: HandCardItem | null;
   readonly verdict: CardVerdict | null;
+  /** 本人出牌的一方（梦主与盗梦者对梦境窥视的目标要求不同） */
+  readonly role?: PlayRole;
   /** 弃牌阶段：需要弃的张数与已选张数；非弃牌阶段为 null */
   readonly discard: { selected: number; required: number } | null;
   readonly onCommit: () => void;
 }
 
-export function DockInfoBar({ item, verdict, discard, onCommit }: DockInfoBarProps) {
+export function DockInfoBar({
+  item,
+  verdict,
+  role = 'thief',
+  discard,
+  onCommit,
+}: DockInfoBarProps) {
   const { t } = useTranslation();
   let body: React.ReactNode;
 
@@ -28,7 +37,7 @@ export function DockInfoBar({ item, verdict, discard, onCommit }: DockInfoBarPro
       </span>
     );
   } else if (item && verdict) {
-    const target = cardTargetKind(item.card);
+    const target = cardTargetKind(item.card, role);
     body = (
       <span data-testid="hand-info-text">
         <b className="font-semibold text-acc-bright" data-testid="hand-info-name">

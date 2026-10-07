@@ -10,9 +10,12 @@ import type { MatchSource, MoveOutcome } from '../../match/matchSource';
 import type { ReportOutcome, ReportReason } from '../../lib/reportApi';
 import type { ReportTarget } from './reportTargets';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
+import type { PlayRole } from '../../lib/cards';
 import type { ChessVaultInfo } from '../ChessTransposeDialog';
 import type { GravityTargetOption } from '../GravityTargetPickerDialog';
 import type { AwaitingNotice } from './awaitingNotice';
+import type { DockEntryKind, EntryReason } from './model/dockEntries';
+import type { PlayBlockReason } from './model/handDerive';
 import type {
   AwaitedAction,
   AwaitedDraft,
@@ -47,6 +50,8 @@ export interface HandCardItem {
   readonly name: string;
   readonly imageUrl: string | undefined;
   readonly mode: HandCardMode;
+  /** 行动阶段轮到本人、但引擎必拒这张牌时的原因（已在迷失层、梦主的解封等）；否则为 null */
+  readonly blockReason: PlayBlockReason | null;
   /** 弃牌阶段已被选中 */
   readonly selected: boolean;
   /** 是当前出牌意图对应的那张牌 */
@@ -228,15 +233,58 @@ export interface ResponseModel {
 export interface GraftModel {
   readonly open: boolean;
   readonly hand: string[];
-  readonly picked: string[];
-  readonly toggle: (card: string) => void;
+  /** 已挑选的手牌位置，按挑选顺序（第 1 张位于牌库最顶）；按位置记录，手里有同名牌时能各选一张 */
+  readonly picked: readonly number[];
+  readonly toggle: (index: number) => void;
   readonly confirm: () => Promise<void>;
+}
+
+/** 底部坞里的一个操作入口：复活 / 复活同伴 / 梦主的移动 */
+export interface DockEntry {
+  readonly kind: DockEntryKind;
+  /** 此刻能不能用；不能用时入口仍显示，说明在 reason 里 */
+  readonly enabled: boolean;
+  readonly reason: EntryReason | null;
+  /** 点击：可用则打开对应弹层；不可用则无操作（界面把原因提示出来） */
+  readonly open: () => void;
+}
+
+/** 复活弹层：选对象（复活同伴时）与要弃的牌（按手牌位置选，同名牌各算一张） */
+export interface ReviveModel {
+  readonly open: boolean;
+  readonly mode: 'self' | 'other';
+  /** 可选的对象（复活同伴时用） */
+  readonly targets: readonly { readonly id: string; readonly name: string }[];
+  readonly target: string | null;
+  readonly hand: readonly string[];
+  readonly picked: readonly number[];
+  /** 要弃几张；密道世界观下只能弃梦境穿梭剂 */
+  readonly required: number;
+  readonly onlyTransit: boolean;
+  /** 手牌里每张牌能不能用来付代价（密道世界观下只有梦境穿梭剂） */
+  readonly eligible: readonly boolean[];
+  readonly canConfirm: boolean;
+  readonly pickTarget: (id: string) => void;
+  readonly toggleCard: (index: number) => void;
+  readonly confirm: () => Promise<void>;
+  readonly cancel: () => void;
+}
+
+/** 梦主的免费移动：选相邻层的弹层 */
+export interface MasterMoveModel {
+  readonly open: boolean;
+  /** 可去的相邻层 */
+  readonly layers: readonly number[];
+  readonly pick: (layer: number) => Promise<void>;
+  readonly cancel: () => void;
 }
 
 /** 角色主动技能面板所需；此刻不显示面板时整个对象为 null */
 export interface SkillPanelModel {
   readonly context: ActiveSkillContext;
   readonly targetIds: readonly string[];
+  /** 在迷失层的其他玩家（灵魂牧师·拯救等目标必须已死亡的技能用） */
+  readonly lostTargetIds: readonly string[];
   readonly nicknames: Record<string, string>;
   readonly invoke: (skill: ActiveSkillDescriptor, args: unknown[]) => void;
 }
@@ -307,6 +355,10 @@ export interface MatchController {
 
   // 操作
   readonly makeMove: MatchMakeMove;
+  /** 本人出牌的一方：梦主与盗梦者对同一张牌可能走不同的 move */
+  readonly playRole: PlayRole;
+  /** 梦主的梦境窥视选目标用：持有贿赂牌的座位 */
+  readonly bribeHolderIds: readonly string[];
   readonly play: PlayModel;
   readonly actions: TurnActions;
 
@@ -314,6 +366,10 @@ export interface MatchController {
   readonly gravity: GravityModel;
   readonly chess: ChessModel;
   readonly graft: GraftModel;
+  /** 底部坞的操作入口（复活 / 复活同伴 / 梦主的移动）；此刻没有为空数组 */
+  readonly entries: readonly DockEntry[];
+  readonly revive: ReviveModel;
+  readonly masterMove: MasterMoveModel;
   readonly response: ResponseModel;
   readonly shootDice: {
     readonly roll: number | null;

@@ -17,6 +17,7 @@ import {
   load,
   scene,
   SHOOT,
+  TRANSIT,
   withPlayer,
 } from './testing/runnerHarness.js';
 
@@ -178,17 +179,18 @@ describe('狮子·王道 / 译梦师·伏笔 / 要塞·冷酷：规则触发时�
         p2: { layer: 1, hand: [KICK] },
         p3: { layer: 2, hand: [KICK] },
         p4: { layer: 3, hand: [KICK] },
-        pM: { layer: 1, hand: [KICK] },
+        pM: { layer: 1, hand: [KICK, TRANSIT, TRANSIT] },
       }),
       'pM',
       { characterId: c('dm_fortress') },
     );
     // 固定骰值 2：梦主射手的 M4 把目标骰 -1 → 1，击杀
+    // 免费移动每回合只有一次，后两次换层用梦境穿梭剂
     G = run(G, 'pM', 'dreamMasterMove', [2]);
     G = run(G, 'pM', 'useFortressColdness', ['p1'], 2);
     expect(G.players.p1!.isAlive).toBe(false);
-    G = run(G, 'pM', 'dreamMasterMove', [1]);
-    G = run(G, 'pM', 'dreamMasterMove', [2]);
+    G = run(G, 'pM', 'playDreamTransit', [TRANSIT, 1]);
+    G = run(G, 'pM', 'playDreamTransit', [TRANSIT, 2]);
     G = run(G, 'pM', 'useFortressColdness', ['p3'], 2);
     expect(G.players.p3!.isAlive).toBe(false);
     expect(checkStateInvariants(G)).toEqual([]);

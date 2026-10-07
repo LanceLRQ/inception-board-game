@@ -18,6 +18,7 @@ import { ChessTransposeDialog } from '../ChessTransposeDialog';
 import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
 import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
+import { ReviveDialog } from '../ReviveDialog';
 import { ShootDiceOverlay } from '../ShootDiceOverlay';
 import { AwaitedResponseSheet } from './shared/AwaitedResponseSheet';
 import type { MatchController } from './controllerTypes';
@@ -29,7 +30,7 @@ interface MatchDialogsProps {
 export function MatchDialogs({ controller }: MatchDialogsProps) {
   const { t } = useTranslation();
   const { view, viewerSeat, viewerLayer, makeMove, nicknameOf } = controller;
-  const { play, gravity, chess, graft } = controller;
+  const { play, gravity, chess, graft, revive, masterMove } = controller;
   const { decree } = play;
 
   return (
@@ -72,6 +73,9 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         viewerPlayerID={viewerSeat}
         viewerLayer={viewerLayer}
         players={view?.players ?? {}}
+        dreamMasterID={view?.dreamMasterID}
+        viewerIsMaster={controller.playRole === 'master'}
+        bribeHolderIds={controller.bribeHolderIds}
         cardNameOf={(cardId) => getCardName(cardId)}
         onPick={(id) => void play.confirmTargetPlayer(id)}
         onCancel={() => play.cancelTargetPlayer()}
@@ -121,6 +125,34 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         cardNameOf={(cardId) => getCardName(cardId)}
         onPick={(layer) => void play.confirmTargetLayer(layer)}
         onCancel={play.cancel}
+      />
+
+      {/* 梦主的免费移动：只能去相邻层 */}
+      <TargetLayerPickerDialog
+        pending={masterMove.open ? { card: 'freeMove', move: 'dreamMasterMove' } : null}
+        viewerLayer={viewerLayer}
+        validLayers={[...masterMove.layers]}
+        cardNameOf={() => t('entries.move.label')}
+        onPick={(layer) => void masterMove.pick(layer)}
+        onCancel={masterMove.cancel}
+      />
+
+      {/* 复活：自己（在迷失层）或同伴 */}
+      <ReviveDialog
+        open={revive.open}
+        mode={revive.mode}
+        targets={revive.targets}
+        target={revive.target}
+        hand={revive.hand}
+        picked={revive.picked}
+        required={revive.required}
+        onlyTransit={revive.onlyTransit}
+        eligible={revive.eligible}
+        canConfirm={revive.canConfirm}
+        onPickTarget={revive.pickTarget}
+        onToggleCard={revive.toggleCard}
+        onConfirm={() => void revive.confirm()}
+        onCancel={revive.cancel}
       />
 
       {/* SHOOT·梦境穿梭剂 mode 选择 */}

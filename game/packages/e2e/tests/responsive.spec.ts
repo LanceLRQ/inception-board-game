@@ -51,7 +51,14 @@ const SCENES = [
   { name: '响应窗口', url: '/game/debug?pending=1', players: 6 },
   { name: '10 人', url: '/game/debug?players=10', players: 10 },
   { name: '弃牌阶段', url: '/game/debug?discard=1', players: 6 },
+  { name: '本人在迷失层（复活入口）', url: '/game/debug?dead=1', players: 6 },
+  { name: '同伴在迷失层（复活同伴入口）', url: '/game/debug?dead=mate', players: 6 },
+  { name: '梦主（移动入口）', url: '/game/debug?as=master', players: 6 },
+  { name: '梦主 + 同伴在迷失层（两个入口）', url: '/game/debug?as=master&dead=mate', players: 6 },
 ] as const;
+
+/** 有操作入口的场景：入口都在视口内、在手牌坞之内、彼此不重叠，也不压住同一操作区里的其他按钮 */
+const ENTRY_SCENE = /dead=|as=master/;
 
 // eslint-disable-next-line no-empty-pattern -- Playwright 要求第一个参数是解构形式，这里只需要 testInfo
 test.beforeEach(({}, testInfo) => {
@@ -140,6 +147,53 @@ async function expectKeyAreasClean(page: Page, vp: ViewportCase): Promise<void> 
   }
 }
 
+/** 操作入口：可见、完整在视口与手牌坞内、彼此不重叠、不压操作区里别的按钮 */
+async function expectEntriesClean(page: Page): Promise<void> {
+  const group = page.getByTestId('dock-entries');
+  await expect(group).toBeVisible();
+  // 收起的手机坞有过渡动画，等位置稳定
+  await page.waitForTimeout(450);
+  const dock = await boxOf(page, 'hand-dock');
+  const entryBoxes: Array<{ id: string; box: Box }> = [];
+  const entries = group.locator('button');
+  const count = await entries.count();
+  expect(count).toBeGreaterThanOrEqual(1);
+  for (let i = 0; i < count; i++) {
+    const b = entries.nth(i);
+    const id = (await b.getAttribute('data-testid')) ?? `entry-${i}`;
+    const box = (await b.boundingBox())!;
+    await expectInViewport(page, box, `入口 ${id}`);
+    expect(contains(dock, box), `入口 ${id} 在手牌坞之内`).toBe(true);
+    entryBoxes.push({ id, box });
+  }
+  for (let i = 0; i < entryBoxes.length; i++) {
+    for (let j = i + 1; j < entryBoxes.length; j++) {
+      expect(
+        boxesOverlap(entryBoxes[i]!.box, entryBoxes[j]!.box),
+        `入口 ${entryBoxes[i]!.id} 与 ${entryBoxes[j]!.id} 不重叠`,
+      ).toBe(false);
+    }
+  }
+  // 同一操作区里的其他按钮：技能与主操作
+  for (const other of ['dock-skill']) {
+    const loc = page.getByTestId(other).first();
+    if (!(await loc.isVisible())) continue;
+    const box = (await loc.boundingBox())!;
+    for (const e of entryBoxes) {
+      expect(boxesOverlap(e.box, box), `入口 ${e.id} 不压 ${other}`).toBe(false);
+    }
+  }
+  const main = page
+    .locator('[data-testid^="action-"]:not([data-testid^="action-confirm"])')
+    .first();
+  if (await main.isVisible()) {
+    const box = (await main.boundingBox())!;
+    for (const e of entryBoxes) {
+      expect(boxesOverlap(e.box, box), `入口 ${e.id} 不压主操作`).toBe(false);
+    }
+  }
+}
+
 const contains = (outer: Box, inner: Box): boolean =>
   inner.x >= outer.x - 1 &&
   inner.y >= outer.y - 1 &&
@@ -167,6 +221,10 @@ for (const vp of VIEWPORTS) {
           await expect(page.locator('[data-testid^="rail-slot-"]')).toHaveCount(scene.players);
         }
         await expectNoPageScroll(page);
+
+        if (ENTRY_SCENE.test(scene.url) && !scene.url.includes('pending=1')) {
+          await expectEntriesClean(page);
+        }
 
         if (scene.url.includes('pending=1')) {
           const cancel = await boxOf(page, 'unlock-response-cancel');

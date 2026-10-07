@@ -3,10 +3,18 @@
 
 import { isShootClassCard } from '@icgame/game-engine';
 import type { MatchView, MatchViewState, PlayerView, RunnerCtx } from '@icgame/game-engine';
-import { actionMoveFor, getCardName } from '../../lib/cards';
+import { actionMoveFor, getCardName, type PlayRole } from '../../lib/cards';
 import { getCardImageUrl } from '../../lib/cardImages';
 import type { ActiveSkillContext } from '../../lib/activeSkills';
+import { peekMasterTargetIds } from '../TargetPlayerPickerDialog/logic';
 import type { HandCardItem, HandCardMode, PendingPlay } from './controllerTypes';
+import { REVIVED_SELF_KEY } from './model/dockEntries';
+import {
+  DEFAULT_PLAY_RULES,
+  playBlockReason,
+  type PlayBlockReason,
+  type PlayRuleContext,
+} from './model/handDerive';
 
 /**
  * 取出界面使用的视图。
@@ -45,6 +53,43 @@ export interface HandModeInput {
   readonly winner: string | null;
   /** 超出手牌上限的张数 */
   readonly overHand: number;
+  /** 引擎必拒的几种出牌（已在迷失层、梦主的解封等）要用的信息；不给按存活的盗梦者处理 */
+  readonly rules?: PlayRuleContext;
+}
+
+/**
+ * 从按座位裁剪的视图推导出牌规则所需的信息：身份（是不是梦主）、是否存活、本回合有没有复活过自己、
+ * 梦主的梦境窥视有没有可选目标（贿赂池里的 heldBy 是公开的）。
+ */
+export function derivePlayRules(
+  G: Pick<MatchView, 'players' | 'dreamMasterID' | 'bribePool'> | undefined,
+  seat: string | null,
+): PlayRuleContext {
+  if (!G || seat === null) return DEFAULT_PLAY_RULES;
+  const me = G.players?.[seat];
+  const role: PlayRole = seat === G.dreamMasterID ? 'master' : 'thief';
+  return {
+    role,
+    alive: me ? !!me.isAlive : true,
+    revivedSelfThisTurn: (me?.skillUsedThisTurn?.[REVIVED_SELF_KEY] ?? 0) > 0,
+    hasPeekMasterTarget:
+      role === 'master' &&
+      peekMasterTargetIds(G.players ?? {}, G.dreamMasterID, seat, bribeHolderIds(G.bribePool))
+        .length > 0,
+  };
+}
+
+/** 持有贿赂牌的座位（不区分成败：视图里只公开谁持有） */
+export function bribeHolderIds(bribePool: MatchView['bribePool'] | undefined): string[] {
+  return [...new Set((bribePool ?? []).flatMap((b) => (b.heldBy ? [b.heldBy] : [])))];
+}
+
+/** 这张牌此刻被引擎拒绝的原因；只在行动阶段轮到本人时才有意义 */
+function blockReasonFor(card: string, input: HandModeInput): PlayBlockReason | null {
+  const { turnPhase, isMyTurn, winner } = input;
+  if (turnPhase !== 'action' || !isMyTurn || winner) return null;
+  const rules = input.rules ?? DEFAULT_PLAY_RULES;
+  return actionMoveFor(card, rules.role) ? playBlockReason(card, rules) : null;
 }
 
 /**
@@ -60,7 +105,13 @@ export function handCardMode(card: string, input: HandModeInput): HandCardMode {
   const { turnPhase, isMyTurn, winner, overHand } = input;
   const isDiscardSelect = turnPhase === 'discard' && overHand > 0 && isMyTurn && !winner;
   if (isDiscardSelect) return 'discard';
-  const isActionPlayable = turnPhase === 'action' && isMyTurn && !winner && !!actionMoveFor(card);
+  const role = input.rules?.role ?? 'thief';
+  const isActionPlayable =
+    turnPhase === 'action' &&
+    isMyTurn &&
+    !winner &&
+    !!actionMoveFor(card, role) &&
+    blockReasonFor(card, input) === null;
   return isActionPlayable ? 'play' : 'idle';
 }
 
@@ -100,6 +151,7 @@ export function deriveHandItems(hand: readonly string[], input: HandItemsInput):
       name: getCardName(card),
       imageUrl: getCardImageUrl(card),
       mode,
+      blockReason: mode === 'idle' ? blockReasonFor(card, input) : null,
       selected: mode === 'discard' && input.selectedDiscard.includes(index),
       pending: input.pendingCard === card,
     };
@@ -142,8 +194,8 @@ export function toggleGravityTargets(prev: string[], playerID: string): string[]
 // ---------------------------------------------------------------------------
 
 /** 手牌对应的出牌意图；这张牌不能在行动阶段打出返回 null */
-export function pendingPlayFor(card: string): PendingPlay | null {
-  const action = actionMoveFor(card);
+export function pendingPlayFor(card: string, role: PlayRole = 'thief'): PendingPlay | null {
+  const action = actionMoveFor(card, role);
   if (!action) return null;
   return {
     card,
@@ -164,10 +216,10 @@ export type CommitPlan =
  * 确认打出一张牌：无目标的牌直接发 move，需要目标的牌进入选目标流程，
  * 梦境穿梭剂与万有引力各自进入专属选择器；这张牌不能在行动阶段打出则返回 null。
  */
-export function commitPlanFor(card: string): CommitPlan | null {
+export function commitPlanFor(card: string, role: PlayRole = 'thief'): CommitPlan | null {
   if (card === 'action_shoot_dream_transit') return { kind: 'dreamTransit' };
   if (card === 'action_gravity') return { kind: 'gravity' };
-  const pending = pendingPlayFor(card);
+  const pending = pendingPlayFor(card, role);
   if (!pending) return null;
   return pending.needsTarget === 'none' ? { kind: 'direct', pending } : { kind: 'target', pending };
 }
@@ -403,6 +455,7 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
     bribePoolAvailable: Array.isArray(G.bribePool)
       ? G.bribePool.some((b) => b.status === 'inPool')
       : false,
+    lostPlayerIds: activeSkillLostTargetIds(players, seat),
     sameLayerPlayerIds: players
       ? Object.entries(players)
           .filter(([pid, p]) => pid !== seat && !!p.isAlive && p.currentLayer === humanLayer)
@@ -430,6 +483,18 @@ export function activeSkillTargetIds(
   return players
     ? Object.entries(players)
         .filter(([pid, p]) => pid !== seat && !!p.isAlive)
+        .map(([pid]) => pid)
+    : [];
+}
+
+/** 在迷失层的其他玩家：灵魂牧师·拯救这类「目标必须已死亡」的技能用 */
+export function activeSkillLostTargetIds(
+  players: MatchView['players'] | undefined,
+  seat: string | null,
+): string[] {
+  return players
+    ? Object.entries(players)
+        .filter(([pid, p]) => pid !== seat && !p.isAlive)
         .map(([pid]) => pid)
     : [];
 }

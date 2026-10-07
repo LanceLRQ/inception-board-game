@@ -9,6 +9,7 @@ import {
   viewFor,
 } from '@icgame/game-engine';
 import { createTestState, makePlayer } from '@icgame/game-engine/testing/fixtures';
+import * as activeSkillsModule from './activeSkills.js';
 import { buildActiveSkillContext } from '../components/MatchRuntime/controllerDerive.js';
 import {
   APOLLO_WORSHIP,
@@ -22,6 +23,7 @@ import {
   GAIA_SHIFT,
   GEMINI_SYNC,
   getAvailableActiveSkills,
+  targetIdsForSkill,
   HALEY_IMPACT,
   LIBRA_BALANCE,
   LORD_OF_WAR_BLACK_MARKET,
@@ -30,6 +32,7 @@ import {
   MARS_KILL,
   MARTYR_SACRIFICE,
   MASTER_DISCARD_NIGHTMARE,
+  PAPRIK_SALVATION,
   PLUTO_BURNING,
   SATURN_FREE_MOVE,
   SHADE_FOLLOW,
@@ -911,5 +914,39 @@ describe('getAvailableActiveSkills · 要塞·冷酷', () => {
     expect(getAvailableActiveSkills(idle)).not.toContain(FORTRESS_COLDNESS);
 
     expect(viewFor(moved, 'p1', { gameOver: false }).players.pM!.skillUsedThisTurn).toBeNull();
+  });
+});
+
+describe('目标玩家的范围 · targetScope', () => {
+  const alive = ['p2', 'p3'];
+  const lost = ['p4'];
+
+  it('灵魂牧师·拯救声明目标是迷失层的玩家，取到的是迷失层名单', () => {
+    expect(PAPRIK_SALVATION.targetScope).toBe('lost');
+    expect(targetIdsForSkill(PAPRIK_SALVATION, alive, lost)).toEqual(lost);
+  });
+
+  it('没声明范围的技能仍取存活玩家，不受影响', () => {
+    expect(APOLLO_WORSHIP.targetScope).toBeUndefined();
+    expect(targetIdsForSkill(APOLLO_WORSHIP, alive, lost)).toEqual(alive);
+    expect(targetIdsForSkill(TOURIST_ASSIST, alive, lost)).toEqual(alive);
+  });
+
+  it('只有拯救一个技能声明了迷失层范围', () => {
+    const scopes = Object.values(activeSkillsModule).filter(
+      (v) => typeof v === 'object' && v !== null && 'targetScope' in v && v.targetScope === 'lost',
+    );
+    expect(scopes).toEqual([PAPRIK_SALVATION]);
+  });
+
+  it('迷失层里没有别人时，灵魂牧师的拯救不可用；视图没给名单时不据此判断', () => {
+    const base = { characterId: 'thief_paprik', hand: ['action_unlock'] };
+    expect(getAvailableActiveSkills(baseCtx({ ...base, lostPlayerIds: [] }))).not.toContain(
+      PAPRIK_SALVATION,
+    );
+    expect(getAvailableActiveSkills(baseCtx({ ...base, lostPlayerIds: ['p4'] }))).toContain(
+      PAPRIK_SALVATION,
+    );
+    expect(getAvailableActiveSkills(baseCtx(base))).toContain(PAPRIK_SALVATION);
   });
 });

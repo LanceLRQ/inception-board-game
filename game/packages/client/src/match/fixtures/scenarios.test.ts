@@ -37,6 +37,24 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('discard=0')).toBe('thief');
   });
 
+  it('dead=1 进入本人在迷失层的场景；dead=mate 是同伴在迷失层，可与 as=master 叠加', () => {
+    expect(idOf('dead=1')).toBe('thief-dead');
+    expect(idOf('dead=mate')).toBe('thief-mate-dead');
+    expect(idOf('as=master&dead=mate')).toBe('master-mate-dead');
+    // 本人是梦主时没有「本人在迷失层」；其余参数优先于 dead
+    expect(idOf('as=master&dead=1')).toBe('master');
+    expect(idOf('dead=1&pending=1')).toBe('thief-pending');
+    expect(idOf('dead=1&pending=virgo')).toBe('thief-pending-virgo');
+    expect(idOf('dead=1&discard=1')).toBe('thief-discard');
+    expect(idOf('dead=0')).toBe('thief');
+  });
+
+  it('bribe=1 只在梦主视角生效：一名盗梦者持有贿赂牌', () => {
+    expect(idOf('as=master&bribe=1')).toBe('master-bribe');
+    expect(idOf('bribe=1')).toBe('thief');
+    expect(idOf('as=master&bribe=1&chess=1')).toBe('master-chess');
+  });
+
   it('pending=各待应答名 进入轮到本人应答的盗梦者场景', () => {
     expect(idOf('pending=shoot')).toBe('thief-pending-shoot');
     expect(idOf('pending=terrorist')).toBe('thief-pending-terrorist');

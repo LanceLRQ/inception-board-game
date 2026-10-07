@@ -41,6 +41,20 @@ export interface ActiveSkillDescriptor {
   readonly extraCheck?: (ctx: ActiveSkillContext) => boolean;
   /** 本回合还能发动几次（技能不限次数、次数由规则触发积累时给出；按钮上显示剩余次数） */
   readonly remaining?: (ctx: ActiveSkillContext) => number;
+  /**
+   * 目标玩家的范围：alive（缺省）= 除本人外的存活玩家；lost = 在迷失层的其他玩家
+   * （灵魂牧师·拯救的目标必须已死亡）。只对声明了它的技能生效。
+   */
+  readonly targetScope?: 'alive' | 'lost';
+}
+
+/** 一个技能可选的目标玩家：按描述符声明的范围，从存活目标与迷失层目标里取 */
+export function targetIdsForSkill(
+  skill: Pick<ActiveSkillDescriptor, 'targetScope'>,
+  aliveIds: readonly string[],
+  lostIds: readonly string[],
+): readonly string[] {
+  return skill.targetScope === 'lost' ? lostIds : aliveIds;
 }
 
 export interface ActiveSkillContext {
@@ -60,6 +74,8 @@ export interface ActiveSkillContext {
   readonly successfulUnlocksThisTurn?: number;
   /** 贿赂池是否仍有可派发项（梦主派贿赂前提） */
   readonly bribePoolAvailable?: boolean;
+  /** 在迷失层的其他玩家 id 列表（灵魂牧师·拯救用） */
+  readonly lostPlayerIds?: readonly string[];
   /** 与人类玩家同层的其他存活玩家 id 列表（盖亚·大地用） */
   readonly sameLayerPlayerIds?: readonly string[];
   /** 弃牌堆（战争之王·黑市等选弃牌堆技能用） */
@@ -147,7 +163,10 @@ export const PAPRIK_SALVATION: ActiveSkillDescriptor = {
   nameKey: 'skill.thief_paprik.skill_0.name',
   descKey: 'skill.thief_paprik.skill_0.desc',
   argKind: 'cardAndPlayer',
-  extraCheck: (ctx) => ctx.hand.length > 0,
+  // 拯救的目标必须已死亡（引擎的 applyPaprikSalvation）；视图没给迷失层名单时不据此判断
+  targetScope: 'lost',
+  extraCheck: (ctx) =>
+    ctx.hand.length > 0 && (ctx.lostPlayerIds === undefined || ctx.lostPlayerIds.length > 0),
 };
 
 export const URANUS_POWER: ActiveSkillDescriptor = {

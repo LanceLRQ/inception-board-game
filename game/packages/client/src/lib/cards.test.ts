@@ -17,6 +17,20 @@ describe('actionMoveFor', () => {
     }
   });
 
+  it('梦境窥视：盗梦者走效果①（选层），梦主走效果②（选玩家），都是引擎接受的 move', () => {
+    expect(actionMoveFor('action_dream_peek')).toEqual({
+      move: 'playPeek',
+      needsTarget: 'layer',
+      argOrder: 'card_first',
+    });
+    expect(actionMoveFor('action_dream_peek', 'master')).toEqual({
+      move: 'playPeekMaster',
+      needsTarget: 'player',
+      argOrder: 'card_first',
+    });
+    expect(isCardForPlayMove('playPeekMaster', 'action_dream_peek' as never)).toBe(true);
+  });
+
   it('has no generic shoot fallback for cards without a dedicated move', () => {
     expect(actionMoveFor('action_death_decree_3')).toBeNull();
     expect(actionMoveFor('action_death_decree_4')).toBeNull();

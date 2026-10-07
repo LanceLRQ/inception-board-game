@@ -6,11 +6,19 @@ import { Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   getAvailableActiveSkills,
+  targetIdsForSkill,
   type ActiveSkillContext,
   type ActiveSkillDescriptor,
 } from '../../lib/activeSkills';
 import { getCardName } from '../../lib/cards';
 import { getCardImageUrl } from '../../lib/cardImages';
+import { toggleHandPick } from '../../lib/handPick';
+import {
+  multiCardArgs,
+  multiCardDiscardArgs,
+  multiCardPlayerArgs,
+  twoCardsShootArgs,
+} from './skillArgs';
 
 /** picker 按钮内小缩略图 + 中文名。兼容原先纯文字布局：inline-flex 横向 */
 function CardPickLabel({ cardId }: { cardId: string }) {
@@ -35,14 +43,18 @@ import { cn } from '../../lib/utils';
 
 interface ActiveSkillPanelProps {
   readonly context: ActiveSkillContext;
+  /** 存活的可选目标 */
   readonly availableTargetIds: readonly string[];
+  /** 在迷失层的玩家（灵魂牧师·拯救等以迷失层玩家为目标的技能用） */
+  readonly lostTargetIds?: readonly string[];
   readonly playerNicknames: Record<string, string>;
   readonly onInvoke: (skill: ActiveSkillDescriptor, args: unknown[]) => void;
 }
 
 export function ActiveSkillPanel({
   context,
-  availableTargetIds,
+  availableTargetIds: aliveTargetIds,
+  lostTargetIds = [],
   playerNicknames,
   onInvoke,
 }: ActiveSkillPanelProps) {
@@ -66,15 +78,15 @@ export function ActiveSkillPanel({
     skill: ActiveSkillDescriptor;
     targetId: string | null;
   } | null>(null);
-  // multiCard: 多选手牌
+  // multiCard: 多选手牌（按手牌位置记录，同名牌各算一张）
   const [pendingMultiCardSkill, setPendingMultiCardSkill] = useState<{
     skill: ActiveSkillDescriptor;
-    selected: string[];
+    selected: number[];
   } | null>(null);
   // multiCardAndPlayer: 先多选手牌再选目标玩家（露娜·月蚀 / 雅典娜·惊叹）
   const [pendingMultiCardPlayerSkill, setPendingMultiCardPlayerSkill] = useState<{
     skill: ActiveSkillDescriptor;
-    selected: string[];
+    selected: number[];
     phase: 'cards' | 'target';
   } | null>(null);
   // layerShiftPicks: 同层玩家每人 +1/-1（盖亚·大地）
@@ -85,7 +97,7 @@ export function ActiveSkillPanel({
   // multiCardAndDiscardCard: 先多选手牌再从弃牌堆选 1 张（战争之王·黑市）
   const [pendingMultiCardDiscardSkill, setPendingMultiCardDiscardSkill] = useState<{
     skill: ActiveSkillDescriptor;
-    selected: string[];
+    selected: number[];
     phase: 'cards' | 'discard';
   } | null>(null);
   // playerAndBribeIndex: 先选目标玩家再选贿赂池 idx（皇城·重金）
@@ -96,11 +108,13 @@ export function ActiveSkillPanel({
   // twoCardsAndShoot: 选 2 张手牌 → 选弃牌堆 SHOOT 1 张（火星·战场世界观）
   const [pendingTwoCardsShootSkill, setPendingTwoCardsShootSkill] = useState<{
     skill: ActiveSkillDescriptor;
-    selected: string[];
+    selected: number[];
     phase: 'cards' | 'shoot';
   } | null>(null);
 
   const skills = getAvailableActiveSkills(context);
+  const targetsOf = (skill: ActiveSkillDescriptor) =>
+    targetIdsForSkill(skill, aliveTargetIds, lostTargetIds);
   if (
     skills.length === 0 &&
     !pendingTargetSkill &&
@@ -178,35 +192,26 @@ export function ActiveSkillPanel({
     }
   };
 
-  const toggleMultiCard = (cardId: string) => {
-    setPendingMultiCardSkill((prev) => {
-      if (!prev) return prev;
-      const idx = prev.selected.indexOf(cardId);
-      if (idx >= 0) {
-        const next = [...prev.selected];
-        next.splice(idx, 1);
-        return { ...prev, selected: next };
-      }
-      return { ...prev, selected: [...prev.selected, cardId] };
-    });
+  // 选牌一律按手牌位置记录（同名牌各算一张），发 move 时再换成牌 id（见 skillArgs.ts）
+  const toggleMultiCard = (index: number) => {
+    setPendingMultiCardSkill((prev) =>
+      prev ? { ...prev, selected: [...toggleHandPick(prev.selected, index)] } : prev,
+    );
   };
 
   const confirmMultiCard = () => {
     if (!pendingMultiCardSkill) return;
-    onInvoke(pendingMultiCardSkill.skill, [pendingMultiCardSkill.selected]);
+    onInvoke(
+      pendingMultiCardSkill.skill,
+      multiCardArgs(context.hand, pendingMultiCardSkill.selected),
+    );
     setPendingMultiCardSkill(null);
   };
 
-  const toggleMultiCardPlayer = (cardId: string) => {
+  const toggleMultiCardPlayer = (index: number) => {
     setPendingMultiCardPlayerSkill((prev) => {
       if (!prev || prev.phase !== 'cards') return prev;
-      const idx = prev.selected.indexOf(cardId);
-      if (idx >= 0) {
-        const next = [...prev.selected];
-        next.splice(idx, 1);
-        return { ...prev, selected: next };
-      }
-      return { ...prev, selected: [...prev.selected, cardId] };
+      return { ...prev, selected: [...toggleHandPick(prev.selected, index)] };
     });
   };
 
@@ -218,7 +223,10 @@ export function ActiveSkillPanel({
 
   const confirmMultiCardPlayer = (targetId: string) => {
     if (!pendingMultiCardPlayerSkill) return;
-    onInvoke(pendingMultiCardPlayerSkill.skill, [pendingMultiCardPlayerSkill.selected, targetId]);
+    onInvoke(
+      pendingMultiCardPlayerSkill.skill,
+      multiCardPlayerArgs(context.hand, pendingMultiCardPlayerSkill.selected, targetId),
+    );
     setPendingMultiCardPlayerSkill(null);
   };
 
@@ -243,16 +251,10 @@ export function ActiveSkillPanel({
     setPendingLayerShiftSkill(null);
   };
 
-  const toggleMultiCardDiscard = (cardId: string) => {
+  const toggleMultiCardDiscard = (index: number) => {
     setPendingMultiCardDiscardSkill((prev) => {
       if (!prev || prev.phase !== 'cards') return prev;
-      const idx = prev.selected.indexOf(cardId);
-      if (idx >= 0) {
-        const next = [...prev.selected];
-        next.splice(idx, 1);
-        return { ...prev, selected: next };
-      }
-      return { ...prev, selected: [...prev.selected, cardId] };
+      return { ...prev, selected: [...toggleHandPick(prev.selected, index)] };
     });
   };
 
@@ -264,10 +266,10 @@ export function ActiveSkillPanel({
 
   const confirmMultiCardDiscard = (discardCardId: string) => {
     if (!pendingMultiCardDiscardSkill) return;
-    onInvoke(pendingMultiCardDiscardSkill.skill, [
-      pendingMultiCardDiscardSkill.selected,
-      discardCardId,
-    ]);
+    onInvoke(
+      pendingMultiCardDiscardSkill.skill,
+      multiCardDiscardArgs(context.hand, pendingMultiCardDiscardSkill.selected, discardCardId),
+    );
     setPendingMultiCardDiscardSkill(null);
   };
 
@@ -277,18 +279,11 @@ export function ActiveSkillPanel({
     setPendingPlayerBribeSkill(null);
   };
 
-  const toggleTwoCardsShoot = (cardId: string) => {
+  const toggleTwoCardsShoot = (index: number) => {
     setPendingTwoCardsShootSkill((prev) => {
       if (!prev || prev.phase !== 'cards') return prev;
-      const idx = prev.selected.indexOf(cardId);
-      if (idx >= 0) {
-        const next = [...prev.selected];
-        next.splice(idx, 1);
-        return { ...prev, selected: next };
-      }
       // 最多 2 张
-      if (prev.selected.length >= 2) return prev;
-      return { ...prev, selected: [...prev.selected, cardId] };
+      return { ...prev, selected: [...toggleHandPick(prev.selected, index, 2)] };
     });
   };
 
@@ -299,10 +294,11 @@ export function ActiveSkillPanel({
   };
 
   const confirmTwoCardsShoot = (shootCardId: string) => {
-    if (!pendingTwoCardsShootSkill || pendingTwoCardsShootSkill.selected.length !== 2) return;
-    const [c1, c2] = pendingTwoCardsShootSkill.selected;
+    if (!pendingTwoCardsShootSkill) return;
     // useMarsBattlefield 签名：discardCard1, discardCard2, targetShootCardId（三独立参数）
-    onInvoke(pendingTwoCardsShootSkill.skill, [c1, c2, shootCardId]);
+    const args = twoCardsShootArgs(context.hand, pendingTwoCardsShootSkill.selected, shootCardId);
+    if (!args) return;
+    onInvoke(pendingTwoCardsShootSkill.skill, args);
     setPendingTwoCardsShootSkill(null);
   };
 
@@ -491,7 +487,7 @@ export function ActiveSkillPanel({
                 </button>
               ))}
             {pendingCardPlayerSkill.card &&
-              availableTargetIds.map((pid) => (
+              targetsOf(pendingCardPlayerSkill.skill).map((pid) => (
                 <button
                   key={pid}
                   type="button"
@@ -529,12 +525,12 @@ export function ActiveSkillPanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {context.hand.map((cardId, idx) => {
-              const active = pendingMultiCardSkill.selected.includes(cardId);
+              const active = pendingMultiCardSkill.selected.includes(idx);
               return (
                 <button
                   key={`${cardId}-${idx}`}
                   type="button"
-                  onClick={() => toggleMultiCard(cardId)}
+                  onClick={() => toggleMultiCard(idx)}
                   className={cn(
                     'rounded-full border px-3 py-1 text-xs hover:border-primary',
                     active ? 'border-primary bg-primary/20 text-primary' : 'border-border bg-muted',
@@ -586,12 +582,12 @@ export function ActiveSkillPanel({
           <div className="flex flex-wrap gap-2">
             {pendingMultiCardPlayerSkill.phase === 'cards' &&
               context.hand.map((cardId, idx) => {
-                const active = pendingMultiCardPlayerSkill.selected.includes(cardId);
+                const active = pendingMultiCardPlayerSkill.selected.includes(idx);
                 return (
                   <button
                     key={`${cardId}-${idx}`}
                     type="button"
-                    onClick={() => toggleMultiCardPlayer(cardId)}
+                    onClick={() => toggleMultiCardPlayer(idx)}
                     className={cn(
                       'rounded-full border px-3 py-1 text-xs hover:border-primary',
                       active
@@ -616,7 +612,7 @@ export function ActiveSkillPanel({
               </button>
             )}
             {pendingMultiCardPlayerSkill.phase === 'target' &&
-              availableTargetIds.map((pid) => (
+              targetsOf(pendingMultiCardPlayerSkill.skill).map((pid) => (
                 <button
                   key={pid}
                   type="button"
@@ -730,12 +726,12 @@ export function ActiveSkillPanel({
           <div className="flex flex-wrap gap-2">
             {pendingMultiCardDiscardSkill.phase === 'cards' &&
               context.hand.map((cardId, idx) => {
-                const active = pendingMultiCardDiscardSkill.selected.includes(cardId);
+                const active = pendingMultiCardDiscardSkill.selected.includes(idx);
                 return (
                   <button
                     key={`${cardId}-${idx}`}
                     type="button"
-                    onClick={() => toggleMultiCardDiscard(cardId)}
+                    onClick={() => toggleMultiCardDiscard(idx)}
                     className={cn(
                       'rounded-full border px-3 py-1 text-xs hover:border-primary',
                       active
@@ -797,7 +793,7 @@ export function ActiveSkillPanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {!pendingPlayerBribeSkill.targetId &&
-              availableTargetIds.map((pid) => (
+              targetsOf(pendingPlayerBribeSkill.skill).map((pid) => (
                 <button
                   key={pid}
                   type="button"
@@ -859,12 +855,12 @@ export function ActiveSkillPanel({
           <div className="flex flex-wrap gap-2">
             {pendingTwoCardsShootSkill.phase === 'cards' &&
               context.hand.map((cardId, idx) => {
-                const active = pendingTwoCardsShootSkill.selected.includes(cardId);
+                const active = pendingTwoCardsShootSkill.selected.includes(idx);
                 return (
                   <button
                     key={`${cardId}-${idx}`}
                     type="button"
-                    onClick={() => toggleTwoCardsShoot(cardId)}
+                    onClick={() => toggleTwoCardsShoot(idx)}
                     className={cn(
                       'rounded-full border px-3 py-1 text-xs hover:border-primary',
                       active
@@ -926,7 +922,7 @@ export function ActiveSkillPanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {!pendingPlayerCardSkill.targetId &&
-              availableTargetIds.map((pid) => (
+              targetsOf(pendingPlayerCardSkill.skill).map((pid) => (
                 <button
                   key={pid}
                   type="button"
@@ -977,7 +973,7 @@ export function ActiveSkillPanel({
           </div>
           <div className="flex flex-wrap gap-2">
             {!pendingPlayerLayerSkill.targetId &&
-              availableTargetIds.map((pid) => (
+              targetsOf(pendingPlayerLayerSkill.skill).map((pid) => (
                 <button
                   key={pid}
                   type="button"
@@ -1055,7 +1051,7 @@ export function ActiveSkillPanel({
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {availableTargetIds.map((pid) => (
+            {targetsOf(pendingTargetSkill).map((pid) => (
               <button
                 key={pid}
                 type="button"

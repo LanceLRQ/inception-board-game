@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTargetOptions, isSameLayerRequired } from './logic';
+import { computeTargetOptions, isSameLayerRequired, peekMasterTargetIds } from './logic';
 
 describe('TargetPlayerPickerDialog · logic', () => {
   describe('isSameLayerRequired', () => {
@@ -86,6 +86,94 @@ describe('TargetPlayerPickerDialog · logic', () => {
         },
       });
       expect(opts.map((o) => o.id)).toEqual(['1', '2', '10']);
+    });
+  });
+});
+
+describe('TargetPlayerPickerDialog · 引擎必拒的目标', () => {
+  // 本人 p1 是盗梦者，pM 是梦主
+  const players = {
+    p1: { isAlive: true, currentLayer: 2, nickname: 'P1' },
+    p2: { isAlive: true, currentLayer: 2, nickname: 'P2' },
+    p3: { isAlive: true, currentLayer: 3, nickname: 'P3' },
+    p4: { isAlive: false, currentLayer: 0, nickname: 'P4' },
+    pM: { isAlive: true, currentLayer: 3, nickname: 'Master' },
+  };
+
+  describe('移形换影', () => {
+    it('盗梦者对梦主使用：梦主置灰并标明原因，其他盗梦者可选', () => {
+      const opts = computeTargetOptions({
+        cardId: 'action_shift',
+        viewerLayer: 2,
+        viewerPlayerID: 'p1',
+        players,
+        dreamMasterID: 'pM',
+        viewerIsMaster: false,
+      });
+      expect(opts.map((o) => o.id)).toEqual(['p2', 'p3', 'pM']);
+      const master = opts.find((o) => o.id === 'pM')!;
+      expect(master.disabled).toBe(true);
+      expect(master.reason).toBe('masterTarget');
+      expect(opts.filter((o) => o.id !== 'pM').every((o) => !o.disabled)).toBe(true);
+    });
+
+    it('梦主对盗梦者使用：全部可选', () => {
+      const opts = computeTargetOptions({
+        cardId: 'action_shift',
+        viewerLayer: 3,
+        viewerPlayerID: 'pM',
+        players,
+        dreamMasterID: 'pM',
+        viewerIsMaster: true,
+      });
+      expect(opts.every((o) => !o.disabled)).toBe(true);
+    });
+
+    it('别的牌（共鸣、KICK）不限制梦主为目标', () => {
+      const opts = computeTargetOptions({
+        cardId: 'action_resonance',
+        viewerLayer: 2,
+        viewerPlayerID: 'p1',
+        players,
+        dreamMasterID: 'pM',
+        viewerIsMaster: false,
+      });
+      expect(opts.find((o) => o.id === 'pM')!.disabled).toBe(false);
+    });
+  });
+
+  describe('梦境窥视效果②（梦主）', () => {
+    it('只列存活、持有贿赂牌的盗梦者', () => {
+      const opts = computeTargetOptions({
+        cardId: 'action_dream_peek',
+        viewerLayer: 3,
+        viewerPlayerID: 'pM',
+        players,
+        dreamMasterID: 'pM',
+        viewerIsMaster: true,
+        bribeHolderIds: ['p2', 'p4'],
+      });
+      // p4 持有贿赂牌但已死亡：引擎不接受
+      expect(opts.map((o) => o.id)).toEqual(['p2']);
+      expect(opts[0]!.disabled).toBe(false);
+    });
+
+    it('没有人持有贿赂牌：一个都不列', () => {
+      expect(
+        computeTargetOptions({
+          cardId: 'action_dream_peek',
+          viewerLayer: 3,
+          viewerPlayerID: 'pM',
+          players,
+          dreamMasterID: 'pM',
+          viewerIsMaster: true,
+          bribeHolderIds: [],
+        }),
+      ).toEqual([]);
+    });
+
+    it('peekMasterTargetIds：不含梦主自己与已死亡者', () => {
+      expect(peekMasterTargetIds(players, 'pM', 'pM', ['pM', 'p1', 'p4'])).toEqual(['p1']);
     });
   });
 });

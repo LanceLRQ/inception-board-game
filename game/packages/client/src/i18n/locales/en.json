@@ -672,7 +672,11 @@
       "notActionPhase": "Can't play: not the action phase",
       "gameOver": "The match is over",
       "discardPhase": "Discard phase: tap cards to discard",
-      "noUi": "Can't be played directly right now"
+      "noUi": "Can't be played directly right now",
+      "dead": "Can't play: you are in the lost layer and can only revive yourself",
+      "masterNoUnlock": "The Dream Master cannot unlock with Unlock; use it in the response window to cancel",
+      "revivedNoUnlock": "You revived yourself this turn and cannot unlock with Unlock",
+      "noPeekTarget": "No thief holds a bribe card to inspect"
     },
     "wait": "Waiting"
   },
@@ -909,6 +913,39 @@
       "bribe": "Bribe",
       "dream": "Dream",
       "other": "Card"
+    }
+  },
+  "entries": {
+    "aria": "Actions",
+    "kind": {
+      "reviveSelf": "Revive",
+      "reviveOther": "Revive ally",
+      "masterMove": "Move"
+    },
+    "reason": {
+      "handShort": "Reviving costs {{count}} cards from your hand; you have {{have}}",
+      "transitShort": "Under the Secret Passage world view reviving costs 1 Dream Transit; you have none",
+      "busy": "Something else is pending; finish it first"
+    },
+    "move": {
+      "label": "Move",
+      "reason": {
+        "used": "You already moved this turn (once per turn)"
+      }
+    },
+    "disabledAria": "{{name}} (unavailable: {{reason}})"
+  },
+  "revive": {
+    "dialog": {
+      "titleSelf": "Revive",
+      "titleOther": "Revive an ally",
+      "descSelf": "Discard cards and you move to layer 1; your turn continues, but you cannot use the unlock effect of Unlock this turn.",
+      "descOther": "The revived player moves to your layer.",
+      "pickTarget": "Choose who to revive",
+      "cost": "Choose {{n}} cards to discard ({{picked}} chosen)",
+      "costTransit": "Secret Passage world view: discard {{n}} Dream Transit ({{picked}} chosen)",
+      "notTransit": "Only Dream Transit can be discarded under the Secret Passage world view",
+      "confirm": "Confirm revive"
     }
   }
 }

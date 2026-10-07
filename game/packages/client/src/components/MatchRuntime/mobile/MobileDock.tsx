@@ -43,13 +43,24 @@ const EXPANDED_HEIGHT: Record<'phone' | 'tablet', string> = {
   tablet: 'min(52dvh, 600px)',
 };
 
-/** 坞的高度（CSS 值）；手机横屏由右栏的 flex 决定，返回 undefined */
-export function dockHeight(open: boolean, mode: MobileMode): string | undefined {
+/** 收起态里操作入口（复活 / 复活同伴 / 移动）多占的一行：按钮高度 + 行距 */
+const ENTRIES_ROW_HEIGHT: Record<'phone' | 'tablet', number> = { phone: 50, tablet: 54 };
+
+/**
+ * 坞的高度（CSS 值）；手机横屏由右栏的 flex 决定，返回 undefined。
+ * 收起态有操作入口时多留一行；展开态的高度本来就按视口比例给，手牌区自己让出这一行。
+ */
+export function dockHeight(
+  open: boolean,
+  mode: MobileMode,
+  withEntries = false,
+): string | undefined {
   if (mode === 'compact-landscape') return undefined;
   const safe = 'env(safe-area-inset-bottom, 0px)';
+  const extra = withEntries ? ENTRIES_ROW_HEIGHT[mode] : 0;
   return open
     ? `calc(${EXPANDED_HEIGHT[mode]} + ${safe})`
-    : `calc(${PEEK_HEIGHT[mode] + 20}px + ${safe})`;
+    : `calc(${PEEK_HEIGHT[mode] + 20 + extra}px + ${safe})`;
 }
 
 export function MobileDock({ controller, open: openState, onOpenChange, mode }: MobileDockProps) {
@@ -115,7 +126,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
 
   const renderCards = (big: boolean) =>
     hand.items.map((item) => {
-      const target = cardTargetKind(item.card);
+      const target = cardTargetKind(item.card, controller.playRole);
       const caption = [
         t(`handInfo.category.${cardCategoryOf(item.card)}`),
         target ? t(`handInfo.target.${target}`) : null,
@@ -147,7 +158,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
         '@container relative z-10 box-border flex flex-col bg-panel pb-safe transition-[height] duration-300 ease-[cubic-bezier(.32,.72,.28,1)]',
         compact ? 'min-h-0 flex-1' : 'shrink-0 border-t border-line-strong',
       )}
-      style={{ height: dockHeight(open, mode) }}
+      style={{ height: dockHeight(open, mode, controller.entries.length > 0) }}
     >
       <div className="relative min-h-0 flex-1">
         {!compact && (
@@ -169,6 +180,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
           <div className="flex h-full min-h-0 flex-col" data-testid="dock-expanded">
             <DockInfoBar
               item={readingItem}
+              role={controller.playRole}
               verdict={readingItem ? cardVerdict(readingItem, verdictCtx) : null}
               discard={
                 inDiscard
@@ -230,6 +242,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
             <div {...bindDrag()} className="touch-pan-x">
               <DockInfoBar
                 item={readingItem}
+                role={controller.playRole}
                 verdict={readingItem ? cardVerdict(readingItem, verdictCtx) : null}
                 discard={
                   inDiscard

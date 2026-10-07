@@ -11,6 +11,7 @@ import {
   InceptionCityGame,
   applyMove,
   createMatch,
+  sendToLimbo,
   viewMatch,
   type GameDef,
   type MatchState,
@@ -157,7 +158,11 @@ function giveTurn(
 }
 
 const isMasterScenario = (id: FixtureScenarioId): boolean =>
-  id === 'master' || id === 'master-pending' || id === 'master-chess';
+  id === 'master' ||
+  id === 'master-pending' ||
+  id === 'master-chess' ||
+  id === 'master-mate-dead' ||
+  id === 'master-bribe';
 const isDiscardScenario = (id: FixtureScenarioId): boolean => id === 'thief-discard';
 /** 弃牌场景里本人多摸的牌数：缺省 4 张手牌 + 3 = 7 张，超出手牌上限（5）2 张 */
 const DISCARD_EXTRA_CARDS = 3;
@@ -221,6 +226,20 @@ function killPlayer(G: SetupState, seat: string): SetupState {
     { [seat]: { layer: 0 as Layer, revealed: false } },
   );
   return placed;
+}
+
+/** 把一张「失败」的贿赂牌交给某人：公开的只有谁持有；成败仍只有持有者与梦主能看 */
+function giveBribe(G: SetupState, seat: string): SetupState {
+  const at = G.bribePool.findIndex((b) => b.status === 'inPool' && b.kind === 'fail');
+  if (at < 0) throw new Error('固定场景发贿赂牌失败：贿赂池里没有可派的牌');
+  const holder = G.players[seat]!;
+  return {
+    ...G,
+    bribePool: G.bribePool.map((b, i) =>
+      i === at ? { ...b, status: 'dealt', heldBy: seat, originalOwnerId: seat } : b,
+    ),
+    players: { ...G.players, [seat]: { ...holder, bribeReceived: holder.bribeReceived + 1 } },
+  };
 }
 
 /** 让某个梦魇落在某一层：原来拿着它的层换到这一层原来的梦魇，保证全局没有重复 */
@@ -306,6 +325,13 @@ export function buildFixtureMatch(
     },
   };
   if (response) G = assignCharacter(G, viewer, response.viewerCharacter);
+  // 复活走查：本人在迷失层（手牌保留），或一名盗梦者同伴在迷失层
+  if (id === 'thief-dead') G = sendToLimbo(G, viewer);
+  if (id === 'thief-mate-dead' || id === 'master-mate-dead') {
+    G = sendToLimbo(G, thieves[thieves.length - 1]!);
+  }
+  // 梦境窥视效果②走查：一名盗梦者持有贿赂牌
+  if (id === 'master-bribe') G = giveBribe(G, thieves[1]!);
   if (id === 'thief-pending-terrorist') G = assignCharacter(G, actor, 'thief_terrorist');
   if (id === 'thief-pending-libra-split') G = assignCharacter(G, actor, 'thief_libra');
 

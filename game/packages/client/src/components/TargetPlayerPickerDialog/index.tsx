@@ -31,6 +31,10 @@ export interface TargetPlayerPickerDialogProps {
     string,
     { isAlive: boolean; currentLayer: number; nickname?: string } | undefined
   >;
+  /** 梦主的座位、本人是不是梦主、持有贿赂牌的座位：移形换影与梦境窥视效果②的目标限制要用 */
+  dreamMasterID?: string;
+  viewerIsMaster?: boolean;
+  bribeHolderIds?: readonly string[];
   /** 卡牌显示名（可选） */
   cardNameOf?: (cardId: string) => string;
   onPick: (targetPlayerID: string) => void;
@@ -44,6 +48,9 @@ export function TargetPlayerPickerDialog({
   viewerPlayerID,
   viewerLayer,
   players,
+  dreamMasterID,
+  viewerIsMaster,
+  bribeHolderIds,
   cardNameOf,
   onPick,
   onCancel,
@@ -56,6 +63,9 @@ export function TargetPlayerPickerDialog({
     viewerLayer,
     viewerPlayerID,
     players,
+    ...(dreamMasterID !== undefined ? { dreamMasterID } : {}),
+    ...(viewerIsMaster !== undefined ? { viewerIsMaster } : {}),
+    ...(bribeHolderIds !== undefined ? { bribeHolderIds } : {}),
   });
 
   return (
@@ -75,20 +85,33 @@ export function TargetPlayerPickerDialog({
             {cardName ? `${cardName} · 选择目标玩家` : '选择目标玩家'}
           </span>
         </DialogTitle>
-        <DialogDescription>同层限制由卡牌规则决定；跨层不可选的目标已置灰。</DialogDescription>
+        <DialogDescription>
+          {pending?.card === 'action_dream_peek'
+            ? '只能查看已持有贿赂牌的盗梦者。'
+            : '同层限制由卡牌规则决定；跨层不可选的目标已置灰。'}
+        </DialogDescription>
       </DialogHeader>
       <DialogBody>
         {decreeSlot}
         <div className="flex flex-wrap gap-2">
           {options.length === 0 ? (
-            <span className="text-xs text-muted-foreground">无可选目标</span>
+            <span className="text-xs text-muted-foreground" data-testid="target-player-empty">
+              无可选目标
+            </span>
           ) : (
             options.map((opt) => (
               <button
                 key={opt.id}
                 type="button"
                 disabled={opt.disabled}
-                title={opt.disabled ? '该 SHOOT 仅限同层目标' : undefined}
+                title={
+                  opt.reason === 'masterTarget'
+                    ? '盗梦者不能对梦主使用移形换影'
+                    : opt.reason === 'sameLayer'
+                      ? '该 SHOOT 仅限同层目标'
+                      : undefined
+                }
+                data-reason={opt.reason ?? undefined}
                 onClick={() => {
                   if (opt.disabled) return;
                   onPick(opt.id);
@@ -97,9 +120,11 @@ export function TargetPlayerPickerDialog({
                 data-testid={`target-player-${opt.id}`}
               >
                 {opt.name}
-                {opt.disabled && opt.crossLayerNumber !== null
-                  ? ` · L${opt.crossLayerNumber}（跨层）`
-                  : ''}
+                {opt.reason === 'masterTarget'
+                  ? ' · 梦主（不可选）'
+                  : opt.reason === 'sameLayer' && opt.crossLayerNumber !== null
+                    ? ` · L${opt.crossLayerNumber}（跨层）`
+                    : ''}
               </button>
             ))
           )}

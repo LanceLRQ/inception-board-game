@@ -7,6 +7,7 @@ import { buildFixtureScenario } from '../../match/fixtures/buildScenario';
 import {
   adaptPlayForCharacter,
   SUDGER_CHARACTER_ID,
+  activeSkillLostTargetIds,
   activeSkillTargetIds,
   buildActiveSkillContext,
   buildPlayArgs,
@@ -39,6 +40,7 @@ import {
   viewOf,
 } from './controllerDerive';
 import type { PendingPlay } from './controllerTypes';
+import { handCardsAt } from '../../lib/handPick';
 
 const thief = buildFixtureScenario('thief');
 const thiefG = thief.view.G as MatchView;
@@ -307,6 +309,52 @@ describe('toggleKeepLastTwo', () => {
   it('已有两个时丢掉最早的，保留最后 2 个', () => {
     expect(toggleKeepLastTwo([1, 2], 3)).toEqual([2, 3]);
     expect(toggleKeepLastTwo(['x', 'y'], 'z')).toEqual(['y', 'z']);
+  });
+});
+
+describe('嫁接放回 · 按手牌位置选，同名牌各算一张', () => {
+  const hand = ['action_shoot', 'action_kick', 'action_shoot'];
+
+  it('手里有两张同名牌：点第 0 张与第 2 张都能选中，发出两张同名牌的 id', () => {
+    const picked = toggleKeepLastTwo(toggleKeepLastTwo<number>([], 0), 2);
+    expect(picked).toEqual([0, 2]);
+    expect(handCardsAt(hand, picked)).toEqual(['action_shoot', 'action_shoot']);
+  });
+
+  it('再点已选的那一张只取消它，同名的另一张仍保持选中', () => {
+    expect(toggleKeepLastTwo([0, 2], 0)).toEqual([2]);
+  });
+
+  it('选择顺序决定放回的先后（第 1 张位于牌库最顶）', () => {
+    expect(handCardsAt(hand, [1, 0])).toEqual(['action_kick', 'action_shoot']);
+  });
+});
+
+describe('灵魂牧师·拯救的目标：在迷失层的其他玩家', () => {
+  it('activeSkillLostTargetIds 只含已死亡的其他玩家，不含自己与存活者', () => {
+    const sc = buildFixtureScenario('thief-mate-dead');
+    const G = sc.view.G as MatchView;
+    const lost = activeSkillLostTargetIds(G.players, sc.seat);
+    expect(lost).toHaveLength(1);
+    expect(G.players[lost[0]!]!.isAlive).toBe(false);
+    // 存活目标列表不受影响：不含迷失层玩家
+    expect(activeSkillTargetIds(G.players, sc.seat)).not.toContain(lost[0]);
+    // 本人在迷失层时，自己不算「其他玩家」
+    const dead = buildFixtureScenario('thief-dead');
+    expect(activeSkillLostTargetIds((dead.view.G as MatchView).players, dead.seat)).toEqual([]);
+  });
+
+  it('技能上下文带出迷失层名单', () => {
+    const sc = buildFixtureScenario('thief-mate-dead');
+    const ctx = buildActiveSkillContext({
+      G: sc.view.G as MatchView,
+      seat: sc.seat,
+      isMyTurn: true,
+      hand: [],
+    });
+    expect(ctx.lostPlayerIds).toEqual(
+      activeSkillLostTargetIds((sc.view.G as MatchView).players, sc.seat),
+    );
   });
 });
 

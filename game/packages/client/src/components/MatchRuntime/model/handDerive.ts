@@ -2,7 +2,7 @@
 // 卡牌效果说明文字：共享卡牌数据里行动牌的 effects 目前是空的，没有可显示的效果文案，
 // 所以信息条只显示「卡名 · 类别 · 目标要求 · 此刻能不能打及原因」，不自行编写规则文字。
 
-import { actionMoveFor } from '../../../lib/cards';
+import { actionMoveFor, type PlayRole } from '../../../lib/cards';
 import type { HandCardItem } from '../controllerTypes';
 
 // ---------------------------------------------------------------------------
@@ -27,11 +27,55 @@ export function cardCategoryOf(cardId: string): CardCategory {
 /** 打出时需要的目标：无 / 目标玩家 / 目标层 / 先选结算方式或多个目标 / 死亡宣言（随 SHOOT 一起打出） */
 export type CardTargetKind = 'none' | 'player' | 'layer' | 'choice' | 'decree';
 
-export function cardTargetKind(cardId: string): CardTargetKind | null {
+export function cardTargetKind(cardId: string, role: PlayRole = 'thief'): CardTargetKind | null {
   if (cardId === 'action_shoot_dream_transit' || cardId === 'action_gravity') return 'choice';
   if (cardId.startsWith('action_death_decree')) return 'decree';
-  const spec = actionMoveFor(cardId);
+  const spec = actionMoveFor(cardId, role);
   return spec ? spec.needsTarget : null;
+}
+
+// ---------------------------------------------------------------------------
+// 这张牌此刻会不会被引擎拒绝
+// ---------------------------------------------------------------------------
+
+/**
+ * 界面上看着能打、但引擎必拒的几种情形：
+ *   dead            已在迷失层：不能使用行动牌（docs/manual/03-game-flow.md:55、:62）
+ *   masterNoUnlock  梦主不能使用【解封】效果①，只能在响应窗口里用效果②抵消（docs/manual/04-action-cards.md:97）
+ *   revivedNoUnlock 本回合复活过自己：不能用【解封】效果①（docs/manual/04-action-cards.md:94）
+ *   noPeekTarget    梦主的【梦境窥视】效果②必须有一名持有贿赂牌的盗梦者可看（docs/manual/04-action-cards.md:115、:119）
+ */
+export type PlayBlockReason = 'dead' | 'masterNoUnlock' | 'revivedNoUnlock' | 'noPeekTarget';
+
+/** 判断一张牌能否打出所需的、从视图推导出来的信息 */
+export interface PlayRuleContext {
+  readonly role: PlayRole;
+  readonly alive: boolean;
+  /** 本回合复活过自己（本人 skillUsedThisTurn 里的标记） */
+  readonly revivedSelfThisTurn: boolean;
+  /** 梦境窥视效果②有没有可选目标（存活、非梦主、持有贿赂牌的盗梦者） */
+  readonly hasPeekMasterTarget: boolean;
+}
+
+/** 没有额外信息时的缺省：存活的盗梦者、没复活过、没有窥视目标（盗梦者不走效果②，用不到） */
+export const DEFAULT_PLAY_RULES: PlayRuleContext = {
+  role: 'thief',
+  alive: true,
+  revivedSelfThisTurn: false,
+  hasPeekMasterTarget: false,
+};
+
+/** 这张牌此刻被引擎拒绝的原因；没有原因返回 null（只判断本表里的几种，其余由引擎校验） */
+export function playBlockReason(card: string, rules: PlayRuleContext): PlayBlockReason | null {
+  if (!rules.alive) return 'dead';
+  if (card === 'action_unlock') {
+    if (rules.role === 'master') return 'masterNoUnlock';
+    if (rules.revivedSelfThisTurn) return 'revivedNoUnlock';
+  }
+  if (card === 'action_dream_peek' && rules.role === 'master' && !rules.hasPeekMasterTarget) {
+    return 'noPeekTarget';
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +88,8 @@ export type VerdictReason =
   | 'notActionPhase'
   | 'gameOver'
   | 'discardPhase'
-  | 'noUi';
+  | 'noUi'
+  | PlayBlockReason;
 
 export interface CardVerdict {
   readonly canPlay: boolean;
@@ -58,12 +103,16 @@ export interface VerdictContext {
 }
 
 /** 一张手牌此刻能不能打；不能打时给出原因（用 controller 已算好的用途 mode 为准） */
-export function cardVerdict(item: Pick<HandCardItem, 'mode'>, ctx: VerdictContext): CardVerdict {
+export function cardVerdict(
+  item: Pick<HandCardItem, 'mode'> & { readonly blockReason?: PlayBlockReason | null },
+  ctx: VerdictContext,
+): CardVerdict {
   if (item.mode === 'play') return { canPlay: true, reason: 'ok' };
   if (item.mode === 'discard') return { canPlay: false, reason: 'discardPhase' };
   if (ctx.winner) return { canPlay: false, reason: 'gameOver' };
   if (!ctx.isMyTurn) return { canPlay: false, reason: 'notMyTurn' };
   if (ctx.turnPhase !== 'action') return { canPlay: false, reason: 'notActionPhase' };
+  if (item.blockReason) return { canPlay: false, reason: item.blockReason };
   return { canPlay: false, reason: 'noUi' };
 }
 

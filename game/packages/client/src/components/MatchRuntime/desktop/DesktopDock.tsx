@@ -40,6 +40,11 @@ export function DesktopDock({ controller }: DesktopDockProps) {
   const verdictCtx = { isMyTurn: turn.isMine, turnPhase: turn.phase, winner };
   const verdict = readingItem ? cardVerdict(readingItem, verdictCtx) : null;
 
+  // 选中的牌此刻打不出时，把原因写在身份块里（桌面没有信息条）
+  const readingNote =
+    verdict && !verdict.canPlay && verdict.reason !== 'discardPhase'
+      ? t(`handInfo.verdict.${verdict.reason}`)
+      : null;
   const skills = skillPanel ? getAvailableActiveSkills(skillPanel.context) : [];
   const skillName = skills[0] ? t(skills[0].nameKey) : null;
   const selfMarkers = stage && self ? (markersBySeat(stage.seats)[self.seat] ?? []) : [];
@@ -75,6 +80,7 @@ export function DesktopDock({ controller }: DesktopDockProps) {
             skillName={skillName}
             mustDiscard={turn.phase === 'discard' && hand.mustDiscard ? hand.overflow : 0}
             markers={selfMarkers}
+            readingNote={readingNote}
             bubble={controller.chat.bubbles.get(self.seat)}
             onPreview={preview.open}
           />
@@ -85,7 +91,7 @@ export function DesktopDock({ controller }: DesktopDockProps) {
         >
           {hand.available && hand.items.length > 0 ? (
             hand.items.map((item) => {
-              const target = cardTargetKind(item.card);
+              const target = cardTargetKind(item.card, controller.playRole);
               return (
                 <DockHandCard
                   key={`${item.card}-${item.index}`}

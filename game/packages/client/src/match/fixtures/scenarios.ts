@@ -24,6 +24,10 @@ export const FIXTURE_SCENARIO_IDS = [
   'thief-pending-virgo',
   'thief-pending-aries',
   'master-chess',
+  'thief-dead',
+  'thief-mate-dead',
+  'master-mate-dead',
+  'master-bribe',
 ] as const;
 
 export type FixtureScenarioId = (typeof FIXTURE_SCENARIO_IDS)[number];
@@ -80,6 +84,10 @@ export function parseFixturePlayers(raw: string | null): number {
  *   ?character=sudger  盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的发动入口）；
  *                      梦主视角、响应窗口与待应答参数优先，忽略它
  *   ?chess=1     与 as=master 叠加：梦主是「棋局」，行动阶段会自动弹出易位弹窗
+ *   ?dead=1      盗梦者视角，本人已在迷失层、轮到自己的出牌阶段、手里有牌（走查「复活」入口）；
+ *                ?dead=mate 本人存活，一名盗梦者同伴在迷失层（走查「复活同伴」，可与 as=master 叠加）；
+ *                梦主视角下 dead=1 忽略；响应窗口、待应答与弃牌参数优先
+ *   ?bribe=1     与 as=master 叠加：一名盗梦者持有贿赂牌（走查梦主的梦境窥视效果②选目标）
  *   ?discard=1   盗梦者处于弃牌阶段，手牌超出上限（梦主视角与响应窗口参数优先，忽略它）
  *   ?players=N   人数 4–10（缺省 6），方便走查座位环在不同人数下的排布
  *   ?chat=1      打开预设短语通道，并注入几条示例消息（固定场景本没有连接，发出的短语只在本机回显）
@@ -96,16 +104,33 @@ export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureSc
       ? PENDING_RESPONSE_SCENARIOS[pendingParam as keyof typeof PENDING_RESPONSE_SCENARIOS]
       : null;
   const chess = searchParams.get('chess') === '1';
+  const deadParam = searchParams.get('dead');
+  const deadSelf = deadParam === '1';
+  const deadMate = deadParam === 'mate';
+  const bribe = searchParams.get('bribe') === '1';
   const sudger = searchParams.get('character') === 'sudger';
   const id: FixtureScenarioId = master
     ? pending
       ? 'master-pending'
       : chess
         ? 'master-chess'
-        : 'master'
+        : deadMate
+          ? 'master-mate-dead'
+          : bribe
+            ? 'master-bribe'
+            : 'master'
     : pending
       ? 'thief-pending'
-      : (response ?? (discard ? 'thief-discard' : sudger ? 'thief-sudger' : 'thief'));
+      : (response ??
+        (discard
+          ? 'thief-discard'
+          : deadSelf
+            ? 'thief-dead'
+            : deadMate
+              ? 'thief-mate-dead'
+              : sudger
+                ? 'thief-sudger'
+                : 'thief'));
   const extras = resolveFixtureExtras(searchParams);
   return {
     id,

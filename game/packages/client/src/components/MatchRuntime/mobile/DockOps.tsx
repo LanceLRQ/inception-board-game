@@ -7,6 +7,7 @@ import { MessageCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { MatchController } from '../controllerTypes';
 import { deriveMainAction } from '../model/handDerive';
+import { DockEntries } from '../shared/DockEntries';
 
 interface DockOpsProps {
   readonly controller: MatchController;
@@ -85,9 +86,13 @@ export function DockOps({ controller, skillReady, onOpenSkill, onOpenChat, layou
     </button>
   );
 
+  // 操作入口（复活 / 复活同伴 / 移动）单独占一行，排在技能与主操作之上；没有入口时不占位
+  const entries = <DockEntries entries={controller.entries} variant="mobile" />;
+
   if (layout === 'column') {
     return (
       <div className="flex shrink-0 flex-col gap-1.5" data-testid="dock-ops">
+        {entries}
         <div className="flex gap-1.5">
           {skillButton}
           {chatButton}
@@ -97,10 +102,13 @@ export function DockOps({ controller, skillReady, onOpenSkill, onOpenChat, layou
     );
   }
   return (
-    <div className="flex shrink-0 flex-row gap-1.5" data-testid="dock-ops">
-      {skillButton}
-      {chatButton}
-      {mainButton}
+    <div className="flex shrink-0 flex-col gap-1.5" data-testid="dock-ops">
+      {entries}
+      <div className="flex flex-row gap-1.5">
+        {skillButton}
+        {chatButton}
+        {mainButton}
+      </div>
     </div>
   );
 }

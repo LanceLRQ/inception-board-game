@@ -71,6 +71,10 @@ const SCENES = [
   ['短语入口与座位气泡', '/game/debug?chat=1'],
   ['意念判官的出牌', '/game/debug?character=sudger'],
   ['结算：局后举报区', '/game/debug?outcome=1'],
+  ['本人在迷失层（复活入口）', '/game/debug?dead=1'],
+  ['同伴在迷失层（复活同伴入口）', '/game/debug?dead=mate'],
+  ['梦主 + 同伴在迷失层（两个入口）', '/game/debug?as=master&dead=mate'],
+  ['梦主的梦境窥视选目标', '/game/debug?as=master&bribe=1'],
 ] as const;
 
 test.describe('触控目标 · 390×844', () => {
@@ -177,6 +181,24 @@ test.describe('触控目标 · 390×844', () => {
     await page.getByTestId('report-submit').click();
     await expect(page.getByTestId('report-result')).toBeVisible();
     await expectTouchClean(page, '举报弹窗（结果）');
+  });
+
+  test('对局：复活弹层与梦主移动弹层', async ({ page }) => {
+    await openScene(page, '/game/debug?dead=1');
+    await page.getByTestId('dock-entry-revive-self').click();
+    await expect(page.getByTestId('revive-dialog')).toBeVisible();
+    await page.getByTestId('revive-card-0').click();
+    await expectTouchClean(page, '复活弹层（本人）');
+
+    await openScene(page, '/game/debug?as=master&dead=mate');
+    await page.getByTestId('dock-entry-revive-other').click();
+    await expect(page.getByTestId('revive-dialog')).toBeVisible();
+    await expectTouchClean(page, '复活弹层（同伴）');
+    await page.keyboard.press('Escape');
+
+    await page.getByTestId('dock-entry-move').click();
+    await expect(page.getByTestId('target-layer-picker-dialog')).toBeVisible();
+    await expectTouchClean(page, '梦主移动弹层');
   });
 
   test('对局：弃牌阶段选牌后', async ({ page }) => {

@@ -62,7 +62,10 @@ export interface ActionMoveSpec {
   needsTarget: 'player' | 'layer' | 'none';
   argOrder?: 'target_first' | 'card_first';
 }
-export function actionMoveFor(id: string): ActionMoveSpec | null {
+/** 出牌的一方：梦主与盗梦者对同一张牌可能走不同的 move（梦境窥视的两个效果） */
+export type PlayRole = 'master' | 'thief';
+
+export function actionMoveFor(id: string, role: PlayRole = 'thief'): ActionMoveSpec | null {
   const card = getCardById(id);
   if (!card || card.category !== 'action') return null;
   const action = card as ActionCardDefinition;
@@ -82,7 +85,11 @@ export function actionMoveFor(id: string): ActionMoveSpec | null {
     return { move: 'playTelekinesis', needsTarget: 'player', argOrder: 'card_first' };
   }
   if (action.id === 'action_dream_peek') {
-    return { move: 'playPeek', needsTarget: 'layer', argOrder: 'card_first' };
+    // 效果①（盗梦者）选一层看金库；效果②（梦主）选一名持有贿赂牌的盗梦者看他的贿赂牌
+    // 对照：docs/manual/04-action-cards.md:115、:119
+    return role === 'master'
+      ? { move: 'playPeekMaster', needsTarget: 'player', argOrder: 'card_first' }
+      : { move: 'playPeek', needsTarget: 'layer', argOrder: 'card_first' };
   }
   if (action.id === 'action_time_storm') return { move: 'playTimeStorm', needsTarget: 'none' };
   if (action.id === 'action_nightmare_unlock') {

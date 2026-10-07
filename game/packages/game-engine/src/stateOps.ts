@@ -251,6 +251,12 @@ function grantFortressColdnessChance(
   };
 }
 
+// === 梦主的免费移动 ===
+// 对照：docs/manual/03-game-flow.md:82 梦主的出牌阶段，可不用功能牌移动到相邻的另一层梦境，每回合仅可使用一次
+// 已用次数记在梦主本人的 skillUsedThisTurn 里，回合开始随之清零（见 beginTurn）；
+// 键不是牌 / 技能标识，客户端从自己的视图读它来判断「移动」入口是否可用。
+export const MASTER_FREE_MOVE_KEY = 'master.freeMove';
+
 // === 判断相邻层 ===
 export function isAdjacentLayer(from: number, to: number): boolean {
   return Math.abs(from - to) === 1;

@@ -8,7 +8,15 @@ import {
   awaitedResponse,
   type MineAwaited,
 } from '../../components/MatchRuntime/response/awaitedResponse';
-import { chessAvailable } from '../../components/MatchRuntime/controllerDerive';
+import {
+  activeSkillLostTargetIds,
+  bribeHolderIds,
+  chessAvailable,
+  deriveHandItems,
+  derivePlayRules,
+} from '../../components/MatchRuntime/controllerDerive';
+import { deriveDockEntries } from '../../components/MatchRuntime/model/dockEntries';
+import { peekMasterTargetIds } from '../../components/TargetPlayerPickerDialog/logic';
 import {
   FIXTURE_DEFAULT_PLAYERS,
   FIXTURE_MAX_PLAYERS,
@@ -54,7 +62,10 @@ describe('buildFixtureScenario · 通用', () => {
     '场景 %s 的局面丰富：各层有心锁、有人已翻开、玩家分布在多层',
     (id) => {
       const G = viewG(id);
-      for (const layer of Object.values(G.layers)) expect(layer.heartLockValue).toBeGreaterThan(0);
+      // 迷失层（0）不是梦境，没有心锁；有人在迷失层时引擎会为它建一条层记录
+      for (const layer of Object.values(G.layers).filter((l) => l.layer !== 0)) {
+        expect(layer.heartLockValue).toBeGreaterThan(0);
+      }
       const revealedThieves = Object.values(G.players).filter(
         (p) => p.isRevealed && p.faction === 'thief',
       );
@@ -399,5 +410,143 @@ describe('buildFixtureScenario · 棋局梦主', () => {
         unopenedVaults: G.vaults.filter((v) => !v.isOpened).length,
       }),
     ).toBe(true);
+  });
+});
+
+/** 把场景视图接到底部坞入口的推导上（与控制层的输入一致） */
+function entriesOf(id: FixtureScenarioId) {
+  const sc = buildFixtureScenario(id);
+  const G = sc.view.G as MatchView;
+  const me = G.players[sc.seat]!;
+  return {
+    sc,
+    G,
+    entries: deriveDockEntries({
+      seat: sc.seat,
+      dreamMasterID: G.dreamMasterID,
+      players: G.players,
+      hand: me.hand ?? [],
+      isMyTurn: G.currentPlayerID === sc.seat,
+      turnPhase: G.turnPhase,
+      winner: null,
+      busy: false,
+    }),
+  };
+}
+
+describe('buildFixtureScenario · 复活走查', () => {
+  it('thief-dead：本人已在迷失层、轮到自己的出牌阶段、手里有牌，只有「复活」入口且可用', () => {
+    const { sc, G, entries } = entriesOf('thief-dead');
+    const me = G.players[sc.seat]!;
+    expect(me.isAlive).toBe(false);
+    expect(me.currentLayer).toBe(0);
+    expect(G.turnPhase).toBe('action');
+    expect(G.currentPlayerID).toBe(sc.seat);
+    expect(me.hand!.length).toBeGreaterThanOrEqual(2);
+    expect(entries).toEqual([{ kind: 'reviveSelf', enabled: true, reason: null }]);
+  });
+
+  it('thief-dead：已死亡的本人手里的牌一张都打不出，原因是在迷失层', () => {
+    const { sc, G } = entriesOf('thief-dead');
+    const me = G.players[sc.seat]!;
+    const items = deriveHandItems(me.hand!, {
+      turnPhase: G.turnPhase,
+      isMyTurn: true,
+      winner: null,
+      overHand: 0,
+      selectedDiscard: [],
+      pendingCard: null,
+      rules: derivePlayRules(G, sc.seat),
+    });
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((it) => it.mode === 'idle' && it.blockReason === 'dead')).toBe(true);
+  });
+
+  it('thief-mate-dead：本人存活，一名盗梦者同伴在迷失层，出现「复活同伴」', () => {
+    const { sc, G, entries } = entriesOf('thief-mate-dead');
+    expect(G.players[sc.seat]!.isAlive).toBe(true);
+    expect(activeSkillLostTargetIds(G.players, sc.seat)).toHaveLength(1);
+    expect(entries).toEqual([{ kind: 'reviveOther', enabled: true, reason: null }]);
+  });
+
+  it('master-mate-dead：梦主既有「移动」又有「复活同伴」', () => {
+    const { entries } = entriesOf('master-mate-dead');
+    expect(entries.map((e) => e.kind)).toEqual(['masterMove', 'reviveOther']);
+    expect(entries.every((e) => e.enabled)).toBe(true);
+  });
+
+  it('缺省梦主场景：只有「移动」；缺省盗梦者场景没有任何入口', () => {
+    expect(entriesOf('master').entries.map((e) => e.kind)).toEqual(['masterMove']);
+    expect(entriesOf('thief').entries).toEqual([]);
+  });
+
+  it('各复活场景的完整状态满足规则不变量', () => {
+    for (const id of ['thief-dead', 'thief-mate-dead', 'master-mate-dead'] as const) {
+      expect(checkInvariants(buildFixtureMatch(id).state.G), id).toEqual([]);
+    }
+  });
+});
+
+describe('buildFixtureScenario · 梦主的出牌限制', () => {
+  it('梦主手里的【解封】不可打出（引擎拒绝梦主使用）', () => {
+    const sc = buildFixtureScenario('master');
+    const G = sc.view.G as MatchView;
+    const hand = G.players[sc.seat]!.hand!;
+    const items = deriveHandItems(hand, {
+      turnPhase: G.turnPhase,
+      isMyTurn: true,
+      winner: null,
+      overHand: 0,
+      selectedDiscard: [],
+      pendingCard: null,
+      rules: derivePlayRules(G, sc.seat),
+    });
+    const unlock = items.find((it) => it.card === 'action_unlock')!;
+    expect(unlock.mode).toBe('idle');
+    expect(unlock.blockReason).toBe('masterNoUnlock');
+    // 同一只手里的 KICK 照常可打
+    expect(items.find((it) => it.card === 'action_kick')!.mode).toBe('play');
+  });
+
+  it('master：没有人持有贿赂牌时，梦主的梦境窥视不可打出', () => {
+    const sc = buildFixtureScenario('master');
+    const G = sc.view.G as MatchView;
+    expect(bribeHolderIds(G.bribePool)).toEqual([]);
+    const rules = derivePlayRules(G, sc.seat);
+    expect(rules.hasPeekMasterTarget).toBe(false);
+    const peek = deriveHandItems(G.players[sc.seat]!.hand!, {
+      turnPhase: G.turnPhase,
+      isMyTurn: true,
+      winner: null,
+      overHand: 0,
+      selectedDiscard: [],
+      pendingCard: null,
+      rules,
+    }).find((it) => it.card === 'action_dream_peek')!;
+    expect(peek.mode).toBe('idle');
+    expect(peek.blockReason).toBe('noPeekTarget');
+  });
+
+  it('master-bribe：一名存活的盗梦者持有贿赂牌，梦境窥视可打出并只能选他；成败对梦主仍不公开', () => {
+    const sc = buildFixtureScenario('master-bribe');
+    const G = sc.view.G as MatchView;
+    const holders = bribeHolderIds(G.bribePool);
+    expect(holders).toHaveLength(1);
+    expect(peekMasterTargetIds(G.players, G.dreamMasterID, sc.seat, holders)).toEqual(holders);
+    const rules = derivePlayRules(G, sc.seat);
+    expect(rules.hasPeekMasterTarget).toBe(true);
+    const peek = deriveHandItems(G.players[sc.seat]!.hand!, {
+      turnPhase: G.turnPhase,
+      isMyTurn: true,
+      winner: null,
+      overHand: 0,
+      selectedDiscard: [],
+      pendingCard: null,
+      rules,
+    }).find((it) => it.card === 'action_dream_peek')!;
+    expect(peek.mode).toBe('play');
+    // 引擎过滤后的视图：持有者公开，成败为 null
+    expect(G.bribePool.find((b) => b.heldBy !== null)!.kind).toBeNull();
+    expect(checkInvariants(buildFixtureMatch('master-bribe').state.G)).toEqual([]);
   });
 });

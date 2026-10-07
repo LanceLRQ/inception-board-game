@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
 import { ActiveSkillPanel } from '../../ActiveSkillPanel';
 import type { MatchController } from '../controllerTypes';
 import { deriveMainAction } from '../model/handDerive';
+import { DockEntries } from '../shared/DockEntries';
 
 interface DockOpsProps {
   readonly controller: MatchController;
@@ -55,6 +56,7 @@ export function DockOps({ controller, commitName, onCommit, skillReady }: DockOp
           {t('desktop.dock.commit', { card: commitName })}
         </button>
       )}
+      <DockEntries entries={controller.entries} variant="desktop" />
       <button
         type="button"
         disabled={!main.enabled}

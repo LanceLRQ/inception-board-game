@@ -17,6 +17,7 @@ export {
   isAdjacentLayer,
   recordCardPlayed,
   FORTRESS_COLDNESS_CHANCES_KEY,
+  MASTER_FREE_MOVE_KEY,
 } from './stateOps.js';
 export * from './config.js';
 export {
@@ -152,6 +153,7 @@ export {
   applyImperialCityWorldShoot,
   applyRevive,
   isSecretPassageWorldActive,
+  REVIVED_SELF_THIS_TURN_KEY,
   applyVenusMirrorWorld,
   VENUS_MIRROR_WORLD_SKILL_ID,
   BLACK_SWAN_SKILL_ID,

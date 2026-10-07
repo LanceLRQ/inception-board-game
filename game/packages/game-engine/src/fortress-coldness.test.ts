@@ -20,6 +20,7 @@ import {
   load,
   scene,
   SHOOT,
+  TRANSIT,
   withPlayer,
 } from './testing/runnerHarness.js';
 
@@ -70,6 +71,13 @@ function afterMasterMove(G: SetupState = fortressScene()): MatchState<SetupState
   return step(load(G), 'pM', 'dreamMasterMove', [2]);
 }
 
+/** 梦主手里再添若干张梦境穿梭剂，供换层用（免费移动每回合只有一次） */
+function withTransits(G: SetupState, count: number): SetupState {
+  return withPlayer(G, 'pM', {
+    hand: [...G.players.pM!.hand, ...Array<typeof TRANSIT>(count).fill(TRANSIT)],
+  });
+}
+
 function withNightmare(G: SetupState, layer: 1 | 2 | 3 | 4): SetupState {
   return {
     ...G,
@@ -99,18 +107,19 @@ describe('发动机会：梦主在自己的出牌阶段每换一次层记一次'
   });
 
   it('换两次层可以发动两次，第三次被拒', () => {
-    let m = afterMasterMove();
-    m = step(m, 'pM', 'dreamMasterMove', [3]);
+    // 免费移动每回合只有一次，第二次换层靠梦境穿梭剂
+    let m = afterMasterMove(withTransits(fortressScene(), 1));
+    m = step(m, 'pM', 'playDreamTransit', [TRANSIT, 3]);
     m = step(m, 'pM', 'useFortressColdness', ['p1']);
     m = step(m, 'pM', 'useFortressColdness', ['p4']);
     expect(isRejected(m, 'pM', 'useFortressColdness', ['p1'])).toBe(true);
   });
 
   it('发动机会可以攒着：连换两次层后，先发动一次，之后再换层仍累计', () => {
-    let m = afterMasterMove();
-    m = step(m, 'pM', 'dreamMasterMove', [3]);
+    let m = afterMasterMove(withTransits(fortressScene(), 2));
+    m = step(m, 'pM', 'playDreamTransit', [TRANSIT, 3]);
     m = step(m, 'pM', 'useFortressColdness', ['p1']);
-    m = step(m, 'pM', 'dreamMasterMove', [4]);
+    m = step(m, 'pM', 'playDreamTransit', [TRANSIT, 4]);
     expect(fortressColdnessChancesLeft(m.G.players.pM!.skillUsedThisTurn)).toBe(2);
   });
 

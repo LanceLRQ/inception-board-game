@@ -18,6 +18,8 @@ interface DockSelfProps {
   /** 弃牌阶段需要弃的张数；不用弃为 0 */
   readonly mustDiscard: number;
   readonly markers: readonly SeatMarker[];
+  /** 选中的牌此刻打不出时的原因；没有为 null */
+  readonly readingNote?: string | null;
   /** 本人此刻还在显示的短语气泡 */
   readonly bubble?: ChatEntry | undefined;
   readonly onPreview: (characterId: string) => void;
@@ -29,6 +31,7 @@ export function DockSelf({
   skillName,
   mustDiscard,
   markers,
+  readingNote = null,
   bubble,
   onPreview,
 }: DockSelfProps) {
@@ -69,6 +72,14 @@ export function DockSelf({
         {skillName && (
           <span className="mt-0.5 block truncate text-[10.5px] text-acc">
             {t('dock.skillReady', { name: skillName })}
+          </span>
+        )}
+        {readingNote && (
+          <span
+            className="mt-0.5 block text-[10.5px] leading-snug text-dim"
+            data-testid="reading-note"
+          >
+            {readingNote}
           </span>
         )}
         {mustDiscard > 0 && (

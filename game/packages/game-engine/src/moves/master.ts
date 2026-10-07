@@ -3,20 +3,36 @@
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import { dealBribeCard, discardNightmareOnLayer, isOutwardThief } from '../engine/skills.js';
 import type { SetupState, VaultDecisionChoice } from '../setup.js';
-import { incrementMoveCounter, movePlayerToLayer } from '../stateOps.js';
+import { MASTER_FREE_MOVE_KEY, incrementMoveCounter, movePlayerToLayer } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase, isAdjacent } from './common.js';
 import { activateNightmareOnLayer } from './nightmareEffects.js';
 import { resolveBribePick } from './settlement.js';
 
 export const masterMoves = {
+  // 梦主的免费移动：出牌阶段不用功能牌移到相邻的另一层，每回合仅一次
+  // 对照：docs/manual/03-game-flow.md:82
   dreamMasterMove: {
     move: ({ G, ctx }: MoveCtx, targetLayer: number) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
-      if (!isAdjacent(G.players[ctx.currentPlayer]!.currentLayer, targetLayer)) {
+      const master = G.players[ctx.currentPlayer]!;
+      if (!isAdjacent(master.currentLayer, targetLayer)) {
         return INVALID_MOVE;
       }
-      return incrementMoveCounter(movePlayerToLayer(G, ctx.currentPlayer, targetLayer));
+      if ((master.skillUsedThisTurn[MASTER_FREE_MOVE_KEY] ?? 0) > 0) return INVALID_MOVE;
+      // 先换层（要塞·冷酷的发动机会在 movePlayerToLayer 里累计），再记本回合已用过
+      const moved = movePlayerToLayer(G, ctx.currentPlayer, targetLayer);
+      const after = moved.players[ctx.currentPlayer]!;
+      return incrementMoveCounter({
+        ...moved,
+        players: {
+          ...moved.players,
+          [ctx.currentPlayer]: {
+            ...after,
+            skillUsedThisTurn: { ...after.skillUsedThisTurn, [MASTER_FREE_MOVE_KEY]: 1 },
+          },
+        },
+      });
     },
     client: false,
   },

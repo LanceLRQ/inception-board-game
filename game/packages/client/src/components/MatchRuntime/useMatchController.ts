@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MatchView } from '@icgame/game-engine';
 import { logger } from '../../lib/logger';
-import { getCardName } from '../../lib/cards';
+import { getCardName, type PlayRole } from '../../lib/cards';
 import type { ActiveSkillDescriptor } from '../../lib/activeSkills';
+import { handCardsAt, validHandPicks, toggleHandPick } from '../../lib/handPick';
 import type { MatchSource } from '../../match/matchSource';
 import { toast } from '@/lib/toast';
 import { rejectMessage } from '../RemoteMatchRuntime/rejectMessage';
@@ -19,7 +20,10 @@ import { remainingSeconds, useSecondClock } from './deadline';
 import { otherTurnLabel } from './turnLabel';
 import {
   adaptPlayForCharacter,
+  activeSkillLostTargetIds,
   activeSkillTargetIds,
+  bribeHolderIds,
+  derivePlayRules,
   buildActiveSkillContext,
   chessAvailable,
   chessDialogOpen,
@@ -49,7 +53,19 @@ import {
   toggleKeepLastTwo,
   viewOf,
 } from './controllerDerive';
+import {
+  adjacentLayers,
+  canConfirmRevive,
+  deriveDockEntries,
+  isSecretPassageActive,
+  reviveArgs,
+  reviveCardEligible,
+  reviveRequirement,
+  reviveTargetIds,
+  type DockEntryKind,
+} from './model/dockEntries';
 import type {
+  DockEntry,
   MatchController,
   MatchMakeMove,
   PendingPlay,
@@ -138,6 +154,10 @@ export function useMatchController(source: MatchSource): MatchController {
   const humanPlayer = mySeat === null ? undefined : players?.[mySeat];
   const vaultsRaw = G?.vaults;
   const dreamMasterID = (G?.dreamMasterID as string) ?? '';
+  // 本人出牌的一方；单独算成字符串，免得依赖下面那个会传给别的函数的规则对象
+  const playRole: PlayRole = mySeat !== null && mySeat === dreamMasterID ? 'master' : 'thief';
+  // 出牌规则所需的信息：是否存活、本回合复活过自己、梦主的窥视有没有目标
+  const playRules = useMemo(() => derivePlayRules(G, mySeat), [G, mySeat]);
 
   // 人类弃牌交互：弃牌阶段必须弃的张数由视图给出（手牌上限可能被巨蟹·庇佑取消）
   const humanHand = useMemo(() => (humanPlayer?.hand as string[]) ?? [], [humanPlayer]);
@@ -292,11 +312,11 @@ export function useMatchController(source: MatchSource): MatchController {
         setGravityPicker({ card, targets: [] });
         return;
       }
-      const next = pendingPlayFor(card);
+      const next = pendingPlayFor(card, playRole);
       if (!next) return;
       setPendingPlay(next);
     },
-    [setDreamTransitPicker, setGravityPicker, setPendingPlay],
+    [playRole, setDreamTransitPicker, setGravityPicker, setPendingPlay],
   );
 
   const chooseDreamMode = useCallback(
@@ -342,13 +362,14 @@ export function useMatchController(source: MatchSource): MatchController {
   // 嫁接 pending resolver：抽 3 后选 2 张返牌库顶
   const pendingGraft = G?.pendingGraft;
   const isHumanGraftPending = pendingGraft?.playerID === mySeat && isMyTurn;
-  const [graftPick, setGraftPick] = useState<string[]>([]);
-  const toggleGraftPick = useCallback((card: string) => {
-    setGraftPick((prev) => toggleKeepLastTwo(prev, card));
+  // 放回的牌按手牌位置记录（手里有同名牌时能各选一张），发 move 时再换成牌 id
+  const [graftPick, setGraftPick] = useState<number[]>([]);
+  const toggleGraftPick = useCallback((index: number) => {
+    setGraftPick((prev) => toggleKeepLastTwo(prev, index));
   }, []);
-  // 派生：只保留仍在手牌中且处于 pending 时的选择
+  // 派生：只保留仍落在手牌范围内且处于 pending 时的选择
   const effectiveGraftPick = useMemo(
-    () => (isHumanGraftPending ? graftPick.filter((c) => humanHand.includes(c)) : []),
+    () => (isHumanGraftPending ? validHandPicks(graftPick, humanHand.length) : []),
     [isHumanGraftPending, graftPick, humanHand],
   );
 
@@ -363,9 +384,9 @@ export function useMatchController(source: MatchSource): MatchController {
   );
   const confirmGraft = useCallback(async () => {
     if (effectiveGraftPick.length !== 2) return;
-    await makeMove('resolveGraft', [[...effectiveGraftPick]]);
+    await makeMove('resolveGraft', [handCardsAt(humanHand, effectiveGraftPick)]);
     setGraftPick([]);
-  }, [effectiveGraftPick, makeMove]);
+  }, [effectiveGraftPick, humanHand, makeMove]);
 
   const toggleDiscard = useCallback(
     (index: number) => {
@@ -381,7 +402,7 @@ export function useMatchController(source: MatchSource): MatchController {
     [overHand, turnNumber],
   );
 
-  const handModeInput = { turnPhase, isMyTurn, winner, overHand };
+  const handModeInput = { turnPhase, isMyTurn, winner, overHand, rules: playRules };
   const handItems = deriveHandItems(humanHand, {
     ...handModeInput,
     selectedDiscard: effectiveSelected,
@@ -396,9 +417,9 @@ export function useMatchController(source: MatchSource): MatchController {
   // 确认打出一张牌：无目标直接发 move；需要目标 / 穿梭剂 / 万有引力与一步出牌相同，进入各自的选择流程
   const commitPlay = useCallback(
     (card: string) => {
-      const input = { turnPhase, isMyTurn, winner, overHand };
+      const input = { turnPhase, isMyTurn, winner, overHand, rules: playRules };
       if (!humanHand.includes(card) || handCardMode(card, input) !== 'play') return;
-      const plan = commitPlanFor(card);
+      const plan = commitPlanFor(card, playRole);
       if (!plan) return;
       if (plan.kind === 'direct') {
         cancelPlay();
@@ -407,7 +428,18 @@ export function useMatchController(source: MatchSource): MatchController {
       }
       startPlay(card);
     },
-    [humanHand, turnPhase, isMyTurn, winner, overHand, makeMove, cancelPlay, startPlay],
+    [
+      humanHand,
+      turnPhase,
+      isMyTurn,
+      winner,
+      overHand,
+      playRules,
+      playRole,
+      makeMove,
+      cancelPlay,
+      startPlay,
+    ],
   );
 
   const self: SelfInfo | null =
@@ -452,6 +484,7 @@ export function useMatchController(source: MatchSource): MatchController {
     skillPanel = {
       context: buildActiveSkillContext({ G, seat: mySeat, isMyTurn, hand: humanHand }),
       targetIds: activeSkillTargetIds(players, mySeat),
+      lostTargetIds: activeSkillLostTargetIds(players, mySeat),
       nicknames: nicknameMap(players),
       invoke: (skill: ActiveSkillDescriptor, args: unknown[]) => {
         // 棋局·易位要先选两个金库，打开弹窗而不是直接发 move
@@ -463,6 +496,151 @@ export function useMatchController(source: MatchSource): MatchController {
       },
     };
   }
+
+  // 底部坞入口：复活（本人在迷失层）/ 复活同伴 / 梦主的移动；弹层的草稿跟着回合与阶段走，换了就失效
+  const dockStamp = `${turnNumber}:${turnPhase}`;
+  const [reviveDraft, setReviveDraft] = useState<{
+    stamp: string;
+    mode: 'self' | 'other';
+    target: string | null;
+    picked: number[];
+  } | null>(null);
+  const [moveOpenStamp, setMoveOpenStamp] = useState<string | null>(null);
+  const entrySpecs = useMemo(
+    () =>
+      G && mySeat !== null && players
+        ? deriveDockEntries({
+            seat: mySeat,
+            dreamMasterID,
+            players,
+            hand: humanHand,
+            isMyTurn,
+            turnPhase,
+            winner,
+            busy: hasOtherPending,
+          })
+        : [],
+    [G, mySeat, players, dreamMasterID, humanHand, isMyTurn, turnPhase, winner, hasOtherPending],
+  );
+  const reviveTargets = useMemo(
+    () =>
+      mySeat !== null && players
+        ? reviveTargetIds(players, mySeat).map((id) => ({
+            id,
+            name: (players[id]?.nickname as string | undefined) ?? id,
+          }))
+        : [],
+    [mySeat, players],
+  );
+  const passage = useMemo(
+    () => (players ? isSecretPassageActive(players, dreamMasterID) : false),
+    [players, dreamMasterID],
+  );
+  const requirement = reviveRequirement(passage);
+
+  const openEntry = useCallback(
+    (kind: DockEntryKind) => {
+      cancelPlay();
+      if (kind === 'masterMove') {
+        setMoveOpenStamp(dockStamp);
+        return;
+      }
+      const mode = kind === 'reviveSelf' ? 'self' : 'other';
+      setReviveDraft({
+        stamp: dockStamp,
+        mode,
+        target: mode === 'other' && reviveTargets.length === 1 ? reviveTargets[0]!.id : null,
+        picked: [],
+      });
+    },
+    [cancelPlay, dockStamp, reviveTargets, setMoveOpenStamp, setReviveDraft],
+  );
+  const entries: DockEntry[] = entrySpecs.map((spec) => ({
+    ...spec,
+    open: () => {
+      if (spec.enabled) openEntry(spec.kind);
+    },
+  }));
+
+  const activeReviveDraft =
+    reviveDraft !== null && reviveDraft.stamp === dockStamp ? reviveDraft : null;
+  const reviveEntryKind: DockEntryKind | null = activeReviveDraft
+    ? activeReviveDraft.mode === 'self'
+      ? 'reviveSelf'
+      : 'reviveOther'
+    : null;
+  const reviveOpen =
+    reviveEntryKind !== null && entrySpecs.some((e) => e.kind === reviveEntryKind && e.enabled);
+  const reviveTarget =
+    activeReviveDraft && reviveTargets.some((t) => t.id === activeReviveDraft.target)
+      ? activeReviveDraft.target
+      : null;
+  const revivePickedRaw = activeReviveDraft?.picked;
+  const revivePicked = useMemo(
+    () =>
+      revivePickedRaw
+        ? validHandPicks(revivePickedRaw, humanHand.length).filter((i) =>
+            reviveCardEligible(humanHand[i]!, passage),
+          )
+        : [],
+    [revivePickedRaw, humanHand, passage],
+  );
+  const reviveCanConfirm =
+    reviveOpen &&
+    activeReviveDraft !== null &&
+    canConfirmRevive({
+      mode: activeReviveDraft.mode,
+      target: reviveTarget,
+      hand: humanHand,
+      picked: revivePicked,
+      passage,
+    });
+  const toggleRevivePick = useCallback(
+    (index: number) => {
+      const card = humanHand[index];
+      if (card === undefined || !reviveCardEligible(card, passage)) return;
+      setReviveDraft((prev) =>
+        prev
+          ? { ...prev, picked: [...toggleHandPick(prev.picked, index, requirement.count)] }
+          : prev,
+      );
+    },
+    [humanHand, passage, requirement.count, setReviveDraft],
+  );
+  const confirmRevive = useCallback(async () => {
+    if (!activeReviveDraft || !reviveCanConfirm) return;
+    const args = reviveArgs(
+      activeReviveDraft.mode === 'self' ? null : reviveTarget,
+      humanHand,
+      revivePicked,
+    );
+    logger.flow('game/move', 'revive', {
+      mode: activeReviveDraft.mode,
+      target: args[0],
+      cards: args[1],
+    });
+    const outcome = await makeMove('playRevive', args);
+    if (outcome.ok) setReviveDraft(null);
+  }, [
+    activeReviveDraft,
+    reviveCanConfirm,
+    reviveTarget,
+    humanHand,
+    revivePicked,
+    makeMove,
+    setReviveDraft,
+  ]);
+
+  const masterMoveOpen =
+    moveOpenStamp === dockStamp && entrySpecs.some((e) => e.kind === 'masterMove' && e.enabled);
+  const pickMasterMoveLayer = useCallback(
+    async (layer: number) => {
+      logger.flow('game/move', 'master free move', { from: playerLayer, to: layer });
+      const outcome = await makeMove('dreamMasterMove', [layer]);
+      if (outcome.ok) setMoveOpenStamp(null);
+    },
+    [makeMove, playerLayer, setMoveOpenStamp],
+  );
 
   const openPreview = useCallback((cardId: string) => setPreviewCard(cardId), []);
   const closePreview = useCallback(() => setPreviewCard(null), []);
@@ -526,6 +704,8 @@ export function useMatchController(source: MatchSource): MatchController {
     },
 
     makeMove,
+    playRole,
+    bribeHolderIds: bribeHolderIds(G?.bribePool),
     play: {
       pending: effectivePending,
       commit: commitPlay,
@@ -609,6 +789,29 @@ export function useMatchController(source: MatchSource): MatchController {
       picked: effectiveGraftPick,
       toggle: toggleGraftPick,
       confirm: confirmGraft,
+    },
+    entries,
+    revive: {
+      open: reviveOpen,
+      mode: activeReviveDraft?.mode ?? 'self',
+      targets: reviveTargets,
+      target: reviveTarget,
+      hand: humanHand,
+      picked: revivePicked,
+      required: requirement.count,
+      onlyTransit: requirement.onlyTransit,
+      eligible: humanHand.map((c) => reviveCardEligible(c, passage)),
+      canConfirm: reviveCanConfirm,
+      pickTarget: (id: string) => setReviveDraft((prev) => (prev ? { ...prev, target: id } : prev)),
+      toggleCard: toggleRevivePick,
+      confirm: confirmRevive,
+      cancel: () => setReviveDraft(null),
+    },
+    masterMove: {
+      open: masterMoveOpen,
+      layers: adjacentLayers(playerLayer),
+      pick: pickMasterMoveLayer,
+      cancel: () => setMoveOpenStamp(null),
     },
     response,
     shootDice: { roll: shootDiceRoll, onComplete: handleDiceComplete },

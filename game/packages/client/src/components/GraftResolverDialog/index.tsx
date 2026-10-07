@@ -15,10 +15,10 @@ import {
 export interface GraftResolverDialogProps {
   open: boolean;
   hand: string[];
-  /** 已挑选的卡牌顺序（第 1 张位于最顶） */
-  picked: string[];
+  /** 已挑选的手牌位置，按挑选顺序（第 1 张位于最顶）；按位置记录，手里有同名牌时能各选一张 */
+  picked: readonly number[];
   cardNameOf?: (cardId: string) => string;
-  onToggle: (cardId: string) => void;
+  onToggle: (index: number) => void;
   onConfirm: () => void;
   onCancel?: () => void;
 }
@@ -54,13 +54,13 @@ export function GraftResolverDialog({
       <DialogBody>
         <div className="flex flex-wrap gap-2">
           {hand.map((card, idx) => {
-            const pickedIdx = picked.indexOf(card);
+            const pickedIdx = picked.indexOf(idx);
             const isPicked = pickedIdx >= 0;
             return (
               <button
                 key={`graft-pick-${idx}-${card}`}
                 type="button"
-                onClick={() => onToggle(card)}
+                onClick={() => onToggle(idx)}
                 className={cn(
                   'rounded-full border px-2.5 py-0.5 text-[11px]',
                   isPicked

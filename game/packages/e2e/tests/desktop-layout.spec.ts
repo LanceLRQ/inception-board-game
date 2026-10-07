@@ -215,6 +215,8 @@ test.describe('桌面布局 · 1024×768', () => {
     ['10 人', '/game/debug?players=10', 9],
     ['4 人', '/game/debug?players=4', 3],
     ['响应窗口 + 9 人', '/game/debug?pending=1&players=9', 8],
+    ['本人在迷失层（复活入口）', '/game/debug?dead=1', 5],
+    ['梦主 + 同伴在迷失层（两个入口）', '/game/debug?as=master&dead=mate', 5],
   ] as const) {
     test(`${name}：无滚动条、座位不重叠、主操作按钮在视口内`, async ({ page }) => {
       await openScene(page, url);
@@ -226,6 +228,45 @@ test.describe('桌面布局 · 1024×768', () => {
       await expectInViewport(page, '[data-testid="copyright-line"]');
     });
   }
+
+  test('操作区最挤的时候（选中可打的牌 + 两个入口 + 主操作 + 技能）所有按钮都在坞内且互不重叠', async ({
+    page,
+  }) => {
+    await openScene(page, '/game/debug?as=master&dead=mate');
+    // 梦主手里的 KICK 可打：选中后出现「打出」
+    await page.locator('[data-testid^="card-"][title="KICK"]').first().click();
+    await expect(page.getByTestId('hand-commit-play')).toBeVisible();
+    await expectNoScroll(page);
+    const dock = (await page.getByTestId('hand-dock').boundingBox())!;
+    const ops = (await page.getByTestId('dock-ops').boundingBox())!;
+    expect(ops.y).toBeGreaterThanOrEqual(dock.y - 1);
+    expect(ops.y + ops.height).toBeLessThanOrEqual(dock.y + dock.height + 1);
+    const ids = [
+      'hand-commit-play',
+      'dock-entry-move',
+      'dock-entry-revive-other',
+      'action-end',
+      'dock-skill',
+    ];
+    const boxes: Array<{ id: string; box: Box }> = [];
+    for (const id of ids) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(box, `${id} 有包围盒`).not.toBeNull();
+      expect(box!.y, `${id} 在坞内（上沿）`).toBeGreaterThanOrEqual(dock.y - 1);
+      expect(box!.y + box!.height, `${id} 在坞内（下沿）`).toBeLessThanOrEqual(
+        dock.y + dock.height + 1,
+      );
+      boxes.push({ id, box: box! });
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        expect(
+          overlap(boxes[i]!.box, boxes[j]!.box),
+          `${boxes[i]!.id} 与 ${boxes[j]!.id} 不重叠`,
+        ).toBe(false);
+      }
+    }
+  });
 
   test('手牌很多时坞内横向滚动，不撑高坞', async ({ page }) => {
     await openScene(page, '/game/debug');

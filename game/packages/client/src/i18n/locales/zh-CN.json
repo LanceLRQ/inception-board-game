@@ -672,7 +672,11 @@
       "notActionPhase": "现在不能打：当前不是出牌阶段",
       "gameOver": "对局已结束",
       "discardPhase": "弃牌阶段：点牌选择要弃的牌",
-      "noUi": "现在不能直接打出"
+      "noUi": "现在不能直接打出",
+      "dead": "现在不能打：你在迷失层，只能复活自己",
+      "masterNoUnlock": "梦主不能用【解封】解锁，只能在响应窗口里用它抵消",
+      "revivedNoUnlock": "本回合复活过自己，不能用【解封】解锁",
+      "noPeekTarget": "没有持有贿赂牌的盗梦者可以查看"
     },
     "wait": "等待"
   },
@@ -909,6 +913,39 @@
       "bribe": "贿赂",
       "dream": "梦境",
       "other": "卡牌"
+    }
+  },
+  "entries": {
+    "aria": "操作入口",
+    "kind": {
+      "reviveSelf": "复活",
+      "reviveOther": "复活同伴",
+      "masterMove": "移动"
+    },
+    "reason": {
+      "handShort": "复活要弃 {{count}} 张手牌，你只有 {{have}} 张",
+      "transitShort": "密道世界观下复活只能弃 1 张梦境穿梭剂，你手里没有",
+      "busy": "有待处理的事项，先处理完再操作"
+    },
+    "move": {
+      "label": "移动",
+      "reason": {
+        "used": "本回合已经移动过（每回合限一次）"
+      }
+    },
+    "disabledAria": "{{name}}（不可用：{{reason}}）"
+  },
+  "revive": {
+    "dialog": {
+      "titleSelf": "复活",
+      "titleOther": "复活同伴",
+      "descSelf": "弃牌后你移动到第 1 层梦境，本回合继续；复活后本回合不能使用【解封】的解锁效果。",
+      "descOther": "被复活的玩家移动到你所在的层。",
+      "pickTarget": "选择要复活的玩家",
+      "cost": "选择 {{n}} 张手牌弃掉（已选 {{picked}}）",
+      "costTransit": "密道世界观：只能弃 {{n}} 张梦境穿梭剂（已选 {{picked}}）",
+      "notTransit": "密道世界观下只能弃梦境穿梭剂",
+      "confirm": "确认复活"
     }
   }
 }

@@ -3,8 +3,11 @@ import {
   cardCategoryOf,
   cardTargetKind,
   cardVerdict,
+  DEFAULT_PLAY_RULES,
   deriveMainAction,
   isBlockedInAction,
+  playBlockReason,
+  type PlayRuleContext,
 } from './handDerive';
 
 describe('cardCategoryOf', () => {
@@ -116,5 +119,56 @@ describe('deriveMainAction', () => {
 
   it('未知阶段按等待处理', () => {
     expect(deriveMainAction({ ...base, phase: 'turnStart' }).kind).toBe('wait');
+  });
+});
+
+describe('playBlockReason · 界面上看着能打、引擎必拒的牌', () => {
+  const rules = (over: Partial<PlayRuleContext> = {}): PlayRuleContext => ({
+    ...DEFAULT_PLAY_RULES,
+    ...over,
+  });
+
+  it('梦主手里的【解封】不能打（只能在响应窗口里用效果②抵消）', () => {
+    expect(playBlockReason('action_unlock', rules({ role: 'master' }))).toBe('masterNoUnlock');
+    expect(playBlockReason('action_unlock', rules())).toBeNull();
+  });
+
+  it('本回合复活过自己：【解封】不能打，其他牌不受影响', () => {
+    expect(playBlockReason('action_unlock', rules({ revivedSelfThisTurn: true }))).toBe(
+      'revivedNoUnlock',
+    );
+    expect(playBlockReason('action_shoot', rules({ revivedSelfThisTurn: true }))).toBeNull();
+  });
+
+  it('梦主的【梦境窥视】要有持有贿赂牌的盗梦者才能打；盗梦者的效果①不看这个', () => {
+    expect(playBlockReason('action_dream_peek', rules({ role: 'master' }))).toBe('noPeekTarget');
+    expect(
+      playBlockReason('action_dream_peek', rules({ role: 'master', hasPeekMasterTarget: true })),
+    ).toBeNull();
+    expect(playBlockReason('action_dream_peek', rules())).toBeNull();
+  });
+
+  it('已在迷失层：任何牌都不能打', () => {
+    expect(playBlockReason('action_shoot', rules({ alive: false }))).toBe('dead');
+    expect(playBlockReason('action_dream_transit', rules({ alive: false }))).toBe('dead');
+  });
+
+  it('cardVerdict 在出牌阶段轮到本人时把原因带出来，其余阶段仍按阶段判断', () => {
+    const myAction = { isMyTurn: true, turnPhase: 'action', winner: null };
+    expect(cardVerdict({ mode: 'idle', blockReason: 'masterNoUnlock' }, myAction)).toEqual({
+      canPlay: false,
+      reason: 'masterNoUnlock',
+    });
+    expect(
+      cardVerdict({ mode: 'idle', blockReason: 'masterNoUnlock' }, { ...myAction, isMyTurn: false })
+        .reason,
+    ).toBe('notMyTurn');
+  });
+});
+
+describe('cardTargetKind · 梦主的梦境窥视选玩家', () => {
+  it('梦主走效果②：选目标玩家；盗梦者走效果①：选目标层', () => {
+    expect(cardTargetKind('action_dream_peek', 'master')).toBe('player');
+    expect(cardTargetKind('action_dream_peek')).toBe('layer');
   });
 });
