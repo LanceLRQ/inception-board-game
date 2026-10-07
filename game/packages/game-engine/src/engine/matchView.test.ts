@@ -752,6 +752,100 @@ describe('对局视图 · 移形换影的角色快照', () => {
   });
 });
 
+describe('对局视图 · 解封次数上限', () => {
+  it('黑洞世界观下下发实际上限 2，而不是状态里的原始值；所有人看到的相同', () => {
+    const blackHole = patchPlayer(G, master, { characterId: 'dm_black_hole' as CardID });
+    expect(blackHole.maxUnlockPerTurn).toBe(1);
+    for (const viewer of [a, b, master, null]) {
+      expect(v(blackHole, viewer).maxUnlockPerTurn).toBe(2);
+    }
+  });
+
+  it('其他梦主沿用原始值', () => {
+    for (const viewer of [a, master, null]) {
+      expect(v(G, viewer).maxUnlockPerTurn).toBe(G.maxUnlockPerTurn);
+    }
+  });
+});
+
+describe('对局视图 · 此刻必须弃几张', () => {
+  const OVER_FIVE = Array.from({ length: 8 }, () => 'action_kick' as CardID);
+
+  /** 轮到 a 的弃牌阶段，a 手牌 8 张；c 是巨蟹，位置由各用例决定 */
+  function discardPhase(): SetupState {
+    return {
+      ...patchPlayer(G, a, { hand: OVER_FIVE }),
+      turnPhase: 'discard',
+    };
+  }
+
+  /** 把某人放进指定层，并同步各层的在场名单 */
+  function placeAt(state: SetupState, id: string, layer: 1 | 2 | 3 | 4): SetupState {
+    const layers = Object.fromEntries(
+      Object.entries(state.layers).map(([key, l]) => [
+        key,
+        {
+          ...l,
+          playersInLayer: [
+            ...l.playersInLayer.filter((pid) => pid !== id),
+            ...(l.layer === layer ? [id] : []),
+          ],
+        },
+      ]),
+    ) as SetupState['layers'];
+    return { ...patchPlayer(state, id, { currentLayer: layer }), layers };
+  }
+
+  it('轮到弃牌的本人：看到超出上限的张数', () => {
+    expect(v(discardPhase(), a).discardRequired).toBe(3);
+  });
+
+  it('手牌没超限时是 0', () => {
+    const s: SetupState = { ...G, turnPhase: 'discard' };
+    expect(v(s, a).discardRequired).toBe(0);
+  });
+
+  it('别的玩家、梦主与旁观者看到 null', () => {
+    const s = discardPhase();
+    for (const viewer of [b, c, master, null, 'nobody']) {
+      expect(v(s, viewer).discardRequired).toBeNull();
+    }
+  });
+
+  it('不是弃牌阶段时，回合主人本人也是 null', () => {
+    for (const phase of ['draw', 'action', 'turnEnd'] as const) {
+      expect(v({ ...discardPhase(), turnPhase: phase }, a).discardRequired).toBeNull();
+    }
+  });
+
+  it('巨蟹·庇佑：与活着的巨蟹同层时为 0', () => {
+    let s = patchPlayer(discardPhase(), c, { characterId: 'thief_cancer' as CardID });
+    s = placeAt(placeAt(s, a, 2), c, 2);
+    expect(v(s, a).discardRequired).toBe(0);
+  });
+
+  it('巨蟹不在同层或已死亡时，照常给出张数', () => {
+    let apart = patchPlayer(discardPhase(), c, { characterId: 'thief_cancer' as CardID });
+    apart = placeAt(placeAt(apart, a, 2), c, 3);
+    expect(v(apart, a).discardRequired).toBe(3);
+
+    let dead = patchPlayer(discardPhase(), c, {
+      characterId: 'thief_cancer' as CardID,
+      isAlive: false,
+    });
+    dead = placeAt(placeAt(dead, a, 2), c, 2);
+    expect(v(dead, a).discardRequired).toBe(3);
+  });
+
+  it('对别人永远是 null：不会借此泄露「这层有一个活着的巨蟹」', () => {
+    let s = patchPlayer(discardPhase(), c, { characterId: 'thief_cancer' as CardID });
+    s = placeAt(placeAt(s, a, 2), c, 2);
+    for (const viewer of [b, c, d, master, null]) {
+      expect(v(s, viewer).discardRequired).toBeNull();
+    }
+  });
+});
+
 describe('对局视图 · 对局结束后', () => {
   it('旁观者看到真实的手牌、角色、阵营、金库内容、贿赂牌成败、梦魇，但仍没有种子和牌库顺序', () => {
     const view = v(asImperial(G), null, true);
@@ -797,7 +891,7 @@ describe('对局视图 · 字段白名单', () => {
     const expected = Object.entries(FIELD_DISPOSITION)
       .filter(([, how]) => how !== 'withheld')
       .map(([key]) => key)
-      .concat(['gameOver', 'usedNightmareCount']);
+      .concat(['gameOver', 'usedNightmareCount', 'discardRequired']);
     expect(Object.keys(v(real, null)).sort()).toEqual(expected.sort());
   });
 

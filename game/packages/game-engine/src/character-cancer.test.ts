@@ -156,6 +156,37 @@ describe('巨蟹 · 庇佑（被动无手牌上限）', () => {
     expect(res.players.p1!.hand.length).toBe(7);
   });
 
+  it('同层玩家手牌 7 张时 → doDiscard 不弃或少弃都被接受', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p2', 'thief_cancer');
+    s = setHand(
+      s,
+      'p1',
+      Array.from({ length: 7 }, () => 'action_unlock' as CardID),
+    );
+    s = { ...s, turnPhase: 'discard' };
+    expectMoveOk(callMove(s, 'doDiscard', [[]]));
+    const res = callMove(s, 'doDiscard', [['action_unlock']]);
+    expectMoveOk(res);
+    expect(res.players.p1!.hand.length).toBe(6);
+  });
+
+  it('非同层玩家手牌 7 张时 → doDiscard 少于 2 张被拒绝，弃满 2 张被接受', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p2', 'thief_cancer');
+    s = setLayer(s, 'p2', 3 as Layer);
+    s = setHand(
+      s,
+      'p1',
+      Array.from({ length: 7 }, () => 'action_unlock' as CardID),
+    );
+    s = { ...s, turnPhase: 'discard' };
+    expect(callMove(s, 'doDiscard', [['action_unlock']])).toBe('INVALID_MOVE');
+    const res = callMove(s, 'doDiscard', [['action_unlock', 'action_unlock']]);
+    expectMoveOk(res);
+    expect(res.players.p1!.hand.length).toBe(5);
+  });
+
   it('非同层玩家手牌 7 张时 → 拒绝 skipDiscard', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p2', 'thief_cancer');

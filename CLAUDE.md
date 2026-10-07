@@ -254,6 +254,7 @@ pnpm --filter @icgame/client cards:manifest   # 只按 public/cards 的内容重
 ### 对局界面的约束
 
 - 界面拿到的永远是**按座位裁剪的视图**（他人手牌只有张数、牌库只有张数），不要在界面里读完整状态才有的字段；本人座位取自来源接口，不得写死座位号（`MatchRuntime/noHardcodedSeat.test.ts` 会拦）
+- 弃牌阶段「还要弃几张」读视图的 `discardRequired`，界面不自己算手牌上限：手牌上限会被巨蟹·庇佑取消，而「这层有活着的巨蟹」是秘密，所以这个字段只给轮到弃牌的本人，其他人与其他阶段为 `null`。上限、抽牌数、解封次数的计算集中在 `game-engine/src/engine/limits.ts`
 - 对局页的分流规则在 `pages/Game/resolveGameMode.ts`
 - 选目标、响应类选择等交互由 `MatchDialogs` 承担（TargetPlayerPickerDialog、ShooterLayerPickerDialog、嫁接/万有引力/棋局易位等）；解封响应由布局内联承载（桌面 `desktop/ResponseWindow.tsx`，移动 `mobile/MobileResponseBar.tsx`，共用 `components/UnlockResponse/useUnlockResponse.ts`）；座位与行动轴节点只展示、不选目标
 - 出牌是**两步**：点牌选中（读牌、看此刻能否打出），再点「打出」才进入出牌流程；弃牌阶段点牌切换选中

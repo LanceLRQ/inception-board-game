@@ -34,6 +34,7 @@ import {
   deriveHandItems,
   deriveOutcome,
   discardCardsFor,
+  discardRequiredOf,
   dreamTransitPending,
   effectiveDiscardSelection,
   effectivePendingPlay,
@@ -41,7 +42,6 @@ import {
   handCardMode,
   layersOfPlayers,
   nicknameMap,
-  overflowCount,
   pendingPlayFor,
   shootToastFor,
   toggleDiscardSelection,
@@ -139,9 +139,9 @@ export function useMatchController(source: MatchSource): MatchController {
   const vaultsRaw = G?.vaults;
   const dreamMasterID = (G?.dreamMasterID as string) ?? '';
 
-  // 人类弃牌交互：超过手牌上限（5）时必须选择要弃的牌
+  // 人类弃牌交互：弃牌阶段必须弃的张数由视图给出（手牌上限可能被巨蟹·庇佑取消）
   const humanHand = useMemo(() => (humanPlayer?.hand as string[]) ?? [], [humanPlayer]);
-  const overHand = overflowCount(humanHand.length);
+  const overHand = discardRequiredOf(G);
   // 弃牌选择按手牌位置记录（手里有同名牌时各算一张）；带上回合号，跨回合的残留自动失效
   const [discardPick, setDiscardPick] = useState<{ turn: number; picked: readonly number[] }>({
     turn: -1,

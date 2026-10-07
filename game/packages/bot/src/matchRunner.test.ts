@@ -103,6 +103,34 @@ describe('advanceStep · phase transitions', () => {
     expect(next.players[s.currentPlayerID]!.hand.length).toBeLessThanOrEqual(5);
   });
 
+  it('discard → turnEnd (keeps the whole hand under Cancer shelter)', () => {
+    const s = scenarioStartOfGame3p();
+    const cur = s.currentPlayerID;
+    const other = Object.keys(s.players).find((id) => id !== cur && id !== s.dreamMasterID)!;
+    const layer = s.players[cur]!.currentLayer;
+    const tooMany = Array.from({ length: 8 }, (_, i) => `c${i}` as `draw_${number}`);
+    const sheltered = {
+      ...s,
+      turnPhase: 'discard' as const,
+      players: {
+        ...s.players,
+        [cur]: { ...s.players[cur]!, hand: tooMany },
+        [other]: {
+          ...s.players[other]!,
+          characterId: 'thief_cancer' as never,
+          currentLayer: layer,
+        },
+      },
+      layers: {
+        ...s.layers,
+        [layer]: { ...s.layers[layer]!, playersInLayer: [cur, other] },
+      },
+    };
+    const next = advanceStep(sheltered, () => 0.5);
+    expect(next.turnPhase).toBe('turnEnd');
+    expect(next.players[cur]!.hand).toEqual(tooMany);
+  });
+
   it('turnEnd → next alive player + turnStart', () => {
     const s = { ...scenarioStartOfGame3p(), turnPhase: 'turnEnd' as const };
     const next = advanceStep(s, () => 0.5);

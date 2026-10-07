@@ -2,9 +2,9 @@
 
 import { describe, it, expect } from 'vitest';
 import type { MatchView, RunnerCtx } from '@icgame/game-engine';
+import { HAND_LIMIT } from '@icgame/game-engine/config';
 import { buildFixtureScenario } from '../../match/fixtures/buildScenario';
 import {
-  HAND_LIMIT,
   adaptPlayForCharacter,
   SUDGER_CHARACTER_ID,
   activeSkillTargetIds,
@@ -21,6 +21,7 @@ import {
   deriveHandItems,
   deriveOutcome,
   discardCardsFor,
+  discardRequiredOf,
   dreamTransitPending,
   effectiveDiscardSelection,
   effectivePendingPlay,
@@ -30,7 +31,6 @@ import {
   isShootPlay,
   layersOfPlayers,
   nicknameMap,
-  overflowCount,
   pendingPlayFor,
   shootToastFor,
   toggleDiscardSelection,
@@ -92,11 +92,25 @@ describe('deriveOutcome', () => {
   });
 });
 
-describe('overflowCount', () => {
-  it('不超过上限为 0，超出按张数算', () => {
-    expect(overflowCount(0)).toBe(0);
-    expect(overflowCount(HAND_LIMIT)).toBe(0);
-    expect(overflowCount(HAND_LIMIT + 2)).toBe(2);
+describe('discardRequiredOf', () => {
+  it('视图里是几就是几；null（非本人弃牌阶段）和没有视图都按 0', () => {
+    expect(discardRequiredOf({ discardRequired: 3 })).toBe(3);
+    expect(discardRequiredOf({ discardRequired: 0 })).toBe(0);
+    expect(discardRequiredOf({ discardRequired: null })).toBe(0);
+    expect(discardRequiredOf(undefined)).toBe(0);
+  });
+
+  it('固定场景「弃牌阶段」：取引擎视图给的超出张数', () => {
+    const G = buildFixtureScenario('thief-discard').view.G as MatchView;
+    const seat = buildFixtureScenario('thief-discard').seat;
+    expect(discardRequiredOf(G)).toBe(G.players[seat]!.hand!.length - HAND_LIMIT);
+    expect(discardRequiredOf(G)).toBeGreaterThan(0);
+  });
+
+  it('固定场景「行动阶段」：视图里没有这个数，按 0', () => {
+    const G = buildFixtureScenario('thief').view.G as MatchView;
+    expect(G.discardRequired).toBeNull();
+    expect(discardRequiredOf(G)).toBe(0);
   });
 });
 

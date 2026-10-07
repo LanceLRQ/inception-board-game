@@ -33,6 +33,21 @@ function makeState(
   });
 }
 
+/** 让 2 号成为巨蟹，并与指定玩家一起放在第 1 层（庇佑生效） */
+function withCancerInLayer(G: SetupState, playerID: string): SetupState {
+  const cancer = G.players['2']!;
+  const layer1 = G.layers[1]!;
+  return {
+    ...G,
+    players: {
+      ...G.players,
+      '2': { ...cancer, characterId: 'thief_cancer' as CardID, currentLayer: 1 },
+      [playerID]: { ...G.players[playerID]!, currentLayer: 1 },
+    },
+    layers: { ...G.layers, 1: { ...layer1, playersInLayer: [playerID, '2'] } },
+  };
+}
+
 const cards = (n: number, prefix = 'c'): string[] =>
   Array.from({ length: n }, (_, i) => `${prefix}${i}`);
 
@@ -93,6 +108,32 @@ describe('pickBotMove', () => {
     expect(pickBotMove(over, '1', legal)).toBe('doDiscard');
     const atLimit = makeState({ turnPhase: 'discard' }, { '1': cards(HAND_LIMIT) });
     expect(pickBotMove(atLimit, '1', legal)).toBe('skipDiscard');
+  });
+
+  it('does not discard when sheltered by a living Cancer in the same layer', () => {
+    const legal = legalMovesFor('playing', 'discard');
+    const G = makeState({ turnPhase: 'discard' }, { '1': cards(HAND_LIMIT + 3) });
+    const sheltered = withCancerInLayer(G, '1');
+    expect(pickBotMove(sheltered, '1', legal)).toBe('skipDiscard');
+    // 巨蟹死亡后庇佑消失，照常弃牌
+    const cancer = sheltered.players['2']!;
+    const dead = {
+      ...sheltered,
+      players: { ...sheltered.players, '2': { ...cancer, isAlive: false } },
+    };
+    expect(pickBotMove(dead, '1', legal)).toBe('doDiscard');
+  });
+
+  it('discards the whole hand under the Joker penalty even below the limit', () => {
+    const legal = legalMovesFor('playing', 'discard');
+    const G = makeState({ turnPhase: 'discard' }, { '1': cards(3) });
+    const joker = G.players['1']!;
+    const armed = {
+      ...G,
+      players: { ...G.players, '1': { ...joker, forcedDiscardArmedAtTurn: G.turnNumber } },
+    };
+    expect(pickBotMove(armed, '1', legal)).toBe('doDiscard');
+    expect(defaultArgsFor('doDiscard', armed, '1')).toEqual([armed.players['1']!.hand]);
   });
 
   it('picks resolveGraft when the bot owns the pending graft', () => {
@@ -184,6 +225,11 @@ describe('defaultArgsFor', () => {
     expect(defaultArgsFor('doDiscard', G, '1')).toEqual([hand.slice(0, 2)]);
     const noOverflow = makeState({}, { '1': cards(3) });
     expect(defaultArgsFor('doDiscard', noOverflow, '1')).toEqual([[]]);
+  });
+
+  it('doDiscard discards nothing when sheltered by Cancer', () => {
+    const G = withCancerInLayer(makeState({}, { '1': cards(HAND_LIMIT + 2) }), '1');
+    expect(defaultArgsFor('doDiscard', G, '1')).toEqual([[]]);
   });
 
   it('dreamMasterMove steps one layer deeper, clamped to 1..4', () => {

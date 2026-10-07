@@ -3,7 +3,7 @@
 //       有待结算事项时优先结算。
 
 import type { SetupState } from '@icgame/game-engine/setup';
-import { HAND_LIMIT } from '@icgame/game-engine/config';
+import { getDiscardRequired } from '@icgame/game-engine/limits';
 import { MOVE_PRIORITY } from './moveTables.js';
 
 /** 仅在存在对应待结算状态时才合法的 move；无待结算时调用会被引擎判为非法，必须从候选中排除 */
@@ -42,12 +42,12 @@ export function pickBotMove(G: SetupState, botID: string, legal: readonly string
     return 'resolveShootMove';
   }
 
-  // 弃牌阶段：手牌超限必须走 doDiscard；否则 skipDiscard
-  // 对照：game-engine skipDiscard 守卫（hand.length > HAND_LIMIT → 非法）
-  const handLen = G.players[botID]?.hand?.length ?? 0;
+  // 弃牌阶段：手牌超限必须走 doDiscard；否则 skipDiscard（巨蟹·庇佑之下没有上限，不必弃）
+  // 对照：game-engine skipDiscard 守卫（必须弃的张数 > 0 → 非法）
   if (legal.includes('doDiscard') || legal.includes('skipDiscard')) {
-    if (handLen > HAND_LIMIT && legal.includes('doDiscard')) return 'doDiscard';
-    if (handLen <= HAND_LIMIT && legal.includes('skipDiscard')) return 'skipDiscard';
+    const mustDiscard = getDiscardRequired(G, botID) > 0;
+    if (mustDiscard && legal.includes('doDiscard')) return 'doDiscard';
+    if (!mustDiscard && legal.includes('skipDiscard')) return 'skipDiscard';
   }
 
   // 排除仅待结算态可用的 move（有待结算的情况上面已处理）
@@ -63,10 +63,9 @@ export function defaultArgsFor(move: string, G: SetupState, botID: string): unkn
   const self = G.players[botID];
   switch (move) {
     case 'doDiscard': {
-      // 手牌超限则弃掉前 N 张（N = 超出数量）；没超限也返回 [[]]
+      // 手牌超限则弃掉前 N 张（N = 必须弃的张数）；没超限或被庇佑时返回 [[]]
       const hand = self?.hand ?? [];
-      const overflow = Math.max(0, hand.length - HAND_LIMIT);
-      return [hand.slice(0, overflow)];
+      return [hand.slice(0, getDiscardRequired(G, botID))];
     }
     case 'dreamMasterMove': {
       const cur = self?.currentLayer ?? 1;

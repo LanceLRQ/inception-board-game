@@ -1,7 +1,7 @@
 // 对局状态的底层操作：抽牌 / 弃牌 / 回合推进 / 移层 / 解封与心锁等纯函数（不 mutate 入参），供 move、回合钩子与技能执行器复用
 
-import { HAND_LIMIT, BASE_DRAW_COUNT } from './config.js';
-import type { SetupState, PlayerSetup } from './setup.js';
+import { BASE_DRAW_COUNT } from './config.js';
+import type { SetupState } from './setup.js';
 import { LOST_LAYER, placePlayerInLayer, sendToLimbo } from './engine/death.js';
 
 // === 抽牌阶段 ===
@@ -110,11 +110,6 @@ export function discardToLimit(
   cardsToDiscard: CardID[],
 ): SetupState {
   return discardCards(state, playerID, cardsToDiscard);
-}
-
-// 需要弃牌的手牌数
-export function getDiscardCount(player: PlayerSetup): number {
-  return Math.max(0, player.hand.length - HAND_LIMIT);
 }
 
 // === 回合开始 ===

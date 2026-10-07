@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { InceptionCityGame, checkInvariants, viewMatch, type MatchView } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
-import { HAND_LIMIT } from '../../components/MatchRuntime/controllerDerive';
+import { HAND_LIMIT } from '@icgame/game-engine/config';
 import { computeUnlockResponseState } from '../../components/UnlockResponse/logic';
 import {
   awaitedActions,
@@ -73,7 +73,10 @@ describe('buildFixtureScenario · 弃牌阶段', () => {
     expect(G.players[sc.seat]!.faction).toBe('thief');
     expect(G.turnPhase).toBe('discard');
     expect(G.currentPlayerID).toBe(sc.seat);
-    expect(G.players[sc.seat]!.hand?.length ?? 0).toBeGreaterThan(HAND_LIMIT);
+    const handSize = G.players[sc.seat]!.hand?.length ?? 0;
+    expect(handSize).toBeGreaterThan(HAND_LIMIT);
+    // 界面用的「必须弃几张」由引擎视图给出，且只给本人
+    expect(G.discardRequired).toBe(handSize - HAND_LIMIT);
   });
 });
 

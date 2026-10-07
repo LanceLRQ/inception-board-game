@@ -2,20 +2,19 @@
 // 回合的开始与结束钩子见 ../turnHooks.ts。
 
 import type { CardID } from '@icgame/shared';
-import { BASE_DRAW_COUNT, HAND_LIMIT } from '../config.js';
 import { isStringArray } from '../engine/argShape.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
+import {
+  getDiscardRequired,
+  getTurnDrawCount,
+  isForcedFullDiscard,
+  needsPlutoHellRoll,
+} from '../engine/limits.js';
 import {
   applyLeoKingdom,
   applyPointmanAssault,
   applyRevive,
   endDrawPhase,
-  getCancerAuraBonus,
-  getMidsummerExtraDraws,
-  getMidsummerWorldThiefBonus,
-  isCancerShelterActive,
-  isOutwardThief,
-  isPlutoHellWorldActive,
   settleAriesExtraDraw,
 } from '../engine/skills.js';
 import { discardToLimit, drawCards, incrementMoveCounter, setTurnPhase } from '../stateOps.js';
@@ -27,25 +26,10 @@ export const turnFlowMoves = {
       if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
       // 抽牌前后对比推出 drawnCards（用于先锋技能触发）
       const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
-      // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果
-      // 对照：cards-data.json dm_pluto_hell 世界观
-      const isThief = isOutwardThief(G, G.currentPlayerID);
-      // 盛夏·充盈是梦主本人的技能：背叛者虽属梦主阵营，没有梦主的技能
-      const isMaster = G.currentPlayerID === G.dreamMasterID;
-      const plutoOverride = isPlutoHellWorldActive(G) && isThief ? random.D6() : null;
-      // 盛夏·充盈：梦主多抽 = 未派发贿赂数
-      // 盛夏·世界观：盗梦者多抽 +1
-      // 对照：docs/manual/06-dream-master.md 盛夏
-      const midsummerMasterBonus = isMaster ? getMidsummerExtraDraws(G) : 0;
-      const midsummerThiefBonus = isThief ? getMidsummerWorldThiefBonus(G) : 0;
-      // 巨蟹·气场：与活着的巨蟹同层（含自己）→ 抽牌 +1（迷失层不触发）
-      // 对照：docs/manual/05-dream-thieves.md 巨蟹
-      const cancerAuraBonus = getCancerAuraBonus(G, G.currentPlayerID);
-      const totalDraw =
-        (plutoOverride ?? BASE_DRAW_COUNT) +
-        midsummerMasterBonus +
-        midsummerThiefBonus +
-        cancerAuraBonus;
+      // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果；只有这时才掷骰
+      // 其余加成（盛夏、巨蟹·气场）与总数的计算见 engine/limits.ts
+      const plutoRoll = needsPlutoHellRoll(G, G.currentPlayerID) ? random.D6() : null;
+      const totalDraw = getTurnDrawCount(G, G.currentPlayerID, plutoRoll);
       let s = drawCards(G, G.currentPlayerID, totalDraw);
       const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
       const drawn = afterHand.slice(beforeHand.length);
@@ -124,10 +108,7 @@ export const turnFlowMoves = {
       const player = G.players[ctx.currentPlayer];
       // 小丑·失控罚则：发动失控的当回合弃牌阶段必须弃光手牌（armedAtTurn === turnNumber）
       // 对照：docs/manual/05-dream-thieves.md 小丑「则你在弃牌阶段必须弃掉所有手牌」
-      const forced =
-        player &&
-        typeof player.forcedDiscardArmedAtTurn === 'number' &&
-        player.forcedDiscardArmedAtTurn === G.turnNumber;
+      const forced = !!player && isForcedFullDiscard(G, ctx.currentPlayer);
       if (forced) {
         // 必须一次性弃掉全部手牌，否则拒绝
         if (cardIds.length !== player!.hand.length) return INVALID_MOVE;
@@ -140,10 +121,8 @@ export const turnFlowMoves = {
         if (idx === -1) return INVALID_MOVE;
         remainingHand.splice(idx, 1);
       }
-      // 弃完后须不超手牌上限；巨蟹·庇佑生效时不限（与 skipDiscard 一致）
-      if (remainingHand.length > HAND_LIMIT && !isCancerShelterActive(G, ctx.currentPlayer)) {
-        return INVALID_MOVE;
-      }
+      // 弃的张数不得少于必须弃的张数（弃完须不超手牌上限；巨蟹·庇佑生效时不限，与 skipDiscard 一致）
+      if (cardIds.length < getDiscardRequired(G, ctx.currentPlayer)) return INVALID_MOVE;
       let next = discardToLimit(G, ctx.currentPlayer, cardIds);
       if (forced) {
         next = {
@@ -167,18 +146,12 @@ export const turnFlowMoves = {
   skipDiscard: {
     move: ({ G, ctx, events }: MoveCtx) => {
       if (!guardTurnPhase(G, ctx, 'discard')) return INVALID_MOVE;
-      // 手牌未超限则允许跳过
-      // 巨蟹·庇佑：与活着的巨蟹同层 → 无手牌上限（不拦截小丑罚则）
-      // 对照：docs/manual/05-dream-thieves.md 巨蟹「庇佑」
+      // 没有必须弃的牌才允许跳过：手牌未超限（巨蟹·庇佑之下无上限），
+      // 且没有待执行的小丑·失控罚则（当回合发动过且手里还有牌 → 必须走 doDiscard 全弃）
+      // 对照：docs/manual/05-dream-thieves.md 巨蟹「庇佑」、小丑「失控」
       const player = G.players[ctx.currentPlayer];
-      const sheltered = isCancerShelterActive(G, ctx.currentPlayer);
-      if (player && player.hand.length > HAND_LIMIT && !sheltered) return INVALID_MOVE;
-      // 小丑·失控罚则：当回合发动过且手牌 > 0 → 不得跳过（必须走 doDiscard 全弃）
-      const armed =
-        !!player &&
-        typeof player.forcedDiscardArmedAtTurn === 'number' &&
-        player.forcedDiscardArmedAtTurn === G.turnNumber;
-      if (armed && player!.hand.length > 0) return INVALID_MOVE;
+      if (getDiscardRequired(G, ctx.currentPlayer) > 0) return INVALID_MOVE;
+      const armed = !!player && isForcedFullDiscard(G, ctx.currentPlayer);
       events.endTurn();
       if (!armed) return G;
       return {

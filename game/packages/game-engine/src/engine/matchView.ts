@@ -17,6 +17,7 @@ import type { CardID, Faction, Layer } from '@icgame/shared';
 import type { BribeSetup, LayerSetup, PlayerSetup, SetupState, VaultSetup } from '../setup.js';
 import type { ResponseWindowState } from './abilities/response-chain.js';
 import type { ResponseWindowSourceType } from './abilities/types.js';
+import { getDiscardRequired, getEffectiveMaxUnlockPerTurn } from './limits.js';
 import type { MatchOutcome } from './outcome.js';
 
 /** 观察者：对局里的玩家，或旁观者（null） */
@@ -236,7 +237,15 @@ export interface MatchView {
   deck: DeckView;
 
   unlockThisTurn: number;
+  /** 实际的每回合解封次数上限（黑洞世界观下为 2）；梦主是谁与世界观都是公开的，所以所有人相同 */
   maxUnlockPerTurn: number;
+  /**
+   * 弃牌阶段此刻必须弃几张（0 = 可直接跳过）。只给轮到弃牌的本人，其他人与其他阶段为 null：
+   * 手牌上限会被巨蟹·庇佑取消，提前或对别人下发等于泄露「你这层有一个活着的巨蟹」；
+   * 弃牌阶段的本人本来就能靠 skipDiscard 是否被接受得知，不构成新增泄露。
+   * 对照：docs/manual/05-dream-thieves.md 巨蟹「庇佑」
+   */
+  discardRequired: number | null;
   /** 梦主（和对局结束后）看到全部；别人为 null，只有下面的数量 */
   usedNightmareIds: CardID[] | null;
   usedNightmareCount: number;
@@ -563,6 +572,11 @@ function viewShiftSnapshot(
   return Object.fromEntries(kept.map((id) => [id, snapshot[id]!]));
 }
 
+function viewDiscardRequired(G: SetupState, who: Audience): number | null {
+  if (who.who === null || who.who !== G.currentPlayerID || G.turnPhase !== 'discard') return null;
+  return getDiscardRequired(G, who.who);
+}
+
 function viewUsedNightmares(G: SetupState, who: Audience): CardID[] | null {
   return who.open || who.isMaster ? G.usedNightmareIds.slice() : null;
 }
@@ -628,7 +642,8 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
     deck: { cardCount: G.deck.cards.length, discardPile: G.deck.discardPile.slice() },
 
     unlockThisTurn: G.unlockThisTurn,
-    maxUnlockPerTurn: G.maxUnlockPerTurn,
+    maxUnlockPerTurn: getEffectiveMaxUnlockPerTurn(G, G.maxUnlockPerTurn),
+    discardRequired: viewDiscardRequired(G, who),
     usedNightmareIds: viewUsedNightmares(G, who),
     usedNightmareCount: G.usedNightmareIds.length,
     activeWorldViews: G.activeWorldViews.slice(),

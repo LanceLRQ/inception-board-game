@@ -1,13 +1,12 @@
 // 核心状态操作测试
 
 import { describe, it, expect } from 'vitest';
-import { createInitialState, type SetupState, type PlayerSetup } from './setup.js';
+import { createInitialState, type SetupState } from './setup.js';
 import type { CardID, Layer } from '@icgame/shared';
 import {
   drawCards,
   discardCard,
   discardToLimit,
-  getDiscardCount,
   beginTurn,
   endTurn,
   setTurnPhase,
@@ -120,21 +119,6 @@ describe('moves', () => {
       const result = discardToLimit(s, 'P1', ['c1', 'not-exist']);
       expect(result.players.P1!.hand).toEqual(['c2', 'c3']);
       expect(result.deck.discardPile).toEqual(['c1']);
-    });
-  });
-
-  // === getDiscardCount ===
-  describe('getDiscardCount', () => {
-    it('returns 0 when within limit', () => {
-      expect(getDiscardCount({ hand: ['a', 'b', 'c'] } as PlayerSetup)).toBe(0);
-    });
-
-    it('returns excess when over limit', () => {
-      expect(getDiscardCount({ hand: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] } as PlayerSetup)).toBe(2);
-    });
-
-    it('returns 0 when exactly at limit', () => {
-      expect(getDiscardCount({ hand: ['a', 'b', 'c', 'd', 'e'] } as PlayerSetup)).toBe(0);
     });
   });
 

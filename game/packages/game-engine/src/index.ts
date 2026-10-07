@@ -10,7 +10,6 @@ export {
   drawCards,
   discardCard,
   discardToLimit,
-  getDiscardCount,
   beginTurn,
   endTurn,
   setTurnPhase,
@@ -19,6 +18,13 @@ export {
   recordCardPlayed,
 } from './stateOps.js';
 export * from './config.js';
+export {
+  getHandLimit,
+  getDiscardRequired,
+  needsPlutoHellRoll,
+  getTurnDrawCount,
+  getEffectiveMaxUnlockPerTurn,
+} from './engine/limits.js';
 export type { ShootOutcome } from './dice.js';
 export { migrateGameState, getSchemaVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';
 

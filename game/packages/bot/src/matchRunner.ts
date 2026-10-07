@@ -11,7 +11,7 @@
 
 import { createInitialState, type SetupState } from '@icgame/game-engine/setup';
 import { checkInvariants, type InvariantViolation } from '@icgame/game-engine/invariants';
-import { HAND_LIMIT } from '@icgame/game-engine/config';
+import { getDiscardRequired } from '@icgame/game-engine/limits';
 import type { CardID } from '@icgame/shared';
 import { generateBatch } from '@icgame/shared';
 
@@ -202,20 +202,21 @@ function drawPhase(state: SetupState, rand: () => number): SetupState {
   };
 }
 
-/** 弃牌阶段：手牌 > HAND_LIMIT 时弃到上限 */
+/** 弃牌阶段：手牌超出上限时弃到上限（巨蟹·庇佑之下不弃） */
 function discardPhase(state: SetupState): SetupState {
   const pid = state.currentPlayerID;
   if (!pid || !state.players[pid]) {
     return { ...state, turnPhase: 'turnEnd' };
   }
   const p = state.players[pid];
-  if (p.hand.length <= HAND_LIMIT) return { ...state, turnPhase: 'turnEnd' };
+  const required = getDiscardRequired(state, pid);
+  if (required === 0) return { ...state, turnPhase: 'turnEnd' };
   return {
     ...state,
     turnPhase: 'turnEnd',
     players: {
       ...state.players,
-      [pid]: { ...p, hand: p.hand.slice(0, HAND_LIMIT) },
+      [pid]: { ...p, hand: p.hand.slice(0, p.hand.length - required) },
     },
   };
 }

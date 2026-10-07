@@ -9,6 +9,7 @@ import {
   withBribes,
 } from './testing/fixtures.js';
 import {
+  scenarioActionPhase,
   scenarioStartOfGame3p,
   scenarioMidGameThiefAtL3,
   scenarioMasterWin,
@@ -193,6 +194,19 @@ describe('checkInvariants - rule 5: hand limit', () => {
     const bad = withHand(turnEnd, 'p1', tooMany);
     const v = checkInvariants(bad);
     expect(v.some((x) => x.rule === 'hand_limit')).toBe(true);
+  });
+
+  it('does not flag > 5 hand at turnEnd when sheltered by a living Cancer', () => {
+    const s = scenarioActionPhase();
+    const cancer = s.players.p2!;
+    const sheltered = {
+      ...s,
+      turnPhase: 'turnEnd' as const,
+      players: { ...s.players, p2: { ...cancer, characterId: 'thief_cancer' as CardID } },
+    };
+    const tooMany = Array.from({ length: 7 }, (_, i) => `a_${i}` as CardID);
+    const v = checkInvariants(withHand(sheltered, 'p1', tooMany));
+    expect(v.some((x) => x.rule === 'hand_limit')).toBe(false);
   });
 
   it('does not flag > 5 hand during action phase', () => {

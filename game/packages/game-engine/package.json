@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./setup": "./src/setup.ts",
     "./config": "./src/config.ts",
+    "./limits": "./src/engine/limits.ts",
     "./invariants": "./src/invariants.ts",
     "./runner": "./src/runner/matchRunner.ts",
     "./net": "./src/net/matchProtocol.ts",

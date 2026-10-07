@@ -10,7 +10,7 @@
 //   2. currentPlayerID 必须在 playerOrder 中（除非 phase=setup）
 //   3. 所有玩家的 currentLayer 在 [0, 4]（0=迷失层）
 //   4. 心锁值非负
-//   5. 手牌上限（turnEnd 时 <= HAND_LIMIT）
+//   5. 手牌上限（turnEnd 时 <= 手牌上限；巨蟹·庇佑之下不限）
 //   6. 死亡玩家必须有 deathTurn
 //   7. （已删除：死亡玩家可以持有手牌）
 //   8. layers[].playersInLayer 与 players[].currentLayer 一致
@@ -18,7 +18,8 @@
 //   10. winner 合法（null | 'thief' | 'master'）
 //   11. 贿赂池状态一致性（heldBy 非空 iff status='dealt'|'deal'|'shattered'）
 
-import { HAND_LIMIT, LAYER_COUNT } from './config.js';
+import { LAYER_COUNT } from './config.js';
+import { getHandLimit } from './engine/limits.js';
 import type { SetupState } from './setup.js';
 
 export interface InvariantViolation {
@@ -84,11 +85,12 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
-  // ---------- 5. 手牌上限（turnEnd 时） ----------
+  // ---------- 5. 手牌上限（turnEnd 时；巨蟹·庇佑之下没有上限） ----------
   if (state.turnPhase === 'turnEnd') {
     for (const p of Object.values(state.players)) {
-      if (p.isAlive && p.hand.length > HAND_LIMIT) {
-        push('hand_limit', `Player ${p.id} hand=${p.hand.length} > ${HAND_LIMIT} at turnEnd`);
+      const limit = getHandLimit(state, p.id);
+      if (p.isAlive && limit !== null && p.hand.length > limit) {
+        push('hand_limit', `Player ${p.id} hand=${p.hand.length} > ${limit} at turnEnd`);
       }
     }
   }

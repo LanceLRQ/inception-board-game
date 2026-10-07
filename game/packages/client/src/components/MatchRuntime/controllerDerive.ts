@@ -8,9 +8,6 @@ import { getCardImageUrl } from '../../lib/cardImages';
 import type { ActiveSkillContext } from '../../lib/activeSkills';
 import type { HandCardItem, HandCardMode, PendingPlay } from './controllerTypes';
 
-/** 手牌上限：弃牌阶段超出的张数必须弃掉 */
-export const HAND_LIMIT = 5;
-
 /**
  * 取出界面使用的视图。
  * 协议里视图的 G 是不透明类型；来源交付的就是按本人座位裁剪过的对局视图，这里集中收窄一次。
@@ -50,9 +47,12 @@ export interface HandModeInput {
   readonly overHand: number;
 }
 
-/** 超出手牌上限的张数 */
-export function overflowCount(handSize: number): number {
-  return Math.max(0, handSize - HAND_LIMIT);
+/**
+ * 弃牌阶段此刻必须弃几张：直接取视图里的值，界面不自己算手牌上限。
+ * 视图只在轮到本人弃牌时给出数字（巨蟹·庇佑之下是 0），其余时候为 null，按 0 处理。
+ */
+export function discardRequiredOf(G: Pick<MatchView, 'discardRequired'> | undefined): number {
+  return G?.discardRequired ?? 0;
 }
 
 /** 一张手牌此刻的用途：弃牌阶段选牌 / 行动阶段可出 / 只读 */
