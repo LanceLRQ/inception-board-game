@@ -4,7 +4,7 @@
 //
 // Tier A 完整接入：阿波罗·崇拜 / 殉道者·牺牲 / 灵雕师·雕琢 / 雅典娜·惊叹 / 哈雷·冲击
 // Tier B 纯函数：处女·完美 / 筑梦师·迷宫 / 雅典娜·急智
-// 跳过：阿波罗·日冕（元能力，待 abilities registry）
+// 跳过：阿波罗·日冕（元能力，尚未实现）
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';

@@ -166,7 +166,7 @@ export interface SetupState {
   //   生命周期：applyShootVariant 在 result==='move' 且 choices.length>=2 时挂起 →
   //             resolveShootMove(layer) 消费。choices.length===1（L1/L4）自动移动，不挂起。
   //   choices：目标当前层的相邻层列表（1..4，已排除 0 迷失层；L1→[2]、L4→[3]、L2→[1,3]、L3→[2,4]）。
-  //   onAfterShoot passive 的触发推迟到 resolveShootMove（自动分支仍在 applyShootVariant 末尾触发一次）。
+  //   命中「移动」的点数不会是 6，处女·完美不会因本次结算触发。
   pendingShootMove?: {
     shooterID: string;
     targetPlayerID: string;
@@ -196,9 +196,9 @@ export interface SetupState {
    * 处女·完美：任意玩家骰出 6 时挂起处女的"三选一"决策窗口
    *   3 个选项：复活己方死者 / 抽 2 张 / 传送任一层
    * 对照：docs/manual/05-dream-thieves.md 处女
-   * 生命周期：dispatchPassives(onAfterShoot) 检测到处女且该次 SHOOT 的最终结算点数=6 时挂起；
+   * 生命周期：settleVirgoPerfect 检测到处女且该次 SHOOT 的最终结算点数=6 时挂起；
    *           respondVirgoPerfect(choice, params) 消费并清空。
-   * 与 pendingShootMove 关系：pendingShootMove 优先（先选层），关闭后 onAfterShoot 触发本窗。
+   * 与 pendingShootMove 关系：pendingShootMove 优先（先选层），关闭后的结算再触发本窗。
    */
   pendingVirgoChoice: {
     virgoID: string;
@@ -210,11 +210,10 @@ export interface SetupState {
    * 当前消费方：双鱼·闪避。后续可扩展 恐怖分子·讹诈 等。
    * 对照：docs/manual/05-dream-thieves.md 双鱼
    * 生命周期：
-   *   - applyShootVariant 在 dispatchPassives(onBeforeShoot) 之后、随机 D6 之前检查
+   *   - applyShootVariant 在随机 D6 之前检查
    *   - target 是双鱼且 canPiscesEvade → 挂起本窗口 + 提前 return（未弃 SHOOT 卡）
-   *   - respondShootEvade：target 闪避（applyPiscesEvade + 弃 SHOOT 卡 + 触发 onAfterShoot）
+   *   - respondShootEvade：target 闪避（applyPiscesEvade + 弃 SHOOT 卡）
    *   - respondShootPass：target 放弃响应 → 重入 SHOOT 核心继续 D6 流程
-   * 序列化注意：dicePreModifier 是函数，不可序列化；该路径（哈雷免费 SHOOT）跳过窗口直走
    */
   pendingShootResponse: {
     shooterID: string;

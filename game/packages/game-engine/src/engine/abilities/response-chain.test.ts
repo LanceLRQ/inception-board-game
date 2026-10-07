@@ -1,19 +1,21 @@
 // 响应链框架测试
 
 import { describe, it, expect } from 'vitest';
-import {
-  openResponseWindow,
-  passOnResponse,
-  respondToWindow,
-  isWindowComplete,
-  handleTimeout,
-  getActiveWindow,
-  getParentWindow,
-  getWindowDepth,
-  getWindowSourceType,
-} from './response-chain.js';
+import { openResponseWindow, passOnResponse, respondToWindow } from './response-chain.js';
 import type { PendingResponse } from './types.js';
+import type { SetupState } from '../../setup.js';
 import { createTestState } from '../../testing/fixtures.js';
+
+/** 响应窗口栈深度：0 = 无窗口；1 = 单窗口；2+ = 嵌套 */
+function windowDepth(state: SetupState): number {
+  let depth = 0;
+  let cur = state.pendingResponseWindow;
+  while (cur) {
+    depth += 1;
+    cur = cur.parentWindow ?? null;
+  }
+  return depth;
+}
 
 describe('openResponseWindow', () => {
   it('在 state 上创建 pendingResponseWindow', () => {
@@ -44,10 +46,9 @@ describe('openResponseWindow', () => {
       onTimeout: 'resolve',
     });
     expect(next.pendingResponseWindow!.sourceType).toBe('unlock');
-    expect(getWindowSourceType(next)).toBe('unlock');
   });
 
-  it('未设置 sourceType 时 getWindowSourceType 返回 null（向后兼容）', () => {
+  it('未设置 sourceType 时窗口上也没有 sourceType（向后兼容）', () => {
     const s = createTestState();
     const next = openResponseWindow(s, {
       sourceAbilityID: 'legacy_source',
@@ -56,12 +57,7 @@ describe('openResponseWindow', () => {
       validResponseAbilityIDs: [],
       onTimeout: 'resolve',
     });
-    expect(getWindowSourceType(next)).toBeNull();
-  });
-
-  it('无活跃窗口时 getWindowSourceType 返回 null', () => {
-    const s = createTestState();
-    expect(getWindowSourceType(s)).toBeNull();
+    expect(next.pendingResponseWindow!.sourceType).toBeUndefined();
   });
 });
 
@@ -153,64 +149,6 @@ describe('respondToWindow', () => {
     const next = openResponseWindow(s, pending);
     const result = respondToWindow(next, 'p1', 'action_unlock_cancel');
     expect(result.resolved).toBe(false);
-  });
-});
-
-describe('isWindowComplete', () => {
-  it('无窗口时返回 true', () => {
-    const s = createTestState();
-    expect(isWindowComplete(s)).toBe(true);
-  });
-
-  it('窗口未完全响应返回 false', () => {
-    const s = createTestState();
-    const pending: PendingResponse = {
-      sourceAbilityID: 'action_unlock',
-      responders: ['p2', 'p3'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: [],
-      onTimeout: 'resolve',
-    };
-    const next = openResponseWindow(s, pending);
-    expect(isWindowComplete(next)).toBe(false);
-  });
-});
-
-describe('handleTimeout', () => {
-  it('无窗口时返回 resolve', () => {
-    const s = createTestState();
-    const result = handleTimeout(s);
-    expect(result.action).toBe('resolve');
-  });
-
-  it('onTimeout=resolve 的窗口超时后返回 resolve', () => {
-    const s = createTestState();
-    const pending: PendingResponse = {
-      sourceAbilityID: 'action_unlock',
-      responders: ['p2'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: [],
-      onTimeout: 'resolve',
-    };
-    const next = openResponseWindow(s, pending);
-    const result = handleTimeout(next);
-    expect(result.action).toBe('resolve');
-    expect(result.state.pendingResponseWindow).toBeNull();
-  });
-
-  it('onTimeout=cancel 的窗口超时后返回 cancel', () => {
-    const s = createTestState();
-    const pending: PendingResponse = {
-      sourceAbilityID: 'action_unlock',
-      responders: ['p2'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: [],
-      onTimeout: 'cancel',
-    };
-    const next = openResponseWindow(s, pending);
-    const result = handleTimeout(next);
-    expect(result.action).toBe('cancel');
-    expect(result.state.pendingResponseWindow).toBeNull();
   });
 });
 
@@ -309,34 +247,6 @@ describe('响应链嵌套 / 边界', () => {
     expect(next.pendingResponseWindow).toBeNull();
   });
 
-  it('isWindowComplete：全员 pass 后 → true', () => {
-    const s = createTestState();
-    let next = openResponseWindow(s, {
-      sourceAbilityID: 'action_unlock',
-      responders: ['p2', 'p3'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: [],
-      onTimeout: 'resolve',
-    });
-    next = passOnResponse(next, 'p2');
-    next = passOnResponse(next, 'p3');
-    // 窗口已关闭 → isWindowComplete 返回 true
-    expect(isWindowComplete(next)).toBe(true);
-  });
-
-  it('空 responders 数组：立即满足完成条件', () => {
-    const s = createTestState();
-    const next = openResponseWindow(s, {
-      sourceAbilityID: 'action_unlock',
-      responders: [],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: [],
-      onTimeout: 'resolve',
-    });
-    // 新开窗口 responded 为空 [] + responders 也为空 [] → 按长度判断已完成
-    expect(isWindowComplete(next)).toBe(true);
-  });
-
   it('响应能力列表为空：任意响应 ID 都无效', () => {
     const s = createTestState();
     const next = openResponseWindow(s, {
@@ -349,22 +259,6 @@ describe('响应链嵌套 / 边界', () => {
     const r = respondToWindow(next, 'p2', 'any_id');
     expect(r.resolved).toBe(false);
     expect(r.state.pendingResponseWindow).toBeDefined();
-  });
-
-  it('响应后 handleTimeout 无效（窗口已关）', () => {
-    const s = createTestState();
-    let next = openResponseWindow(s, {
-      sourceAbilityID: 'action_unlock',
-      responders: ['p2'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: ['x'],
-      onTimeout: 'cancel',
-    });
-    const r1 = respondToWindow(next, 'p2', 'x');
-    next = r1.state;
-    const r2 = handleTimeout(next);
-    // 已关窗 → 默认 resolve
-    expect(r2.action).toBe('resolve');
   });
 
   it('passOnResponse 不影响 sourceAbilityID / validResponseAbilityIDs', () => {
@@ -385,13 +279,13 @@ describe('响应链嵌套 / 边界', () => {
 // ============================================================================
 // 栈式真·嵌套（响应窗口子系统）
 //
-// 覆盖：深度查询 / 父窗口访问 / 内层关闭自动回退外层 / 多级 pass 回传 /
+// 覆盖：深度 / 父窗口 / 内层关闭自动回退外层 / 多级 pass 回传 /
 //       取消解封中嵌套 SHOOT 响应 / 跨嵌套层独立计数
 // ============================================================================
 describe('响应链栈式嵌套', () => {
-  it('getWindowDepth：空状态返回 0，单窗口返回 1，嵌套返回栈深', () => {
+  it('栈深度：空状态返回 0，单窗口返回 1，嵌套返回栈深', () => {
     let s = createTestState();
-    expect(getWindowDepth(s)).toBe(0);
+    expect(windowDepth(s)).toBe(0);
 
     s = openResponseWindow(s, {
       sourceAbilityID: 'action_unlock',
@@ -400,7 +294,7 @@ describe('响应链栈式嵌套', () => {
       validResponseAbilityIDs: ['action_unlock_cancel'],
       onTimeout: 'resolve',
     });
-    expect(getWindowDepth(s)).toBe(1);
+    expect(windowDepth(s)).toBe(1);
 
     s = openResponseWindow(s, {
       sourceAbilityID: 'action_shoot',
@@ -409,7 +303,7 @@ describe('响应链栈式嵌套', () => {
       validResponseAbilityIDs: ['pisces_evade'],
       onTimeout: 'cancel',
     });
-    expect(getWindowDepth(s)).toBe(2);
+    expect(windowDepth(s)).toBe(2);
 
     s = openResponseWindow(s, {
       sourceAbilityID: 'action_graft',
@@ -418,10 +312,10 @@ describe('响应链栈式嵌套', () => {
       validResponseAbilityIDs: [],
       onTimeout: 'resolve',
     });
-    expect(getWindowDepth(s)).toBe(3);
+    expect(windowDepth(s)).toBe(3);
   });
 
-  it('getActiveWindow / getParentWindow：读取栈顶与父层', () => {
+  it('栈顶与父层：新窗口在栈顶，旧窗口保留为 parentWindow', () => {
     let s = createTestState();
     s = openResponseWindow(s, {
       sourceAbilityID: 'action_unlock',
@@ -437,8 +331,8 @@ describe('响应链栈式嵌套', () => {
       validResponseAbilityIDs: ['pisces_evade'],
       onTimeout: 'cancel',
     });
-    expect(getActiveWindow(s)!.sourceAbilityID).toBe('action_shoot');
-    expect(getParentWindow(s)!.sourceAbilityID).toBe('action_unlock');
+    expect(s.pendingResponseWindow!.sourceAbilityID).toBe('action_shoot');
+    expect(s.pendingResponseWindow!.parentWindow!.sourceAbilityID).toBe('action_unlock');
   });
 
   it('内层响应关闭 → 自动回退到外层 parentWindow', () => {
@@ -459,11 +353,11 @@ describe('响应链栈式嵌套', () => {
       validResponseAbilityIDs: ['pisces_evade'],
       onTimeout: 'cancel',
     });
-    expect(getWindowDepth(s)).toBe(2);
+    expect(windowDepth(s)).toBe(2);
     // 内层响应 → 栈回退
     const r = respondToWindow(s, 'p3', 'pisces_evade');
     expect(r.resolved).toBe(true);
-    expect(getWindowDepth(r.state)).toBe(1);
+    expect(windowDepth(r.state)).toBe(1);
     expect(r.state.pendingResponseWindow!.sourceAbilityID).toBe('action_unlock');
     expect(r.state.pendingResponseWindow!.responders).toEqual(['p2']);
   });
@@ -490,13 +384,13 @@ describe('响应链栈式嵌套', () => {
     });
     // 内层 p3 pass → 内层关闭 → 回退外层
     s = passOnResponse(s, 'p3');
-    expect(getWindowDepth(s)).toBe(1);
+    expect(windowDepth(s)).toBe(1);
     expect(s.pendingResponseWindow!.sourceAbilityID).toBe('action_unlock');
     // 外层 responded 状态保留（p2 已 pass）
     expect(s.pendingResponseWindow!.responded).toEqual(['p2']);
     // 外层 p4 再 pass → 栈清空
     s = passOnResponse(s, 'p4');
-    expect(getWindowDepth(s)).toBe(0);
+    expect(windowDepth(s)).toBe(0);
     expect(s.pendingResponseWindow).toBeNull();
   });
 
@@ -529,28 +423,6 @@ describe('响应链栈式嵌套', () => {
     expect(r2.state.pendingResponseWindow).toBeNull();
   });
 
-  it('内层超时 handleTimeout → onTimeout 传给外层处理调用方，栈回退', () => {
-    let s = createTestState();
-    s = openResponseWindow(s, {
-      sourceAbilityID: 'action_unlock',
-      responders: ['p2'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: ['action_unlock_cancel'],
-      onTimeout: 'resolve',
-    });
-    s = openResponseWindow(s, {
-      sourceAbilityID: 'action_shoot',
-      responders: ['p3'],
-      timeoutMs: 30000,
-      validResponseAbilityIDs: ['pisces_evade'],
-      onTimeout: 'cancel',
-    });
-    const r = handleTimeout(s);
-    // 返回 cancel（内层的 onTimeout）+ state 回退到外层
-    expect(r.action).toBe('cancel');
-    expect(r.state.pendingResponseWindow!.sourceAbilityID).toBe('action_unlock');
-  });
-
   it('三层嵌套：开 3 层后依次关闭 → 深度 3 → 2 → 1 → 0', () => {
     let s = createTestState();
     for (const id of ['action_unlock', 'action_shoot', 'action_graft']) {
@@ -562,13 +434,13 @@ describe('响应链栈式嵌套', () => {
         onTimeout: 'resolve',
       });
     }
-    expect(getWindowDepth(s)).toBe(3);
+    expect(windowDepth(s)).toBe(3);
     s = respondToWindow(s, 'px', 'r').state;
-    expect(getWindowDepth(s)).toBe(2);
+    expect(windowDepth(s)).toBe(2);
     s = respondToWindow(s, 'px', 'r').state;
-    expect(getWindowDepth(s)).toBe(1);
+    expect(windowDepth(s)).toBe(1);
     s = respondToWindow(s, 'px', 'r').state;
-    expect(getWindowDepth(s)).toBe(0);
+    expect(windowDepth(s)).toBe(0);
     expect(s.pendingResponseWindow).toBeNull();
   });
 

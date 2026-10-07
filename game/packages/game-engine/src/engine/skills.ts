@@ -587,18 +587,12 @@ export function applyChessWorldViewPeek(state: SetupState, masterID: string): Se
   return drawCards(state, masterID, 2);
 }
 
-/** 检查棋局技能使用次数 */
-export function getChessUsesLeft(player: PlayerSetup): number {
-  const used = player.skillUsedThisGame[CHESS_SKILL_ID] ?? 0;
-  return Math.max(0, CHESS_MAX_USES - used);
-}
-
 // ============================================================================
 // 高复杂度角色（7 个 / 9 技能）
 // ============================================================================
 // Tier A 完整接入：阿波罗·崇拜 / 殉道者·牺牲 / 灵雕师·雕琢 / 雅典娜·惊叹 / 哈雷·冲击
 // Tier B 纯函数：处女·完美 / 筑梦师·迷宫 / 雅典娜·急智（接入待 pending state 批次）
-// 跳过：阿波罗·日冕（元能力，需 abilities registry 框架）
+// 跳过：阿波罗·日冕（元能力，尚未实现）
 
 // === 阿波罗 · 崇拜 ===
 // 出牌阶段：选择一位拥有贿赂牌的盗梦者，随机抽取该盗梦者的 1 张牌入手。回合限 1 次。
@@ -778,6 +772,34 @@ export type VirgoPerfectChoice = 'revive' | 'draw_two' | 'teleport';
 /** 处女完美触发条件：任意玩家骰 6 */
 export function isVirgoPerfectTriggered(rawRoll: number): boolean {
   return rawRoll === 6;
+}
+
+/**
+ * SHOOT 结算后检查处女·完美：本次 SHOOT 的最终点数为 6 时，存活的处女挂起 pendingVirgoChoice
+ * 等待三选一（由 respondVirgoPerfect move 执行）。
+ *   - 最终点数是经 M4、狂热、雕琢、毒针等修正之后的结果，不是原始 D6（G.lastShootRoll 只供动画）
+ *   - 没有掷骰的结算（双鱼·游离躲开）不调用本函数，因此不触发
+ *   - 已有挂起的选择时不重入
+ * shooterID 取当前回合玩家（best-effort 记录）。
+ */
+export function settleVirgoPerfect(state: SetupState, shootRoll: number): SetupState {
+  if (!isVirgoPerfectTriggered(shootRoll)) return state;
+  let current = state;
+  for (const playerID of state.playerOrder) {
+    const player = state.players[playerID];
+    if (!player || !player.isAlive) continue;
+    if (player.characterId !== 'thief_virgo') continue;
+    if (current.pendingVirgoChoice) continue;
+    current = {
+      ...current,
+      pendingVirgoChoice: {
+        virgoID: playerID,
+        triggerRoll: shootRoll,
+        shooterID: current.currentPlayerID,
+      },
+    };
+  }
+  return current;
 }
 
 /**
@@ -1242,6 +1264,21 @@ export function applySpaceQueenObserve(state: SetupState, selfID: string): Setup
   return drawCards(state, selfID, 1);
 }
 
+/**
+ * 解封成功后结算空间女王·监察：每位存活的空间女王抽 1，按座次依次结算。
+ * 对照：docs/manual/05-dream-thieves.md 空间女王
+ */
+export function settleSpaceQueenObserve(state: SetupState): SetupState {
+  let current = state;
+  for (const playerID of state.playerOrder) {
+    const player = state.players[playerID];
+    if (!player || !player.isAlive) continue;
+    if (player.characterId !== 'thief_space_queen') continue;
+    current = applySpaceQueenObserve(current, playerID) ?? current;
+  }
+  return current;
+}
+
 /** 空间女王技能 2：放 1 手牌到牌库顶（纯函数） */
 export function applySpaceQueenStashTop(
   state: SetupState,
@@ -1592,6 +1629,24 @@ export function ariesExtraDrawCount(state: SetupState): number {
   return state.usedNightmareIds.length;
 }
 
+/**
+ * 白羊·弃梦魇加成：抽牌阶段由白羊本人（且必须是当前回合玩家、存活）额外抽 N 张（N = 已弃梦魇数）。
+ * 对照：docs/manual/05-dream-thieves.md 白羊
+ * 按座次遍历存活玩家，只有「当前回合的白羊」满足条件，至多抽一次。
+ */
+export function settleAriesExtraDraw(state: SetupState): SetupState {
+  let current = state;
+  for (const playerID of state.playerOrder) {
+    const player = state.players[playerID];
+    if (!player || !player.isAlive) continue;
+    if (player.characterId !== 'thief_aries') continue;
+    if (playerID !== current.currentPlayerID) continue;
+    const extra = ariesExtraDrawCount(current);
+    if (extra > 0) current = drawCards(current, playerID, extra);
+  }
+  return current;
+}
+
 // === 射手 · 神射（纯函数） ===
 // 1: SHOOT 目标移动时可不让其移动（响应）
 // 2: 击杀 1 玩家后改 1 心锁（限 1 次）
@@ -1699,15 +1754,6 @@ export function applyAquariusCoherence(
 // === 格林射线 · 移转（纯函数） ===
 // 弃 1 梦境穿梭剂 + 1 SHOOT → 移到任意层 + 执行 SHOOT 效果
 export const GREEN_RAY_SKILL_ID = 'thief_green_ray.skill_0';
-
-/** 格林射线弃牌组合判定 */
-export function canGreenRayActivate(player: PlayerSetup): boolean {
-  if (player.characterId !== 'thief_green_ray') return false;
-  if (!player.isAlive) return false;
-  const hasTransit = player.hand.some((c) => c === 'action_dream_transit');
-  const hasShoot = player.hand.some(isShootClassCard);
-  return hasTransit && hasShoot;
-}
 
 // ============================================================================
 // 梦主 6 角色（纯函数 + 简单接入）
@@ -2144,13 +2190,6 @@ export function applySecretPassageTeleport(
   return s;
 }
 
-/** 检查密道·传送剩余次数 */
-export function getSecretPassageUsesLeft(player: PlayerSetup): number {
-  if (player.characterId !== 'dm_secret_passage') return 0;
-  const used = player.skillUsedThisTurn[SECRET_PASSAGE_SKILL_ID] ?? 0;
-  return Math.max(0, SECRET_PASSAGE_MAX_USES_PER_TURN - used);
-}
-
 // === 天王星·苍穹 · 权力 ===
 // 出牌阶段，每拥有 1 张未派发贿赂 → 可令一位盗梦者移动到除迷失层外指定层数
 // 必须移动到不同层；可重复对同一人
@@ -2184,14 +2223,6 @@ export function applyUranusPower(
   let s = markSkillUsed(state, masterID, URANUS_POWER_SKILL_ID);
   s = movePlayerToLayer(s, targetID, targetLayer);
   return s;
-}
-
-/** 天王星·权力剩余次数 */
-export function getUranusPowerUsesLeft(state: SetupState, player: PlayerSetup): number {
-  if (player.characterId !== 'dm_uranus_firmament') return 0;
-  const inPoolCount = state.bribePool.filter((b) => b.status === 'inPool').length;
-  const usedThisTurn = player.skillUsedThisTurn[URANUS_POWER_SKILL_ID] ?? 0;
-  return Math.max(0, inPoolCount - usedThisTurn);
 }
 
 // === 冥王星·地狱 · 业火 ===
@@ -2344,14 +2375,6 @@ export function applySaturnFreeMove(
   let s = markSkillUsed(state, playerID, SATURN_FREE_MOVE_SKILL_ID);
   s = movePlayerToLayer(s, playerID, targetLayer);
   return s;
-}
-
-/** 土星世界观免费移动是否本回合还可用 */
-export function canUseSaturnFreeMoveThisTurn(state: SetupState, playerID: string): boolean {
-  if (!canSaturnFreeMove(state, playerID)) return false;
-  const p = state.players[playerID];
-  if (!p) return false;
-  return canUseSkill(p, SATURN_FREE_MOVE_SKILL_ID, 'ownTurnOncePerTurn');
 }
 
 // === 天王星·苍穹世界观 ===
@@ -2689,7 +2712,7 @@ export const IMPERIAL_CITY_WORLD_SKILL_ID = 'dm_imperial_city.worldview';
  * 收到 1 张贿赂牌时调用：皇城世界观下，该玩家获得 1 次视为 SHOOT 的发动机会。
  * 对照：docs/manual/06-dream-master.md 皇城「当玩家收到贿赂牌时」
  */
-export function grantImperialShootCharge(state: SetupState, playerID: string): SetupState {
+function grantImperialShootCharge(state: SetupState, playerID: string): SetupState {
   if (getMasterCharacterID(state) !== 'dm_imperial_city') return state;
   const p = state.players[playerID];
   if (!p) return state;

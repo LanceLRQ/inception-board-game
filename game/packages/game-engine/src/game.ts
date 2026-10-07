@@ -112,6 +112,9 @@ import {
   SAGITTARIUS_HEART_LOCK_SKILL_ID,
   canUseSagittariusHeartLock,
   applySpaceQueenStashTop,
+  settleSpaceQueenObserve,
+  settleAriesExtraDraw,
+  settleVirgoPerfect,
   applyBlackHoleLevy,
   applyBlackHoleAbsorb,
   applyImperialCityWorldShoot,
@@ -137,7 +140,6 @@ import {
   ATHENA_WIT_SKILL_ID,
 } from './engine/skills.js';
 import { shiftGuardAndRestore } from './engine/abilities/shift-guard.js';
-import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { denyAction } from './engine/actionRights.js';
 import { isCardForPlayMove } from './engine/playCardKinds.js';
@@ -264,7 +266,7 @@ function settleVaultOpened(before: SetupState, after: SetupState): SetupState {
 
 // --- 内部 helper：解封成功完整副作用链 ---
 // 由 passResponse（全员 pass）与 resolveUnlock（兜底）共享。
-// 顺序：applyUnlockSuccess → 金币金库挂起梦主三选一 → 译梦师抽 2 → 梦境猎手·满载 → onUnlock passive。
+// 顺序：applyUnlockSuccess → 金币金库挂起梦主三选一 → 译梦师抽 2 → 梦境猎手·满载 → 空间女王·监察。
 // 对照：docs/manual/04-action-cards.md 解封 + docs/manual/08-appendix.md M4-4
 function resolveUnlockFull(G: SetupState): SetupState {
   if (!G.pendingUnlock) return G;
@@ -273,7 +275,7 @@ function resolveUnlockFull(G: SetupState): SetupState {
   s = settleVaultOpened(G, s);
   s = applyInterpreterForeshadow(s, unlockerId);
   s = applyExtractorBounty(s, unlockerId);
-  s = dispatchPassives(s, 'onUnlock').state;
+  s = settleSpaceQueenObserve(s);
   return s;
 }
 
@@ -438,8 +440,6 @@ export const InceptionCityGame = {
               s = movePlayerToLayer(s, s.dreamMasterID, returnLayer);
             }
           }
-          // abilities registry：触发 onTurnStart passive
-          s = dispatchPassives(s, 'onTurnStart').state;
           return s;
         },
         // 回合末：还原移形换影快照（对照 docs/manual/04-action-cards.md 移形换影 解析）
@@ -465,8 +465,6 @@ export const InceptionCityGame = {
           // 冥王星地狱世界观：抽牌阶段结束时手牌≥6 打下的标记，在该盗梦者回合结束时兑现 → 入迷失层
           // 对照：docs/manual/06-dream-master.md 冥王星·地狱
           s = applyPlutoHellLostCheck(s, ctx.currentPlayer);
-          // abilities registry：触发 onTurnEnd passive
-          s = dispatchPassives(s, 'onTurnEnd').state;
           return s;
         },
       },
@@ -504,12 +502,9 @@ export const InceptionCityGame = {
             s = applyPointmanAssault(s, G.currentPlayerID, drawn);
             // 狮子王道：抽完后从牌库顶额外抽 = 梦主手牌数
             s = applyLeoKingdom(s, G.currentPlayerID);
-            // abilities registry：运行 onDrawPhase passive（白羊·skill_1 等）
-            // 主动技能（小丑/黑天鹅）由 UI 通过 listAvailableActives 展示按钮，显式触发
-            s = dispatchPassives(s, 'onDrawPhase').state;
+            // 白羊·弃梦魇加成：抽牌阶段额外抽牌
+            s = settleAriesExtraDraw(s);
             s = endDrawPhase(s);
-            // 进入行动阶段 → 触发 onActionPhase passive
-            s = dispatchPassives(s, 'onActionPhase').state;
             return s;
           },
           client: false,
@@ -545,10 +540,7 @@ export const InceptionCityGame = {
                 },
               },
             };
-            s = endDrawPhase(s);
-            // 进入行动阶段 → 触发 onActionPhase passive
-            s = dispatchPassives(s, 'onActionPhase').state;
-            return s;
+            return endDrawPhase(s);
           },
           client: false,
         },
@@ -561,9 +553,7 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             const applied = applyBlackSwanTour(G, G.currentPlayerID, distribution);
             if (applied === null) return INVALID_MOVE;
-            let s = endDrawPhase(applied);
-            s = dispatchPassives(s, 'onActionPhase').state;
-            return s;
+            return endDrawPhase(applied);
           },
           client: false,
         },
@@ -576,9 +566,7 @@ export const InceptionCityGame = {
             if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
             const applied = applyBlackHoleLevy(G, G.currentPlayerID, giverPicks);
             if (applied === null) return INVALID_MOVE;
-            let s = endDrawPhase(applied);
-            s = dispatchPassives(s, 'onActionPhase').state;
-            return s;
+            return endDrawPhase(applied);
           },
           client: false,
         },
@@ -677,8 +665,6 @@ export const InceptionCityGame = {
               s = { ...s, pendingResonance: null };
             }
             s = setTurnPhase(s, 'discard');
-            // 进入弃牌阶段 → 触发 onDiscardPhase passive（空间女王·放置 等）
-            s = dispatchPassives(s, 'onDiscardPhase').state;
             return s;
           },
           client: false,
@@ -803,7 +789,6 @@ export const InceptionCityGame = {
             if (result === 'kill') {
               s = { ...s, pendingSudgerRolls: null };
               s = killPlayer(s, pending.targetPlayerID, ctx.currentPlayer);
-              s = dispatchPassives(s, 'onKilled').state;
             } else if (result === 'move') {
               if (pending.extraOnMove) {
                 const tp = s.players[pending.targetPlayerID]!;
@@ -826,7 +811,7 @@ export const InceptionCityGame = {
               s = { ...s, pendingSudgerRolls: null };
             }
 
-            s = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: chosenRoll }).state;
+            s = settleVirgoPerfect(s, chosenRoll);
             return recordCardPlayed(incrementMoveCounter(s), pending.cardId);
           },
           client: false,
@@ -1035,7 +1020,7 @@ export const InceptionCityGame = {
         },
         // SHOOT 结算判定 move 后的"发动方选层"响应：L2/L3 目标由发动方选相邻层
         //   对照：docs/manual/04-action-cards.md SHOOT 解析 "由你来选择移动"
-        //   生命周期：applyShootVariant 挂起 pendingShootMove → 本 move 消费 + 触发 onAfterShoot
+        //   生命周期：applyShootVariant 挂起 pendingShootMove → 本 move 消费
         //   仅 shooterID 可消费（非当前回合玩家也能操作，因 SHOOT 发动可能跨 turnPhase 时机；故不 guard turnPhase）
         resolveShootMove: {
           move: ({ G, ctx }: MoveCtx, layer: number) => {
@@ -1045,9 +1030,7 @@ export const InceptionCityGame = {
             if (!Number.isInteger(layer) || !p.choices.includes(layer)) return INVALID_MOVE;
             let s: SetupState = movePlayerToLayer(G, p.targetPlayerID, layer);
             s = { ...s, pendingShootMove: null };
-            // 延后的 onAfterShoot passive 在此触发一次。命中「移动」的点数不会是 6，
-            // 处女·完美不会在这里触发，所以不传 shootRoll
-            s = dispatchPassives(s, 'onAfterShoot').state;
+            // 命中「移动」的点数不会是 6，处女·完美不会在这里触发
             return incrementMoveCounter(s);
           },
           client: false,
@@ -2020,7 +2003,7 @@ export const InceptionCityGame = {
 
         // 双鱼·闪避（skill_0）· SHOOT 响应窗口
         //   pendingShootResponse 由 applyShootVariant 在 pre-roll 阶段挂起；本 move 由目标双鱼消费
-        //   evade 分支：移到 currentLayer-1 + 翻面 + 弃 SHOOT 卡 + onAfterShoot passive
+        //   evade 分支：移到 currentLayer-1 + 翻面 + 弃 SHOOT 卡
         //   pass 分支：放弃响应 → 重入 applyShootVariant（skipPiscesCheck=true）继续骰
         // 仅 pendingShootResponse.targetPlayerID 本人可发起；回合外 move 不 guard turnPhase
         respondShootEvade: {
@@ -2039,9 +2022,8 @@ export const InceptionCityGame = {
             if (s === null) return INVALID_MOVE;
             // 2) shooter 弃 SHOOT 卡（避免免费再用）
             s = discardCard(s, pending.shooterID, pending.cardId);
-            // 3) 清空 pending + 触发 onAfterShoot；躲开没有掷骰，不给 shootRoll（处女·完美不触发）
+            // 3) 清空 pending；躲开没有掷骰，处女·完美不触发
             s = { ...s, pendingShootResponse: null };
-            s = dispatchPassives(s, 'onAfterShoot').state;
             // void random 防止未使用警告（保持签名一致）
             void random;
             return incrementMoveCounter(s);
@@ -2201,7 +2183,7 @@ export const InceptionCityGame = {
 
         // 处女·完美（skill_0）· 三选一响应窗
         // 对照：docs/manual/05-dream-thieves.md 处女
-        // 触发：dispatchPassives(onAfterShoot) 在本次 SHOOT 的最终结算点数为 6 时挂起 pendingVirgoChoice
+        // 触发：settleVirgoPerfect 在本次 SHOOT 的最终结算点数为 6 时挂起 pendingVirgoChoice
         // 约束：
         //   - 仅 pendingVirgoChoice.virgoID 本人可发起（回合外 move，不 guard turnPhase）
         //   - choice='revive' 需 targetID 参数（己方死亡角色）
@@ -2904,8 +2886,6 @@ interface ShootVariantOpts {
   moveFaces: number[];
   extraOnMove: 'discard_unlocks' | 'discard_shoots' | null;
   decreeId?: CardID; // 死亡宣言展示（不弃，附加死亡骰面）
-  /** 骰值前置修饰 hook（用于哈雷·冲击 -2 等场景；优先级低于灵雕师/天蝎/金牛） */
-  dicePreModifier?: (baseRoll: number) => number;
   /** 射手·禁足：SHOOT 结果为 move 时阻止目标移动 */
   preventMove?: boolean;
   /**
@@ -2986,14 +2966,8 @@ function applyShootVariant(
   const deathFaces = decreeCheck !== null ? [...opts.deathFaces, decreeCheck] : opts.deathFaces;
 
   // Pisces 闪避响应窗口（pre-roll）
-  // 限制：dicePreModifier 路径（哈雷免费 SHOOT，函数不可序列化）跳过窗口
   // skipPiscesCheck=true 由 respondShootPass move 重入时设置
-  if (
-    !opts.skipPiscesCheck &&
-    !opts.dicePreModifier &&
-    !G.pendingShootResponse &&
-    canPiscesEvade(target)
-  ) {
+  if (!opts.skipPiscesCheck && !G.pendingShootResponse && canPiscesEvade(target)) {
     return {
       ...G,
       pendingShootResponse: {
@@ -3014,10 +2988,8 @@ function applyShootVariant(
   // Terrorist 狂热响应窗口（pre-roll，Pisces 之后）
   // 触发：shooter 是恐怖分子（被动技能 skill_1）→ target 必须弃 1 张否则骰 -1
   // 对照：docs/manual/05-dream-thieves.md 恐怖分子 狂热 247 行
-  // 限制：dicePreModifier 路径同样跳过（哈雷免费 SHOOT 等特殊路径不挂窗）
   if (
     !opts.skipTerroristCheck &&
-    !opts.dicePreModifier &&
     !G.pendingShootResponse &&
     shooter.characterId === 'thief_terrorist' &&
     target.isAlive
@@ -3039,8 +3011,6 @@ function applyShootVariant(
     };
   }
 
-  // abilities registry：触发 onBeforeShoot passive（被动修饰仅作事件记录）
-  const preShootState = dispatchPassives(G, 'onBeforeShoot').state;
   const rawD6 = random.D6();
   // 恐怖分子·狂热惩罚：未弃牌时 baseRoll -1，点数修正最低为 1（与 M4、要塞、哈雷等修正一致）
   const baseRoll = opts.terroristPenalty ? Math.max(1, rawD6 - 1) : rawD6;
@@ -3054,7 +3024,7 @@ function applyShootVariant(
 
   // 记录原始骰值供客户端骰子动画使用（展示未修饰的真实 D6 结果）
   // lastShootRoll 记录原始 D6（1-6）供动画展示；resolution 用修饰后 baseRoll
-  const s0 = { ...preShootState, lastShootRoll: rawD6 };
+  const s0 = { ...G, lastShootRoll: rawD6 };
 
   // === 角色 SHOOT 修饰链 ===
   // 天蝎·毒针 / 金牛·号角
@@ -3090,12 +3060,6 @@ function applyShootVariant(
     } else {
       result = baseResult;
     }
-  } else if (opts.dicePreModifier) {
-    // hook：哈雷·冲击附带 -2 修饰（仅由解封触发的免费 SHOOT 使用）
-    // 哈雷为盗梦者，postM4Roll === baseRoll；保持原 dicePreModifier 输入
-    const finalRoll = opts.dicePreModifier(baseRoll);
-    settledRoll = finalRoll;
-    result = resolveShootCustom(finalRoll, deathFaces, opts.moveFaces);
   } else {
     // 通用路径：使用 M4 修饰后骰值（梦主 SHOOT 时 -1，盗梦者 SHOOT 时恒等）
     settledRoll = postM4Roll;
@@ -3131,8 +3095,6 @@ function applyShootVariant(
         },
       };
     }
-    // abilities registry：击杀后触发 onKilled passive（射手·心锁等待此时机）
-    s = dispatchPassives(s, 'onKilled').state;
   } else if (result === 'move') {
     // on-move 副作用：弃目标特定手牌
     if (opts.extraOnMove) {
@@ -3151,10 +3113,10 @@ function applyShootVariant(
       const cur = s.players[targetPlayerID]!.currentLayer;
       const choices = computeShootMoveChoices(cur);
       if (choices.length === 1) {
-        // L1→[2] / L4→[3]：唯一相邻层，自动移动 + 继续触发 onAfterShoot
+        // L1→[2] / L4→[3]：唯一相邻层，自动移动 + 继续结算
         s = movePlayerToLayer(s, targetPlayerID, choices[0]!);
       } else if (choices.length >= 2) {
-        // L2/L3：挂起由发动方（ctx.currentPlayer）选择；onAfterShoot 推迟到 resolveShootMove
+        // L2/L3：挂起由发动方（ctx.currentPlayer）选择；之后的结算推迟到 resolveShootMove
         s = {
           ...s,
           pendingShootMove: {
@@ -3171,10 +3133,10 @@ function applyShootVariant(
     }
   }
 
-  // abilities registry：SHOOT 结算完成后触发 onAfterShoot passive（处女·完美按最终点数判断是否为 6）
+  // SHOOT 结算完成后检查处女·完美（按最终点数判断是否为 6）
   //   注意：choices.length>=2 的挂起分支已在上方 return（命中「移动」的点数不会是 6，不会触发完美），
   //   此处仅覆盖 kill / miss / L1L4 自动移动 / preventMove 情形
-  s = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: settledRoll }).state;
+  s = settleVirgoPerfect(s, settledRoll);
   return incrementMoveCounter(s);
 }
 

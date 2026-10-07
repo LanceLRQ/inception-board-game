@@ -9,7 +9,6 @@ export const BASE_DRAW_COUNT = 2;
 
 // 回合方向
 export type TurnDirection = 'clockwise' | 'counter-clockwise' | 'alternating';
-export const DEFAULT_TURN_DIRECTION: TurnDirection = 'counter-clockwise';
 
 // 玩家人数配置表
 export interface PlayerCountConfig {
@@ -34,12 +33,6 @@ export const VAULT_COIN_COUNT = 3;
 
 // 梦境层数
 export const LAYER_COUNT = 4; // 1-4
-
-// SHOOT 死亡面
-export const SHOOT_DEATH_FACES = [1];
-export const SHOOT_ASSASSIN_DEATH_FACES = [1, 2];
-export const SHOOT_ARMOR_PIERCING_DEATH_FACES = [1, 2];
-export const SHOOT_EXPLOSIVE_DEATH_FACES = [1, 2];
 
 // 响应窗口超时（秒）
 export const RESPONSE_WINDOW_TIMEOUT = 30;

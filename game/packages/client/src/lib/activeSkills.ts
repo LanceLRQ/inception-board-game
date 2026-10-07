@@ -1,7 +1,7 @@
 // 主动技能元信息 + 可用性推导
-// 对照：engine/abilities/characters/ + engine/skills.ts
+// 对照：game-engine 的 engine/skills.ts
 //
-// 仅处理"行动阶段可点按钮触发"的主动技能；被动技能由 dispatcher 自动触发
+// 仅处理"行动阶段可点按钮触发"的主动技能；被动技能由引擎在对应时机自动结算
 // 支持：
 //   - 影子·潜伏 (thief_shade → playShadeFollow, 无参)
 //   - 阿波罗·崇拜 (thief_apollo → playApolloWorship, 1 target)

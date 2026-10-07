@@ -6,7 +6,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MASTER_CHARACTERS, THIEF_CHARACTERS } from '@icgame/shared';
 import * as skillsModule from './skills.js';
-import { ALL_MASTER_ABILITIES, ALL_THIEF_ABILITIES } from './abilities/characters/index.js';
 import { SKILLS_IMPLEMENTED_WITHOUT_ID, SKILLS_NOT_IMPLEMENTED } from './skillCoverage.js';
 
 /** 配置里的全部技能与世界观标识 */
@@ -19,7 +18,7 @@ function configSkillIds(): Set<string> {
   return ids;
 }
 
-/** 引擎登记的技能标识：skills.ts 导出的标识常量 + 能力注册表里的能力 */
+/** 引擎登记的技能标识：skills.ts 导出的标识常量 */
 function engineSkillIds(): Set<string> {
   const ids = new Set<string>();
   for (const value of Object.values(skillsModule)) {
@@ -27,7 +26,6 @@ function engineSkillIds(): Set<string> {
       ids.add(value);
     }
   }
-  for (const a of [...ALL_THIEF_ABILITIES, ...ALL_MASTER_ABILITIES]) ids.add(a.id);
   return ids;
 }
 
@@ -38,23 +36,6 @@ describe('技能标识 · 引擎与卡牌配置对账', () => {
   it('引擎登记的每个技能标识都存在于卡牌配置里', () => {
     const unknown = [...engine].filter((id) => !config.has(id));
     expect(unknown).toEqual([]);
-  });
-
-  it('能力注册表里每个能力的 id 都以所属角色 id 开头（按前缀取角色的约定）', () => {
-    const characterIds = [...THIEF_CHARACTERS, ...MASTER_CHARACTERS].map((c) => c.id as string);
-    for (const a of [...ALL_THIEF_ABILITIES, ...ALL_MASTER_ABILITIES]) {
-      expect(
-        characterIds.some((cid) => a.id.startsWith(`${cid}.`)),
-        a.id,
-      ).toBe(true);
-    }
-  });
-
-  it('能力的名称与描述文案键由 id 推出：character.<id>.name / desc', () => {
-    for (const a of [...ALL_THIEF_ABILITIES, ...ALL_MASTER_ABILITIES]) {
-      expect(a.name, a.id).toBe(`character.${a.id}.name`);
-      expect(a.description, a.id).toBe(`character.${a.id}.desc`);
-    }
   });
 
   it('配置里没有引擎入口的技能，与两张登记表合起来正好一致', () => {

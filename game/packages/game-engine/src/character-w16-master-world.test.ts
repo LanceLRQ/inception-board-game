@@ -10,10 +10,7 @@ import {
   applyPlutoHellLostCheck,
   endDrawPhase,
   applySaturnFreeMove,
-  canUseSaturnFreeMoveThisTurn,
   findMasterID,
-  SATURN_FREE_MOVE_SKILL_ID,
-  markSkillUsed,
 } from './engine/skills.js';
 import { callMove, expectMoveOk } from './testing/fixtures.js';
 import { scenarioStartOfGame3p } from './testing/scenarios.js';
@@ -227,24 +224,6 @@ describe('冥王星·地狱世界观', () => {
 });
 
 describe('土星·领地世界观', () => {
-  it('canUseSaturnFreeMoveThisTurn：持贿赂 → true', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    s = setBribeReceived(s, 'p1', 1);
-    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(true);
-  });
-
-  it('canUseSaturnFreeMoveThisTurn：无贿赂 → false', () => {
-    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(false);
-  });
-
-  it('canUseSaturnFreeMoveThisTurn：本回合已用 → false', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    s = setBribeReceived(s, 'p1', 1);
-    s = markSkillUsed(s, 'p1', SATURN_FREE_MOVE_SKILL_ID);
-    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(false);
-  });
-
   it('applySaturnFreeMove：移动到相邻层', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
     s = setBribeReceived(s, 'p1', 1);

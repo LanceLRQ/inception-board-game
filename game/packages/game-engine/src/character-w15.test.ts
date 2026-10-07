@@ -18,7 +18,6 @@ import {
   isAquariusUnlimitedActive,
   ariesExtraDrawCount,
   applySagittariusHeartLock,
-  canGreenRayActivate,
   GEMINI_SKILL_ID,
   PISCES_SKILL_ID,
   LUNA_SKILL_ID,
@@ -344,20 +343,5 @@ describe('射手 · 神射（thief_sagittarius）', () => {
     s = { ...s, layers: { ...s.layers, 1: { ...s.layers[1]!, heartLockValue: 0 } } };
     const r = applySagittariusHeartLock(s, 'p1', 1, -1, 5);
     expect(r).toBe(s);
-  });
-});
-
-describe('格林射线 · 移转（thief_green_ray · 扩展）', () => {
-  it('canGreenRayActivate：含梦境穿梭剂 + SHOOT', () => {
-    let s = scenarioActionPhase();
-    s = setCharacter(s, 'p1', 'thief_green_ray' as CardID);
-    s = setHand(s, 'p1', ['action_dream_transit', 'action_shoot'] as CardID[]);
-    expect(canGreenRayActivate(s.players.p1!)).toBe(true);
-  });
-  it('缺穿梭剂 → false', () => {
-    let s = scenarioActionPhase();
-    s = setCharacter(s, 'p1', 'thief_green_ray' as CardID);
-    s = setHand(s, 'p1', ['action_shoot'] as CardID[]);
-    expect(canGreenRayActivate(s.players.p1!)).toBe(false);
   });
 });

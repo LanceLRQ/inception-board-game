@@ -1,83 +1,30 @@
 // 骰子系统测试
 
 import { describe, it, expect } from 'vitest';
-import { rollDice, resolveShoot, BLUE_DICE_FACES, RED_DICE_FACES } from './dice.js';
+import { resolveShootCustom, BLUE_DICE_FACES, RED_DICE_FACES } from './dice.js';
 
 describe('dice', () => {
-  describe('rollDice', () => {
-    // 固定 d6 返回值（模拟 BGIO Random API）
-    const fixedD6 = () => 3;
-
-    it('rolls single die by default', () => {
-      const result = rollDice(fixedD6);
-      expect(result.values).toEqual([3]);
-      expect(result.total).toBe(3);
-      expect(result.modified).toBe(3);
+  describe('resolveShootCustom', () => {
+    it('点数在死亡面里 → kill', () => {
+      expect(resolveShootCustom(1, [1], [2, 3, 4, 5])).toBe('kill');
+      expect(resolveShootCustom(2, [1, 2], [3, 4, 5])).toBe('kill');
     });
 
-    it('rolls multiple dice', () => {
-      const seq = [2, 5, 1][Symbol.iterator]();
-      const d6 = () => seq.next().value as number;
-      const result = rollDice(d6, 3);
-      expect(result.values).toEqual([2, 5, 1]);
-      expect(result.total).toBe(8);
+    it('点数在移动面里 → move', () => {
+      expect(resolveShootCustom(3, [1], [2, 3, 4, 5])).toBe('move');
+      expect(resolveShootCustom(5, [1], [2, 3, 4, 5])).toBe('move');
     });
 
-    it('applies positive modifiers clamped to 6', () => {
-      const result = rollDice(fixedD6, 1, [{ source: 'test', value: 10 }]);
-      expect(result.total).toBe(3);
-      expect(result.modified).toBe(6); // min(6, 3+10)
+    it('既不在死亡面也不在移动面 → miss', () => {
+      expect(resolveShootCustom(6, [1], [2, 3, 4, 5])).toBe('miss');
     });
 
-    it('applies negative modifiers clamped to 1', () => {
-      const result = rollDice(fixedD6, 1, [{ source: 'test', value: -10 }]);
-      expect(result.modified).toBe(1); // max(1, 3-10)
+    it('移动面按传入的清单算：不在清单里的点数不算移动', () => {
+      expect(resolveShootCustom(2, [1], [3, 4, 5])).toBe('miss');
     });
 
-    it('sums multiple modifiers', () => {
-      const result = rollDice(fixedD6, 1, [
-        { source: 'a', value: 2 },
-        { source: 'b', value: -1 },
-      ]);
-      expect(result.modified).toBe(4); // 3 + 2 - 1
-    });
-
-    it('preserves modifiers in result', () => {
-      const mods = [{ source: 'skill', value: 1 }];
-      const result = rollDice(fixedD6, 1, mods);
-      expect(result.modifiers).toEqual(mods);
-    });
-  });
-
-  describe('resolveShoot', () => {
-    it('kill when roll matches death face', () => {
-      expect(resolveShoot(1, [1])).toBe('kill');
-    });
-
-    it('kill with multiple death faces', () => {
-      expect(resolveShoot(2, [1, 2])).toBe('kill');
-    });
-
-    it('move when roll is 2-5 and not death face', () => {
-      expect(resolveShoot(3, [1])).toBe('move');
-      expect(resolveShoot(2, [1])).toBe('move');
-      expect(resolveShoot(5, [1])).toBe('move');
-    });
-
-    it('miss when roll is 6 and not death face', () => {
-      expect(resolveShoot(6, [1])).toBe('miss');
-    });
-
-    it('uses default death faces [1]', () => {
-      expect(resolveShoot(1)).toBe('kill');
-      expect(resolveShoot(4)).toBe('move');
-      expect(resolveShoot(6)).toBe('miss');
-    });
-
-    it('assassin death faces [1,2]', () => {
-      expect(resolveShoot(1, [1, 2])).toBe('kill');
-      expect(resolveShoot(2, [1, 2])).toBe('kill');
-      expect(resolveShoot(3, [1, 2])).toBe('move');
+    it('死亡面优先于移动面', () => {
+      expect(resolveShootCustom(2, [2], [2, 3])).toBe('kill');
     });
   });
 

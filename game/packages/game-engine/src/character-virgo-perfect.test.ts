@@ -3,16 +3,19 @@
 //
 // 覆盖范围：
 //   A. 三选一 helper 纯函数（applyVirgoResurrect / applyVirgoDrawTwo / applyVirgoTeleport）
-//   B. virgoPerfect.apply 挂起 pendingVirgoChoice
-//   C. dispatchPassives(onAfterShoot) 集成（lastShootRoll=6 自动挂起）
+//   B. settleVirgoPerfect 挂起 pendingVirgoChoice（最终点数 6、不重入、座次与存活判定）
+//   C. playShoot 真实结算：最终点数 6 自动挂起
 //   D. respondVirgoPerfect move 三分支 + skip 跳过
 
 import { describe, expect, it } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
 import type { SetupState } from './setup.js';
-import { applyVirgoResurrect, applyVirgoDrawTwo, applyVirgoTeleport } from './engine/skills.js';
-import { virgoPerfect } from './engine/abilities/characters/thief/virgo.js';
-import { dispatchPassives } from './engine/abilities/dispatch-helpers.js';
+import {
+  applyVirgoResurrect,
+  applyVirgoDrawTwo,
+  applyVirgoTeleport,
+  settleVirgoPerfect,
+} from './engine/skills.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
 import { callMove } from './testing/fixtures.js';
 
@@ -31,18 +34,6 @@ function killPlayer(state: SetupState, playerID: string): SetupState {
       ...state.players,
       [playerID]: { ...p, isAlive: false, deathTurn: state.turnNumber, currentLayer: 0 as Layer },
     },
-  };
-}
-
-function virgoCtx(state: SetupState, virgoID: string, shootRoll?: number) {
-  return {
-    ...(shootRoll === undefined ? {} : { shootRoll }),
-    invokerID: virgoID,
-    turnNumber: state.turnNumber,
-    turnPhase: state.turnPhase,
-    dreamMasterID: state.dreamMasterID,
-    invokerFaction: state.players[virgoID]!.faction,
-    d6: () => 4,
   };
 }
 
@@ -156,30 +147,41 @@ describe('处女 · 完美 · applyVirgoTeleport', () => {
 });
 
 // ============================================================================
-// B. virgoPerfect.apply 挂起 pendingVirgoChoice
+// B. settleVirgoPerfect 挂起 pendingVirgoChoice
 // ============================================================================
 
-describe('处女 · 完美 · ability.apply', () => {
-  it('最终点数=6 + 角色匹配 → 挂起 pendingVirgoChoice', () => {
+describe('处女 · 完美 · settleVirgoPerfect', () => {
+  it('最终点数=6 + 处女在场 → 挂起 pendingVirgoChoice，shooterID 取当前回合玩家', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
     s = { ...s, currentPlayerID: 'p2' };
-    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1', 6), {});
-    expect(r.state).not.toBeNull();
-    expect(r.state!.pendingVirgoChoice).toEqual({
+    const next = settleVirgoPerfect(s, 6);
+    expect(next.pendingVirgoChoice).toEqual({
       virgoID: 'p1',
       triggerRoll: 6,
       shooterID: 'p2',
     });
   });
 
-  it('最终点数≠6 → no-op', () => {
+  it('最终点数≠6 → 原样返回', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_virgo');
     s = { ...s, lastShootRoll: 6 };
-    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1', 5), {});
-    expect(r.state).not.toBeNull();
-    expect(r.state!.pendingVirgoChoice).toBeNull();
+    const next = settleVirgoPerfect(s, 5);
+    expect(next).toBe(s);
+    expect(next.pendingVirgoChoice).toBeNull();
+  });
+
+  it('无处女角色 + 最终点数=6 → 不触发', () => {
+    const s = scenarioActionPhase();
+    expect(settleVirgoPerfect(s, 6).pendingVirgoChoice).toBeNull();
+  });
+
+  it('处女已死亡 → 不触发', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_virgo');
+    s = killPlayer(s, 'p1');
+    expect(settleVirgoPerfect(s, 6).pendingVirgoChoice).toBeNull();
   });
 
   it('已挂起 pendingVirgoChoice → 不重入', () => {
@@ -190,35 +192,51 @@ describe('处女 · 完美 · ability.apply', () => {
       lastShootRoll: 6,
       pendingVirgoChoice: { virgoID: 'p1', triggerRoll: 6, shooterID: 'p2' },
     };
-    const r = virgoPerfect.apply(s, virgoCtx(s, 'p1'), {});
-    expect(r.state).toBe(s); // 引用相等：未生成新状态
+    expect(settleVirgoPerfect(s, 6)).toBe(s); // 引用相等：未生成新状态
   });
 });
 
 // ============================================================================
-// C. dispatchPassives(onAfterShoot) 集成
+// C. playShoot 真实结算：最终点数 6 自动挂起
 // ============================================================================
 
-describe('处女 · 完美 · dispatchPassives 集成', () => {
-  it('最终点数=6 + 处女在场 → dispatchPassives 自动挂起', () => {
+describe('处女 · 完美 · playShoot 集成', () => {
+  function shootScene(): SetupState {
     let s = scenarioActionPhase();
-    s = setCharacter(s, 'p1', 'thief_virgo');
-    const r = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: 6 });
-    expect(r.state.pendingVirgoChoice).not.toBeNull();
-    expect(r.state.pendingVirgoChoice!.virgoID).toBe('p1');
+    s = setCharacter(s, 'p2', 'thief_virgo');
+    const p1 = s.players.p1!;
+    const p2 = s.players.p2!;
+    return {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...p1, hand: ['action_shoot' as CardID], currentLayer: 2 as Layer },
+        p2: { ...p2, currentLayer: 2 as Layer, isAlive: true },
+      },
+      layers: { ...s.layers, [2]: { ...s.layers[2]!, playersInLayer: ['p1', 'p2'] } },
+    };
+  }
+
+  it('SHOOT 最终点数 6 → 在场的处女（被射者）挂起三选一', () => {
+    const r = callMove(shootScene(), 'playShoot', ['p2', 'action_shoot'], {
+      currentPlayer: 'p1',
+      rolls: [6],
+    });
+    expect(r).not.toBe('INVALID_MOVE');
+    expect((r as SetupState).pendingVirgoChoice).toEqual({
+      virgoID: 'p2',
+      triggerRoll: 6,
+      shooterID: 'p1',
+    });
   });
 
-  it('最终点数=5 + 处女在场 → 不触发', () => {
-    let s = scenarioActionPhase();
-    s = setCharacter(s, 'p1', 'thief_virgo');
-    const r = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: 5 });
-    expect(r.state.pendingVirgoChoice).toBeNull();
-  });
-
-  it('无处女角色 + 最终点数=6 → 不触发', () => {
-    const s = scenarioActionPhase();
-    const r = dispatchPassives(s, 'onAfterShoot', undefined, { shootRoll: 6 });
-    expect(r.state.pendingVirgoChoice).toBeNull();
+  it('SHOOT 最终点数 3 → 不挂起', () => {
+    const r = callMove(shootScene(), 'playShoot', ['p2', 'action_shoot'], {
+      currentPlayer: 'p1',
+      rolls: [3],
+    });
+    expect(r).not.toBe('INVALID_MOVE');
+    expect((r as SetupState).pendingVirgoChoice).toBeNull();
   });
 });
 

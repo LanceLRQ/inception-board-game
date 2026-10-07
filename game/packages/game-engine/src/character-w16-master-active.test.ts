@@ -8,11 +8,7 @@ import {
   applyUranusPower,
   applyPlutoBurning,
   canImperialPickBribe,
-  getSecretPassageUsesLeft,
-  getUranusPowerUsesLeft,
   findMasterID,
-  SECRET_PASSAGE_SKILL_ID,
-  URANUS_POWER_SKILL_ID,
   PLUTO_BURNING_SKILL_ID,
   markSkillUsed,
 } from './engine/skills.js';
@@ -193,17 +189,6 @@ describe('密道（dm_secret_passage）·传送', () => {
     expect(r).toBeNull();
   });
 
-  it('getSecretPassageUsesLeft：初始 2', () => {
-    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
-    expect(getSecretPassageUsesLeft(s.players.pM!)).toBe(2);
-  });
-
-  it('getSecretPassageUsesLeft：用 1 次后 1', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
-    s = markSkillUsed(s, 'pM', SECRET_PASSAGE_SKILL_ID);
-    expect(getSecretPassageUsesLeft(s.players.pM!)).toBe(1);
-  });
-
   it('move playSecretPassageTeleport：成功调用', () => {
     let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
     s = setActionPhase(s);
@@ -263,17 +248,6 @@ describe('天王星·苍穹（dm_uranus_firmament）·权力', () => {
     s = setBribePool(s, [{ id: 'b1', status: 'inPool' }]);
     const r = applyUranusPower(s, 'pM', 'p1', 2 as Layer);
     expect(r).toBeNull();
-  });
-
-  it('getUranusPowerUsesLeft：剩余次数随用量递减', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
-    s = setBribePool(s, [
-      { id: 'b1', status: 'inPool' },
-      { id: 'b2', status: 'inPool' },
-    ]);
-    expect(getUranusPowerUsesLeft(s, s.players.pM!)).toBe(2);
-    s = markSkillUsed(s, 'pM', URANUS_POWER_SKILL_ID);
-    expect(getUranusPowerUsesLeft(s, s.players.pM!)).toBe(1);
   });
 
   it('move useUranusPower：成功调用', () => {

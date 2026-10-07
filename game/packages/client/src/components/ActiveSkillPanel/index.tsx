@@ -1,5 +1,5 @@
 // 主动技能按钮面板 —— 行动阶段人类玩家可见
-// 对照：client/src/lib/activeSkills.ts + engine/abilities/characters/thief/*
+// 对照：client/src/lib/activeSkills.ts + game-engine 的 engine/skills.ts
 
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';

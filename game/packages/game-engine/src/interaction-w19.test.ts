@@ -31,7 +31,6 @@ import {
   canMarsKill,
   canImperialPickBribe,
   applySecretPassageTeleport,
-  getSecretPassageUsesLeft,
   applySudgerVerdict,
   applyScorpiusPoison,
   applyTaurusHorn,
@@ -43,7 +42,6 @@ import {
   isTerroristCrossLayerActive,
   canPiscesEvade,
   isAquariusUnlimitedActive,
-  canGreenRayActivate,
   isJupiterPeakLayerOK,
   checkAthenaAweCondition,
   canUseTouristAssist,
@@ -53,13 +51,11 @@ import {
   applyLeoKingdom,
   applyBlackHoleLevy,
   applyUranusPower,
-  getUranusPowerUsesLeft,
   applyPlutoBurning,
   isUranusFirmamentWorldActive,
   applyAthenaWit,
   applyShadeFollow,
   applySaturnFreeMove,
-  canUseSaturnFreeMoveThisTurn,
   applyUranusFirmamentMoveDiscard,
   applyMarsBattlefieldExchange,
   applyMarsKillDiscardUnlock,
@@ -936,52 +932,6 @@ describe('密道·传送 happy path + 守卫', () => {
   });
 });
 
-describe('密道·传送次数计量', () => {
-  it('getSecretPassageUsesLeft：非密道梦主 → 0', () => {
-    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
-    const mid = findMasterID(s)!;
-    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(0);
-  });
-
-  it('getSecretPassageUsesLeft：密道梦主 0 用 → 2', () => {
-    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
-    const mid = findMasterID(s)!;
-    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(2);
-  });
-
-  it('getSecretPassageUsesLeft：密道梦主 用 1 次 → 1', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
-    const mid = findMasterID(s)!;
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [mid]: {
-          ...s.players[mid]!,
-          skillUsedThisTurn: { 'dm_secret_passage.skill_0': 1 },
-        },
-      },
-    };
-    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(1);
-  });
-
-  it('getSecretPassageUsesLeft：密道梦主 用 2 次 → 0（上限）', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_secret_passage');
-    const mid = findMasterID(s)!;
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [mid]: {
-          ...s.players[mid]!,
-          skillUsedThisTurn: { 'dm_secret_passage.skill_0': 2 },
-        },
-      },
-    };
-    expect(getSecretPassageUsesLeft(s.players[mid]!)).toBe(0);
-  });
-});
-
 // ============================================================================
 // 交互矩阵扩充（第六批 · 纯函数批量）
 // 聚焦子集：SHOOT 修饰链纯函数 / 角色触发纯判定 / 骰值 clamp / 牌型分类
@@ -1077,27 +1027,6 @@ describe('角色被动触发守卫', () => {
   it('canPiscesEvade：非双鱼 → false', () => {
     const s = scenarioStartOfGame3p();
     expect(canPiscesEvade(s.players.p1!)).toBe(false);
-  });
-
-  it('canGreenRayActivate：格林射线 + 有穿梭剂 + 有 SHOOT → true', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_green_ray');
-    s = setHand(s, 'p1', ['action_dream_transit' as CardID, 'action_shoot' as CardID]);
-    expect(canGreenRayActivate(s.players.p1!)).toBe(true);
-  });
-
-  it('canGreenRayActivate：缺穿梭剂 → false', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_green_ray');
-    s = setHand(s, 'p1', ['action_shoot' as CardID]);
-    expect(canGreenRayActivate(s.players.p1!)).toBe(false);
-  });
-
-  it('canGreenRayActivate：缺 SHOOT 类 → false', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_green_ray');
-    s = setHand(s, 'p1', ['action_dream_transit' as CardID, 'action_unlock' as CardID]);
-    expect(canGreenRayActivate(s.players.p1!)).toBe(false);
   });
 });
 
@@ -1505,35 +1434,7 @@ describe('天王星·权力 apply 分支', () => {
   });
 });
 
-describe('天王星·权力剩余次数 + 世界观', () => {
-  it('getUranusPowerUsesLeft：非天王星梦主 → 0', () => {
-    const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
-    expect(getUranusPowerUsesLeft(s, s.players[findMasterID(s)!]!)).toBe(0);
-  });
-
-  it('getUranusPowerUsesLeft：inPool=1 + 未用 → 1', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
-    s = withInPoolBribe(s);
-    expect(getUranusPowerUsesLeft(s, s.players[findMasterID(s)!]!)).toBe(1);
-  });
-
-  it('getUranusPowerUsesLeft：inPool=1 + 已用 1 次 → 0', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
-    s = withInPoolBribe(s);
-    const mid = findMasterID(s)!;
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        [mid]: {
-          ...s.players[mid]!,
-          skillUsedThisTurn: { 'dm_uranus_firmament.skill_0': 1 },
-        },
-      },
-    };
-    expect(getUranusPowerUsesLeft(s, s.players[mid]!)).toBe(0);
-  });
-
+describe('天王星·苍穹世界观判定', () => {
   it('isUranusFirmamentWorldActive：天王星梦主 → true / 其他 → false', () => {
     const s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_uranus_firmament');
     expect(isUranusFirmamentWorldActive(s)).toBe(true);
@@ -1734,28 +1635,6 @@ describe('土星世界观免费移动 apply 分支', () => {
     };
     const r = applySaturnFreeMove(s, 'p1', 2 as Layer);
     expect(r).toBeNull();
-  });
-
-  it('canUseSaturnFreeMoveThisTurn：未用 + 持贿赂 → true', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    s = { ...s, players: { ...s.players, p1: { ...s.players.p1!, bribeReceived: 1 } } };
-    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(true);
-  });
-
-  it('canUseSaturnFreeMoveThisTurn：已用过 → false', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    s = {
-      ...s,
-      players: {
-        ...s.players,
-        p1: {
-          ...s.players.p1!,
-          bribeReceived: 1,
-          skillUsedThisTurn: { 'dm_saturn_territory.worldview': 1 },
-        },
-      },
-    };
-    expect(canUseSaturnFreeMoveThisTurn(s, 'p1')).toBe(false);
   });
 });
 

@@ -1,36 +1,5 @@
 // @icgame/game-engine - 游戏引擎
 
-// 幂等性检查
-const processedIntents = new Map<string, number>();
-
-export interface MoveIntent {
-  readonly type: string;
-  readonly payload: unknown;
-  readonly intentId: string;
-}
-
-export interface MoveResult {
-  readonly ok: boolean;
-  readonly state: unknown;
-  readonly error?: string;
-}
-
-export function isIntentProcessed(intentId: string, _currentCounter: number): boolean {
-  return processedIntents.has(intentId);
-}
-
-export function markIntentProcessed(intentId: string, counter: number): void {
-  if (processedIntents.size > 1000) {
-    const oldest = processedIntents.keys().next().value;
-    if (oldest !== undefined) processedIntents.delete(oldest);
-  }
-  processedIntents.set(intentId, counter);
-}
-
-export function incrementMoveCounter(state: { moveCounter: number }): typeof state {
-  return { ...state, moveCounter: state.moveCounter + 1 };
-}
-
 // 导出游戏核心
 export { InceptionCityGame } from './game.js';
 export { INVALID_MOVE } from './engine/invalidMove.js';
@@ -49,9 +18,8 @@ export {
   isAdjacentLayer,
   recordCardPlayed,
 } from './moves.js';
-export { rollDice, resolveShoot } from './dice.js';
-export type { DiceResult, DiceModifier, ShootOutcome } from './dice.js';
 export * from './config.js';
+export type { ShootOutcome } from './dice.js';
 export { migrateGameState, getSchemaVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';
 
 // 请求校验：move 名单由 move 表派生 · 请求形状 · 幂等与限流
@@ -73,7 +41,7 @@ export type {
   RateGuard,
 } from './engine/validator.js';
 
-// 健壮性 · 死亡/迷失层/超时
+// 健壮性 · 死亡/迷失层
 export {
   LOST_LAYER,
   canAct,
@@ -83,16 +51,6 @@ export {
   getAlivePlayers,
   getAliveInLayer,
 } from './engine/death.js';
-
-export {
-  RESPONSE_WINDOW_MS,
-  AI_TAKEOVER_MS,
-  DISCONNECT_FORCE_MS,
-  applyResponseTimeout,
-  shouldTakeover,
-  shouldForceDisconnect,
-} from './engine/timeout.js';
-export type { TimeoutDefault, PresenceInfo } from './engine/timeout.js';
 
 // 双面角色
 export {
@@ -119,7 +77,6 @@ export {
   applyFortressDiceModifier,
   applyChessTranspose,
   applyChessWorldViewPeek,
-  getChessUsesLeft,
   applyTouristAssist,
   canUseTouristAssist,
   applyLeoKingdom,

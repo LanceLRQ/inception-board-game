@@ -10,7 +10,6 @@ import {
   applyFortressDiceModifier,
   applyChessTranspose,
   applyChessWorldViewPeek,
-  getChessUsesLeft,
   POINTMAN_SKILL_ID,
   INTERPRETER_SKILL_ID,
   CHESS_SKILL_ID,
@@ -349,23 +348,6 @@ describe('棋局 · 易位 (Chess)', () => {
     };
     const result = applyChessTranspose(s, 'dm', 0, 1);
     expect(result).toBe(s);
-  });
-});
-
-describe('getChessUsesLeft', () => {
-  it('returns 2 for unused', () => {
-    const player = makePlayer({ skillUsedThisGame: {} });
-    expect(getChessUsesLeft(player)).toBe(2);
-  });
-
-  it('returns 1 after one use', () => {
-    const player = makePlayer({ skillUsedThisGame: { [CHESS_SKILL_ID]: 1 } });
-    expect(getChessUsesLeft(player)).toBe(1);
-  });
-
-  it('returns 0 after two uses', () => {
-    const player = makePlayer({ skillUsedThisGame: { [CHESS_SKILL_ID]: 2 } });
-    expect(getChessUsesLeft(player)).toBe(0);
   });
 });
 

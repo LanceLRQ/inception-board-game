@@ -1,7 +1,6 @@
 // 卡牌配置里的技能 / 世界观与引擎实现的对账清单
 //
-// 「引擎入口」指引擎里有一个以配置标识登记的东西：engine/skills.ts 里的 `*_SKILL_ID` 常量，
-// 或能力注册表（engine/abilities/characters）里 id 为该标识的能力。
+// 「引擎入口」指引擎里有一个以配置标识登记的东西：engine/skills.ts 里的 `*_SKILL_ID` 常量。
 // 配置里有、却没有引擎入口的技能与世界观必须登记在下面两张表之一，并写明原因；
 // skillCoverage.test.ts 把这两张表与配置逐条对账（多登记、少登记都会失败）。
 //
@@ -23,6 +22,8 @@ export const SKILLS_IMPLEMENTED_WITHOUT_ID: Readonly<Record<string, string>> = {
     '狂热：SHOOT 结算前由 game.ts 按射手角色 id 挂起应答窗口，拒绝弃牌则骰值 -1',
   'dm_harbor.worldview':
     '港口世界观：终局判定 endIf 里的 checkHarborWin（两个金库打开且秘密未开，梦主胜）',
+  'dm_mercury_route.worldview':
+    '航路世界观：startGame 分配梦主角色后由 applyMercuryRouteExtraFailBribe 向贿赂池追加 1 张失败贿赂',
   'dm_black_hole.worldview': '黑洞世界观：getEffectiveMaxUnlockPerTurn 把每回合解锁上限提到 2',
   'dm_midsummer.skill_0': '充盈：抽牌阶段按未派发贿赂数多抽牌（getMidsummerExtraDraws）',
   'dm_midsummer.worldview': '盛夏世界观：抽牌阶段盗梦者多抽 1 张（getMidsummerWorldThiefBonus）',
