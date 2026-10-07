@@ -220,4 +220,46 @@ describe('buildRealtime 的跨域配置', () => {
     expect(await originHeader('http://a.test')).toBe('http://a.test');
     expect(await originHeader(undefined)).toBeNull();
   });
+
+  /** 实时连接握手（长轮询）的跨域头：socket.io 自己的跨域配置 */
+  async function socketOriginHeader(
+    corsOrigin: string | string[] | undefined,
+  ): Promise<string | null> {
+    const rt = buildRealtime({
+      store: new InMemoryMatchStore(),
+      archive: new InMemoryMatchArchive(),
+      lobbyRedis: {
+        get: vi.fn(),
+        setex: vi.fn(),
+        set: vi.fn(),
+        del: vi.fn(),
+        exists: vi.fn(),
+      },
+      heartbeatRedis: { get: vi.fn(), setex: vi.fn(), del: vi.fn() } as never,
+      httpRateLimit: passThrough,
+      ws: corsOrigin === undefined ? undefined : { corsOrigin },
+    });
+    const port = await rt.start(0);
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/ws/?EIO=4&transport=polling`, {
+        headers: { Origin: 'http://a.test' },
+      });
+      return res.headers.get('access-control-allow-origin');
+    } finally {
+      await rt.stop();
+    }
+  }
+
+  it('实时连接：没配置时不放行任何跨域源；白名单只放行名单内的源；* 放行所有', async () => {
+    expect(await socketOriginHeader(undefined)).toBeNull();
+    expect(await socketOriginHeader([])).toBeNull();
+    expect(await socketOriginHeader(['http://a.test'])).toBe('http://a.test');
+    expect(await socketOriginHeader(['http://b.test'])).toBeNull();
+    expect(await socketOriginHeader(['*'])).toBe('*');
+  });
+
+  it('HTTP 与实时连接都没配置时：任何源都拿不到跨域头', async () => {
+    expect(await originHeader(undefined)).toBeNull();
+    expect(await socketOriginHeader(undefined)).toBeNull();
+  });
 });

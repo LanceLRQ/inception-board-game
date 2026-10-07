@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { signToken } from '../infra/jwt.js';
 import { AppError } from '../infra/errors.js';
+import { InMemoryBanChecker } from '../services/BanChecker.js';
 import { isComplete, loadFinishedMatch, optionalAccountId, toStepView } from './archiveEvents.js';
 import {
   ACCOUNT_OUTSIDER,
@@ -12,15 +13,25 @@ import {
 } from '../testing/archiveFixture.js';
 
 describe('optionalAccountId', () => {
-  it('有效令牌给出账号 id', () => {
-    const t = signToken({ playerId: 'p1', nickname: 'x' });
-    expect(optionalAccountId(`Bearer ${t}`)).toBe('p1');
+  it('有效令牌给出账号 id', async () => {
+    const t = signToken({ playerId: 'p1', nickname: 'x', tokenVersion: 0 });
+    expect(await optionalAccountId(`Bearer ${t}`)).toBe('p1');
+    expect(await optionalAccountId(`Bearer ${t}`, new InMemoryBanChecker())).toBe('p1');
   });
 
-  it('没有头、格式不对、令牌无效都给 null 而不抛', () => {
-    expect(optionalAccountId(undefined)).toBeNull();
-    expect(optionalAccountId('Basic abc')).toBeNull();
-    expect(optionalAccountId('Bearer garbage')).toBeNull();
+  it('没有头、格式不对、令牌无效都给 null 而不抛', async () => {
+    expect(await optionalAccountId(undefined)).toBeNull();
+    expect(await optionalAccountId('Basic abc')).toBeNull();
+    expect(await optionalAccountId('Bearer garbage')).toBeNull();
+  });
+
+  it('令牌版本已作废（账号在别处找回过）：按未登录处理，不给账号 id', async () => {
+    const bans = new InMemoryBanChecker();
+    bans.setTokenVersion('p1', 1);
+    const stale = signToken({ playerId: 'p1', nickname: 'x', tokenVersion: 0 });
+    const fresh = signToken({ playerId: 'p1', nickname: 'x', tokenVersion: 1 });
+    expect(await optionalAccountId(`Bearer ${stale}`, bans)).toBeNull();
+    expect(await optionalAccountId(`Bearer ${fresh}`, bans)).toBe('p1');
   });
 });
 

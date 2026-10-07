@@ -34,7 +34,7 @@ const realInit = {
   nickname: 'A',
   token: 't',
   expiresAt: 1,
-  recoveryCode: 'ABCD-2345',
+  recoveryCode: 'ABCD-2345-EFGH',
   recoveryCodeWarning: 'w',
 };
 
@@ -51,7 +51,7 @@ describe('identityApi', () => {
     post.mockResolvedValue(realInit);
     const { identityApi } = await import('./identityApi');
     const res = await identityApi.init('A');
-    expect(res.recoveryCode).toBe('ABCD-2345');
+    expect(res.recoveryCode).toBe('ABCD-2345-EFGH');
     expect(res.offline).toBe(false);
   });
 
@@ -72,17 +72,17 @@ describe('identityApi', () => {
   });
 
   it('recover 走 POST /identity/recover，返回新恢复码', async () => {
-    post.mockResolvedValue({ ...realInit, recoveryCode: 'WXYZ-7890' });
+    post.mockResolvedValue({ ...realInit, recoveryCode: 'WXYZ-7890-MNPQ' });
     const { identityApi } = await import('./identityApi');
-    const res = await identityApi.recover('ABCD-2345');
-    expect(post).toHaveBeenCalledWith('/identity/recover', { code: 'ABCD-2345' });
-    expect(res.recoveryCode).toBe('WXYZ-7890');
+    const res = await identityApi.recover('ABCD-2345-EFGH');
+    expect(post).toHaveBeenCalledWith('/identity/recover', { code: 'ABCD-2345-EFGH' });
+    expect(res.recoveryCode).toBe('WXYZ-7890-MNPQ');
   });
 
   it('recover 遇到后端错误直接抛出，不回落到模拟身份', async () => {
     post.mockRejectedValue(new TypeError('Failed to fetch'));
     const { identityApi, isOfflineIdentity } = await import('./identityApi');
-    await expect(identityApi.recover('ABCD-2345')).rejects.toBeInstanceOf(TypeError);
+    await expect(identityApi.recover('ABCD-2345-EFGH')).rejects.toBeInstanceOf(TypeError);
     expect(isOfflineIdentity()).toBe(false);
   });
 
@@ -91,7 +91,7 @@ describe('identityApi', () => {
     const { identityApi } = await import('./identityApi');
     await identityApi.init('A');
     post.mockClear();
-    await expect(identityApi.recover('ABCD-2345')).rejects.toMatchObject({ code: 'OFFLINE' });
+    await expect(identityApi.recover('ABCD-2345-EFGH')).rejects.toMatchObject({ code: 'OFFLINE' });
     await expect(identityApi.rotateRecoveryCode()).rejects.toMatchObject({ code: 'OFFLINE' });
     expect(post).not.toHaveBeenCalled();
   });

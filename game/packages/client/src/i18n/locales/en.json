@@ -290,6 +290,7 @@
       "NOT_IN_MATCH": "You are not in this match",
       "PROTOCOL_MISMATCH": "Client version differs from the server, please refresh",
       "REPLACED": "You joined this match from another page",
+      "TOKEN_REVOKED": "This account was restored on another device, please re-enter",
       "MATCH_ABORTED": "The server cannot continue this match, please re-enter later"
     }
   },
@@ -530,21 +531,22 @@
     "restore": {
       "entry": "Already have an account? Restore with a recovery code",
       "label": "Recovery code",
-      "placeholder": "XXXX-XXXX",
+      "placeholder": "XXXX-XXXX-XXXX",
       "submit": "Restore",
-      "hint": "After restoring, this code stops working and a new one is issued."
+      "hint": "After restoring, this code stops working and a new one is issued. Any other device signed in to this account is signed out."
     },
     "error": {
       "invalid": "The recovery code is invalid or has already been used. Each code works only once; please check for typos.",
       "banned": "This account is banned and cannot be restored for now.",
       "rateLimited": "Too many attempts. Please try again later.",
-      "format": "Invalid format. A recovery code has 8 letters or digits.",
+      "format": "Invalid format. A recovery code has 12 letters or digits.",
       "offline": "Offline mode: recovery codes are unavailable.",
       "network": "Network or server error. Please try again later."
     },
     "rotateError": {
       "unauthorized": "Your session has expired. Please go back to the lobby."
     },
+    "revoked": "This account was restored on another device, so you have been signed out here.",
     "account": {
       "heading": "Account",
       "nickname": "Nickname",

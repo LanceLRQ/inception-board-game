@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../app.js';
-import { hashRecoveryCode, legacyHashRecoveryCode } from '../infra/recoveryCode.js';
+import jwt from 'jsonwebtoken';
+import { hashRecoveryCode } from '../infra/recoveryCode.js';
 import {
   createMemoryIdentityPrisma,
   type MemoryIdentityPrisma,
@@ -24,10 +25,17 @@ let server: Server | null = null;
 let base = '';
 let db: MemoryIdentityPrisma;
 
+let disconnects: Array<{ playerId: string; code?: string; message?: string }>;
+
 async function start(recoverLimiter?: RecoverAttemptLimiter): Promise<void> {
   db = createMemoryIdentityPrisma();
+  disconnects = [];
   const app = createApp({
     identityPrisma: db,
+    disconnectPlayer: (playerId, code, message) => {
+      disconnects.push({ playerId, code, message });
+      return 1;
+    },
     ...(recoverLimiter ? { recoverLimiter } : {}),
     rateLimit: async (_ctx, next) => {
       await next();
@@ -74,12 +82,6 @@ describe('恢复码存储与一次性', () => {
       include: { player: true },
     });
     expect(row?.playerId).toBe(c.playerId);
-    expect(
-      await db.recoveryCode.findUnique({
-        where: { codeHash: legacyHashRecoveryCode(c.recoveryCode) },
-        include: { player: true },
-      }),
-    ).toBeNull();
   });
 
   it('恢复成功后旧码失效，响应带新码且新码可用', async () => {
@@ -93,7 +95,7 @@ describe('恢复码存储与一次性', () => {
       recoveryCodeWarning: string;
     };
     expect(body.playerId).toBe(c.playerId);
-    expect(body.recoveryCode).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+    expect(body.recoveryCode).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     expect(body.recoveryCode).not.toBe(c.recoveryCode);
     expect(body.recoveryCodeWarning).toBeTruthy();
 
@@ -134,32 +136,19 @@ describe('恢复码存储与一次性', () => {
     );
   });
 
-  it('旧的无盐哈希记录可恢复，并被改写成新哈希', async () => {
+  it('不再接受 8 位的旧格式恢复码，也不消耗额度', async () => {
     await start();
-    const player = await db.player.create({
-      data: { id: 'p-legacy', nickname: '乙', avatarSeed: '1', locale: 'zh-CN' },
-    });
-    await db.recoveryCode.create({
-      data: { codeHash: legacyHashRecoveryCode('ABCD-1234'), playerId: player.id },
-    });
+    for (let i = 0; i < 20; i++) {
+      expect((await post('/identity/recover', { code: 'ABCD-2345' })).status).toBe(400);
+    }
+    expect((await post('/identity/recover', { code: '0000-0000-0000' })).status).toBe(422);
+  });
 
-    const r = await post('/identity/recover', { code: 'ABCD-1234' });
-    expect(r.status).toBe(200);
-    expect(((await r.json()) as { playerId: string }).playerId).toBe('p-legacy');
-
-    // 旧哈希已不存在，记录改写到新哈希（并已作废）
-    expect(
-      await db.recoveryCode.findUnique({
-        where: { codeHash: legacyHashRecoveryCode('ABCD-1234') },
-        include: { player: true },
-      }),
-    ).toBeNull();
-    const upgraded = await db.recoveryCode.findUnique({
-      where: { codeHash: hashRecoveryCode('ABCD-1234') },
-      include: { player: true },
-    });
-    expect(upgraded?.revokedAt).not.toBeNull();
-    expect((await post('/identity/recover', { code: 'ABCD-1234' })).status).toBe(422);
+  it('不带连字符、小写的完整 12 位恢复码同样可恢复', async () => {
+    await start();
+    const c = await init();
+    const compact = c.recoveryCode.replace(/-/g, '').toLowerCase();
+    expect((await post('/identity/recover', { code: compact })).status).toBe(200);
   });
 
   it('GET /identity/recovery-code 只返回是否存在与创建时间，不含哈希', async () => {
@@ -174,6 +163,125 @@ describe('恢复码存储与一次性', () => {
     const body = JSON.parse(text) as { hasCode: boolean; createdAt: string };
     expect(body.hasCode).toBe(true);
     expect(body.createdAt).toBeTruthy();
+  });
+});
+
+const authed = (token: string, path: string, init: RequestInit = {}) =>
+  fetch(`${base}${path}`, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+      ...init.headers,
+    },
+  });
+
+function versionOf(token: string): number {
+  return (jwt.decode(token) as { tokenVersion: number }).tokenVersion;
+}
+
+describe('恢复后旧设备的令牌作废', () => {
+  interface Recovered {
+    token: string;
+    recoveryCode: string;
+  }
+  const recover = async (code: string): Promise<Recovered> =>
+    (await (await post('/identity/recover', { code })).json()) as Recovered;
+
+  it('建档的令牌版本是 0，恢复一次加一，新令牌带新版本', async () => {
+    await start();
+    const c = await init();
+    expect(versionOf(c.token)).toBe(0);
+    const r1 = await recover(c.recoveryCode);
+    expect(versionOf(r1.token)).toBe(1);
+    const r2 = await recover(r1.recoveryCode);
+    expect(versionOf(r2.token)).toBe(2);
+    expect((await db.player.findUnique({ where: { id: c.playerId } }))?.tokenVersion).toBe(2);
+  });
+
+  it('恢复后新令牌可用，旧令牌立刻被拒（即使旧令牌刚被缓存过）', async () => {
+    await start();
+    const c = await init();
+    // 先用旧令牌访问一次，让账号状态进入缓存
+    expect((await authed(c.token, '/identity/me')).status).toBe(200);
+    const r = await recover(c.recoveryCode);
+    const oldRes = await authed(c.token, '/identity/me');
+    expect(oldRes.status).toBe(401);
+    expect(((await oldRes.json()) as { error: { code: string } }).error.code).toBe('TOKEN_REVOKED');
+    expect((await authed(r.token, '/identity/me')).status).toBe(200);
+  });
+
+  it('旧令牌不能再轮换恢复码、改昵称、查看恢复码状态，新令牌不受影响', async () => {
+    await start();
+    const c = await init();
+    const r = await recover(c.recoveryCode);
+
+    const rotate = await authed(c.token, '/identity/rotate-recovery-code', { method: 'POST' });
+    expect(rotate.status).toBe(401);
+    const rename = await authed(c.token, '/identity/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ nickname: '乙乙' }),
+    });
+    expect(rename.status).toBe(401);
+    expect((await authed(c.token, '/identity/recovery-code')).status).toBe(401);
+
+    // 被拒的请求没有产生副作用：昵称没变，新恢复码仍有效
+    expect((await db.player.findUnique({ where: { id: c.playerId } }))?.nickname).toBe('甲');
+    expect((await post('/identity/recover', { code: r.recoveryCode })).status).toBe(200);
+    expect((await authed(r.token, '/identity/recovery-code')).status).toBe(401); // r 已被下一次恢复作废
+  });
+
+  it('改昵称与轮换恢复码不改变令牌版本；改昵称签发的新令牌沿用当前版本', async () => {
+    await start();
+    const c = await init();
+    const r = await recover(c.recoveryCode);
+    const rename = await authed(r.token, '/identity/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ nickname: '乙乙' }),
+    });
+    const { token } = (await rename.json()) as { token: string };
+    expect(versionOf(token)).toBe(1);
+    expect((await authed(token, '/identity/rotate-recovery-code', { method: 'POST' })).status).toBe(
+      200,
+    );
+    expect((await db.player.findUnique({ where: { id: c.playerId } }))?.tokenVersion).toBe(1);
+    expect((await authed(r.token, '/identity/me')).status).toBe(200);
+  });
+
+  it('恢复成功后断开该账号现有的全部连接，原因是令牌作废', async () => {
+    await start();
+    const c = await init();
+    await recover(c.recoveryCode);
+    expect(disconnects).toEqual([
+      { playerId: c.playerId, code: 'TOKEN_REVOKED', message: expect.any(String) },
+    ]);
+  });
+
+  it('恢复失败（无效码、事务失败）既不加版本也不断连接，旧令牌照常可用', async () => {
+    await start();
+    const c = await init();
+    expect((await post('/identity/recover', { code: '0000-0000-0000' })).status).toBe(422);
+    db.recoveryCode.create = async () => {
+      throw new Error('db write failed');
+    };
+    expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(500);
+    expect(disconnects).toEqual([]);
+    expect((await db.player.findUnique({ where: { id: c.playerId } }))?.tokenVersion).toBe(0);
+    expect((await authed(c.token, '/identity/me')).status).toBe(200);
+  });
+
+  it('恢复成功记一条 INFO 日志，日志里没有恢复码与令牌', async () => {
+    await start();
+    const c = await init();
+    const r = await recover(c.recoveryCode);
+    const infoCalls = (logger.info as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const line = infoCalls.find((args) => args[1] === 'identity recovered');
+    expect(line?.[0]).toMatchObject({ playerId: c.playerId });
+    const text = JSON.stringify(infoCalls);
+    expect(text).not.toContain(c.recoveryCode);
+    expect(text).not.toContain(r.recoveryCode);
+    expect(text).not.toContain(r.token);
+    expect(text).not.toContain(c.token);
   });
 });
 
@@ -222,7 +330,7 @@ describe('恢复失败限速：并发', () => {
       return realFind(args);
     };
     const results = await Promise.all(
-      Array.from({ length: 100 }, () => post('/identity/recover', { code: '0000-0000' })),
+      Array.from({ length: 100 }, () => post('/identity/recover', { code: '0000-0000-0000' })),
     );
     const statuses = results.map((r) => r.status);
     const invalid = statuses.filter((s) => s === 422).length;
@@ -237,7 +345,7 @@ describe('恢复失败限速', () => {
     await start();
     const c = await init();
     for (let i = 0; i < 10; i++) {
-      expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(422);
+      expect((await post('/identity/recover', { code: '0000-0000-0000' })).status).toBe(422);
     }
     expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(429);
   });
@@ -250,7 +358,7 @@ describe('恢复失败限速', () => {
       expect(r.status).toBe(200);
       code = ((await r.json()) as { recoveryCode: string }).recoveryCode;
     }
-    for (let i = 0; i < 9; i++) await post('/identity/recover', { code: '0000-0000' });
+    for (let i = 0; i < 9; i++) await post('/identity/recover', { code: '0000-0000-0000' });
     expect((await post('/identity/recover', { code })).status).toBe(200);
   });
 
@@ -264,7 +372,7 @@ describe('恢复失败限速', () => {
       },
     });
     const c = await init();
-    expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(429);
+    expect((await post('/identity/recover', { code: '0000-0000-0000' })).status).toBe(429);
     expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(429);
     expect(logger.error).toHaveBeenCalled();
   });
@@ -281,7 +389,7 @@ describe('恢复失败限速', () => {
     await start(new FallbackRecoverAttemptLimiter(broken, new InMemoryRecoverAttemptLimiter()));
     const c = await init();
     for (let i = 0; i < RECOVER_FAIL_LIMIT; i++) {
-      expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(422);
+      expect((await post('/identity/recover', { code: '0000-0000-0000' })).status).toBe(422);
     }
     expect((await post('/identity/recover', { code: c.recoveryCode })).status).toBe(429);
   });
@@ -313,13 +421,14 @@ describe('恢复失败限速', () => {
     for (let i = 0; i < 20; i++) {
       expect((await post('/identity/recover', { code: 'bad' })).status).toBe(400);
     }
-    expect((await post('/identity/recover', { code: '0000-0000' })).status).toBe(422);
+    expect((await post('/identity/recover', { code: '0000-0000-0000' })).status).toBe(422);
   });
 
   it('超长的 fingerprint 返回 400', async () => {
     await start();
     expect(
-      (await post('/identity/recover', { code: '0000-0000', fingerprint: 'f'.repeat(129) })).status,
+      (await post('/identity/recover', { code: '0000-0000-0000', fingerprint: 'f'.repeat(129) }))
+        .status,
     ).toBe(400);
   });
 });

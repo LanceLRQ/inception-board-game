@@ -153,3 +153,14 @@ export {
   isMatchPlayerCount,
   playersShortOfMinimum,
 } from './rules/playerCount.js';
+
+// 恢复码格式
+export {
+  RECOVERY_CODE_ALPHABET,
+  RECOVERY_CODE_FORMATTED_LENGTH,
+  RECOVERY_CODE_GROUP_SIZE,
+  RECOVERY_CODE_LENGTH,
+  formatRecoveryCode,
+  isRecoveryCodeShape,
+  normalizeRecoveryCodeInput,
+} from './identity/recoveryCode.js';

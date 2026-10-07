@@ -224,11 +224,11 @@ describe('伪造与畸形请求', () => {
     const { room, accounts } = makeRoom({ humans: 4, bots: 0 });
     await server.rt.matches.createFromRoom(room);
 
-    const stranger = signToken({ playerId: 'not-a-member', nickname: 'x' });
+    const stranger = signToken({ playerId: 'not-a-member', nickname: 'x', tokenVersion: 0 });
     const a = await tryConnect(server.url, stranger, room.id);
     expect(a).toEqual({ ok: false, reason: 'NOT_IN_MATCH' });
 
-    const member = signToken({ playerId: accounts[0]!.playerId, nickname: 'x' });
+    const member = signToken({ playerId: accounts[0]!.playerId, nickname: 'x', tokenVersion: 0 });
     const b = await tryConnect(server.url, member, 'no-such-match');
     expect(b).toEqual({ ok: false, reason: 'NOT_IN_MATCH' });
 
@@ -691,7 +691,7 @@ describe('封禁', () => {
   it('被封禁的账号握手被拒，错误为 BANNED；解封后可连接', async () => {
     const { server, matchID, accounts } = await room();
     const acct = accounts[0]!;
-    const token = signToken({ playerId: acct.playerId, nickname: acct.nickname });
+    const token = signToken({ playerId: acct.playerId, nickname: acct.nickname, tokenVersion: 0 });
     server.bans.ban(acct.playerId);
     const out = await tryConnect(server.url, token, matchID, acct.playerId);
     expect(out).toEqual({ ok: false, reason: 'BANNED' });

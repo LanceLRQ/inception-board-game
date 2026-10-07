@@ -66,7 +66,7 @@ export class MemoryRedis implements LobbyRedis {
 export interface DevServerOptions {
   port?: number;
   timing?: TimingConfig;
-  /** 允许跨域访问的页面源（客户端开发服务的地址） */
+  /** 允许跨域访问的页面源（客户端开发服务的地址）；不给就只允许同源 */
   corsOrigin?: string;
   /** 对局种子来源；默认读环境变量 MATCH_FIXED_SEED，没配置就每局随机 */
   randomSeed?: () => string;
@@ -110,7 +110,6 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
   const redis = new MemoryRedis();
   let started: Realtime | null = null;
   const identity = createMemoryIdentityPrisma();
-  const origin = opts.corsOrigin ?? '*';
   // 配置了固定种子时，每一局都用同一个种子（端到端用例要求每次走同一局）；
   // 生产环境配置该变量会在这里抛错，进程拒绝启动
   const randomSeed = opts.randomSeed ?? resolveFixedMatchSeed(process.env);
@@ -130,7 +129,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     httpRateLimit: async (_ctx, next) => {
       await next();
     },
-    ws: { corsOrigin: origin, path: '/ws' },
+    ws: { ...(opts.corsOrigin ? { corsOrigin: opts.corsOrigin } : {}), path: '/ws' },
   });
   started = rt;
   const port = await rt.start(opts.port ?? 0);

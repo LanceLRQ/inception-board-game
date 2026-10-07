@@ -1,41 +1,20 @@
-import { createHmac, createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { RECOVERY_CODE_ALPHABET, RECOVERY_CODE_LENGTH, formatRecoveryCode } from '@icgame/shared';
 import { logger } from './logger.js';
 
-// Crockford's Base32 编码（匿名身份的恢复码格式）
-// 排除 I/L/O/U 防止混淆
+// 恢复码生成：Crockford Base32，长度与字符集取自共享常量
 
-const ENCODING_CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-const DECODING_MAP = new Map<string, number>();
-for (let i = 0; i < ENCODING_CHARS.length; i++) {
-  DECODING_MAP.set(ENCODING_CHARS.charAt(i), i);
-}
-
-export function encodeCrockford(num: bigint): string {
-  if (num === 0n) return '0';
-  let result = '';
-  let n = num;
-  while (n > 0n) {
-    const idx = Number(n % 32n);
-    result = ENCODING_CHARS[idx]! + result;
-    n /= 32n;
-  }
-  return result;
-}
-
+/** 生成一个新的恢复码：每个字符取 5 位随机数（32 整除 256，取低 5 位没有取模偏差），共 60 位熵 */
 export function generateRecoveryCode(): string {
-  const bytes = new Uint8Array(5); // 40 bits → 8 chars in base32
+  const bytes = new Uint8Array(RECOVERY_CODE_LENGTH);
   crypto.getRandomValues(bytes);
-  let num = 0n;
-  for (const b of bytes) {
-    num = num * 256n + BigInt(b);
-  }
-  const raw = encodeCrockford(num).padStart(8, '0');
-  // 格式化为 XXXX-XXXX
-  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
+  let raw = '';
+  for (const b of bytes) raw += RECOVERY_CODE_ALPHABET[b & 31]!;
+  return formatRecoveryCode(raw);
 }
 
 // ---- 恢复码哈希 ----
-// 恢复码只有约 40 bit 熵，库里若只存无盐摘要，库一泄露就能离线穷举；
+// 恢复码只有 60 bit 熵，库里若只存无盐摘要，库一泄露仍可能被离线穷举；
 // 因此带服务端密钥（pepper）做 HMAC，密钥不与数据放在一起。
 
 /** 开发 / 测试环境未配置密钥时使用的固定值；生产环境禁止使用 */
@@ -46,7 +25,7 @@ const MIN_PEPPER_LENGTH = 16;
 
 let devPepperWarned = false;
 
-/** 去掉连字符并转大写，让 `abcd-1234` / `ABCD1234` 得到同一个哈希 */
+/** 去掉连字符并转大写，让 `abcd-2345-efgh` / `ABCD2345EFGH` 得到同一个哈希 */
 export function normalizeRecoveryCode(code: string): string {
   return code.replace(/-/g, '').toUpperCase();
 }
@@ -77,9 +56,4 @@ export function hashRecoveryCode(code: string, env: NodeJS.ProcessEnv = process.
   return createHmac('sha256', resolveRecoveryPepper(env))
     .update(normalizeRecoveryCode(code))
     .digest('hex');
-}
-
-/** 旧数据的哈希：对「带连字符的大写形式」做无盐 SHA-256，仅用于识别并升级旧记录 */
-export function legacyHashRecoveryCode(code: string): string {
-  return createHash('sha256').update(code.toUpperCase()).digest('hex');
 }

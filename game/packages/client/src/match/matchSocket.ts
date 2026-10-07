@@ -11,6 +11,7 @@ import {
 import { isValidChatPresetId } from '@icgame/shared';
 import { logger } from '@/lib/logger';
 import { toLocalDeadline } from '@/lib/deadlineClock';
+import { TOKEN_REVOKED_CODE, notifyIdentityRevoked } from '@/lib/identityRevoked';
 import { appendChatEntry, parseIncomingChat, type ChatEntry } from './chat';
 import type { ConnectionState, MoveOutcome } from './matchSource';
 
@@ -62,7 +63,7 @@ export interface MatchSocketSnapshot {
   chat: readonly ChatEntry[];
 }
 
-const HANDSHAKE_REJECTIONS = ['AUTH_REQUIRED', 'AUTH_INVALID', 'NOT_IN_MATCH'];
+const HANDSHAKE_REJECTIONS = ['AUTH_REQUIRED', 'AUTH_INVALID', 'TOKEN_REVOKED', 'NOT_IN_MATCH'];
 const DEFAULT_MOVE_TIMEOUT_MS = 10_000;
 
 const INITIAL: MatchSocketSnapshot = {
@@ -260,7 +261,11 @@ export class MatchSocket {
 
   private onServerError(msg: { code?: string }): void {
     if (this.closed) return;
-    if (msg?.code === 'REPLACED' || msg?.code === 'MATCH_ABORTED') {
+    if (
+      msg?.code === 'REPLACED' ||
+      msg?.code === 'MATCH_ABORTED' ||
+      msg?.code === TOKEN_REVOKED_CODE
+    ) {
       this.fail(msg.code);
       return;
     }
@@ -374,6 +379,8 @@ export class MatchSocket {
     this.settleAll({ ok: false, code: 'timeout' });
     this.update({ fatal: reason, connection: 'failed' });
     this.socket?.disconnect();
+    // 账号已在别处恢复：本机令牌作废，交给根组件清掉身份并回大厅
+    if (reason === TOKEN_REVOKED_CODE) notifyIdentityRevoked(this.options.token);
   }
 
   private settleAll(outcome: MoveOutcome): void {

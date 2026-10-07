@@ -103,20 +103,26 @@ beforeEach(() => {
 
 describe('authorizeHandshake', () => {
   let h: Harness;
-  const verify = (token: string): { playerId: string; nickname: string } => {
-    if (token === 'good-0') return { playerId: 'acct-0', nickname: '真人0' };
-    if (token === 'good-stranger') return { playerId: 'acct-x', nickname: '路人' };
+  const verify = (token: string): { playerId: string; nickname: string; tokenVersion: number } => {
+    if (token === 'good-0') return { playerId: 'acct-0', nickname: '真人0', tokenVersion: 0 };
+    if (token === 'good-stranger') return { playerId: 'acct-x', nickname: '路人', tokenVersion: 0 };
     throw new Error('bad token');
   };
   const banned = new Set<string>();
+  /** 账号当前的令牌版本；没登记的账号是 0 */
+  const versions = new Map<string, number>();
   beforeEach(async () => {
     banned.clear();
+    versions.clear();
     h = await makeMatch();
   });
   const deps = () => ({
     verifyToken: verify,
     matches: h.svc,
-    bans: { isBanned: async (id: string) => banned.has(id) },
+    bans: {
+      isBanned: async (id: string) => banned.has(id),
+      isTokenCurrent: async (id: string, v: number) => (versions.get(id) ?? 0) === v,
+    },
   });
 
   it('accepts a member and returns the seat', async () => {
@@ -162,6 +168,19 @@ describe('authorizeHandshake', () => {
     const missing = await authorizeHandshake({ token: 'good-0', matchID: 'no-such-match' }, deps());
     expect(stranger).toEqual({ ok: false, error: 'NOT_IN_MATCH' });
     expect(missing).toEqual(stranger);
+  });
+
+  it('令牌版本已落后（账号在别处找回过）：返回 TOKEN_REVOKED，且不查成员关系', async () => {
+    versions.set('acct-0', 1);
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 'room-1' }, deps())).toEqual({
+      ok: false,
+      error: 'TOKEN_REVOKED',
+    });
+    // 不是成员的对局也一样：先判令牌，不泄露对局是否存在
+    expect(await authorizeHandshake({ token: 'good-0', matchID: 'no-such' }, deps())).toEqual({
+      ok: false,
+      error: 'TOKEN_REVOKED',
+    });
   });
 
   it('rejects a banned account with BANNED before checking membership', async () => {

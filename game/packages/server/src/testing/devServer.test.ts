@@ -287,4 +287,71 @@ describe('全内存开发服务', () => {
     ).toBe(403);
     expect((await post(b.token, { targetSeat: Number(sa.seat), reason: 'nope' })).status).toBe(400);
   });
+  it('凭恢复码在新设备找回账号：旧设备的对局与房间连接被踢，旧令牌不能再握手，新令牌可以', async () => {
+    dev = await startDevServer({ port: 0 });
+    const base = dev.url;
+    const a = await api<{ token: string; recoveryCode: string }>(
+      base,
+      'POST',
+      '/identity/init',
+      undefined,
+      { nickname: '甲' },
+    );
+    const room = await api<{ code: string }>(base, 'POST', '/rooms', a.token, { maxPlayers: 4 });
+    await api(base, 'POST', `/rooms/${room.code}/fill-ai`, a.token);
+    const started = await api<{ matchId: string }>(
+      base,
+      'POST',
+      `/rooms/${room.code}/start`,
+      a.token,
+    );
+
+    const open = (url: string, auth: Record<string, string>) => {
+      // 两条连接各用独立的底层连接（forceNew），否则同一地址的连接会被复用，断开一条会带走另一条
+      const socket = io(url, {
+        path: '/ws',
+        auth,
+        transports: ['websocket'],
+        reconnection: false,
+        forceNew: true,
+      });
+      sockets.push(socket);
+      const errors: Array<{ code?: string }> = [];
+      socket.on('icg:error', (msg: { code?: string }) => errors.push(msg));
+      return { socket, errors };
+    };
+    const until = async (cond: () => boolean): Promise<void> => {
+      const deadline = Date.now() + 3000;
+      while (!cond()) {
+        if (Date.now() > deadline) throw new Error('等待超时');
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    };
+    const matchConn = open(base, { token: a.token, matchID: started.matchId });
+    const roomConn = open(`${base}/rooms`, { token: a.token, code: room.code });
+    await until(() => matchConn.socket.connected && roomConn.socket.connected);
+
+    // 新设备凭恢复码找回
+    const recovered = await api<{ token: string }>(base, 'POST', '/identity/recover', undefined, {
+      code: a.recoveryCode,
+    });
+
+    await until(() => matchConn.socket.disconnected && roomConn.socket.disconnected);
+    expect(matchConn.errors).toContainEqual(expect.objectContaining({ code: 'TOKEN_REVOKED' }));
+    expect(roomConn.errors).toContainEqual(expect.objectContaining({ code: 'TOKEN_REVOKED' }));
+
+    // 旧令牌重连被拒，且原因明确；新令牌正常
+    const rejectOf = (url: string, auth: Record<string, string>) =>
+      new Promise<string>((resolve) => {
+        const { socket } = open(url, auth);
+        socket.on('connect_error', (err: Error) => resolve(err.message));
+      });
+    expect(await rejectOf(base, { token: a.token, matchID: started.matchId })).toBe(
+      'TOKEN_REVOKED',
+    );
+    expect(await rejectOf(`${base}/rooms`, { token: a.token, code: room.code })).toBe(
+      'TOKEN_REVOKED',
+    );
+    expect((await firstState(base, recovered.token, started.matchId)).seat).toBeTruthy();
+  });
 });

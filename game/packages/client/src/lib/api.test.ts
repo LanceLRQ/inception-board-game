@@ -5,6 +5,7 @@ vi.mock('./logger', () => ({
 }));
 
 import { ApiRequestError, NETWORK_ERROR_CODE, api, isNetworkError } from './api';
+import { subscribeIdentityRevoked } from './identityRevoked';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -62,5 +63,64 @@ describe('api 请求封装', () => {
     await expect(api.get('/x')).resolves.toEqual({ a: 1 });
     const init = fetchMock.mock.calls[0]![1] as { headers: Record<string, string> };
     expect(init.headers.Authorization).toBe('Bearer tok-1');
+  });
+
+  describe('令牌被服务端作废（账号已在别处恢复）', () => {
+    function stubError(status: number, code: string) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status,
+          json: async () => ({ error: { code, message: 'x' } }),
+        }),
+      );
+    }
+
+    it('401 TOKEN_REVOKED：广播失效通知（带上用过的令牌），调用方仍收到请求错误', async () => {
+      vi.stubGlobal('localStorage', { getItem: () => 'tok-old' });
+      stubError(401, 'TOKEN_REVOKED');
+      const seen: Array<string | null> = [];
+      const off = subscribeIdentityRevoked((t) => seen.push(t));
+      try {
+        await expect(api.get('/identity/me')).rejects.toMatchObject({
+          status: 401,
+          code: 'TOKEN_REVOKED',
+        });
+      } finally {
+        off();
+      }
+      expect(seen).toEqual(['tok-old']);
+    });
+
+    it.each([
+      [401, 'UNAUTHORIZED'],
+      [403, 'BANNED'],
+      [422, 'INVALID_RECOVERY_CODE'],
+    ])('%i %s 不触发失效通知', async (status, code) => {
+      vi.stubGlobal('localStorage', { getItem: () => 'tok-old' });
+      stubError(status, code);
+      const seen: Array<string | null> = [];
+      const off = subscribeIdentityRevoked((t) => seen.push(t));
+      try {
+        await api.get('/x').catch(() => undefined);
+      } finally {
+        off();
+      }
+      expect(seen).toEqual([]);
+    });
+
+    it('没带令牌的请求收到 TOKEN_REVOKED 也不处理（没有身份可清）', async () => {
+      vi.stubGlobal('localStorage', { getItem: () => null });
+      stubError(401, 'TOKEN_REVOKED');
+      const seen: Array<string | null> = [];
+      const off = subscribeIdentityRevoked((t) => seen.push(t));
+      try {
+        await api.get('/x').catch(() => undefined);
+      } finally {
+        off();
+      }
+      expect(seen).toEqual([]);
+    });
   });
 });

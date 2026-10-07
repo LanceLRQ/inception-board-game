@@ -60,7 +60,8 @@ services:
       # 运营接口令牌，留空即关闭运营接口
       OPERATOR_TOKEN: ${OPERATOR_TOKEN:-}
       OPERATOR_ID: ${OPERATOR_ID:-}
-      WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-*}
+      # 留空 = 只允许同源（自带 nginx 是同源部署）；前后端分域名时填前端页面的源
+      WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-}
       # 邀请链接分享卡片：站点对外地址（留空则取请求里的 Host）与缩略图路径
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       INVITE_IMAGE_PATH: ${INVITE_IMAGE_PATH:-/pwa-512x512.png}

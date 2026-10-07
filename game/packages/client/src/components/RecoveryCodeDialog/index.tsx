@@ -63,7 +63,7 @@ export function RecoveryCodeDialog({
       </DialogHeader>
       <DialogBody>
         <div
-          className="select-all rounded-lg border border-border bg-muted px-3 py-4 text-center font-mono text-3xl font-bold tracking-widest"
+          className="select-all rounded-lg border border-border bg-muted px-3 py-4 text-center font-mono text-2xl font-bold tracking-wider sm:text-3xl"
           data-testid="recovery-code-value"
         >
           {code}

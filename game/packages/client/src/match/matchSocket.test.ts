@@ -8,6 +8,7 @@ import {
   type SeatInfo,
 } from '@icgame/game-engine';
 import { remainingSeconds } from '@/lib/deadlineClock';
+import { subscribeIdentityRevoked } from '@/lib/identityRevoked';
 import { MatchSocket, type SocketLike } from './matchSocket';
 
 type Handler = (...args: unknown[]) => void;
@@ -522,7 +523,7 @@ describe('MatchSocket', () => {
     expect(ms.getSnapshot().connection).toBe('reconnecting');
   });
 
-  it.each(['AUTH_REQUIRED', 'AUTH_INVALID', 'NOT_IN_MATCH'])(
+  it.each(['AUTH_REQUIRED', 'AUTH_INVALID', 'TOKEN_REVOKED', 'NOT_IN_MATCH'])(
     '握手被拒 %s：fatal 置位、failed、停止重连',
     (code) => {
       ms.connect();
@@ -533,6 +534,44 @@ describe('MatchSocket', () => {
       expect(socket.disconnectCalls).toBe(1);
     },
   );
+
+  it('令牌被作废：握手被拒时通知身份失效，带上本连接用的令牌', () => {
+    const seen: Array<string | null> = [];
+    const off = subscribeIdentityRevoked((t) => seen.push(t));
+    try {
+      ms.connect();
+      socket.fire('connect_error', new Error('TOKEN_REVOKED'));
+    } finally {
+      off();
+    }
+    expect(seen).toEqual(['tok']);
+  });
+
+  it('令牌被作废：已连上后收到 icg:error 同样 fatal、failed 并通知身份失效', () => {
+    const seen: Array<string | null> = [];
+    const off = subscribeIdentityRevoked((t) => seen.push(t));
+    try {
+      ready(1);
+      socket.fire('icg:error', { type: 'icg:error', code: 'TOKEN_REVOKED', message: 'x' });
+    } finally {
+      off();
+    }
+    expect(ms.getSnapshot().fatal).toBe('TOKEN_REVOKED');
+    expect(ms.getSnapshot().connection).toBe('failed');
+    expect(seen).toEqual(['tok']);
+  });
+
+  it('其他握手拒绝不通知身份失效', () => {
+    const seen: Array<string | null> = [];
+    const off = subscribeIdentityRevoked((t) => seen.push(t));
+    try {
+      ms.connect();
+      socket.fire('connect_error', new Error('NOT_IN_MATCH'));
+    } finally {
+      off();
+    }
+    expect(seen).toEqual([]);
+  });
 
   it('其他 connect_error 不置 fatal，保持重连', () => {
     ms.connect();

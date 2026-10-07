@@ -1,4 +1,4 @@
-// 恢复码尝试次数限制：按来源地址与全站两级计数，防止对 8 位恢复码的在线穷举
+// 恢复码尝试次数限制：按来源地址与全站两级计数，防止对恢复码的在线穷举
 
 import { isIPv6 } from 'node:net';
 import { logger } from '../infra/logger.js';

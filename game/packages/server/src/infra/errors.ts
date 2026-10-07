@@ -3,6 +3,7 @@
 export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
+  | 'TOKEN_REVOKED'
   | 'FORBIDDEN'
   | 'BANNED'
   | 'NOT_FOUND'
@@ -17,6 +18,7 @@ export type ErrorCode =
 const HTTP_STATUS: Record<ErrorCode, number> = {
   VALIDATION_ERROR: 422,
   UNAUTHORIZED: 401,
+  TOKEN_REVOKED: 401,
   FORBIDDEN: 403,
   BANNED: 403,
   NOT_FOUND: 404,

@@ -61,7 +61,7 @@ async function setup() {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        authorization: `Bearer ${signToken({ playerId: account, nickname: account })}`,
+        authorization: `Bearer ${signToken({ playerId: account, nickname: account, tokenVersion: 0 })}`,
       },
       body: JSON.stringify(body),
     });

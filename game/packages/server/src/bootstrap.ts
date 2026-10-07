@@ -153,7 +153,10 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     identityPrisma: deps.identityPrisma,
     recoverLimiter: deps.recoverLimiter,
     bans,
-    disconnectPlayer: (playerId) => gateway.disconnectPlayer(playerId),
+    // 对局连接与房间推送连接都要断开
+    disconnectPlayer: (playerId, code, message) =>
+      gateway.disconnectPlayer(playerId, code, message) +
+      rooms.disconnectPlayer(playerId, code, message),
     ...(deps.reports !== undefined ? { reports: deps.reports } : {}),
     corsOrigin: deps.ws?.corsOrigin,
     trustProxy: deps.trustProxy,

@@ -52,7 +52,7 @@ cd inception-board-game/game
 
 动作：创建数据目录 `deploy/prod/data/`；`.env` 不存在时从 `.env.example` 复制；`JWT_SECRET`、`RECOVERY_CODE_PEPPER`、`POSTGRES_PASSWORD`、`REDIS_PASSWORD` 为空时各生成一个随机值写回 `.env`（已有值不覆盖）；最后写入锁文件 `deploy/prod/.init.lock`，重复运行会被拦下。
 
-随后按需检查 `.env`，生产至少把 `WS_CORS_ORIGIN` 改成前端域名。
+随后按需检查 `.env`。使用自带的 nginx（前端与接口同一个域名）时，`WS_CORS_ORIGIN` 保持留空即可；前后端分域名部署时，把它设成前端页面的源。
 
 ### 3. 构建镜像
 
@@ -88,7 +88,7 @@ cd inception-board-game/game
 | `POSTGRES_PASSWORD` | 必填 | 数据库密码；留空由 `prod.sh init` 生成 |
 | `REDIS_PASSWORD` | 必填 | Redis 密码；留空由 `prod.sh init` 生成。只用字母和数字：它会被拼进连接地址，特殊字符需要转义 |
 | `POSTGRES_DB` / `POSTGRES_USER` | 可选 | 数据库名与用户，默认 `icgame` |
-| `WS_CORS_ORIGIN` | 建议改 | 允许访问后端的页面来源，接口请求与联机实时连接共用；生产填前端域名（如 `https://ico.example.com`），开发用 `*` |
+| `WS_CORS_ORIGIN` | 可选 | 允许跨域访问后端的页面来源（多个用逗号分隔），接口请求与联机实时连接共用。**留空 = 不放行任何跨域源，只有同源页面能访问**，自带 nginx 是同源部署，保持留空即可。**前后端分域名部署时，把它设成前端页面的源**（如 `https://ico.example.com`）。写 `*` 表示放行所有网站，生产环境启动时会打一条警告 |
 | `TRUST_PROXY` | 可选 | 默认 `1`（后端前面是 nginx）：接口限流按 `X-Forwarded-For` 的真实来源地址计数。如果自行把后端端口改为对外开放，不要开启，否则来源地址可被伪造 |
 | `HTTP_RATE_LIMIT_PER_MINUTE` | 可选 | 接口限流：同一来源地址每分钟的请求额度，默认 300。房间等待页靠服务端推送刷新，推送不可用时才每 15 秒轮询一次 |
 | `PUBLIC_BASE_URL` | 建议填 | 站点对外地址（协议 + 域名，如 `https://ico.example.com`，不带路径）。房间邀请链接 `/invite/房间码` 对聊天软件的预览抓取器返回分享卡片，卡片里的链接与缩略图地址按它拼；留空则取请求里的 Host（经 nginx 时取 `X-Forwarded-Host`） |
@@ -225,7 +225,7 @@ cp .env.example .env              # 开发用的变量保持默认即可
 ./scripts/dev.sh dev              # pnpm dev：服务端 + 客户端
 ```
 
-`dev.sh` 启动时会把 `.env` 导出到环境，服务端运行时不读 `.env` 文件，靠的就是这里导出的 `DATABASE_URL`、`REDIS_URL`。`VITE_API_URL`、`VITE_WS_URL` 是生产镜像的构建参数，开发时不会导出（前端直连 `localhost:3001`）。不带参数运行 `./scripts/dev.sh` 进入交互菜单。
+`dev.sh` 启动时会把 `.env` 导出到环境，服务端运行时不读 `.env` 文件，靠的就是这里导出的 `DATABASE_URL`、`REDIS_URL`。`VITE_API_URL`、`VITE_WS_URL` 是生产镜像的构建参数，开发时不会导出（前端直连 `localhost:3001`）。开发时前端（`localhost:3000`）直连后端（`localhost:3001`），属于跨域，所以服务端的 `dev` 脚本在 `WS_CORS_ORIGIN` 未设置时默认放行 `http://localhost:3000` 与 `http://127.0.0.1:3000`；前端换了端口或地址时，在 `.env` 里写上 `WS_CORS_ORIGIN`。不带参数运行 `./scripts/dev.sh` 进入交互菜单。
 
 | 命令 | 作用 |
 | --- | --- |
@@ -293,7 +293,7 @@ cp .env.example .env              # 开发用的变量保持默认即可
 | **数据备份** | 定期做 `pg_dump`（见上文「备份」），并备份 `deploy/prod/data/` |
 | **日志收集** | 把 `./scripts/prod.sh logs` 的输出接入 Loki 等日志系统 |
 | **监控告警** | 后续版本将落地 Grafana 面板；当前可用 `/health` + `/ready` 简单探活 |
-| **CORS 收敛** | `WS_CORS_ORIGIN` 禁用 `*`，改为具体前端域名 |
+| **CORS 收敛** | `WS_CORS_ORIGIN` 保持留空（同源）；分域名部署时填前端域名，不要用 `*` |
 | **后端端口** | 默认只绑定本机，外部访问一律经前端端口。不要把 `api` 服务的端口映射改成对外开放；确有需要时同时把 `TRUST_PROXY` 设为 `0` |
 | **数据库与 Redis 端口** | 生产编排不映射它们的宿主机端口，不要自行加上 |
 | **Redis 淘汰策略** | 不要给 Redis 设置内存淘汰策略：它存着进行中的对局，被淘汰会让对局丢失 |
@@ -309,7 +309,7 @@ cp .env.example .env              # 开发用的变量保持默认即可
 - [ ] `./scripts/prod.sh start` 无报错
 - [ ] `./scripts/prod.sh health` 全部通过（退出码 0）
 - [ ] 浏览器打开首屏可见 Landing 页
-- [ ] `.env` 中 `WS_CORS_ORIGIN` 已改为前端域名
+- [ ] `.env` 中 `WS_CORS_ORIGIN` 为空（同源部署），或已设成前端页面的源（分域名部署），不是 `*`
 - [ ] 防火墙只开放 80/443（生产环境）
 
 ---

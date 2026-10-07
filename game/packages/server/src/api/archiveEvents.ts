@@ -7,6 +7,7 @@ import { eventsFor, type MatchEvent } from '@icgame/game-engine/runner';
 import { AppError } from '../infra/errors.js';
 import { extractBearerToken, verifyToken } from '../infra/jwt.js';
 import type { MatchArchive, StepGap, StepRow } from '../match/MatchArchive.js';
+import type { BanChecker } from '../services/BanChecker.js';
 
 /** 返回给客户端的一步 */
 export interface StepView {
@@ -15,12 +16,21 @@ export interface StepView {
   events: MatchEvent[];
 }
 
-/** 可选地识别身份：令牌有效返回账号 id，没有或无效都返回 null，不报错 */
-export function optionalAccountId(authorization: string | undefined): string | null {
+/**
+ * 可选地识别身份：令牌有效返回账号 id，没有或无效都返回 null，不报错。
+ * 传了账号状态查询器时，版本已作废的令牌（账号在别处找回过）同样按未登录处理，
+ * 否则旧设备还能靠它看到只属于本人座位的私密内容。
+ */
+export async function optionalAccountId(
+  authorization: string | undefined,
+  bans?: Pick<BanChecker, 'isTokenCurrent'>,
+): Promise<string | null> {
   const token = extractBearerToken(authorization);
   if (!token) return null;
   try {
-    return verifyToken(token).playerId;
+    const { playerId, tokenVersion } = verifyToken(token);
+    if (bans && !(await bans.isTokenCurrent(playerId, tokenVersion))) return null;
+    return playerId;
   } catch {
     return null;
   }

@@ -23,6 +23,7 @@ import type { MatchRoom, StepOutput } from '../match/MatchRoom.js';
 import type { MatchService } from '../match/MatchService.js';
 import { verifyToken } from '../infra/jwt.js';
 import { logger } from '../infra/logger.js';
+import { socketCorsOptions } from '../middleware/cors.js';
 import { CHAT_BROADCAST_EVENT } from './chatMessage.js';
 import {
   authorizeHandshake,
@@ -39,7 +40,7 @@ export interface GatewayDeps {
   readonly bot: BotManager;
   readonly heartbeat: HeartbeatManager;
   readonly moveGateway: Pick<MoveGateway, 'accept' | 'commit' | 'consumeRate'>;
-  readonly bans: Pick<BanChecker, 'isBanned'>;
+  readonly bans: Pick<BanChecker, 'isBanned' | 'isTokenCurrent'>;
 }
 
 export interface GatewayOptions {
@@ -77,7 +78,7 @@ export class SocketGateway {
   attach(httpServer: HttpServer): IOServer {
     const io = new IOServer(httpServer, {
       path: this.opts.path ?? DEFAULT_PATH,
-      cors: this.opts.corsOrigin ? { origin: this.opts.corsOrigin, credentials: true } : undefined,
+      cors: socketCorsOptions(this.opts.corsOrigin),
       pingInterval: 25_000,
       pingTimeout: 20_000,
     });
@@ -153,7 +154,7 @@ export class SocketGateway {
     }
   }
 
-  /** 断开某账号的全部连接（封禁生效时调用）；返回断开的连接数。座位随后走掉线托管 */
+  /** 断开某账号的全部对局连接（封禁生效、凭恢复码在别处找回账号时调用）；返回断开的连接数。座位随后走掉线托管 */
   disconnectPlayer(playerID: string, code = 'BANNED', message = 'Account is banned'): number {
     const sids = [...this.deps.registry.getSocketsByPlayer(playerID)];
     for (const sid of sids) {

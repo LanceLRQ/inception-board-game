@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import Koa from 'koa';
-import { corsMiddleware, parseOrigins } from './cors.js';
+import {
+  corsMiddleware,
+  hasWildcardOrigin,
+  isWildcardInProduction,
+  parseOrigins,
+  resolveCorsOrigins,
+  socketCorsOptions,
+} from './cors.js';
 import { errorHandler } from './errorHandler.js';
 import { AppError } from '../infra/errors.js';
 
@@ -113,5 +120,59 @@ describe('parseOrigins', () => {
 
   it('数组输入同样整理', () => {
     expect(parseOrigins([' http://a.test ', ''])).toEqual(['http://a.test']);
+  });
+});
+
+describe('resolveCorsOrigins', () => {
+  it('没配置或配置为空白：空列表，也就是只允许同源', () => {
+    expect(resolveCorsOrigins({})).toEqual([]);
+    expect(resolveCorsOrigins({ WS_CORS_ORIGIN: '' })).toEqual([]);
+    expect(resolveCorsOrigins({ WS_CORS_ORIGIN: '  ' })).toEqual([]);
+  });
+
+  it('配置了就按逗号拆开；显式写 * 仍然是放行所有', () => {
+    expect(resolveCorsOrigins({ WS_CORS_ORIGIN: 'https://a.test, https://b.test' })).toEqual([
+      'https://a.test',
+      'https://b.test',
+    ]);
+    expect(resolveCorsOrigins({ WS_CORS_ORIGIN: '*' })).toEqual(['*']);
+  });
+});
+
+describe('hasWildcardOrigin', () => {
+  it('只在列表里含 * 时为真', () => {
+    expect(hasWildcardOrigin(['*'])).toBe(true);
+    expect(hasWildcardOrigin(['https://a.test', '*'])).toBe(true);
+    expect(hasWildcardOrigin(['https://a.test'])).toBe(false);
+    expect(hasWildcardOrigin([])).toBe(false);
+  });
+});
+
+describe('isWildcardInProduction', () => {
+  it('只有生产环境且放行任意源时为真', () => {
+    expect(isWildcardInProduction(['*'], { NODE_ENV: 'production' })).toBe(true);
+    expect(isWildcardInProduction(['*'], { NODE_ENV: 'development' })).toBe(false);
+    expect(isWildcardInProduction(['https://a.test'], { NODE_ENV: 'production' })).toBe(false);
+    expect(isWildcardInProduction([], { NODE_ENV: 'production' })).toBe(false);
+  });
+});
+
+describe('socketCorsOptions', () => {
+  it('没有配置：不给跨域选项，实时连接只接受同源', () => {
+    expect(socketCorsOptions(undefined)).toBeUndefined();
+    expect(socketCorsOptions([])).toBeUndefined();
+    expect(socketCorsOptions('')).toBeUndefined();
+  });
+
+  it('白名单：逐个源匹配', () => {
+    expect(socketCorsOptions('https://a.test, https://b.test')).toEqual({
+      origin: ['https://a.test', 'https://b.test'],
+      credentials: true,
+    });
+  });
+
+  it('含 *：放行所有源（socket.io 的数组白名单不认 *，要单独写成字符串），且不带凭据', () => {
+    expect(socketCorsOptions(['*'])).toEqual({ origin: '*' });
+    expect(socketCorsOptions(['https://a.test', '*'])).toEqual({ origin: '*' });
   });
 });

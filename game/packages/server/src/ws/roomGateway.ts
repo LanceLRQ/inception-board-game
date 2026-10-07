@@ -18,19 +18,24 @@ export const MAX_ROOM_CONNECTIONS_PER_PLAYER = 5;
 
 const ROOM_CODE_PATTERN = /^[A-Za-z0-9]{6}$/;
 
-export type RoomHandshakeError = 'AUTH_REQUIRED' | 'AUTH_INVALID' | 'BANNED' | 'NOT_IN_ROOM';
+export type RoomHandshakeError =
+  | 'AUTH_REQUIRED'
+  | 'AUTH_INVALID'
+  | 'TOKEN_REVOKED'
+  | 'BANNED'
+  | 'NOT_IN_ROOM';
 
 export type RoomHandshakeResult =
   | { ok: true; playerID: string; room: RoomState }
   | { ok: false; error: RoomHandshakeError };
 
 export interface RoomHandshakeDeps {
-  verifyToken(token: string): { playerId: string };
-  bans: Pick<BanChecker, 'isBanned'>;
+  verifyToken(token: string): { playerId: string; tokenVersion: number };
+  bans: Pick<BanChecker, 'isBanned' | 'isTokenCurrent'>;
   getRoom(code: string): Promise<RoomState | null>;
 }
 
-/** 房间连接的握手校验：令牌有效、未被封禁、本人是房间成员。房间不存在与非成员不作区分 */
+/** 房间连接的握手校验：令牌有效且未被作废、未被封禁、本人是房间成员。房间不存在与非成员不作区分 */
 export async function authorizeRoomHandshake(
   auth: unknown,
   deps: RoomHandshakeDeps,
@@ -43,10 +48,14 @@ export async function authorizeRoomHandshake(
   }
 
   let playerId: string;
+  let tokenVersion: number;
   try {
-    playerId = deps.verifyToken(token).playerId;
+    ({ playerId, tokenVersion } = deps.verifyToken(token));
   } catch {
     return { ok: false, error: 'AUTH_INVALID' };
+  }
+  if (!(await deps.bans.isTokenCurrent(playerId, tokenVersion))) {
+    return { ok: false, error: 'TOKEN_REVOKED' };
   }
   if (await deps.bans.isBanned(playerId)) return { ok: false, error: 'BANNED' };
 
@@ -69,7 +78,7 @@ export function roomChannel(code: string): string {
 }
 
 export interface RoomGatewayDeps {
-  bans: Pick<BanChecker, 'isBanned'>;
+  bans: Pick<BanChecker, 'isBanned' | 'isTokenCurrent'>;
   getRoom(code: string): Promise<RoomState | null>;
 }
 
@@ -107,6 +116,23 @@ export class RoomGateway {
   detach(): void {
     this.ns?.removeAllListeners();
     this.ns = null;
+  }
+
+  /**
+   * 断开某账号在所有房间里的推送连接（封禁生效、凭恢复码在别处找回账号时调用）；返回断开的连接数。
+   * 先发一条带原因的错误再断开，客户端据此区分「被踢」与普通掉线。
+   */
+  disconnectPlayer(playerID: string, code = 'BANNED', message = 'Account is banned'): number {
+    const ns = this.ns;
+    if (ns === null) return 0;
+    let count = 0;
+    for (const socket of [...ns.sockets.values()]) {
+      if ((socket.data as RoomSocketData).playerID !== playerID) continue;
+      socket.emit('icg:error', { type: 'icg:error', code, message });
+      socket.disconnect(true);
+      count += 1;
+    }
+    return count;
   }
 
   /** 房间变了：把最新状态推给仍在成员里的连接，已不在成员里的连接断开 */

@@ -5,6 +5,7 @@
 
 import { io } from 'socket.io-client';
 import { logger } from './logger';
+import { TOKEN_REVOKED_CODE, notifyIdentityRevoked } from './identityRevoked';
 import type { RoomState } from './roomApi';
 import type { SocketLike } from '../match/matchSocket';
 
@@ -14,7 +15,13 @@ export type RoomPushStatus = 'idle' | 'connecting' | 'connected' | 'down';
 export const ROOM_EVENT = 'icg:room';
 const ROOM_NAMESPACE = '/rooms';
 /** 握手被拒的原因：重连也不会成功，不再重试 */
-const HANDSHAKE_REJECTIONS = ['AUTH_REQUIRED', 'AUTH_INVALID', 'BANNED', 'NOT_IN_ROOM'];
+const HANDSHAKE_REJECTIONS = [
+  'AUTH_REQUIRED',
+  'AUTH_INVALID',
+  TOKEN_REVOKED_CODE,
+  'BANNED',
+  'NOT_IN_ROOM',
+];
 
 export interface RoomSocketOptions {
   /** 协议 + 主机 + 端口，不含路径 */
@@ -129,6 +136,7 @@ export class RoomSocket {
     if (HANDSHAKE_REJECTIONS.includes(message)) {
       // 重连也不会通过握手；交给轮询兜底
       this.socket?.disconnect();
+      if (message === TOKEN_REVOKED_CODE) notifyIdentityRevoked(this.options.token);
     }
   }
 
@@ -141,6 +149,14 @@ export class RoomSocket {
       // 服务端随后会断开；不再自动重连
       this.closed = true;
       this.socket?.disconnect();
+      return;
+    }
+    if (msg?.code === TOKEN_REVOKED_CODE) {
+      // 账号已在别处恢复：不再重连，交给根组件清掉身份
+      this.setStatus('down');
+      this.closed = true;
+      this.socket?.disconnect();
+      notifyIdentityRevoked(this.options.token);
       return;
     }
     logger.warn('net/room', 'server error', { code: msg?.code });

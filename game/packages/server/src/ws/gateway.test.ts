@@ -102,6 +102,27 @@ describe('SocketGateway.disconnectPlayer', () => {
     expect(emitted[0]!.payload).toMatchObject({ code: 'BANNED' });
     expect(gateway.disconnectPlayer('nobody')).toBe(0);
   });
+
+  it('可以指定原因：账号在别处找回时告知「令牌作废」', () => {
+    const emitted: Array<{ payload: unknown }> = [];
+    const registry = {
+      getSocketsByPlayer: () => ['s1'],
+    } as unknown as ConnectionRegistry;
+    const gateway = new SocketGateway({
+      registry,
+      router: {} as never,
+      bot: {} as never,
+      heartbeat: {} as never,
+      moveGateway: {} as never,
+      bans: {} as never,
+    });
+    (gateway as unknown as { io: unknown }).io = {
+      to: () => ({ emit: (_e: string, payload: unknown) => emitted.push({ payload }) }),
+      sockets: { sockets: new Map([['s1', { disconnect: () => undefined }]]) },
+    };
+    gateway.disconnectPlayer('acct-1', 'TOKEN_REVOKED', 'recovered elsewhere');
+    expect(emitted[0]!.payload).toMatchObject({ code: 'TOKEN_REVOKED' });
+  });
 });
 
 describe('SocketGateway 存储与中断通知', () => {

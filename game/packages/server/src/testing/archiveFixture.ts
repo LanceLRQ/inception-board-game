@@ -7,7 +7,9 @@ import Koa from 'koa';
 import type Router from '@koa/router';
 import type { MatchEvent } from '@icgame/game-engine/runner';
 import { signToken } from '../infra/jwt.js';
+import { banCheckerContext } from '../middleware/auth.js';
 import { errorHandler } from '../middleware/errorHandler.js';
+import type { BanChecker } from '../services/BanChecker.js';
 import { InMemoryMatchArchive, type StepRow } from '../match/MatchArchive.js';
 import type { MatchMetaRow } from '../api/matchMeta.js';
 import { makeTestSnapshot } from '../match/MatchStore.contract.js';
@@ -25,8 +27,8 @@ export const SEAT1_SECRET = 'SECRET-CARD-FOR-SEAT-1';
 /** move 参数里的标记：任何响应里都不应出现 */
 export const ARGS_SECRET = 'ARGS-SECRET-VALUE';
 
-export function tokenFor(playerId: string): string {
-  return signToken({ playerId, nickname: playerId });
+export function tokenFor(playerId: string, tokenVersion = 0): string {
+  return signToken({ playerId, nickname: playerId, tokenVersion });
 }
 
 function stepRow(matchID: string, stateID: number): StepRow {
@@ -104,9 +106,10 @@ function parseJson(text: string): JsonBody {
 }
 
 /** 起一个只挂给定路由的服务，返回简易 GET 客户端 */
-export async function serveRouter(router: Router): Promise<TestServer> {
+export async function serveRouter(router: Router, bans?: BanChecker): Promise<TestServer> {
   const app = new Koa();
   app.use(errorHandler);
+  if (bans) app.use(banCheckerContext(bans));
   app.use(router.routes());
   const server: Server = createServer(app.callback());
   await new Promise<void>((resolve) => server.listen(0, resolve));

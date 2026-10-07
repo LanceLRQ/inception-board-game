@@ -16,6 +16,8 @@ let cachedSecret: string | null = null;
 export interface JWTPayload {
   playerId: string;
   nickname: string;
+  /** 签发时账号的令牌版本；账号凭恢复码在别处找回后版本加一，旧令牌随之作废 */
+  tokenVersion: number;
 }
 
 /** 读取签名密钥：生产环境缺失或过短时抛错；其他环境回落到开发值并提示一次 */
@@ -59,7 +61,12 @@ export function signToken(payload: JWTPayload): string {
 }
 
 export function verifyToken(token: string): JWTPayload {
-  return jwt.verify(token, getSecret(), { algorithms: ['HS256'] }) as JWTPayload;
+  const payload = jwt.verify(token, getSecret(), { algorithms: ['HS256'] }) as JWTPayload;
+  // 没有版本号的令牌无法判断是否已被作废，一律当作无效
+  if (!Number.isInteger(payload.tokenVersion) || payload.tokenVersion < 0) {
+    throw new Error('token version missing');
+  }
+  return payload;
 }
 
 /** 令牌的过期时刻（毫秒时间戳），取自令牌自身，与配置的有效期保持一致 */

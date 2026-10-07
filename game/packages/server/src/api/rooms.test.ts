@@ -36,7 +36,7 @@ async function call(
   const res = await fetch(`http://127.0.0.1:${port}${path}`, {
     method,
     headers: {
-      authorization: `Bearer ${signToken({ playerId: 'P1', nickname: 'A' })}`,
+      authorization: `Bearer ${signToken({ playerId: 'P1', nickname: 'A', tokenVersion: 0 })}`,
       'content-type': 'application/json',
     },
     body: body === undefined ? undefined : JSON.stringify(body),

@@ -25,6 +25,8 @@ model Player {
   banReason     String?   @map("ban_reason")
   banUntil      DateTime? @map("ban_until") @db.Timestamptz
   metadata      Json      @default("{}")
+  /// 令牌版本：凭恢复码在新设备找回账号时加一，签发时写进令牌，版本落后的旧令牌随之作废
+  tokenVersion  Int       @default(0) @map("token_version")
 
   recoveryCodes      RecoveryCode[]
   deviceFingerprints DeviceFingerprint[]

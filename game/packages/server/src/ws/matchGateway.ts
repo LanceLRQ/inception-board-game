@@ -24,21 +24,26 @@ import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from '../services/BanChecker.js';
 import type { MoveGateway } from '../services/MoveGateway.js';
 
-export type HandshakeError = 'AUTH_REQUIRED' | 'AUTH_INVALID' | 'BANNED' | 'NOT_IN_MATCH';
+export type HandshakeError =
+  | 'AUTH_REQUIRED'
+  | 'AUTH_INVALID'
+  | 'TOKEN_REVOKED'
+  | 'BANNED'
+  | 'NOT_IN_MATCH';
 
 export type HandshakeResult =
   | { ok: true; playerID: string; matchID: string; nickname: string; seat: string }
   | { ok: false; error: HandshakeError };
 
 export interface HandshakeDeps {
-  verifyToken(token: string): { playerId: string; nickname: string };
+  verifyToken(token: string): { playerId: string; nickname: string; tokenVersion: number };
   matches: Pick<MatchService, 'seatOf'>;
-  bans: Pick<BanChecker, 'isBanned'>;
+  bans: Pick<BanChecker, 'isBanned' | 'isTokenCurrent'>;
 }
 
 const MATCH_ID_MAX_LENGTH = 64;
 
-/** 握手校验：令牌有效、账号未被封禁，且是这局的真人成员。对局不存在与非成员不作区分 */
+/** 握手校验：令牌有效且未被作废、账号未被封禁，且是这局的真人成员。对局不存在与非成员不作区分 */
 export async function authorizeHandshake(
   auth: unknown,
   deps: HandshakeDeps,
@@ -50,12 +55,21 @@ export async function authorizeHandshake(
     return { ok: false, error: 'AUTH_REQUIRED' };
   }
 
-  let payload: { playerId: string; nickname: string };
+  let payload: { playerId: string; nickname: string; tokenVersion: number };
   try {
     payload = deps.verifyToken(token);
   } catch {
     logger.warn({ matchID, reason: 'AUTH_INVALID' }, 'ws handshake rejected');
     return { ok: false, error: 'AUTH_INVALID' };
+  }
+
+  // 账号已在别处用恢复码找回：旧设备的令牌作废，握手被拒（客户端据此清掉本机身份）
+  if (!(await deps.bans.isTokenCurrent(payload.playerId, payload.tokenVersion))) {
+    logger.warn(
+      { matchID, playerId: payload.playerId, reason: 'TOKEN_REVOKED' },
+      'ws handshake rejected',
+    );
+    return { ok: false, error: 'TOKEN_REVOKED' };
   }
 
   if (await deps.bans.isBanned(payload.playerId)) {

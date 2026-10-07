@@ -411,7 +411,7 @@ init_prod() {
   echo ""
   echo "接下来请按顺序完成以下步骤："
   echo ""
-  echo "1. 按需检查 .env：WS_CORS_ORIGIN（生产改成前端域名）、CLIENT_PORT、IMAGE_* 等"
+  echo "1. 按需检查 .env：CLIENT_PORT、IMAGE_* 等（前后端分域名部署时再填 WS_CORS_ORIGIN）"
   echo ""
   echo "2. 构建镜像（首次约需十分钟），或在配置了 IMAGE_REGISTRY 后直接拉取："
   echo "   ./scripts/prod.sh build"

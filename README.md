@@ -15,7 +15,7 @@
 - 📱 移动端优先设计（PWA、竖屏、单手触达）
 - 🤖 人机模式（纯本地运行，零服务器流量）
 - 👥 好友房联机对局（6 位房间码，空位可补 Bot，服务端权威判定）
-- 🔐 匿名身份（localStorage JWT + 跨设备恢复码）
+- 🔐 匿名身份（localStorage JWT + 12 位跨设备恢复码；在新设备恢复后，旧设备的登录随即失效）
 - 🌐 TypeScript 全栈：React 19 + Vite 前端，Koa + socket.io 后端，自建对局运行器
 
 ## 游戏说明 · Game Manual
@@ -60,7 +60,7 @@ cd inception-board-game/game
 JWT_SECRET=<随机 32 字节以上>            # 必填，留空时由 prod.sh init 生成
 POSTGRES_PASSWORD=<强密码>               # 必填，留空时由 prod.sh init 生成
 REDIS_PASSWORD=<强密码，只用字母和数字>   # 必填，留空时由 prod.sh init 生成
-WS_CORS_ORIGIN=https://your-domain.com   # 允许访问后端的页面来源，生产不要用 *
+WS_CORS_ORIGIN=                          # 留空即只允许同源（自带 nginx 是同源部署）；前后端分域名时填前端页面的源
 CLIENT_PORT=80                           # 前端对外端口
 ```
 

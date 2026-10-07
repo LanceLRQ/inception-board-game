@@ -186,7 +186,7 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
     const { viewer, steps, complete, gaps } = await loadFinishedMatch(
       archive,
       id!,
-      optionalAccountId(ctx.headers.authorization),
+      await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
     );
     const rest = after === undefined ? steps : steps.filter((s) => s.stateID > after);
     const page = rest.slice(0, limit);
@@ -216,7 +216,7 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
     const { viewer, steps, complete, gaps } = await loadFinishedMatch(
       archive,
       id!,
-      optionalAccountId(ctx.headers.authorization),
+      await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
     );
     const picked = sliceByStateID(steps, from, to);
     const first = picked[0]?.stateID;
@@ -243,7 +243,7 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
     const { steps, complete, gaps } = await loadFinishedMatch(
       archive,
       id!,
-      optionalAccountId(ctx.headers.authorization),
+      await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
     );
     ctx.body = {
       minMoveCounter: steps[0]?.stateID ?? null,
@@ -261,7 +261,7 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
     const { viewer, steps, complete, gaps } = await loadFinishedMatch(
       archive,
       id!,
-      optionalAccountId(ctx.headers.authorization),
+      await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
     );
     const meta = await loadDownloadMeta(id!);
     if (!meta) throw new AppError('NOT_FOUND', 'Replay not found');

@@ -383,7 +383,11 @@ export async function connect(
   account: Pick<RoomAccount, 'playerId' | 'nickname'>,
   matchID: string,
 ): Promise<TestClient> {
-  const token = signToken({ playerId: account.playerId, nickname: account.nickname });
+  const token = signToken({
+    playerId: account.playerId,
+    nickname: account.nickname,
+    tokenVersion: 0,
+  });
   const out = await tryConnect(server.url, token, matchID, account.playerId);
   if (!out.ok) throw new Error(`握手被拒：${out.reason}`);
   return out.client;

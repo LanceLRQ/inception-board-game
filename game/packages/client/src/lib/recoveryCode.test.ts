@@ -8,10 +8,11 @@ import {
 } from './recoveryCode';
 
 describe('formatRecoveryCodeInput', () => {
-  it('小写转大写，4 位后自动补连字符', () => {
+  it('小写转大写，每 4 位自动补连字符', () => {
     expect(formatRecoveryCodeInput('abcd')).toBe('ABCD');
     expect(formatRecoveryCodeInput('abcde')).toBe('ABCD-E');
     expect(formatRecoveryCodeInput('abcd2345')).toBe('ABCD-2345');
+    expect(formatRecoveryCodeInput('abcd2345efg')).toBe('ABCD-2345-EFG');
   });
 
   it('去掉空格、连字符和其他无关字符', () => {
@@ -19,8 +20,8 @@ describe('formatRecoveryCodeInput', () => {
     expect(formatRecoveryCodeInput('ab_cd!@#23')).toBe('ABCD-23');
   });
 
-  it('最多保留 8 个有效字符', () => {
-    expect(formatRecoveryCodeInput('ABCD2345XYZ9')).toBe('ABCD-2345');
+  it('最多保留 12 个有效字符', () => {
+    expect(formatRecoveryCodeInput('ABCD2345EFGH9999')).toBe('ABCD-2345-EFGH');
   });
 
   it('按 Crockford 规则归一易混字符：O→0，I/L→1，U 被丢弃', () => {
@@ -28,8 +29,9 @@ describe('formatRecoveryCodeInput', () => {
     expect(formatRecoveryCodeInput('OIL0')).toBe('0110');
   });
 
-  it('粘贴带连字符的完整恢复码保持原样', () => {
-    expect(formatRecoveryCodeInput('7K2M-9QXA')).toBe('7K2M-9QXA');
+  it('粘贴带或不带连字符的完整恢复码都得到同一个展示形式', () => {
+    expect(formatRecoveryCodeInput('7K2M-9QXA-4B6C')).toBe('7K2M-9QXA-4B6C');
+    expect(formatRecoveryCodeInput('7k2m9qxa4b6c')).toBe('7K2M-9QXA-4B6C');
   });
 
   it('空输入返回空串', () => {
@@ -39,9 +41,10 @@ describe('formatRecoveryCodeInput', () => {
 });
 
 describe('isRecoveryCodeComplete', () => {
-  it('只有 8 个有效字符才算完整', () => {
-    expect(isRecoveryCodeComplete('ABCD-2345')).toBe(true);
-    expect(isRecoveryCodeComplete('ABCD-234')).toBe(false);
+  it('只有 12 个有效字符才算完整，8 位旧格式不算', () => {
+    expect(isRecoveryCodeComplete('ABCD-2345-EFGH')).toBe(true);
+    expect(isRecoveryCodeComplete('ABCD-2345-EFG')).toBe(false);
+    expect(isRecoveryCodeComplete('ABCD-2345')).toBe(false);
     expect(isRecoveryCodeComplete('')).toBe(false);
   });
 });

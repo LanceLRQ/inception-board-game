@@ -2,6 +2,7 @@
 // 失败统一抛 ApiRequestError：HTTP 错误带真实状态码，连不上服务（断网、跨域被拒、DNS 失败）是状态码 0。
 
 import { logger } from './logger';
+import { TOKEN_REVOKED_CODE, notifyIdentityRevoked } from './identityRevoked';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -44,11 +45,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ApiError | null;
-    throw new ApiRequestError(
-      res.status,
-      body?.error?.code ?? 'UNKNOWN',
-      body?.error?.message ?? `HTTP ${res.status}`,
-    );
+    const code = body?.error?.code ?? 'UNKNOWN';
+    // 账号已在别处用恢复码找回，本机令牌作废：通知根组件清掉身份并回大厅
+    if (res.status === 401 && code === TOKEN_REVOKED_CODE && token) notifyIdentityRevoked(token);
+    throw new ApiRequestError(res.status, code, body?.error?.message ?? `HTTP ${res.status}`);
   }
 
   return res.json() as Promise<T>;

@@ -1,10 +1,14 @@
-// 恢复码端到端：建档展示 → 换浏览器凭码恢复 → 旧码作废 → 设置页重新生成
+// 恢复码端到端：建档展示 → 换浏览器凭码恢复 → 旧码作废、旧浏览器的令牌失效 → 设置页重新生成
 //
 // 服务端是全内存的开发服务（见 playwright.online.config.ts），身份路由与真实服务端同一份实现。
 
 import { test, expect, type Browser, type Page } from '@playwright/test';
 
-const CODE_PATTERN = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
+const CODE_PATTERN = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
+/** 联机端到端用的服务端地址（见 playwright.online.config.ts） */
+const SERVER_URL = 'http://localhost:3101';
+
+const stripDashes = (code: string): string => code.replace(/-/g, '');
 
 async function openPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext();
@@ -35,13 +39,20 @@ test('建档展示恢复码，换浏览器凭码恢复后旧码作废，设置�
   await expect(first.getByTestId('recovery-code-dialog')).toBeVisible();
   await first.getByTestId('recovery-code-confirm').click();
   await expect(first.getByTestId('lobby-create')).toBeVisible();
+  const oldToken = await first.evaluate(() => localStorage.getItem('icgame-token'));
+  expect(oldToken).toBeTruthy();
+  const meWith = (token: string) =>
+    first.request.get(`${SERVER_URL}/identity/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  expect((await meWith(oldToken!)).status()).toBe(200);
 
   // 2. 另一个浏览器（没有任何本地身份）：小写、不带连字符的输入也能恢复
   const second = await openPage(browser);
   await second.goto('/lobby');
   await second.getByTestId('lobby-restore-toggle').click();
   const input = second.getByTestId('lobby-restore-input');
-  await input.fill(code1.replace('-', '').toLowerCase());
+  await input.fill(stripDashes(code1).toLowerCase());
   await expect(input).toHaveValue(code1);
   await second.getByTestId('lobby-restore-submit').click();
   const code2 = await readCode(second);
@@ -49,6 +60,16 @@ test('建档展示恢复码，换浏览器凭码恢复后旧码作废，设置�
   await expect(second.getByTestId('recovery-code-old-revoked')).toBeVisible();
   await second.getByTestId('recovery-code-confirm').click();
   await expect(second.getByTestId('lobby-create')).toBeVisible();
+
+  // 2.1 旧浏览器的令牌随之失效：服务端明确拒绝；旧浏览器下一次请求时清掉本机身份、给出提示并回到大厅
+  const stale = await meWith(oldToken!);
+  expect(stale.status()).toBe(401);
+  expect(((await stale.json()) as { error: { code: string } }).error.code).toBe('TOKEN_REVOKED');
+  await first.goto('/settings');
+  await expect(first).toHaveURL(/\/lobby$/);
+  await expect(first.getByText(/其他设备上恢复|restored on another device/)).toBeVisible();
+  await expect(first.locator('#lobby-nickname')).toBeVisible();
+  expect(await first.evaluate(() => localStorage.getItem('icgame-token'))).toBeNull();
 
   // 3. 旧码已作废：第三个浏览器用它恢复失败，给出"无效或已使用"提示
   const third = await openPage(browser);
@@ -87,7 +108,7 @@ test('建档展示恢复码，换浏览器凭码恢复后旧码作废，设置�
     );
     for (const c of [code1, code2, code3]) {
       expect(stored).not.toContain(c);
-      expect(stored).not.toContain(c.replace('-', ''));
+      expect(stored).not.toContain(stripDashes(c));
     }
   }
   for (const p of [first, second, third]) await p.context().close();

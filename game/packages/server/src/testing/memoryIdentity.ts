@@ -26,6 +26,7 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
         isBanned: false,
         banUntil: null,
         banReason: null,
+        tokenVersion: 0,
       };
       players.set(row.id, row);
       return row;
@@ -44,6 +45,7 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
         isBanned: data.isBanned ?? row.isBanned,
         banUntil: data.banUntil === undefined ? row.banUntil : data.banUntil,
         banReason: data.banReason === undefined ? row.banReason : data.banReason,
+        tokenVersion: row.tokenVersion + (data.tokenVersion?.increment ?? 0),
       };
       players.set(row.id, next);
       return next;
@@ -78,11 +80,6 @@ export function createMemoryIdentityPrisma(): MemoryIdentityPrisma {
         row.revokedAt = data.revokedAt;
         if (data.lastUsedAt) row.lastUsedAt = data.lastUsedAt;
         if (data.useCount) row.useCount += data.useCount.increment;
-        if (data.codeHash && data.codeHash !== row.codeHash) {
-          codes.delete(row.codeHash);
-          row.codeHash = data.codeHash;
-          codes.set(row.codeHash, row);
-        }
         count += 1;
       }
       return { count };

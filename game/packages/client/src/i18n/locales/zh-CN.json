@@ -290,6 +290,7 @@
       "NOT_IN_MATCH": "你不在这局对局中",
       "PROTOCOL_MISMATCH": "客户端版本与服务端不一致，请刷新页面",
       "REPLACED": "你已在其他页面进入这局对局",
+      "TOKEN_REVOKED": "这个账号已在其他设备上恢复，请重新进入",
       "MATCH_ABORTED": "服务器无法继续这局对局，请稍后重新进入"
     }
   },
@@ -530,21 +531,22 @@
     "restore": {
       "entry": "已有账号？用恢复码恢复",
       "label": "恢复码",
-      "placeholder": "XXXX-XXXX",
+      "placeholder": "XXXX-XXXX-XXXX",
       "submit": "恢复",
-      "hint": "恢复成功后，这个恢复码会失效，并换发一个新的。"
+      "hint": "恢复成功后，这个恢复码会失效，并换发一个新的；这个账号在其他设备上的登录也会失效。"
     },
     "error": {
       "invalid": "恢复码无效或已经用过。恢复码只能使用一次，请检查是否抄错。",
       "banned": "该账号已被封禁，暂时无法恢复。",
       "rateLimited": "尝试次数过多，请稍后再试。",
-      "format": "恢复码格式不对，应为 8 位字母或数字。",
+      "format": "恢复码格式不对，应为 12 位字母或数字。",
       "offline": "当前是离线模式，无法使用恢复码。",
       "network": "网络或服务端出错，请稍后再试。"
     },
     "rotateError": {
       "unauthorized": "登录已失效，请回到大厅重新进入。"
     },
+    "revoked": "这个账号已在其他设备上恢复，本机已退出登录。",
     "account": {
       "heading": "账号",
       "nickname": "昵称",

@@ -6,7 +6,11 @@ import { useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
-import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
+import {
+  MATCH_MAX_PLAYERS,
+  MATCH_MIN_PLAYERS,
+  RECOVERY_CODE_FORMATTED_LENGTH,
+} from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi } from '../../lib/roomApi';
 import { requestErrorMessage } from '../../lib/roomQueries';
@@ -230,7 +234,7 @@ export default function Lobby() {
                 placeholder={t('recovery.restore.placeholder')}
                 value={restoreInput}
                 onChange={(e) => setRestoreInput(formatRecoveryCodeInput(e.target.value))}
-                maxLength={9}
+                maxLength={RECOVERY_CODE_FORMATTED_LENGTH}
                 autoComplete="off"
                 autoCapitalize="characters"
                 spellCheck={false}

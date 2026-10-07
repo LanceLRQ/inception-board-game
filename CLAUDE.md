@@ -21,8 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 匿名身份
 
 - 无注册、无邮箱、无密码
-- 身份 = localStorage JWT + 8 位恢复码（Crockford's Base32）
-- 跨设备迁移仅靠恢复码（一次性 + 重置机制）
+- 身份 = localStorage JWT + 12 位恢复码（Crockford's Base32，展示为 `XXXX-XXXX-XXXX`）
+- 跨设备迁移仅靠恢复码（一次性 + 重置机制）；凭恢复码在新设备找回账号后，旧设备的令牌立即作废（令牌版本号）
 
 ### 私有部署友好
 

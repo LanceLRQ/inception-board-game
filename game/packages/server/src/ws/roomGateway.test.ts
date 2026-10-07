@@ -41,16 +41,19 @@ function makeRoom(over: Partial<RoomState> = {}): RoomState {
 }
 
 function token(playerId: string): string {
-  return signToken({ playerId, nickname: playerId });
+  return signToken({ playerId, nickname: playerId, tokenVersion: 0 });
 }
 
 describe('authorizeRoomHandshake', () => {
   const base = {
     verifyToken: (t: string) => {
       if (t === 'bad') throw new Error('bad');
-      return { playerId: t };
+      return { playerId: t, tokenVersion: 0 };
     },
-    bans: { isBanned: async (id: string) => id === 'banned' },
+    bans: {
+      isBanned: async (id: string) => id === 'banned',
+      isTokenCurrent: async (id: string, v: number) => (id === 'recovered' ? v === 1 : v === 0),
+    },
     getRoom: async (code: string) => (code === 'ABC234' ? makeRoom() : null),
   };
 
@@ -64,6 +67,7 @@ describe('authorizeRoomHandshake', () => {
     ['没有令牌', { code: 'ABC234' }, 'AUTH_REQUIRED'],
     ['房间码格式不对', { token: 'p1', code: 'ABC' }, 'AUTH_REQUIRED'],
     ['令牌无效', { token: 'bad', code: 'ABC234' }, 'AUTH_INVALID'],
+    ['令牌版本已作废', { token: 'recovered', code: 'ABC234' }, 'TOKEN_REVOKED'],
     ['账号被封禁', { token: 'banned', code: 'ABC234' }, 'BANNED'],
     ['不是成员', { token: 'p9', code: 'ABC234' }, 'NOT_IN_ROOM'],
     ['房间不存在', { token: 'p1', code: 'ZZZ999' }, 'NOT_IN_ROOM'],
@@ -88,7 +92,7 @@ describe('RoomGateway（真实 socket）', () => {
     http = createServer();
     io = new IOServer(http, { path: '/ws' });
     const gateway = new RoomGateway({
-      bans: { isBanned: async () => false },
+      bans: { isBanned: async () => false, isTokenCurrent: async () => true },
       getRoom: async () => room.current,
     });
     gateway.attach(io);
@@ -188,6 +192,32 @@ describe('RoomGateway（真实 socket）', () => {
         opened.filter((c) => c.socket.connected).length === MAX_ROOM_CONNECTIONS_PER_PLAYER &&
         opened.filter((c) => c.socket.disconnected).length === 1,
     );
+  });
+
+  it('disconnectPlayer：只断开该账号的房间连接，先发带原因的错误；其他人不受影响', async () => {
+    const holder = { current: makeRoom() as RoomState | null };
+    const { gateway, url } = await boot(holder);
+    const a1 = connect(url, 'p1');
+    const a2 = connect(url, 'p1');
+    const b = connect(url, 'p2');
+    await until(() => [a1, a2, b].every((c) => c.received.length > 0));
+
+    expect(gateway.disconnectPlayer('p1', 'TOKEN_REVOKED', 'recovered elsewhere')).toBe(2);
+    await until(() => a1.socket.disconnected && a2.socket.disconnected);
+    expect(a1.errors).toContainEqual(expect.objectContaining({ code: 'TOKEN_REVOKED' }));
+    expect(a2.errors).toContainEqual(expect.objectContaining({ code: 'TOKEN_REVOKED' }));
+    expect(b.socket.connected).toBe(true);
+    expect(gateway.disconnectPlayer('nobody')).toBe(0);
+  });
+
+  it('disconnectPlayer 不带原因时按封禁处理', async () => {
+    const holder = { current: makeRoom() as RoomState | null };
+    const { gateway, url } = await boot(holder);
+    const a = connect(url, 'p1');
+    await until(() => a.received.length > 0);
+    gateway.disconnectPlayer('p1');
+    await until(() => a.socket.disconnected);
+    expect(a.errors).toContainEqual(expect.objectContaining({ code: 'BANNED' }));
   });
 
   it('roomChannel 对房间码大小写不敏感', () => {

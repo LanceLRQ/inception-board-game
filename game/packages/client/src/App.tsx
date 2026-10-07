@@ -11,9 +11,11 @@ import { useEffectsStore } from './stores/useEffectsStore';
 import { Toaster } from './components/ui/toaster';
 import { cardAssets } from './lib/cardAssets';
 import { isPlaceholderMode } from './lib/assetsMode';
+import { useRevokedIdentityHandler } from './hooks/useRevokedIdentity';
 
 export default function App() {
   useThemeEffect();
+  useRevokedIdentityHandler();
   const motionPref = useEffectsStore((s) => s.prefs.motion);
   const { t } = useTranslation();
 

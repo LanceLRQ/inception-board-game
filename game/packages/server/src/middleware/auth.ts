@@ -14,7 +14,7 @@ export function banCheckerContext(checker: BanChecker): Middleware {
   };
 }
 
-// JWT 认证中间件，将 playerID 注入 ctx.state.player；已挂载封禁查询器时，被封禁账号返回 403
+// JWT 认证中间件，将玩家信息注入 ctx.state.player；已挂载账号状态查询器时，令牌版本已作废返回 401、被封禁账号返回 403
 export const authMiddleware: Middleware = async (ctx, next) => {
   const token = extractBearerToken(ctx.headers.authorization);
   if (!token) {
@@ -30,10 +30,20 @@ export const authMiddleware: Middleware = async (ctx, next) => {
   }
 
   const bans = ctx.state.banChecker as BanChecker | undefined;
-  if (bans && (await bans.isBanned(payload.playerId))) {
-    throw new AppError('BANNED', 'Account is banned');
+  if (bans) {
+    // 先判令牌版本：账号已在别处找回时，旧设备要收到明确的「已作废」而不是笼统的拒绝
+    if (!(await bans.isTokenCurrent(payload.playerId, payload.tokenVersion))) {
+      throw new AppError('TOKEN_REVOKED', 'Token has been revoked');
+    }
+    if (await bans.isBanned(payload.playerId)) {
+      throw new AppError('BANNED', 'Account is banned');
+    }
   }
 
-  ctx.state.player = { playerId: payload.playerId, nickname: payload.nickname };
+  ctx.state.player = {
+    playerId: payload.playerId,
+    nickname: payload.nickname,
+    tokenVersion: payload.tokenVersion,
+  };
   await next();
 };

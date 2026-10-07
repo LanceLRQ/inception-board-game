@@ -87,7 +87,7 @@ test.describe('好友房 Lobby / Room 流程', () => {
           nickname: FAKE_NICKNAME,
           token: FAKE_TOKEN,
           expiresAt: Date.now() + 86_400_000,
-          recoveryCode: 'ABCD-1234',
+          recoveryCode: 'ABCD-2345-EFGH',
           recoveryCodeWarning: '请妥善保存',
         }),
       });
@@ -185,7 +185,7 @@ test.describe('好友房 Lobby / Room 流程', () => {
     await page.getByRole('button', { name: /继续/ }).click();
 
     // 3. 建档后先弹恢复码弹窗，确认保存后才进入创建/加入入口
-    await expect(page.getByTestId('recovery-code-value')).toHaveText('ABCD-1234');
+    await expect(page.getByTestId('recovery-code-value')).toHaveText('ABCD-2345-EFGH');
     await page.getByTestId('recovery-code-confirm').click();
     await expect(page.getByTestId('lobby-nickname')).toHaveText(FAKE_NICKNAME);
     await expect(page.getByTestId('lobby-create')).toBeVisible();

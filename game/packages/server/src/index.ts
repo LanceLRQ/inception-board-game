@@ -7,7 +7,7 @@ import { createRedisClient } from './infra/redis.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
 import { isOperatorTokenTooShort, MIN_OPERATOR_TOKEN_LENGTH } from './middleware/operatorAuth.js';
-import { parseOrigins } from './middleware/cors.js';
+import { isWildcardInProduction, resolveCorsOrigins } from './middleware/cors.js';
 import { resolveRecoveryPepper } from './infra/recoveryCode.js';
 import { resolveJwtSecret } from './infra/jwt.js';
 import {
@@ -41,6 +41,12 @@ if (isOperatorTokenTooShort(process.env)) {
   );
 }
 
+// 跨域白名单：没配置时只允许同源；显式写 * 放行所有源，生产环境要提醒
+const corsOrigins = resolveCorsOrigins(process.env);
+if (isWildcardInProduction(corsOrigins, process.env)) {
+  logger.warn('WS_CORS_ORIGIN 配置为 *：生产环境允许任意网站跨域访问接口，建议改成前端页面的源');
+}
+
 const redis = createRedisClient();
 const realtime = buildRealtime({
   store: new RedisMatchStore(redis),
@@ -54,7 +60,7 @@ const realtime = buildRealtime({
   ),
   timing: timingFromEnv(process.env),
   ws: {
-    corsOrigin: parseOrigins(process.env.WS_CORS_ORIGIN ?? '*'),
+    corsOrigin: corsOrigins,
     path: process.env.WS_PATH ?? '/ws',
   },
   trustProxy: process.env.TRUST_PROXY === '1',

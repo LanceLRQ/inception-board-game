@@ -5,14 +5,11 @@ import { logger } from '../infra/logger.js';
 import { prisma as defaultPrisma } from '../infra/postgres.js';
 import { signToken, tokenExpiresAt } from '../infra/jwt.js';
 import { nicknameSchema } from '../infra/nicknameSchema.js';
-import {
-  generateRecoveryCode,
-  hashRecoveryCode,
-  legacyHashRecoveryCode,
-} from '../infra/recoveryCode.js';
+import { isRecoveryCodeShape } from '@icgame/shared';
+import { generateRecoveryCode, hashRecoveryCode } from '../infra/recoveryCode.js';
 import { AppError } from '../infra/errors.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { isBanActive } from '../services/BanChecker.js';
+import { isBanActive, type BanChecker } from '../services/BanChecker.js';
 import {
   InMemoryRecoverAttemptLimiter,
   recoverLimitKey,
@@ -29,6 +26,8 @@ export interface IdentityPlayerRow {
   isBanned: boolean;
   banUntil: Date | null;
   banReason: string | null;
+  /** 令牌版本：凭恢复码找回账号时加一，版本落后的旧令牌作废 */
+  tokenVersion: number;
 }
 
 /** 身份路由实际用到的数据库操作；真实实现是 Prisma 客户端，测试与内存服务用内存表 */
@@ -54,6 +53,7 @@ export interface IdentityTables {
         isBanned?: boolean;
         banUntil?: Date | null;
         banReason?: string | null;
+        tokenVersion?: { increment: number };
       };
     }): Promise<IdentityPlayerRow>;
   };
@@ -64,12 +64,11 @@ export interface IdentityTables {
       revokedAt: Date | null;
       player: IdentityPlayerRow;
     } | null>;
-    /** 条件更新：用于一次性作废（只有仍有效的码才会命中）与旧哈希升级 */
+    /** 条件更新：用于一次性作废（只有仍有效的码才会命中） */
     updateMany(args: {
       where: { playerId?: string; codeHash?: string; revokedAt: null };
       data: {
         revokedAt: Date;
-        codeHash?: string;
         lastUsedAt?: Date;
         useCount?: { increment: number };
       };
@@ -82,10 +81,15 @@ export interface IdentityTables {
   };
 }
 
+export interface IdentityRouterDeps {
+  prisma?: IdentityPrisma;
+  recoverLimiter?: RecoverAttemptLimiter;
+  /** 断开某账号现有的全部实时连接，返回断开数；恢复成功后用来踢掉旧设备 */
+  disconnectPlayer?: (playerId: string, code?: string, message?: string) => number;
+}
+
 /** 身份路由；数据库访问由调用方注入，缺省用全局客户端 */
-export function createIdentityRouter(
-  deps: { prisma?: IdentityPrisma; recoverLimiter?: RecoverAttemptLimiter } = {},
-): Router {
+export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
   const prisma = deps.prisma ?? (defaultPrisma as unknown as IdentityPrisma);
   const recoverLimiter = deps.recoverLimiter ?? new InMemoryRecoverAttemptLimiter();
   const router = new Router();
@@ -121,7 +125,11 @@ export function createIdentityRouter(
       data: { codeHash, playerId: player.id },
     });
 
-    const token = signToken({ playerId: player.id, nickname: player.nickname });
+    const token = signToken({
+      playerId: player.id,
+      nickname: player.nickname,
+      tokenVersion: player.tokenVersion,
+    });
 
     ctx.status = 201;
     ctx.body = {
@@ -136,7 +144,7 @@ export function createIdentityRouter(
 
   // POST /identity/recover - 凭恢复码恢复身份
   const recoverSchema = z.object({
-    code: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/i),
+    code: z.string().refine(isRecoveryCodeShape),
     fingerprint: z.string().max(128).optional(),
   });
 
@@ -161,29 +169,17 @@ export function createIdentityRouter(
       throw new AppError('INVALID_RECOVERY_CODE', '恢复码无效或已失效');
     };
 
-    // 先按现行哈希查；查不到再按旧的无盐哈希查，命中的旧记录在下面改写为现行哈希
-    let storedHash = hashRecoveryCode(code);
-    let record = await prisma.recoveryCode.findUnique({
+    const storedHash = hashRecoveryCode(code);
+    const record = await prisma.recoveryCode.findUnique({
       where: { codeHash: storedHash },
       include: { player: true },
     });
-    let legacy = false;
-    if (!record) {
-      const legacyHash = legacyHashRecoveryCode(code);
-      record = await prisma.recoveryCode.findUnique({
-        where: { codeHash: legacyHash },
-        include: { player: true },
-      });
-      if (record) {
-        legacy = true;
-        storedHash = legacyHash;
-      }
-    }
 
     if (!record || record.revokedAt || isBanActive(record.player)) return fail();
 
     // 一次性：条件更新只会让仍有效的码命中，并发提交同一个码只有一个成功
-    // 作废旧码与签发新码放进同一个事务：中途失败时旧码仍然有效，账号不会落到没有任何可用恢复码
+    // 作废旧码、签发新码、令牌版本加一放进同一个事务：中途失败时旧码仍然有效、旧令牌也不会被作废，
+    // 账号不会落到没有任何可用恢复码，也不会出现旧设备被踢而新设备没拿到身份
     const playerId = record.playerId;
     const newCode = generateRecoveryCode();
     const claimed = await prisma.$transaction(async (tx) => {
@@ -193,20 +189,28 @@ export function createIdentityRouter(
           revokedAt: new Date(),
           lastUsedAt: new Date(),
           useCount: { increment: 1 },
-          ...(legacy ? { codeHash: hashRecoveryCode(code) } : {}),
         },
       });
-      if (used.count === 0) return false;
+      if (used.count === 0) return null;
       await tx.recoveryCode.create({
         data: { codeHash: hashRecoveryCode(newCode), playerId },
       });
-      await tx.player.update({
+      return tx.player.update({
         where: { id: playerId },
-        data: { lastSeenAt: new Date() },
+        data: { lastSeenAt: new Date(), tokenVersion: { increment: 1 } },
       });
-      return true;
     });
     if (!claimed) return fail();
+
+    // 版本已在库里加一：丢掉缓存，旧令牌不能再靠缓存多活一段时间；再断开旧设备的实时连接
+    (ctx.state.banChecker as BanChecker | undefined)?.invalidate(playerId);
+    const disconnected =
+      deps.disconnectPlayer?.(
+        playerId,
+        'TOKEN_REVOKED',
+        'Account was recovered on another device',
+      ) ?? 0;
+    logger.info({ playerId, disconnected }, 'identity recovered');
 
     // 成功的恢复不计入失败次数：退还额度；退还失败不影响成功响应
     try {
@@ -215,11 +219,15 @@ export function createIdentityRouter(
       logger.warn({ err }, 'recover limiter refund failed');
     }
 
-    const token = signToken({ playerId: record.playerId, nickname: record.player.nickname });
+    const token = signToken({
+      playerId,
+      nickname: claimed.nickname,
+      tokenVersion: claimed.tokenVersion,
+    });
 
     ctx.body = {
-      playerId: record.playerId,
-      nickname: record.player.nickname,
+      playerId,
+      nickname: claimed.nickname,
       token,
       expiresAt: tokenExpiresAt(token),
       recoveryCode: newCode,
@@ -261,10 +269,14 @@ export function createIdentityRouter(
       },
     });
 
-    // 昵称变了需要重新签 token
+    // 昵称变了需要重新签 token；令牌版本不变（版本只在凭恢复码找回账号时加一）
     let token: string | undefined;
     if (data.nickname) {
-      token = signToken({ playerId: player.id, nickname: player.nickname });
+      token = signToken({
+        playerId: player.id,
+        nickname: player.nickname,
+        tokenVersion: player.tokenVersion,
+      });
     }
 
     ctx.body = {

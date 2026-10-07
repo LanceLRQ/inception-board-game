@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SocketLike } from '../match/matchSocket';
 import type { RoomState } from './roomApi';
+import { subscribeIdentityRevoked } from './identityRevoked';
 import { ROOM_EVENT, RoomSocket, parseRoomMessage, type RoomPushStatus } from './roomSocket';
 
 vi.mock('./logger', () => ({
@@ -152,6 +153,38 @@ describe('RoomSocket', () => {
     socket.fire('connect_error', new Error('NOT_IN_ROOM'));
     expect(rs.getStatus()).toBe('down');
     expect(socket.disconnectCalls).toBe(1);
+  });
+
+  it('令牌被作废：握手被拒时断开不再重试，并通知身份失效', () => {
+    const seen: Array<string | null> = [];
+    const off = subscribeIdentityRevoked((t) => seen.push(t));
+    try {
+      rs.connect();
+      socket.fire('connect_error', new Error('TOKEN_REVOKED'));
+    } finally {
+      off();
+    }
+    expect(rs.getStatus()).toBe('down');
+    expect(socket.disconnectCalls).toBe(1);
+    expect(seen).toEqual(['tok']);
+  });
+
+  it('令牌被作废：已连上后收到 icg:error 同样断开并通知身份失效，之后的消息被忽略', () => {
+    const seen: Array<string | null> = [];
+    const off = subscribeIdentityRevoked((t) => seen.push(t));
+    try {
+      rs.connect();
+      socket.fire(ROOM_EVENT, { room: room() });
+      socket.fire('icg:error', { code: 'TOKEN_REVOKED' });
+      socket.fire(ROOM_EVENT, { room: room() });
+    } finally {
+      off();
+    }
+    expect(seen).toEqual(['tok']);
+    expect(rs.getStatus()).toBe('down');
+    expect(socket.disconnectCalls).toBe(1);
+    expect(rooms).toHaveLength(1);
+    expect(removed).toBe(0);
   });
 
   it('网络类的连接错误：状态 down，但不放弃（底层继续重连）', () => {

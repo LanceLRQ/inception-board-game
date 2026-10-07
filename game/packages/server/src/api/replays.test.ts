@@ -6,6 +6,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { buildShareUrl, createReplayShareLink, createReplaysRouter } from './replays.js';
 import { ShortLinkService, InMemoryShortLinkStore } from '../services/ShortLinkService.js';
 import { AppError } from '../infra/errors.js';
+import { InMemoryBanChecker, type BanChecker } from '../services/BanChecker.js';
 import {
   ACCOUNT_OUTSIDER,
   ACCOUNT_SEAT0,
@@ -33,7 +34,7 @@ afterEach(async () => {
   server = null;
 });
 
-async function setup() {
+async function setup(bans?: BanChecker) {
   const archive = await seedArchive();
   server = await serveRouter(
     createReplaysRouter({
@@ -53,6 +54,7 @@ async function setup() {
             }
           : null,
     }),
+    bans,
   );
   return { archive, server };
 }
@@ -135,6 +137,21 @@ describe('回放接口 · 按座位裁剪', () => {
       (await server.get(`/replays/${FINISHED_ID}/events`, tokenFor(ACCOUNT_OUTSIDER))).json
         .viewerID,
     ).toBeNull();
+  });
+});
+
+describe('回放接口 · 令牌作废', () => {
+  it('账号在别处找回后，旧令牌当作未登录：看不到本人座位的私密内容，新令牌不受影响', async () => {
+    const bans = new InMemoryBanChecker();
+    bans.setTokenVersion(ACCOUNT_SEAT1, 1);
+    const { server } = await setup(bans);
+    const stale = await server.get(`/replays/${FINISHED_ID}/events`, tokenFor(ACCOUNT_SEAT1, 0));
+    expect(stale.status).toBe(200);
+    expect(stale.json.viewerID).toBeNull();
+    expect(stale.text).not.toContain(SEAT1_SECRET);
+    const fresh = await server.get(`/replays/${FINISHED_ID}/events`, tokenFor(ACCOUNT_SEAT1, 1));
+    expect(fresh.json.viewerID).toBe('1');
+    expect(fresh.text).toContain(SEAT1_SECRET);
   });
 });
 

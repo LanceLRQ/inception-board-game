@@ -1,7 +1,7 @@
 import Koa, { type Middleware } from 'koa';
 import bodyParser from 'koa-bodyparser';
 import { logger } from './infra/logger.js';
-import { corsMiddleware } from './middleware/cors.js';
+import { corsMiddleware, parseOrigins } from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { healthRouter } from './api/health.js';
@@ -38,11 +38,14 @@ export interface AppDeps {
   recoverLimiter?: RecoverAttemptLimiter;
   /** 封禁查询器；鉴权中间件与运营接口共用。不给时用全局数据库 */
   bans?: BanChecker;
-  /** 断开某账号现有的全部连接，返回断开数；封禁生效时由运营接口调用 */
-  disconnectPlayer?: (playerId: string) => number;
+  /**
+   * 断开某账号现有的全部连接，返回断开数。封禁生效时由运营接口调用（缺省按封禁处理），
+   * 凭恢复码找回账号后由身份接口调用（带上 TOKEN_REVOKED）。
+   */
+  disconnectPlayer?: (playerId: string, code?: string, message?: string) => number;
   /** 举报接口的依赖；不给时用全局数据库；传 null 表示不挂举报路由（全内存服务没有对局成员表） */
   reports?: ReportsRouterDeps | null;
-  /** 允许跨域访问的页面源；不给时不处理跨域 */
+  /** 允许跨域访问的页面源；不给（或为空）时不放行任何跨域源，只有同源页面能访问 */
   corsOrigin?: string | string[];
   /** 邀请链接与分享卡片的配置；不给时读环境变量 PUBLIC_BASE_URL / INVITE_IMAGE_PATH */
   invite?: InviteConfig;
@@ -59,7 +62,9 @@ export function createApp(deps: AppDeps = {}): Koa {
   }
 
   // 全局中间件；跨域在最外层，预检不计入限流，出错的响应也带跨域头
-  if (deps.corsOrigin) app.use(corsMiddleware(deps.corsOrigin));
+  if (deps.corsOrigin && parseOrigins(deps.corsOrigin).length > 0) {
+    app.use(corsMiddleware(deps.corsOrigin));
+  }
   app.use(errorHandler);
   app.use(bodyParser());
   app.use(deps.rateLimit ?? rateLimitMiddleware);
@@ -80,6 +85,7 @@ export function createApp(deps: AppDeps = {}): Koa {
   const identityRouter = createIdentityRouter({
     prisma: deps.identityPrisma,
     recoverLimiter: deps.recoverLimiter,
+    ...(deps.disconnectPlayer ? { disconnectPlayer: deps.disconnectPlayer } : {}),
   });
   app.use(identityRouter.routes());
   app.use(identityRouter.allowedMethods());

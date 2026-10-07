@@ -67,7 +67,7 @@ describe('jwt 密钥缓存与算法', () => {
 
   it('首次使用时才读取环境变量，之后沿用缓存', () => {
     process.env.JWT_SECRET = 'first-secret';
-    const token = signToken({ playerId: 'p', nickname: 'n' });
+    const token = signToken({ playerId: 'p', nickname: 'n', tokenVersion: 0 });
     process.env.JWT_SECRET = 'second-secret';
     expect(verifyToken(token).playerId).toBe('p');
     resetJwtSecretCacheForTest();
@@ -98,7 +98,7 @@ describe('jwt 密钥缓存与算法', () => {
   });
 
   it('签发的令牌头部算法是 HS256', () => {
-    const token = signToken({ playerId: 'p', nickname: 'n' });
+    const token = signToken({ playerId: 'p', nickname: 'n', tokenVersion: 0 });
     const header = JSON.parse(Buffer.from(token.split('.')[0]!, 'base64url').toString()) as {
       alg: string;
     };
@@ -107,7 +107,9 @@ describe('jwt 密钥缓存与算法', () => {
 
   it('JWT_EXPIRES_IN 生效', () => {
     process.env.JWT_EXPIRES_IN = '1h';
-    const decoded = verifyToken(signToken({ playerId: 'p', nickname: 'n' })) as JWTPayload & {
+    const decoded = verifyToken(
+      signToken({ playerId: 'p', nickname: 'n', tokenVersion: 0 }),
+    ) as JWTPayload & {
       iat: number;
       exp: number;
     };
@@ -116,7 +118,9 @@ describe('jwt 密钥缓存与算法', () => {
 
   it('未设置 JWT_EXPIRES_IN 时缺省 30 天', () => {
     delete process.env.JWT_EXPIRES_IN;
-    const decoded = verifyToken(signToken({ playerId: 'p', nickname: 'n' })) as JWTPayload & {
+    const decoded = verifyToken(
+      signToken({ playerId: 'p', nickname: 'n', tokenVersion: 0 }),
+    ) as JWTPayload & {
       iat: number;
       exp: number;
     };
@@ -124,8 +128,13 @@ describe('jwt 密钥缓存与算法', () => {
   });
 });
 
+/** 与被测代码用同一个密钥签名：非生产环境没配置时就是开发值 */
+function getForgeSecret(): string {
+  return resolveJwtSecret({});
+}
+
 describe('jwt', () => {
-  const testPayload: JWTPayload = { playerId: 'player-1', nickname: 'TestUser' };
+  const testPayload: JWTPayload = { playerId: 'player-1', nickname: 'TestUser', tokenVersion: 0 };
 
   describe('signToken / verifyToken', () => {
     it('signs and verifies a token round-trip', () => {
@@ -133,6 +142,22 @@ describe('jwt', () => {
       const decoded = verifyToken(token);
       expect(decoded.playerId).toBe('player-1');
       expect(decoded.nickname).toBe('TestUser');
+    });
+
+    it('载荷里带令牌版本号，验证后原样取回', () => {
+      expect(verifyToken(signToken({ ...testPayload, tokenVersion: 3 })).tokenVersion).toBe(3);
+    });
+
+    it.each([
+      ['缺少版本号', undefined],
+      ['版本号是字符串', '0'],
+      ['版本号为负', -1],
+      ['版本号不是整数', 1.5],
+    ])('%s 的令牌被拒', (_name, tokenVersion) => {
+      const forged = jwt.sign({ playerId: 'p', nickname: 'n', tokenVersion }, getForgeSecret(), {
+        algorithm: 'HS256',
+      });
+      expect(() => verifyToken(forged)).toThrow(/token version/);
     });
 
     it('throws on invalid token', () => {
@@ -182,7 +207,7 @@ describe('jwt', () => {
 
   describe('tokenExpiresAt', () => {
     it('returns the expiry carried by the token, in milliseconds', () => {
-      const token = signToken({ playerId: 'p1', nickname: 'n' });
+      const token = signToken({ playerId: 'p1', nickname: 'n', tokenVersion: 0 });
       const { exp } = jwt.decode(token) as { exp: number };
       expect(tokenExpiresAt(token)).toBe(exp * 1000);
     });

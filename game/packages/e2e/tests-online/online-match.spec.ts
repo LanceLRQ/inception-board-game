@@ -95,9 +95,9 @@ async function createProfile(player: Player): Promise<void> {
   await player.page.goto('/lobby');
   await player.page.locator('#lobby-nickname').fill(player.name);
   await player.page.getByRole('button', { name: /继续|Continue/ }).click();
-  // 建档后会弹出恢复码弹窗，必须确认才能继续；格式为 XXXX-XXXX
+  // 建档后会弹出恢复码弹窗，必须确认才能继续；格式为 XXXX-XXXX-XXXX
   await expect(player.page.getByTestId('recovery-code-value')).toHaveText(
-    /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/,
+    /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/,
   );
   await player.page.getByTestId('recovery-code-confirm').click();
   await expect(player.page.getByTestId('lobby-create')).toBeVisible();

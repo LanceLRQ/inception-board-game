@@ -28,17 +28,23 @@ describe('isBanActive', () => {
 });
 
 function fakePrisma() {
-  const rows = new Map<string, BanFields>();
+  const rows = new Map<string, BanFields & { tokenVersion?: number }>();
   const calls = { count: 0 };
+  /** 设了该钩子时，查询在返回前先等它：用来制造「查询进行中账号被改写」的竞态 */
+  const gate: { before?: () => Promise<void> } = {};
   const prisma: BanPrisma = {
     player: {
       async findUnique({ where }) {
         calls.count++;
-        return rows.get(where.id) ?? null;
+        const row = rows.get(where.id);
+        // 先取快照再等待：模拟数据库在查询开始那一刻读到的值
+        const snapshot = row ? { ...row, tokenVersion: row.tokenVersion ?? 0 } : null;
+        await gate.before?.();
+        return snapshot;
       },
     },
   };
-  return { rows, calls, prisma };
+  return { rows, calls, gate, prisma };
 }
 
 describe('PrismaBanChecker', () => {
@@ -79,6 +85,61 @@ describe('PrismaBanChecker', () => {
     expect(await checker.isBanned('a')).toBe(true);
     now = 101;
     expect(await checker.isBanned('a')).toBe(false);
+  });
+});
+
+describe('PrismaBanChecker 令牌版本', () => {
+  const unbanned = { isBanned: false, banUntil: null };
+
+  it('令牌版本与库里一致才算当前，不一致或账号不存在都不是', async () => {
+    const { prisma, rows } = fakePrisma();
+    const checker = new PrismaBanChecker(prisma);
+    rows.set('a', { ...unbanned, tokenVersion: 2 });
+    expect(await checker.isTokenCurrent('a', 2)).toBe(true);
+    expect(await checker.isTokenCurrent('a', 1)).toBe(false);
+    expect(await checker.isTokenCurrent('a', 3)).toBe(false);
+    expect(await checker.isTokenCurrent('ghost', 0)).toBe(false);
+  });
+
+  it('封禁与令牌版本共用一次查库与同一份缓存', async () => {
+    const { prisma, rows, calls } = fakePrisma();
+    const checker = new PrismaBanChecker(prisma);
+    rows.set('a', { ...unbanned, tokenVersion: 0 });
+    await checker.isBanned('a');
+    await checker.isTokenCurrent('a', 0);
+    await checker.isTokenCurrent('a', 0);
+    expect(calls.count).toBe(1);
+  });
+
+  it('缓存时长内读不到版本变化，invalidate 之后立刻读到', async () => {
+    const { prisma, rows } = fakePrisma();
+    const checker = new PrismaBanChecker(prisma);
+    rows.set('a', { ...unbanned, tokenVersion: 0 });
+    expect(await checker.isTokenCurrent('a', 0)).toBe(true);
+    rows.set('a', { ...unbanned, tokenVersion: 1 });
+    expect(await checker.isTokenCurrent('a', 0)).toBe(true); // 缓存未失效
+    checker.invalidate('a');
+    expect(await checker.isTokenCurrent('a', 0)).toBe(false);
+    expect(await checker.isTokenCurrent('a', 1)).toBe(true);
+  });
+
+  it('查询进行中账号被 invalidate：这次读到的旧值不写进缓存', async () => {
+    const { prisma, rows, calls, gate } = fakePrisma();
+    const checker = new PrismaBanChecker(prisma);
+    rows.set('a', { ...unbanned, tokenVersion: 0 });
+    let release!: () => void;
+    gate.before = () => new Promise<void>((resolve) => (release = resolve));
+    const pending = checker.isTokenCurrent('a', 0); // 读到版本 0 后卡住
+
+    // 此时账号在别处被恢复：版本加一并失效缓存
+    rows.set('a', { ...unbanned, tokenVersion: 1 });
+    checker.invalidate('a');
+    release();
+    expect(await pending).toBe(true); // 这次请求本身按它读到的值判定
+
+    gate.before = undefined;
+    expect(await checker.isTokenCurrent('a', 0)).toBe(false); // 下一次必须重新查库
+    expect(calls.count).toBe(2);
   });
 });
 
@@ -132,5 +193,14 @@ describe('InMemoryBanChecker', () => {
     expect(await checker.isBanned('a')).toBe(true);
     checker.unban('a');
     expect(await checker.isBanned('a')).toBe(false);
+  });
+
+  it('令牌版本默认是 0，可按账号改写', async () => {
+    const checker = new InMemoryBanChecker();
+    expect(await checker.isTokenCurrent('a', 0)).toBe(true);
+    expect(await checker.isTokenCurrent('a', 1)).toBe(false);
+    checker.setTokenVersion('a', 2);
+    expect(await checker.isTokenCurrent('a', 2)).toBe(true);
+    expect(await checker.isTokenCurrent('a', 0)).toBe(false);
   });
 });
