@@ -312,7 +312,8 @@ describe('黄金轨迹', () => {
         runGoldenMatch({ numPlayers, seed, maxSteps: 300, checkpointEvery: CHECKPOINT_EVERY });
       expect(run().record).toEqual(run().record);
     }
-  });
+    // 六局各 300 步，开覆盖率统计时在慢机器上会超过缺省的 5 秒
+  }, 60_000);
 
   it('不同种子得到不同的轨迹（哈希确实对状态敏感）', () => {
     const finals = new Set(games.map((g) => g.record.finalHash));
