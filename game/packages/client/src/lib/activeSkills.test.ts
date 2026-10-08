@@ -599,7 +599,7 @@ describe('getAvailableActiveSkills · 雅典娜·惊叹', () => {
   });
 });
 
-describe('getAvailableActiveSkills · 盖亚·大地', () => {
+describe('getAvailableActiveSkills · 盖亚·撼动', () => {
   it('盖亚 + 同层有其他玩家 + 未用完 → 含', () => {
     const list = getAvailableActiveSkills(
       baseCtx({
@@ -647,8 +647,27 @@ describe('getAvailableActiveSkills · 盖亚·大地', () => {
     expect(list).not.toContain(GAIA_SHIFT);
   });
 
-  it('argKind = layerShiftPicks', () => {
-    expect(GAIA_SHIFT.argKind).toBe('layerShiftPicks');
+  it('argKind = directionChoice：只选一个方向', () => {
+    expect(GAIA_SHIFT.argKind).toBe('directionChoice');
+  });
+
+  it('方向选项：第 1 层不能选 -1、第 4 层不能选 +1，并说明原因；中间层两个方向都可选', () => {
+    const choices = (humanLayer: number) =>
+      GAIA_SHIFT.choices!(baseCtx({ characterId: 'thief_gaia', humanLayer }));
+    const at1 = choices(1);
+    expect(at1.find((c) => c.value === 'decrease')!.disabled?.key).toBe(
+      'skill.reason.gaiaBottomLayer',
+    );
+    expect(at1.find((c) => c.value === 'increase')!.disabled).toBeNull();
+    const at4 = choices(4);
+    expect(at4.find((c) => c.value === 'increase')!.disabled?.key).toBe(
+      'skill.reason.gaiaTopLayer',
+    );
+    expect(at4.find((c) => c.value === 'decrease')!.disabled).toBeNull();
+    for (const c of choices(2)) expect(c.disabled).toBeNull();
+    // 文案里带上要去的层
+    expect(choices(3).find((c) => c.value === 'increase')!.labelParams).toEqual({ layer: 4 });
+    expect(choices(3).find((c) => c.value === 'decrease')!.labelParams).toEqual({ layer: 2 });
   });
 });
 

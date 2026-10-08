@@ -35,8 +35,12 @@ interface RightsRule {
   actors: (G: SetupState) => readonly string[] | null;
 }
 
-/** 非回合主人在没有待结算时唯一可以发的 move */
-export const OFF_TURN_MOVES: readonly string[] = ['useAthenaWit'];
+/**
+ * 非回合主人在没有待结算时可以发的 move：
+ *   雅典娜·急智（别人对她使用行动牌时）、空间女王·造物（任意玩家的弃牌阶段，阶段由 move 自己检查）
+ * 对照：docs/manual/05-dream-thieves.md 雅典娜、空间女王
+ */
+export const OFF_TURN_MOVES: readonly string[] = ['useAthenaWit', 'useSpaceQueenStashTop'];
 
 const RIGHTS_RULES: readonly RightsRule[] = [
   {

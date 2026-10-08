@@ -147,6 +147,73 @@ test.describe('现有参数形态补上的技能入口', () => {
     expect(typeof sent[0]!.args[0]).toBe('string');
   });
 
+  test('空间女王·造物：别人的弃牌阶段也能发动，发出 useSpaceQueenStashTop(牌)', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=space-queen-other');
+    // 不是本人回合，主操作不可用，但技能入口可用
+    await expect(page.getByTestId('action-wait')).toBeDisabled();
+    await openSkillPanel(page);
+
+    const button = skillButton(page, 'useSpaceQueenStashTop');
+    await expect(button).toBeVisible();
+    await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+    // 别的角色技能不会出现在别人的回合里
+    await expect(page.getByTestId('active-skill-buttons').locator('button')).toHaveCount(1);
+    await button.click();
+    await expect(page.getByTestId('active-skill-card-picker')).toBeVisible();
+    await page.getByTestId('active-skill-card-0').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]!.move).toBe('useSpaceQueenStashTop');
+    expect(typeof sent[0]!.args[0]).toBe('string');
+  });
+
+  test('盖亚·撼动：只选一个方向，发出 playGaiaShift(±1)', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=gaia');
+    await openSkillPanel(page);
+
+    await skillButton(page, 'playGaiaShift').click();
+    await expect(page.getByTestId('active-skill-step-form')).toBeVisible();
+    // 本人在第 2 层：两个方向都可选，没有逐人选方向的界面
+    await expect(page.getByTestId('active-skill-step-choice-decrease')).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await expect(page.getByTestId('active-skill-step-choice-increase')).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await expect(page.getByTestId('active-skill-layer-shift-picker')).toHaveCount(0);
+    await page.getByTestId('active-skill-step-choice-decrease').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playGaiaShift', args: [-1] });
+  });
+
+  test('白羊·闪耀：抽牌阶段选多抽几张（0 到 2），发出 doDraw(张数)；直接点「抽牌」则不带参数', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=aries-glow');
+    await openSkillPanel(page);
+
+    await skillButton(page, 'doDraw').click();
+    await expect(page.getByTestId('active-skill-step-form')).toBeVisible();
+    await expect(page.getByTestId(/^active-skill-step-choice-\d$/)).toHaveCount(3);
+    await page.getByTestId('active-skill-step-choice-1').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'doDraw', args: [1] });
+  });
+
+  test('白羊·闪耀：直接点「抽牌」抽满，参数为空', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=aries-glow');
+    await page.getByTestId('action-draw').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'doDraw', args: [] });
+  });
+
   test('黑洞·吸纳：只列有存活玩家的相邻层', async ({ page }) => {
     const sent = recordMoves(page);
     await openScene(page, '/game/debug?skill=black-hole');
@@ -570,8 +637,9 @@ test.describe('背面技能与分步表单技能', () => {
     await cards.first().click();
     await page.getByTestId('active-skill-step-next').click();
 
-    const layers = page.getByTestId(/^active-skill-step-layer-\d$/);
-    expect(await layers.count()).toBeGreaterThanOrEqual(2);
+    // 每一层都能去（只移动不射击也合法），本人所在层（第 2 层）标着「不移动」
+    await expect(page.getByTestId(/^active-skill-step-layer-\d$/)).toHaveCount(4);
+    await expect(page.getByTestId('active-skill-step-layer-2')).toContainText('不移动');
     await page.getByTestId('active-skill-step-layer-1').click();
     const targets = page.getByTestId(/^active-skill-step-player-\d+$/);
     expect(await targets.count()).toBeGreaterThanOrEqual(1);
@@ -580,8 +648,65 @@ test.describe('背面技能与分步表单技能', () => {
       '',
     );
     await targets.first().click();
+    // 目标可以不选，所以选完要点确认
+    await page.getByTestId('active-skill-step-next').click();
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
     expect(sent[0]).toEqual({ move: 'playGreenRayArrest', args: ['action_shoot', id, 1] });
+  });
+
+  test('格林射线·缉捕：只移动（不选目标）发出 (牌, null, 层)', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=green-ray');
+    await openSkillPanel(page);
+    await skillButton(page, 'playGreenRayArrest').click();
+    await page
+      .getByTestId(/^active-skill-step-card-\d+$/)
+      .first()
+      .click();
+    await page.getByTestId('active-skill-step-next').click();
+    await page.getByTestId('active-skill-step-layer-4').click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playGreenRayArrest', args: ['action_shoot', null, 4] });
+  });
+
+  test('格林射线·缉捕：只射击（层选本人所在层）发出 (牌, 目标, 本层)', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=green-ray');
+    await openSkillPanel(page);
+    await skillButton(page, 'playGreenRayArrest').click();
+    await page
+      .getByTestId(/^active-skill-step-card-\d+$/)
+      .first()
+      .click();
+    await page.getByTestId('active-skill-step-next').click();
+    await page.getByTestId('active-skill-step-layer-2').click();
+    const targets = page.getByTestId(/^active-skill-step-player-\d+$/);
+    expect(await targets.count()).toBeGreaterThanOrEqual(1);
+    const id = ((await targets.first().getAttribute('data-testid')) ?? '').replace(
+      'active-skill-step-player-',
+      '',
+    );
+    await targets.first().click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playGreenRayArrest', args: ['action_shoot', id, 2] });
+  });
+
+  test('格林射线·缉捕：不移动也不射击时确认置灰并说明', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=green-ray');
+    await openSkillPanel(page);
+    await skillButton(page, 'playGreenRayArrest').click();
+    await page
+      .getByTestId(/^active-skill-step-card-\d+$/)
+      .first()
+      .click();
+    await page.getByTestId('active-skill-step-next').click();
+    await page.getByTestId('active-skill-step-layer-2').click();
+    await expect(page.getByTestId('active-skill-step-next')).toBeDisabled();
+    await expect(page.getByTestId('active-skill-step-blocked')).toContainText('至少要做一样');
+    expect(sent).toHaveLength(0);
   });
 
   test('水瓶·凝聚：弃牌堆里本回合用过的牌不列；选一张发出 playAquariusCoherence', async ({

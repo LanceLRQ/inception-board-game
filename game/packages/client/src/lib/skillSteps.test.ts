@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
   AQUARIUS_COHERENCE,
   EMPTY_PICKS,
+  ARIES_GLOW,
+  GAIA_SHIFT,
   GREEN_RAY_ARREST,
   LUNA_FULL_MOON,
   MARS_KILL,
@@ -21,6 +23,7 @@ import {
   discardChoicesFor,
   handPickReady,
   isInstantStep,
+  layerStepChoices,
   isStepSkill,
   nightmareKindAt,
   stepReady,
@@ -261,5 +264,62 @@ describe('分步表单 · 选项与回退', () => {
     const picks = { ...EMPTY_PICKS, layer: 1, params: { targetLayer: 2, action: 'add' } };
     expect(clearFrom(steps, 1, picks).params).toBeNull();
     expect(clearFrom(steps, 1, picks).layer).toBe(1);
+  });
+});
+
+describe('分步表单 · 格林射线的移动与射击各自可选', () => {
+  it('目标步骤可不选；全部选完才能拼参数', () => {
+    const steps = stepsFor(GREEN_RAY_ARREST, ctx(), EMPTY_PICKS);
+    expect(steps.map((x) => x.kind)).toEqual(['handCards', 'layer', 'players']);
+    expect(steps[2]).toMatchObject({ kind: 'players', optional: true });
+    expect(isInstantStep(steps[2]!)).toBe(false);
+  });
+
+  it('只移动：不选目标，参数里目标位是 null', () => {
+    const c = ctx({ humanLayer: 2, hand: ['action_dream_transit', 'action_shoot'] });
+    expect(buildStepArgs(GREEN_RAY_ARREST, c, { ...EMPTY_PICKS, cards: [1], layer: 4 })).toEqual([
+      'action_shoot',
+      null,
+      4,
+    ]);
+  });
+
+  it('只射击：层选本人所在层，选了目标', () => {
+    const c = ctx({ humanLayer: 2, hand: ['action_dream_transit', 'action_shoot'] });
+    expect(
+      buildStepArgs(GREEN_RAY_ARREST, c, { ...EMPTY_PICKS, cards: [1], layer: 2, players: ['t'] }),
+    ).toEqual(['action_shoot', 't', 2]);
+  });
+
+  it('层留在本人所在层又不选目标：什么都不做，拼不出参数并给出原因', () => {
+    const c = ctx({ humanLayer: 2, hand: ['action_dream_transit', 'action_shoot'] });
+    const nothing = { ...EMPTY_PICKS, cards: [1], layer: 2 };
+    expect(buildStepArgs(GREEN_RAY_ARREST, c, nothing)).toBeNull();
+    expect(GREEN_RAY_ARREST.confirmBlocked!(c, nothing)).toEqual({
+      key: 'skill.reason.greenRayNothing',
+    });
+  });
+
+  it('每一层都能选，本人所在层带「不移动」标记', () => {
+    const c = ctx({ humanLayer: 3 });
+    expect(layerStepChoices(GREEN_RAY_ARREST, c, EMPTY_PICKS)).toEqual([1, 2, 3, 4]);
+    expect(GREEN_RAY_ARREST.layerStayCurrent).toBe(true);
+  });
+});
+
+describe('分步表单 · 盖亚的方向与白羊的张数', () => {
+  it('盖亚·撼动走分步表单，只有一步选方向；增加 = +1，减少 = -1', () => {
+    expect(isStepSkill(GAIA_SHIFT)).toBe(true);
+    expect(stepsFor(GAIA_SHIFT, ctx(), EMPTY_PICKS).map((x) => x.kind)).toEqual(['choice']);
+    expect(buildStepArgs(GAIA_SHIFT, ctx(), { ...EMPTY_PICKS, choice: 'increase' })).toEqual([1]);
+    expect(buildStepArgs(GAIA_SHIFT, ctx(), { ...EMPTY_PICKS, choice: 'decrease' })).toEqual([-1]);
+    expect(buildStepArgs(GAIA_SHIFT, ctx(), EMPTY_PICKS)).toBeNull();
+  });
+
+  it('白羊·闪耀走分步表单，选项的取值就是多抽的张数', () => {
+    expect(isStepSkill(ARIES_GLOW)).toBe(true);
+    expect(buildStepArgs(ARIES_GLOW, ctx(), { ...EMPTY_PICKS, choice: '0' })).toEqual([0]);
+    expect(buildStepArgs(ARIES_GLOW, ctx(), { ...EMPTY_PICKS, choice: '3' })).toEqual([3]);
+    expect(buildStepArgs(ARIES_GLOW, ctx(), EMPTY_PICKS)).toBeNull();
   });
 });

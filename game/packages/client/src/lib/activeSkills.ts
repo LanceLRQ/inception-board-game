@@ -24,7 +24,6 @@ export type ActiveSkillArgKind =
   | 'playerAndCard'
   | 'multiCard'
   | 'multiCardAndPlayer'
-  | 'layerShiftPicks'
   | 'multiCardAndDiscardCard'
   | 'playerAndBribeIndex'
   | 'twoCardsAndShoot'
@@ -35,7 +34,9 @@ export type ActiveSkillArgKind =
   | 'layerAndChoice'
   | 'discardCard'
   | 'playerAndMultiCard'
-  | 'layerAndParams';
+  | 'layerAndParams'
+  | 'directionChoice'
+  | 'countChoice';
 
 /** 技能此刻用不了的原因（i18n 键 + 参数） */
 export interface SkillReason {
@@ -87,6 +88,8 @@ export interface SkillChoice {
   readonly value: string;
   /** i18n 键 */
   readonly labelKey: string;
+  /** 文案里的参数 */
+  readonly labelParams?: Readonly<Record<string, string | number>>;
   /** 此刻选不了的原因；可选时为 null */
   readonly disabled: SkillReason | null;
 }
@@ -102,6 +105,11 @@ export interface ActiveSkillDescriptor {
   readonly argKind: ActiveSkillArgKind;
   /** 要求的回合阶段（默认 'action'） */
   readonly requiredPhase?: 'action' | 'discard' | 'draw';
+  /**
+   * 别人的回合里也能发动（空间女王·造物：任意玩家的弃牌阶段）。
+   * 非本人回合时，面板只列出声明了它的技能；阶段、次数与其他条件照常判断。
+   */
+  readonly offTurn?: boolean;
   /** 结构性条件：不满足就不显示 */
   readonly extraCheck?: (ctx: ActiveSkillContext) => boolean;
   /** 次数限制：用完后置灰并说明 */
@@ -133,6 +141,13 @@ export interface ActiveSkillDescriptor {
   readonly discardPickable?: (card: string, ctx: ActiveSkillContext) => boolean;
   /** 分步表单里「选一项」步骤的选项（射手·穿心：增加 / 减少） */
   readonly choices?: (ctx: ActiveSkillContext) => readonly SkillChoice[];
+  /** 层步骤里，本人所在层表示「不移动」（格林射线·缉捕：移动可选），按钮上带说明 */
+  readonly layerStayCurrent?: boolean;
+  /**
+   * 分步表单全部选完后仍然发不出去的情形（格林射线·缉捕：移动与射击至少要做一样）；
+   * 返回原因则最后一步的确认置灰并说明。
+   */
+  readonly confirmBlocked?: (ctx: ActiveSkillContext, picks: SkillPicks) => SkillReason | null;
 }
 
 /** 一个技能可选的目标玩家：按描述符声明的范围，从存活目标与迷失层目标里取 */
@@ -197,7 +212,7 @@ export interface ActiveSkillContext {
   readonly bribePoolAvailable?: boolean;
   /** 在迷失层的其他玩家 id 列表（灵魂牧师·拯救用） */
   readonly lostPlayerIds?: readonly string[];
-  /** 与人类玩家同层的其他存活玩家 id 列表（盖亚·大地用） */
+  /** 与人类玩家同层的其他存活玩家 id 列表（盖亚·撼动等同层技能用） */
   readonly sameLayerPlayerIds?: readonly string[];
   /** 弃牌堆（战争之王·黑市等选弃牌堆技能用） */
   readonly discardPile?: readonly string[];
@@ -211,6 +226,8 @@ export interface ActiveSkillContext {
   readonly unopenedVaults?: number;
   /** 本回合已打出的牌（公开；水瓶·凝聚、金星·镜界复制据此判断） */
   readonly playedCards?: readonly string[];
+  /** 已弃掉（含发动过）的梦魇牌张数（公开；白羊·闪耀据此决定最多多抽几张） */
+  readonly usedNightmareCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -467,8 +484,9 @@ export const PISCES_BLESSING: ActiveSkillDescriptor = {
 /** 格林射线·缉捕要弃的梦境穿梭剂（引擎写死这一张） */
 const GREEN_RAY_TRANSIT = TRANSIT_CARD;
 
-// 格林射线·缉捕：弃 1 张梦境穿梭剂和 1 张 SHOOT 类牌，移到任意一层，再对那里的目标执行该 SHOOT 的效果；不限次数
-// 参数顺序是 (SHOOT 牌, 目标, 层)，界面先选牌、再选层、再选该层的目标。
+// 格林射线·缉捕：弃 1 张梦境穿梭剂和 1 张 SHOOT 类牌，可以移到任意一层，然后可以对目标执行该 SHOOT 的效果；不限次数。
+// 移动与射击各自可选：层选本人所在层 = 不移动，目标不选 = 不射击，但两样至少要做一样（引擎同样拒绝什么都不做）。
+// 参数顺序是 (SHOOT 牌, 目标 | 空, 层 | 空)，界面先选牌、再选层、再选该层的目标（可不选）。
 // 目标的范围与普通出牌的 SHOOT 一致：要求同层的牌只能选移动后同层的人，刺客之王不限层，木星·巅峰世界观可选相邻层。
 // 对照：引擎的 playGreenRayArrest；SHOOT 的层数限制见 engine 的 violatesShootLayerLimit
 export const GREEN_RAY_ARREST: ActiveSkillDescriptor = {
@@ -481,17 +499,16 @@ export const GREEN_RAY_ARREST: ActiveSkillDescriptor = {
   extraCheck: (ctx) => ctx.hand.length > 0,
   pickCount: 1,
   handPickable: (card) => isShootClassCard(card as never),
-  layerChoices: (ctx, _targetId, picks) => {
-    const card = picks ? greenRayShootCard(ctx, picks) : null;
-    return [1, 2, 3, 4].filter(
-      (layer) => card === null || greenRayTargets(ctx, card, layer).length > 0,
-    );
-  },
+  // 任意一层都可以去（只移动不射击也是合法的），本人所在层 = 不移动
+  layerChoices: () => [1, 2, 3, 4],
+  layerStayCurrent: true,
   targets: (ctx, picks) => {
     if (!picks || picks.layer === null) return null;
     const card = greenRayShootCard(ctx, picks);
     return card === null ? [] : greenRayTargets(ctx, card, picks.layer);
   },
+  confirmBlocked: (ctx, picks) =>
+    picks.layer === ctx.humanLayer && picks.players.length === 0 ? reason('greenRayNothing') : null,
   blocked: (ctx) => {
     if (!ctx.hand.includes(GREEN_RAY_TRANSIT)) return reason('noTransitInHand');
     return countCards(ctx.hand, (c) => isShootClassCard(c as never)) > 0
@@ -695,22 +712,64 @@ export const LORD_OF_WAR_BLACK_MARKET: ActiveSkillDescriptor = {
   blocked: (ctx) => ((ctx.discardPile?.length ?? 0) > 0 ? null : reason('discardEmpty')),
 };
 
-// 盖亚·大地 —— 使同层其他玩家各自 +1 / -1 层（限 2 次/回合）
-// 对照：docs/manual/05-dream-thieves.md 盖亚 + 引擎的 playGaiaShift
+// 盖亚·撼动 —— 选一个方向（-1 或 +1），令同层其余玩家全部移到那一层（回合限 2 次）；
+// 盖亚自己不动，不能因此进入迷失层：第 1 层不能选 -1，第 4 层不能选 +1。
+// 对照：docs/manual/05-dream-thieves.md 盖亚 + 引擎的 playGaiaShift（参数就是方向 -1 / +1）
 export const GAIA_SHIFT: ActiveSkillDescriptor = {
   id: 'thief_gaia.skill_0',
   characterId: 'thief_gaia',
   move: 'playGaiaShift',
   nameKey: 'skill.thief_gaia.skill_0.name',
   descKey: 'skill.thief_gaia.skill_0.desc',
-  argKind: 'layerShiftPicks',
-  // 同层必须有其他存活玩家可选
+  argKind: 'directionChoice',
+  // 同层必须有其他存活玩家可移动
   extraCheck: (ctx) => (ctx.sameLayerPlayerIds?.length ?? 0) > 0,
   usage: { key: 'thief_gaia.skill_0', limit: 2 },
+  choices: (ctx) => [
+    {
+      value: 'decrease',
+      labelKey: 'skill.choice.gaiaDown',
+      labelParams: { layer: ctx.humanLayer - 1 },
+      disabled: ctx.humanLayer - 1 < 1 ? reason('gaiaBottomLayer') : null,
+    },
+    {
+      value: 'increase',
+      labelKey: 'skill.choice.gaiaUp',
+      labelParams: { layer: ctx.humanLayer + 1 },
+      disabled: ctx.humanLayer + 1 > 4 ? reason('gaiaTopLayer') : null,
+    },
+  ],
 };
 
-// 空间女王·造物：弃牌阶段把 1 张手牌放到牌库顶；不限次数
-// 对照：docs/manual/05-dream-thieves.md 空间女王；引擎的 useSpaceQueenStashTop（只在回合主人自己的弃牌阶段接受）
+// 白羊·闪耀：每有 1 张弃掉（含发动过）的梦魇牌，抽牌阶段可多抽 1 张，多抽几张由白羊自选（0 到张数）。
+// 不点这个技能、直接点「抽牌」就是抽满（引擎的缺省）。发的是 doDraw，参数是多抽的张数。
+// 对照：docs/manual/05-dream-thieves.md 白羊「闪耀」；引擎的 doDraw / isValidAriesExtraChoice
+export const ARIES_GLOW: ActiveSkillDescriptor = {
+  id: 'thief_aries.skill_1',
+  characterId: 'thief_aries',
+  move: 'doDraw',
+  nameKey: 'skill.thief_aries.skill_1.name',
+  descKey: 'skill.thief_aries.skill_1.desc',
+  argKind: 'countChoice',
+  requiredPhase: 'draw',
+  // 一张梦魇都没弃过就没有可选的
+  extraCheck: (ctx) => (ctx.usedNightmareCount ?? 0) > 0,
+  // 从抽满往下列到「不多抽」
+  choices: (ctx) =>
+    Array.from({ length: (ctx.usedNightmareCount ?? 0) + 1 }, (_, i) => {
+      const n = (ctx.usedNightmareCount ?? 0) - i;
+      return {
+        value: String(n),
+        labelKey: n === 0 ? 'skill.choice.ariesGlowNone' : 'skill.choice.ariesGlow',
+        labelParams: { n },
+        disabled: null,
+      };
+    }),
+};
+
+// 空间女王·造物：任意玩家的弃牌阶段，把 1 张手牌放到牌库顶；不限次数
+// 别人的弃牌阶段也能发动（offTurn），引擎把它登记为回合外可发的 move
+// 对照：docs/manual/05-dream-thieves.md 空间女王；引擎的 useSpaceQueenStashTop
 export const SPACE_QUEEN_STASH: ActiveSkillDescriptor = {
   id: 'thief_space_queen.skill_1',
   characterId: 'thief_space_queen',
@@ -719,6 +778,7 @@ export const SPACE_QUEEN_STASH: ActiveSkillDescriptor = {
   descKey: 'skill.thief_space_queen.skill_1.desc',
   argKind: 'handCard',
   requiredPhase: 'discard',
+  offTurn: true,
   extraCheck: (ctx) => ctx.hand.length > 0,
 };
 
@@ -1008,6 +1068,7 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   LIBRA_BALANCE,
   FORGER_EXCHANGE,
   SPACE_QUEEN_STASH,
+  ARIES_GLOW,
   BLACK_HOLE_ABSORB,
   LUNA_FULL_MOON,
   PISCES_BLESSING,
@@ -1068,12 +1129,13 @@ const NEEDS_TARGET: readonly ActiveSkillArgKind[] = [
 
 /** 推导当前人类玩家可见的主动技能项：该显示的都显示，此刻用不了的带原因 */
 export function getSkillEntries(ctx: ActiveSkillContext): SkillEntry[] {
-  if (!ctx.isHumanTurn) return [];
   if (!ctx.isAlive) return [];
   if (ctx.hasPending) return [];
 
   const entries: SkillEntry[] = [];
   for (const d of ALL_DESCRIPTORS) {
+    // 别人的回合里只有声明了 offTurn 的技能（空间女王·造物）可以发动
+    if (!ctx.isHumanTurn && !d.offTurn) continue;
     // '__any__' 作为通配匹配任意 characterId（配合 extraCheck 做阵营过滤）
     if (d.characterId !== '__any__' && d.characterId !== ctx.characterId) continue;
     const required = d.requiredPhase ?? 'action';

@@ -74,19 +74,16 @@ function accountDeck(was: SetupState, now: SetupState): DeckAccount | null {
   const discardLoss = minus(was.deck.discardPile, now.deck.discardPile);
   // 进入牌库的牌里有从弃牌堆来的，说明重洗过，这一步按差值算不了
   if (common(entered, discardLoss).length > 0) return null;
-  // 从手牌里移出游戏的时间风暴本身；其余新增的是被翻开的牌库顶
+  // 移出游戏的只有时间风暴本身。不能用「手牌里少了几张风暴」来对账：战争之王·黑市可以一边弃出一张风暴，
+  // 一边从弃牌堆（被翻开的牌里可能有风暴）拿回另一张，手牌里的风暴数不变。
+  // 所以只看新增的移出牌里有没有不是时间风暴的，那才是被翻开移出的牌库顶
   const newlyRemoved = now.removedFromGame.slice(was.removedFromGame.length);
-  const stormsIn = (G: SetupState): number =>
-    Object.values(G.players).reduce(
-      (t, pl) => t + pl.hand.filter((c) => c === 'action_time_storm').length,
-      0,
-    );
-  const stormsLeftHands = newlyRemoved.length > 0 ? stormsIn(was) - stormsIn(now) : 0;
+  const flippedOut = newlyRemoved.filter((card) => card !== 'action_time_storm').length;
   return {
     left: was.deck.cards.length - now.deck.cards.length,
     out,
     entered: entered.length,
-    flipped: newlyRemoved.length - stormsLeftHands,
+    flipped: flippedOut,
     discardGain: minus(now.deck.discardPile, was.deck.discardPile),
   };
 }

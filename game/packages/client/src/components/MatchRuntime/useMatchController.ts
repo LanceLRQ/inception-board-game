@@ -515,9 +515,10 @@ export function useMatchController(source: MatchSource): MatchController {
     unopenedVaults: unopenedVaultCount(vaultsRaw ?? []),
   });
 
-  // 角色主动技能面板（影子·潜伏 / 阿波罗·崇拜）：非本人回合或对局结束不显示
+  // 角色主动技能面板：对局结束不显示；非本人回合时面板里只会有「回合外也能发动」的技能
+  // （空间女王·造物：任意玩家的弃牌阶段），其余由 getSkillEntries 按 isHumanTurn 过滤掉
   let skillPanel: SkillPanelModel | null = null;
-  if (G && isMyTurn && !winner) {
+  if (G && mySeat !== null && !winner) {
     skillPanel = {
       context: buildActiveSkillContext({ G, seat: mySeat, isMyTurn, hand: humanHand }),
       targetIds: activeSkillTargetIds(players, mySeat),

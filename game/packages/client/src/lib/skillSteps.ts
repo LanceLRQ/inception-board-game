@@ -6,7 +6,9 @@
 // 参数拼装与引擎各 move 的入参一一对应，有真实引擎对账测试（skillEngineFlow.test.ts）：
 //   multiCardAndPlayers  playLunaFullMoon(弃牌 id 列表, 复活的玩家列表)
 //   optionalPlayer       playPiscesBlessing(复活的玩家 | null)
-//   cardPlayerLayer      playGreenRayArrest(SHOOT 牌, 目标, 层)        界面先选牌、再选层、再选目标
+//   cardPlayerLayer      playGreenRayArrest(SHOOT 牌, 目标 | null, 层)  界面先选牌、再选层（本人所在层 = 不移动）、再选目标（可不选 = 不射击）
+//   countChoice          doDraw(多抽的张数)                               界面选多抽几张（白羊·闪耀）
+//   directionChoice      playGaiaShift(方向 -1 | +1)                   界面选一个方向，同层其余玩家全部移动
 //   layerAndChoice       useSagittariusHeartLock(层, +1 | -1)           界面先选增减、再选层
 //   discardCard          playAquariusCoherence(弃牌堆里的牌)
 //   playerAndMultiCard   useVenusMirrorWorld(目标, 弃牌 id 列表)
@@ -49,8 +51,16 @@ const STEP_FORMS: Partial<Record<ActiveSkillArgKind, StepForm>> = {
     build: (_hand, p) => [p.players[0] ?? null],
   },
   cardPlayerLayer: {
-    steps: [{ kind: 'handCards' }, { kind: 'layer' }, { kind: 'players' }],
-    build: (hand, p) => [handCardsAt(hand, p.cards)[0], p.players[0], p.layer],
+    steps: [{ kind: 'handCards' }, { kind: 'layer' }, { kind: 'players', optional: true }],
+    build: (hand, p) => [handCardsAt(hand, p.cards)[0], p.players[0] ?? null, p.layer],
+  },
+  countChoice: {
+    steps: [{ kind: 'choice' }],
+    build: (_hand, p) => [Number(p.choice)],
+  },
+  directionChoice: {
+    steps: [{ kind: 'choice' }],
+    build: (_hand, p) => [p.choice === 'increase' ? 1 : -1],
   },
   layerAndChoice: {
     steps: [{ kind: 'choice' }, { kind: 'layer' }],
@@ -155,6 +165,7 @@ export function buildStepArgs(
   if (!form) return null;
   const steps = stepsFor(skill, ctx, picks);
   if (!steps.every((step) => stepReady(step, skill, ctx, picks, paramsReady))) return null;
+  if (skill.confirmBlocked?.(ctx, picks)) return null;
   return form.build(ctx.hand, picks);
 }
 

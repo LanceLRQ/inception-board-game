@@ -22,6 +22,7 @@ import {
   ACTIVE_SKILL_DESCRIPTORS,
   APOLLO_WORSHIP,
   AQUARIUS_COHERENCE,
+  ARIES_GLOW,
   ARCHITECT_MAZE,
   ATHENA_AWE,
   BLACK_HOLE_ABSORB,
@@ -65,6 +66,7 @@ import {
 import { activeSkillLostTargetIds, activeSkillTargetIds } from '../MatchRuntime/controllerDerive';
 import {
   buildStepArgs,
+  choicesFor,
   handChoicesFor,
   layerStepChoices,
   nightmareKindAt,
@@ -338,16 +340,17 @@ const ROWS: Row[] = [
     },
   },
   {
-    name: '盖亚·大地',
+    name: '盖亚·撼动',
     skill: GAIA_SHIFT,
     build: () => {
       const s = asThief('thief_gaia', cards('action_kick'));
       const mate = s.others[0]!;
-      return {
-        state: moveTo(s.state, mate, s.state.G.players[s.me]!.currentLayer),
-        seat: s.me,
-        args: [{ [mate]: 1 }],
-      };
+      const state = moveTo(s.state, mate, s.state.G.players[s.me]!.currentLayer);
+      const args = buildStepArgs(GAIA_SHIFT, contextOf(state, s.me), {
+        ...EMPTY_PICKS,
+        choice: 'increase',
+      })!;
+      return { state, seat: s.me, args };
     },
   },
   {
@@ -481,6 +484,23 @@ const ROWS: Row[] = [
       const args = buildStepArgs(PISCES_BLESSING, contextOf(state, s.me), {
         ...EMPTY_PICKS,
         players: [dead],
+      })!;
+      return { state, seat: s.me, args };
+    },
+  },
+  {
+    name: '白羊·闪耀（抽牌阶段）',
+    skill: ARIES_GLOW,
+    build: () => {
+      const s = asThief('thief_aries', cards('action_kick'));
+      let state = setPhase(s.state, 'draw');
+      state = editG(state, (G) => ({
+        ...G,
+        usedNightmareIds: cards('nightmare_echo', 'nightmare_plague'),
+      }));
+      const args = buildStepArgs(ARIES_GLOW, contextOf(state, s.me), {
+        ...EMPTY_PICKS,
+        choice: '1',
       })!;
       return { state, seat: s.me, args };
     },
@@ -889,6 +909,95 @@ describe('可选目标与层', () => {
     expect(entryOf(setPhase(s.state, 'discard'), s.me, SPACE_QUEEN_STASH)?.enabled).toBe(true);
   });
 
+  it('空间女王·造物：别人的弃牌阶段也显示，引擎以空间女王本人的名义接受；别的阶段 / 别的技能不显示', () => {
+    const s = asThief('thief_space_queen', cards('action_kick', 'action_unlock'));
+    const owner = s.others[0]!;
+    const offTurn = (phase: SetupState['turnPhase']) =>
+      editG(s.state, (G) => ({ ...G, currentPlayerID: owner, turnPhase: phase }));
+
+    const discard = offTurn('discard');
+    expect(contextOf(discard, s.me).isHumanTurn).toBe(false);
+    expect(entryOf(discard, s.me, SPACE_QUEEN_STASH)).toMatchObject({
+      enabled: true,
+      reason: null,
+    });
+    const after = apply(discard, s.me, 'useSpaceQueenStashTop', ['action_kick']);
+    expect(after).not.toBeNull();
+    expect(after!.G.deck.cards[0]).toBe('action_kick');
+    expect(after!.G.currentPlayerID).toBe(owner);
+    // 不限次数：连着发动第二次，界面仍然可用，引擎也接受
+    expect(entryOf(after!, s.me, SPACE_QUEEN_STASH)?.enabled).toBe(true);
+    expect(apply(after!, s.me, 'useSpaceQueenStashTop', ['action_unlock'])).not.toBeNull();
+
+    // 别人的出牌 / 抽牌阶段：界面不显示，引擎也拒绝
+    for (const phase of ['action', 'draw'] as const) {
+      const other = offTurn(phase);
+      expect(entryOf(other, s.me, SPACE_QUEEN_STASH), phase).toBeUndefined();
+      expect(apply(other, s.me, 'useSpaceQueenStashTop', ['action_kick']), phase).toBeNull();
+    }
+    // 别人回合里其他角色的主动技能一概不显示
+    const chemist = setCharacter(discard, s.me, 'thief_chemist');
+    expect(getSkillEntries(contextOf(chemist, s.me))).toEqual([]);
+  });
+
+  it('盖亚·撼动：同层其余玩家全部随方向移动，只选方向；第 1 层不能 -1、第 4 层不能 +1，引擎也拒绝', () => {
+    const s = asThief('thief_gaia', cards('action_kick'));
+    const [a, b] = s.others;
+    let state = moveTo(moveTo(moveTo(s.state, s.me, 2), a!, 2), b!, 2);
+    const ctx = contextOf(state, s.me);
+    expect(choicesFor(GAIA_SHIFT, ctx).map((c) => [c.value, c.disabled])).toEqual([
+      ['decrease', null],
+      ['increase', null],
+    ]);
+    expect(buildStepArgs(GAIA_SHIFT, ctx, EMPTY_PICKS), '没选方向').toBeNull();
+    const down = buildStepArgs(GAIA_SHIFT, ctx, { ...EMPTY_PICKS, choice: 'decrease' })!;
+    expect(down).toEqual([-1]);
+    const after = apply(state, s.me, 'playGaiaShift', down)!;
+    expect(after).not.toBeNull();
+    const here = state.G.layers[2]!.playersInLayer.filter((id) => id !== s.me);
+    expect(here.length).toBeGreaterThanOrEqual(2);
+    for (const id of here) expect(after.G.players[id]!.currentLayer).toBe(1);
+    expect(after.G.players[s.me]!.currentLayer).toBe(2);
+
+    // 第 1 层：-1 置灰并说明原因；引擎拒绝
+    state = moveTo(moveTo(state, s.me, 1), a!, 1);
+    const at1 = choicesFor(GAIA_SHIFT, contextOf(state, s.me));
+    expect(at1.find((c) => c.value === 'decrease')!.disabled?.key).toBe(
+      'skill.reason.gaiaBottomLayer',
+    );
+    expect(apply(state, s.me, 'playGaiaShift', [-1])).toBeNull();
+    expect(apply(state, s.me, 'playGaiaShift', [1])).not.toBeNull();
+    // 第 4 层：+1 置灰；引擎拒绝
+    state = moveTo(moveTo(state, s.me, 4), a!, 4);
+    const at4 = choicesFor(GAIA_SHIFT, contextOf(state, s.me));
+    expect(at4.find((c) => c.value === 'increase')!.disabled?.key).toBe(
+      'skill.reason.gaiaTopLayer',
+    );
+    expect(apply(state, s.me, 'playGaiaShift', [1])).toBeNull();
+    expect(apply(state, s.me, 'playGaiaShift', [-1])).not.toBeNull();
+  });
+
+  it('白羊·闪耀：界面列出 0 到已弃梦魇数，每个选项引擎都接受；超出上限引擎拒绝；不带参数抽满', () => {
+    const s = asThief('thief_aries', cards('action_kick'));
+    const used = cards('nightmare_echo', 'nightmare_plague');
+    let state = setPhase(s.state, 'draw');
+    expect(entryOf(state, s.me, ARIES_GLOW), '没弃过梦魇不显示').toBeUndefined();
+    state = editG(state, (G) => ({ ...G, usedNightmareIds: used }));
+    const ctx = contextOf(state, s.me);
+    const values = choicesFor(ARIES_GLOW, ctx).map((c) => c.value);
+    expect(values).toEqual(['2', '1', '0']);
+    const handAfter = (args: unknown[]) =>
+      apply(state, s.me, 'doDraw', args)?.G.players[s.me]!.hand.length;
+    const base = s.state.G.players[s.me]!.hand.length;
+    for (const v of values) {
+      const args = buildStepArgs(ARIES_GLOW, ctx, { ...EMPTY_PICKS, choice: v })!;
+      expect(args).toEqual([Number(v)]);
+      expect(handAfter(args), `多抽 ${v} 张`).toBe(base + 2 + Number(v));
+    }
+    expect(handAfter([]), '不带参数抽满').toBe(base + 2 + 2);
+    expect(handAfter([3]), '超出上限').toBeUndefined();
+  });
+
   it('双子·命运：本回合解封次数已用尽时置灰（减少心锁算一次解封），引擎也拒绝', () => {
     const s = asThief('thief_gemini', cards('action_kick'));
     const state = patchPlayer(setPhase(s.state, 'discard'), s.me, { successfulUnlocksThisTurn: 1 });
@@ -994,7 +1103,7 @@ describe('分步表单技能 · 界面可选项与引擎一致', () => {
     );
   });
 
-  it('格林射线·缉捕：只能选 SHOOT 类牌；层只列有目标的层，目标是移动后同层的存活玩家', () => {
+  it('格林射线·缉捕：只能选 SHOOT 类牌；任意层都能去，本人所在层表示不移动；目标是移动后同层的存活玩家', () => {
     const s = asThief(
       'thief_green_ray',
       cards('action_dream_transit', 'action_kick', 'action_shoot'),
@@ -1002,17 +1111,11 @@ describe('分步表单技能 · 界面可选项与引擎一致', () => {
     const ctx = contextOf(s.state, s.me);
     expect(handChoicesFor(GREEN_RAY_ARREST, ctx)).toEqual([2]);
     const picks = { ...EMPTY_PICKS, cards: [2] };
-    const layers = layerStepChoices(GREEN_RAY_ARREST, ctx, picks);
-    // 每个列出的层上都有至少一名其他存活玩家；没人的层不列
-    for (const layer of layers) {
-      expect(
-        s.state.G.layers[layer]!.playersInLayer.filter((id) => id !== s.me).length,
-      ).toBeGreaterThan(0);
-    }
-    for (const layer of [1, 2, 3, 4].filter((l) => !layers.includes(l))) {
-      expect(s.state.G.layers[layer]!.playersInLayer.filter((id) => id !== s.me)).toEqual([]);
-    }
-    const layer = layers[0]!;
+    // 只移动不射击也是合法的，所以每一层都列（包括没人的层）
+    expect(layerStepChoices(GREEN_RAY_ARREST, ctx, picks)).toEqual([1, 2, 3, 4]);
+    const layer = [1, 2, 3, 4].find(
+      (l) => s.state.G.layers[l]!.playersInLayer.filter((id) => id !== s.me).length > 0,
+    )!;
     const targets = playerChoicesFor(GREEN_RAY_ARREST, ctx, { ...picks, layer }, [], []);
     expect(targets).toEqual(s.state.G.layers[layer]!.playersInLayer.filter((id) => id !== s.me));
     // 引擎对不在该层的目标拒绝
@@ -1022,6 +1125,56 @@ describe('分步表单技能 · 界面可选项与引擎一致', () => {
     expect(
       apply(s.state, s.me, 'playGreenRayArrest', ['action_shoot', elsewhere, layer]),
     ).toBeNull();
+  });
+
+  it('格林射线·缉捕：只移动（不选目标）界面拼出 [牌, null, 层]，引擎接受且不射击', () => {
+    const s = asThief('thief_green_ray', cards('action_dream_transit', 'action_shoot'));
+    const ctx = contextOf(s.state, s.me);
+    const myLayer = s.state.G.players[s.me]!.currentLayer;
+    const layer = myLayer === 4 ? 3 : myLayer + 1;
+    const args = buildStepArgs(GREEN_RAY_ARREST, ctx, { ...EMPTY_PICKS, cards: [1], layer })!;
+    expect(args).toEqual(['action_shoot', null, layer]);
+    const after = apply(s.state, s.me, 'playGreenRayArrest', args)!;
+    expect(after).not.toBeNull();
+    expect(after.G.players[s.me]!.currentLayer).toBe(layer);
+    // 代价照付：穿梭剂和 SHOOT 都弃了
+    expect(after.G.players[s.me]!.hand).toEqual([]);
+    // 没有射击：所有人都还活着
+    for (const id of Object.keys(after.G.players)) expect(after.G.players[id]!.isAlive).toBe(true);
+  });
+
+  it('格林射线·缉捕：只射击（层选本人所在层）界面拼出 [牌, 目标, 本层]，引擎接受且不移动', () => {
+    const s = asThief('thief_green_ray', cards('action_dream_transit', 'action_shoot_assassin'));
+    const ctx = contextOf(s.state, s.me);
+    const myLayer = s.state.G.players[s.me]!.currentLayer;
+    const target = s.others[2]!;
+    const args = buildStepArgs(GREEN_RAY_ARREST, ctx, {
+      ...EMPTY_PICKS,
+      cards: [1],
+      layer: myLayer,
+      players: [target],
+    })!;
+    expect(args).toEqual(['action_shoot_assassin', target, myLayer]);
+    const after = apply(s.state, s.me, 'playGreenRayArrest', args)!;
+    expect(after).not.toBeNull();
+    expect(after.G.players[s.me]!.currentLayer).toBe(myLayer);
+    expect(after.G.players[s.me]!.hand).toEqual([]);
+  });
+
+  it('格林射线·缉捕：既不移动也不射击，界面不让确认并说明，引擎也拒绝', () => {
+    const s = asThief('thief_green_ray', cards('action_dream_transit', 'action_shoot'));
+    const ctx = contextOf(s.state, s.me);
+    const myLayer = s.state.G.players[s.me]!.currentLayer;
+    const nothing = { ...EMPTY_PICKS, cards: [1], layer: myLayer };
+    expect(buildStepArgs(GREEN_RAY_ARREST, ctx, nothing)).toBeNull();
+    expect(GREEN_RAY_ARREST.confirmBlocked!(ctx, nothing)?.key).toBe(
+      'skill.reason.greenRayNothing',
+    );
+    // 换一层，或者选一个目标，就放行
+    expect(GREEN_RAY_ARREST.confirmBlocked!(ctx, { ...nothing, players: ['x'] })).toBeNull();
+    expect(GREEN_RAY_ARREST.confirmBlocked!(ctx, { ...nothing, layer: myLayer + 1 })).toBeNull();
+    expect(apply(s.state, s.me, 'playGreenRayArrest', ['action_shoot', null, myLayer])).toBeNull();
+    expect(apply(s.state, s.me, 'playGreenRayArrest', ['action_shoot'])).toBeNull();
   });
 
   it('格林射线·缉捕：刺客之王不限层，所有存活的其他玩家都可选', () => {

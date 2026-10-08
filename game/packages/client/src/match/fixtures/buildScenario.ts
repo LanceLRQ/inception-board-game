@@ -19,7 +19,7 @@ import {
   type SeatInfo,
 } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
-import type { CardID, Layer } from '@icgame/shared';
+import { NIGHTMARE_CARDS, type CardID, type Layer } from '@icgame/shared';
 import { FIXTURE_DEFAULT_PLAYERS, type FixtureScenarioId } from './scenarios';
 
 const game: GameDef<SetupState> = InceptionCityGame;
@@ -166,6 +166,8 @@ interface SkillScene {
   readonly masterCharacter?: string;
   /** 回合阶段；缺省是出牌阶段 */
   readonly phase?: 'draw' | 'discard';
+  /** 回合主人：缺省是本人；other = 第二名盗梦者（走查别人回合里本人也能发动的技能） */
+  readonly turnOwner?: 'viewer' | 'other';
   readonly adjust?: (G: SetupState, who: { viewer: string; master: string }) => SetupState;
 }
 
@@ -237,6 +239,39 @@ const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
     adjust: (G) => withoutTransitInDiscard(G),
   },
   'skill-space-queen': { viewer: 'thief', character: 'thief_space_queen', phase: 'discard' },
+  // 轮到别人弃牌：空间女王在别人的弃牌阶段也能发动造物
+  'skill-space-queen-other': {
+    viewer: 'thief',
+    character: 'thief_space_queen',
+    phase: 'discard',
+    turnOwner: 'other',
+  },
+  // 盖亚：同层有两名同伴，选一个方向让他们全部移动
+  'skill-gaia': {
+    viewer: 'thief',
+    character: 'thief_gaia',
+    adjust: (G, { viewer, master }) => {
+      const mates = G.playerOrder.filter((id) => id !== viewer && id !== master).slice(0, 2);
+      const here: Record<string, { layer: Layer; revealed: boolean }> = {
+        [viewer]: { layer: 2, revealed: false },
+      };
+      for (const id of mates) here[id] = { layer: 2, revealed: false };
+      return placePlayers(G, here);
+    },
+  },
+  // 白羊：抽牌阶段，已有 2 张梦魇弃掉（闪耀最多多抽 2 张）
+  'skill-aries-glow': {
+    viewer: 'thief',
+    character: 'thief_aries',
+    phase: 'draw',
+    adjust: (G) => {
+      const onBoard = new Set(Object.values(G.layers).map((l) => l.nightmareId));
+      const spare = NIGHTMARE_CARDS.map((card) => card.id as CardID).filter(
+        (id) => !onBoard.has(id),
+      );
+      return { ...G, usedNightmareIds: spare.slice(0, 2) };
+    },
+  },
   'skill-black-hole': { viewer: 'thief', character: 'thief_black_hole' },
   'skill-terrorist': { viewer: 'thief', character: 'thief_terrorist' },
   'skill-sagittarius': { viewer: 'thief', character: 'thief_sagittarius' },
@@ -487,7 +522,10 @@ export function buildFixtureMatch(
   const response = RESPONSE_SPECS[id];
   const skillScene = SKILL_SCENES[id];
   // 待应答场景里由第二名盗梦者当回合主人；其余场景轮到本人
-  const actor = isPendingScenario(id) || response?.turnOwner === 'other' ? thieves[1]! : viewer;
+  const actor =
+    isPendingScenario(id) || response?.turnOwner === 'other' || skillScene?.turnOwner === 'other'
+      ? thieves[1]!
+      : viewer;
 
   // 发牌：先给指定的牌，再给其余人摸牌；他们的牌张数各不相同
   let G = base.G;
@@ -589,8 +627,9 @@ export function buildFixtureMatch(
       break;
     }
     case 'thief-pending-virgo': {
-      // 引擎里这一步由 SHOOT 掷出 6 触发；这里直接摆出结果：最近一次掷骰是 6，处女的选择待决
-      let G2 = killPlayer(state.G, lastThief);
+      // 引擎里这一步由 SHOOT 掷出 6 触发；这里直接摆出结果：最近一次掷骰是 6，处女的选择待决。
+      // 一名盗梦者和梦主都已死亡：复活的对象不限阵营，两个人都在名单里
+      let G2 = killPlayer(killPlayer(state.G, lastThief), state.G.dreamMasterID);
       G2 = {
         ...G2,
         lastShootRoll: 6,

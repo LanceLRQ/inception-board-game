@@ -507,6 +507,7 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
     skillUsedThisGame: humanPlayer?.skillUsedThisGame ?? {},
     unopenedVaults: Array.isArray(G.vaults) ? unopenedVaultCount(G.vaults) : 0,
     playedCards: Array.isArray(G.playedCardsThisTurn) ? G.playedCardsThisTurn : [],
+    usedNightmareCount: typeof G.usedNightmareCount === 'number' ? G.usedNightmareCount : 0,
     ...(seat !== null ? { seat } : {}),
     isDreamMaster: seat !== null && seat === dreamMasterID,
     dreamMasterID,

@@ -150,11 +150,11 @@ test.describe('固定场景 · 应答窗口', () => {
     await action(page, 'skip').click();
     expect(await lastMove(sent, 2)).toEqual({ move: 'respondVirgoPerfect', args: ['skip'] });
 
-    // 复活：只列出已死亡的盗梦者
+    // 复活：列出所有已死亡的玩家，不限阵营（场景里一名盗梦者和梦主都已死亡）
     await expect(action(page, 'revive')).toBeEnabled();
     await action(page, 'revive').click();
     const targets = page.getByTestId('awaited-sheet-targets').locator('button');
-    await expect(targets).toHaveCount(1);
+    await expect(targets).toHaveCount(2);
     await expect(page.getByTestId('awaited-sheet-confirm')).toBeDisabled();
     await targets.first().click();
     await page.getByTestId('awaited-sheet-confirm').click();

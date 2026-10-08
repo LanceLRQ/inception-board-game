@@ -280,10 +280,32 @@ describe('awaitedResponse · 处女', () => {
     expect(awaitedResponse(virgoView('0'), '1')).toEqual({ mine: false });
   });
 
-  it('可复活的人：已死亡、不是自己、不是梦主、视图上不是梦主阵营', () => {
+  it('可复活的人：任何已死亡的玩家，不限阵营，不含自己', () => {
     const a = mine(virgoView('0'), '0');
-    expect(a).toMatchObject({ kind: 'virgo', alive: true, reviveTargets: ['2', '4'] });
+    expect(a).toMatchObject({ kind: 'virgo', alive: true, reviveTargets: ['2', '3', '4'] });
     expect((a as Extract<MineAwaited, { kind: 'virgo' }>).teleportLayers).toEqual([1, 2, 3, 4]);
+  });
+
+  it('梦主死亡时也在可复活名单里', () => {
+    const view = viewWith({
+      pendingVirgoChoice: { virgoID: '0', triggerRoll: 6, shooterID: '1' },
+      players: {
+        '0': player('0'),
+        '1': player('1'),
+        '9': player('9', { isAlive: false, currentLayer: 0, faction: 'master', isRevealed: true }),
+      },
+    });
+    expect(mine(view, '0')).toMatchObject({ kind: 'virgo', reviveTargets: ['9'] });
+    const a = mine(view, '0');
+    expect(sheetCommand(a, 'virgo-revive', { ...EMPTY_DRAFT, reviveTarget: '9' })).toEqual({
+      move: 'respondVirgoPerfect',
+      args: ['revive', { targetID: '9' }],
+    });
+  });
+
+  it('活着的人不在可复活名单里，不能确认', () => {
+    const a = mine(virgoView('0'), '0');
+    expect(sheetCommand(a, 'virgo-revive', { ...EMPTY_DRAFT, reviveTarget: '1' })).toBeNull();
   });
 
   it('没有可复活的人：复活按钮不可点；抽牌与传送可点', () => {
@@ -329,7 +351,7 @@ describe('awaitedResponse · 处女', () => {
       args: ['revive', { targetID: '4' }],
     });
     // 不在可复活名单里的人不能确认
-    expect(sheetCommand(a, 'virgo-revive', { ...EMPTY_DRAFT, reviveTarget: '3' })).toBeNull();
+    expect(sheetCommand(a, 'virgo-revive', { ...EMPTY_DRAFT, reviveTarget: '9' })).toBeNull();
     expect(sheetCommand(a, 'virgo-teleport', EMPTY_DRAFT)).toBeNull();
     expect(sheetCommand(a, 'virgo-teleport', { ...EMPTY_DRAFT, teleportLayer: 4 })).toEqual({
       move: 'respondVirgoPerfect',

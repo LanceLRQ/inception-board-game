@@ -198,11 +198,11 @@ describe('露娜 · 月蚀（thief_luna）', () => {
 // ============================================================================
 // 盖亚 · 大地
 // ============================================================================
-describe('盖亚 · 大地（thief_gaia）', () => {
-  it('成功：同层 p2 移到 layer 2', () => {
+describe('盖亚 · 撼动（thief_gaia）纯函数', () => {
+  it('成功：同层 p2 随方向 +1 移到 layer 2', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_gaia' as CardID);
-    const r = applyGaiaShift(s, 'p1', { p2: 1 });
+    const r = applyGaiaShift(s, 'p1', 1);
     expect(r).not.toBeNull();
     expect(r!.players.p2!.currentLayer).toBe(2);
     expect(r!.players.p1!.skillUsedThisTurn[GAIA_SKILL_ID]).toBe(1);
@@ -211,33 +211,31 @@ describe('盖亚 · 大地（thief_gaia）', () => {
   it('拒绝：方向超出 layer 范围（layer 1 -1 = 0）', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_gaia' as CardID);
-    expect(applyGaiaShift(s, 'p1', { p2: -1 })).toBeNull();
-  });
-
-  it('拒绝：包含非同层玩家', () => {
-    let s = scenarioActionPhase();
-    s = setCharacter(s, 'p1', 'thief_gaia' as CardID);
-    s = setLayer(s, 'p2', 3 as Layer);
-    expect(applyGaiaShift(s, 'p1', { p2: 1 })).toBeNull();
+    expect(applyGaiaShift(s, 'p1', -1)).toBeNull();
   });
 
   it('限制：本回合 2 次', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_gaia' as CardID);
-    const r1 = applyGaiaShift(s, 'p1', { p2: 1 });
+    const r1 = applyGaiaShift(s, 'p1', 1);
     expect(r1).not.toBeNull();
-    // 第 2 次需要重置 p2 同层
-    const s2 = setLayer(r1!, 'p2', 1 as Layer);
-    const r2 = applyGaiaShift(s2, 'p1', { p2: 1 });
+    // 第 2 次需要把被移走的人重置到盖亚同层
+    const regroup = (state: SetupState): SetupState => {
+      let out = state;
+      for (const id of Object.keys(state.players)) {
+        if (id !== 'p1') out = setLayer(out, id, 1 as Layer);
+      }
+      return out;
+    };
+    const r2 = applyGaiaShift(regroup(r1!), 'p1', 1);
     expect(r2).not.toBeNull();
-    const s3 = setLayer(r2!, 'p2', 1 as Layer);
-    expect(applyGaiaShift(s3, 'p1', { p2: 1 })).toBeNull();
+    expect(applyGaiaShift(regroup(r2!), 'p1', 1)).toBeNull();
   });
 
   it('move 接入：playGaiaShift', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_gaia' as CardID);
-    const r = callMove(s, 'playGaiaShift', [{ p2: 1 }]);
+    const r = callMove(s, 'playGaiaShift', [1]);
     expectMoveOk(r);
     expect(r.players.p2!.currentLayer).toBe(2);
   });

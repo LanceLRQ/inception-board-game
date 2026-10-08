@@ -127,3 +127,37 @@ describe('处女·完美：复活一位玩家', () => {
     expect(res.ok).toBe(false);
   });
 });
+
+describe('处女·完美：复活的对象与落点的补充边界', () => {
+  it('复活梦主时落在处女所在层，梦主的来源层记录清空，手牌保留', () => {
+    const { res } = revive('pM');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const master = res.state.G.players.pM!;
+    expect(master.currentLayer).toBe(3);
+    expect(master.layerBeforeLimbo).toBeNull();
+    expect(master.hand).toEqual([KICK, UNLOCK, UNLOCK]);
+    expect(res.state.G.layers[3]!.playersInLayer).toContain('pM');
+    expect(checkStateInvariants(res.state.G)).toEqual([]);
+  });
+
+  it('活着的玩家和处女自己都不能作为复活对象', () => {
+    for (const targetID of ['p2', 'p1']) {
+      const res = applyMove(game, load(scene('p3')), {
+        playerID: 'p1',
+        move: 'respondVirgoPerfect',
+        args: ['revive', { targetID }],
+      });
+      expect(res.ok, targetID).toBe(false);
+    }
+  });
+
+  it('不带目标的复活被拒绝，待应答状态保留', () => {
+    const res = applyMove(game, load(scene('p3')), {
+      playerID: 'p1',
+      move: 'respondVirgoPerfect',
+      args: ['revive'],
+    });
+    expect(res.ok).toBe(false);
+  });
+});

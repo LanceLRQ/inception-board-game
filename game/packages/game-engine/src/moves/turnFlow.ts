@@ -15,6 +15,7 @@ import {
   applyPointmanAssault,
   applyRevive,
   endDrawPhase,
+  isValidAriesExtraChoice,
   settleAriesExtraDraw,
   settleBlackHoleReverse,
 } from '../engine/skills.js';
@@ -22,9 +23,11 @@ import { discardToLimit, drawCards, incrementMoveCounter, setTurnPhase } from '.
 import { type MoveCtx, guardTurnPhase } from './common.js';
 
 export const turnFlowMoves = {
+  // ariesExtra：白羊·闪耀多抽的张数（0 到已弃梦魇数），只有存活的白羊可以带；不带则抽满
   doDraw: {
-    move: ({ G, ctx, random }: MoveCtx) => {
+    move: ({ G, ctx, random }: MoveCtx, ariesExtra?: number | null) => {
       if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
+      if (!isValidAriesExtraChoice(G, G.currentPlayerID, ariesExtra)) return INVALID_MOVE;
       // 抽牌前后对比推出 drawnCards（用于先锋技能触发）
       const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
       // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果；只有这时才掷骰
@@ -38,8 +41,8 @@ export const turnFlowMoves = {
       s = applyPointmanAssault(s, G.currentPlayerID, drawn);
       // 狮子王道：抽完后从牌库顶额外抽 = 梦主手牌数
       s = applyLeoKingdom(s, G.currentPlayerID);
-      // 白羊·弃梦魇加成：抽牌阶段额外抽牌
-      s = settleAriesExtraDraw(s);
+      // 白羊·闪耀：抽牌阶段按白羊自己选的张数额外抽牌
+      s = settleAriesExtraDraw(s, ariesExtra);
       // 黑洞·倒流：梦主自己的抽牌阶段恢复心锁
       s = settleBlackHoleReverse(s);
       s = endDrawPhase(s);

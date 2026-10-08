@@ -7,7 +7,9 @@ import type { CardID, Layer } from '@icgame/shared';
 import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { createTestState, makeLayer } from './testing/fixtures.js';
-import { sendToLimbo } from './engine/death.js';
+import { killPlayer, sendToLimbo } from './engine/death.js';
+import { fortressColdnessChancesLeft } from './engine/skills.js';
+import { movePlayerToLayer } from './stateOps.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import {
   applyMove,
@@ -159,5 +161,75 @@ describe('梦主迷失层复活的落点', () => {
     const s = step(load(G), 'p2', 'playRevive', [null, [KICK, KICK]]);
     expect(s.G.players.p2!.isAlive).toBe(true);
     expect(s.G.players.p2!.layerBeforeLimbo).toBeNull();
+  });
+});
+
+describe('梦主迷失层复活的落点：边界与各条入迷失层的路径', () => {
+  /** p1 的回合结束，轮到梦主，返回梦主回合开始后的状态 */
+  function toMasterTurn(G: SetupState): MatchState<SetupState> {
+    let s = step(load(G), 'p1', 'endActionPhase');
+    s = step(s, 'p1', 'skipDiscard');
+    expect(s.ctx.currentPlayer).toBe('pM');
+    return s;
+  }
+
+  function masterAt(layer: 1 | 2 | 3 | 4): SetupState {
+    const base = scene();
+    const layers = { ...base.layers };
+    for (const l of [1, 2, 3, 4] as const) {
+      layers[l] = {
+        ...layers[l]!,
+        playersInLayer: layers[l]!.playersInLayer.filter((id) => id !== 'pM'),
+      };
+    }
+    layers[layer] = { ...layers[layer]!, playersInLayer: [...layers[layer]!.playersInLayer, 'pM'] };
+    return {
+      ...base,
+      layers,
+      players: { ...base.players, pM: { ...base.players.pM!, currentLayer: layer as Layer } },
+    };
+  }
+
+  it.each([1, 4] as const)('在第 %i 层进入迷失层，回合开始回到第 %i 层', (layer) => {
+    const G = sendToLimbo(masterAt(layer), 'pM');
+    expect(G.players.pM!.layerBeforeLimbo).toBe(layer);
+    const s = toMasterTurn(G);
+    expect(s.G.players.pM!.currentLayer).toBe(layer);
+    expect(s.G.layers[layer]!.playersInLayer).toContain('pM');
+    expect(checkStateInvariants(s.G)).toEqual([]);
+  });
+
+  it('经 movePlayerToLayer 移向迷失层与被击杀一样记下来源层', () => {
+    const moved = movePlayerToLayer(masterAt(2), 'pM', 0);
+    expect(moved.players.pM!.layerBeforeLimbo).toBe(2);
+    const killed = killPlayer(masterAt(4), 'pM', 'p1');
+    expect(killed.players.pM!.layerBeforeLimbo).toBe(4);
+  });
+
+  it('已经在迷失层时再次进入迷失层不会冲掉来源层', () => {
+    const once = sendToLimbo(masterAt(3), 'pM');
+    const twice = sendToLimbo(movePlayerToLayer(once, 'pM', 0), 'pM');
+    expect(twice.players.pM!.layerBeforeLimbo).toBe(3);
+    expect(toMasterTurn(twice).G.players.pM!.currentLayer).toBe(3);
+  });
+
+  it('复活不弃牌：手牌张数与弃牌堆都不变', () => {
+    const G = sendToLimbo(masterAt(3), 'pM');
+    const s = toMasterTurn(G);
+    expect(s.G.players.pM!.hand).toEqual(G.players.pM!.hand);
+  });
+
+  it('要塞·冷酷：回合开始的这次复活不产生发动机会', () => {
+    let G = sendToLimbo(masterAt(3), 'pM');
+    G = {
+      ...G,
+      players: { ...G.players, pM: { ...G.players.pM!, characterId: c('dm_fortress') } },
+    };
+    const s = toMasterTurn(G);
+    const master = s.G.players.pM!;
+    expect(master.currentLayer).toBe(3);
+    expect(fortressColdnessChancesLeft(master.skillUsedThisTurn)).toBe(0);
+    // 出牌阶段里真的换一次层才有机会：对照组
+    expect(s.G.turnPhase).toBe('draw');
   });
 });

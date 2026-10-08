@@ -156,3 +156,157 @@ describe('playGreenRayArrest move', () => {
     expect(r.moveCounter).toBe(before + 1);
   });
 });
+
+// 卡面：「若你弃掉1张【梦境穿梭剂】和1张SHOOT类牌，可移动到任意一层梦境，然后可执行该SHOOT类牌的效果」。
+// 移动与射击各自可选：可以只移动、只射击，两样都不做则不能发动；代价（弃一张穿梭剂和一张 SHOOT 类牌）不变。
+// 对照：docs/manual/04-action-cards.md 梦境穿梭剂、SHOOT；卡面见角色牌「缉捕」
+describe('playGreenRayArrest：移动与射击各自可选', () => {
+  const TRANSIT = 'action_dream_transit' as CardID;
+  const SHOOT = 'action_shoot' as CardID;
+
+  it('只移动：弃穿梭剂和 SHOOT 作为代价，移到目标层，不射击', () => {
+    const s = setupGreenRay();
+    const r = callMove(s, 'playGreenRayArrest', [SHOOT, null, 3], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.players.p1!.currentLayer).toBe(3);
+    expect(r.players.p1!.hand).toEqual([]);
+    expect(r.deck.discardPile).toEqual(expect.arrayContaining([TRANSIT, SHOOT]));
+    // 没有射击：目标毫发无伤，也没有骰子结果
+    expect(r.players.p2!.isAlive).toBe(true);
+    expect(r.lastShootRoll).toBe(s.lastShootRoll);
+    // SHOOT 只是代价，没有被打出
+    expect(r.playedCardsThisTurn).not.toContain(SHOOT);
+    expect(r.moveCounter).toBe(s.moveCounter + 1);
+  });
+
+  it('只移动：目标参数省略（不传）同样可以', () => {
+    const s = setupGreenRay();
+    const r = callMove(s, 'playGreenRayArrest', [SHOOT, undefined, 2], { currentPlayer: 'p1' });
+    expectMoveOk(r);
+    expect(r.players.p1!.currentLayer).toBe(2);
+    expect(r.layers[2]!.playersInLayer).toContain('p1');
+    expect(r.layers[1]!.playersInLayer).not.toContain('p1');
+  });
+
+  it('只射击（不移动）：层参数省略，留在原层对同层目标射击', () => {
+    const s = setupGreenRay();
+    const r = callMove(s, 'playGreenRayArrest', [SHOOT, 'pM'], { currentPlayer: 'p1', rolls: [1] });
+    expectMoveOk(r);
+    expect(r.players.p1!.currentLayer).toBe(1);
+    expect(r.players.pM!.isAlive).toBe(false);
+    expect(r.players.p1!.hand).toEqual([]);
+    expect(r.deck.discardPile).toEqual(expect.arrayContaining([TRANSIT, SHOOT]));
+    expect(r.playedCardsThisTurn).toContain(SHOOT);
+  });
+
+  it('只射击：层参数等于当前所在层同样算不移动', () => {
+    const s = setupGreenRay();
+    const r = callMove(s, 'playGreenRayArrest', [SHOOT, 'pM', 1], {
+      currentPlayer: 'p1',
+      rolls: [1],
+    });
+    expectMoveOk(r);
+    expect(r.players.p1!.currentLayer).toBe(1);
+    expect(r.players.pM!.isAlive).toBe(false);
+  });
+
+  it('只射击：目标不在同层时按这张 SHOOT 的层数限制被拒绝', () => {
+    const s = setupGreenRay();
+    expect(callMove(s, 'playGreenRayArrest', [SHOOT, 'p2'], { currentPlayer: 'p1' })).toBe(
+      'INVALID_MOVE',
+    );
+  });
+
+  it('移动并射击（原有用法）仍然可用', () => {
+    const s = setupGreenRay();
+    const r = callMove(s, 'playGreenRayArrest', [SHOOT, 'p2', 4], {
+      currentPlayer: 'p1',
+      rolls: [1],
+    });
+    expectMoveOk(r);
+    expect(r.players.p1!.currentLayer).toBe(4);
+    expect(r.players.p2!.isAlive).toBe(false);
+  });
+
+  it('两样都不做（不移动也不射击）被拒绝，什么都不弃', () => {
+    const s = setupGreenRay();
+    for (const args of [
+      [SHOOT],
+      [SHOOT, null, null],
+      [SHOOT, undefined, undefined],
+      [SHOOT, null, 1], // 留在原层且不射击
+    ]) {
+      expect(
+        callMove(s, 'playGreenRayArrest', args, { currentPlayer: 'p1' }),
+        JSON.stringify(args),
+      ).toBe('INVALID_MOVE');
+    }
+  });
+
+  it('给了目标就必须是合法目标：自己、死亡玩家、不存在的玩家都被拒绝', () => {
+    const s = setupGreenRay();
+    expect(callMove(s, 'playGreenRayArrest', [SHOOT, 'p1', 4], { currentPlayer: 'p1' })).toBe(
+      'INVALID_MOVE',
+    );
+    const dead = { ...s, players: { ...s.players, p2: { ...s.players.p2!, isAlive: false } } };
+    expect(callMove(dead, 'playGreenRayArrest', [SHOOT, 'p2', 4], { currentPlayer: 'p1' })).toBe(
+      'INVALID_MOVE',
+    );
+    expect(callMove(s, 'playGreenRayArrest', [SHOOT, 'nobody', 4], { currentPlayer: 'p1' })).toBe(
+      'INVALID_MOVE',
+    );
+  });
+
+  it('给了层就必须是 1-4 的整数', () => {
+    const s = setupGreenRay();
+    for (const layer of [0, 5, -1, 2.5, '3']) {
+      expect(
+        callMove(s, 'playGreenRayArrest', [SHOOT, null, layer], { currentPlayer: 'p1' }),
+        String(layer),
+      ).toBe('INVALID_MOVE');
+    }
+  });
+
+  it('只移动时代价照付：缺穿梭剂或缺 SHOOT 类牌都不能发动', () => {
+    const s = setupGreenRay();
+    const noTransit = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, hand: [SHOOT] } },
+    };
+    expect(
+      callMove(noTransit, 'playGreenRayArrest', [SHOOT, null, 3], { currentPlayer: 'p1' }),
+    ).toBe('INVALID_MOVE');
+    const noShoot = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1!, hand: [TRANSIT] } },
+    };
+    expect(callMove(noShoot, 'playGreenRayArrest', [SHOOT, null, 3], { currentPlayer: 'p1' })).toBe(
+      'INVALID_MOVE',
+    );
+    // 代价牌必须是 SHOOT 类牌
+    const notShootCard = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1!, hand: [TRANSIT, 'action_kick' as CardID] },
+      },
+    };
+    expect(
+      callMove(notShootCard, 'playGreenRayArrest', ['action_kick', null, 3], {
+        currentPlayer: 'p1',
+      }),
+    ).toBe('INVALID_MOVE');
+  });
+
+  it('非出牌阶段、非格林射线、非回合主人仍然被拒绝（只移动也一样）', () => {
+    const s = setupGreenRay();
+    expect(
+      callMove({ ...s, turnPhase: 'discard' }, 'playGreenRayArrest', [SHOOT, null, 3], {
+        currentPlayer: 'p1',
+      }),
+    ).toBe('INVALID_MOVE');
+    expect(callMove(s, 'playGreenRayArrest', [SHOOT, null, 3], { currentPlayer: 'p2' })).toBe(
+      'INVALID_MOVE',
+    );
+  });
+});

@@ -88,7 +88,7 @@ export interface VirgoAwaited {
   readonly shooterID: string;
   /** 处女是否还活着；已死亡时三个效果都不能执行，只能放弃 */
   readonly alive: boolean;
-  /** 可复活的玩家：已死亡、不是自己、不是梦主、视图上不是已知的梦主阵营 */
+  /** 可复活的玩家：任何已死亡的玩家，不限阵营、含梦主（引擎只要求目标已死亡、不是处女自己） */
   readonly reviveTargets: readonly string[];
   /** 可传送到的层：1-4 层任选（不含迷失层） */
   readonly teleportLayers: readonly number[];
@@ -229,10 +229,7 @@ export function awaitedResponse(view: MatchView, seat: string | null): AwaitedRe
     const alive = me?.isAlive === true;
     const reviveTargets = alive
       ? Object.values(view.players)
-          .filter(
-            (p) =>
-              !p.isAlive && p.id !== seat && p.id !== view.dreamMasterID && p.faction === 'thief',
-          )
+          .filter((p) => !p.isAlive && p.id !== seat)
           .map((p) => p.id)
       : [];
     return {

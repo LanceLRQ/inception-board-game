@@ -345,7 +345,6 @@
     "chooseHandCard": "选择手牌：",
     "chooseMultiCards": "多选手牌：",
     "chooseLayer": "选择层：",
-    "chooseLayerShift": "为同层玩家选择 +1/-1 层（可留空）：",
     "chooseDiscardCard": "从弃牌堆选 1 张：",
     "chooseBribe": "选择贿赂：",
     "chooseTwoNonShoot": "选 2 张非 SHOOT 手牌弃掉：",
@@ -476,10 +475,16 @@
         "desc": "弃 2 张手牌 → 从弃牌堆取 1 张（回合限 1 次）"
       }
     },
+    "thief_aries": {
+      "skill_1": {
+        "name": "白羊·闪耀",
+        "desc": "每有 1 张弃掉的梦魇牌，抽牌阶段可多抽 1 张，多抽几张由你选（不选则抽满）"
+      }
+    },
     "thief_gaia": {
       "skill_0": {
         "name": "盖亚·撼动",
-        "desc": "同层玩家各自 +1 或 -1 层（每回合限 2 次）"
+        "desc": "选一个方向，同层其余玩家全部移到那一层（-1 或 +1），不能进入迷失层（每回合限 2 次）"
       }
     },
     "dm_fortress": {
@@ -558,12 +563,15 @@
       "noFreshInDiscard": "弃牌堆里没有本回合未使用过的牌",
       "noKillThisTurn": "本回合还没有击杀过玩家",
       "nothingToMirror": "本回合还没有打出 SHOOT 类牌或 KICK，没有可复制的效果",
-      "needTwoInHand": "需要手里至少有 2 张牌"
+      "needTwoInHand": "需要手里至少有 2 张牌",
+      "gaiaBottomLayer": "你在第 1 层，不能把其余玩家移进迷失层",
+      "gaiaTopLayer": "你在第 4 层，没有更深的梦境可去",
+      "greenRayNothing": "移动与射击至少要做一样：换一层，或者选一个目标"
     },
     "thief_space_queen": {
       "skill_1": {
         "name": "空间女王·造物",
-        "desc": "弃牌阶段，把 1 张手牌放到牌库顶"
+        "desc": "任意玩家的弃牌阶段，把 1 张手牌放到牌库顶"
       }
     },
     "thief_black_hole": {
@@ -590,7 +598,11 @@
     },
     "choice": {
       "increaseLock": "增加 1 个心锁",
-      "decreaseLock": "减少 1 个心锁"
+      "decreaseLock": "减少 1 个心锁",
+      "ariesGlow": "多抽 {{n}} 张",
+      "ariesGlowNone": "不多抽",
+      "gaiaDown": "同层其余玩家全部 -1 层（去第 {{layer}} 层）",
+      "gaiaUp": "同层其余玩家全部 +1 层（去第 {{layer}} 层）"
     },
     "hint": {
       "darwinOrder": "按选牌的先后放回牌库顶：先选的在最顶。新抽的 2 张牌发动前看不到，这里只能从现有手牌里选。"
@@ -604,6 +616,7 @@
       "nightmareParams": "补充梦魇的参数：",
       "back": "上一步",
       "noPlayers": "没有可选的玩家",
+      "stayLayer": "（当前层，不移动）",
       "noLayers": "没有可选的层"
     },
     "thief_pisces": {
@@ -615,7 +628,7 @@
     "thief_green_ray": {
       "skill_0": {
         "name": "格林射线·缉捕",
-        "desc": "弃 1 张梦境穿梭剂和 1 张 SHOOT 类牌，移到任意一层，再对那里的目标执行该 SHOOT 的效果"
+        "desc": "弃 1 张梦境穿梭剂和 1 张 SHOOT 类牌，可以移到任意一层，再可以对目标执行该 SHOOT 的效果（移动与射击各自可选，至少做一样）"
       }
     },
     "thief_aquarius": {
@@ -891,7 +904,7 @@
       },
       "virgoRevive": {
         "title": "复活一名玩家",
-        "desc": "被复活的玩家回到第 1 层，手牌清空。",
+        "desc": "任何已死亡的玩家都可以（不限阵营，含梦主）。被复活的玩家回到你所在的层，手牌保留。",
         "confirm": "确认复活"
       },
       "virgoTeleport": {

@@ -36,6 +36,9 @@ export const FIXTURE_SCENARIO_IDS = [
   'skill-gemini-back',
   'skill-chemist',
   'skill-space-queen',
+  'skill-space-queen-other',
+  'skill-gaia',
+  'skill-aries-glow',
   'skill-black-hole',
   'skill-terrorist',
   'skill-sagittarius',
@@ -101,6 +104,9 @@ export const SKILL_SCENARIOS = {
   'gemini-back': 'skill-gemini-back',
   chemist: 'skill-chemist',
   'space-queen': 'skill-space-queen',
+  'space-queen-other': 'skill-space-queen-other',
+  gaia: 'skill-gaia',
+  'aries-glow': 'skill-aries-glow',
   'black-hole': 'skill-black-hole',
   terrorist: 'skill-terrorist',
   sagittarius: 'skill-sagittarius',
@@ -140,7 +146,8 @@ export function parseFixturePlayers(raw: string | null): number {
  *                      梦主视角、响应窗口与待应答参数优先，忽略它
  *   ?skill=名    走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面（视角由场景决定，响应窗口与待应答参数优先）：
  *                draw 抽牌阶段（略过抽牌）· joker 抽牌阶段的小丑 · gemini-back 翻到背面的双子 · chemist 药剂师
- *                · space-queen 弃牌阶段的空间女王 · black-hole 黑洞 · terrorist 恐怖分子 · sagittarius 射手
+ *                · space-queen 弃牌阶段的空间女王 · space-queen-other 别人的弃牌阶段里的空间女王 · gaia 同层有两名同伴的盖亚
+ *                · aries-glow 抽牌阶段、弃掉过 2 张梦魇的白羊 · black-hole 黑洞 · terrorist 恐怖分子 · sagittarius 射手
  *                · imperial 皇城世界观下有 SHOOT 机会 · saturn 土星世界观下持贿赂 · unlock-none 所在层心锁为 0
  *                · unlock-spent 本回合已成功解封 · black-swan 抽牌阶段的黑天鹅 · luna 翻到背面的露娜（有同伴在迷失层）
  *                · pisces 翻到背面的双鱼（有同伴在迷失层）· darwin 达尔文 · green-ray 格林射线 · aquarius 本回合打出过两张同名牌的水瓶

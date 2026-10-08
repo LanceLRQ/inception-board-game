@@ -35,6 +35,10 @@ const card: ArgCheck = (v) => isId(v);
 const layer: ArgCheck = (v) =>
   typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= LAYER_MAX;
 
+/** 张数：非负整数（上限只是防止畸形输入，真正的上限由 move 按局面判断） */
+const count: ArgCheck = (v) =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= MAX_CARD_LIST;
+
 const bool: ArgCheck = (v) => typeof v === 'boolean';
 
 const cardList: ArgCheck = (v) => Array.isArray(v) && v.length <= MAX_CARD_LIST && v.every(isId);
@@ -100,7 +104,6 @@ const shootExtras = [optional(card), optional(bool)] as const;
 /** move 名 → 各参数的校验，顺序与 move 的形参一致 */
 export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   // 无参数
-  doDraw: [],
   skipDraw: [],
   playJokerGamble: [],
   endActionPhase: [],
@@ -119,6 +122,7 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   skipDiscard: [],
 
   // 玩家 / 牌 / 层
+  doDraw: [optional(count)],
   playBlackSwanTour: [recordByPlayer(cardList)],
   playBlackHoleLevy: [recordByPlayer(card)],
   useBlackHoleAbsorb: [layer],
@@ -142,7 +146,7 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   playShootArmor: [player, card, optional(card)],
   playShootBurst: [player, card, optional(card)],
   resolveShootMove: [layer],
-  playGreenRayArrest: [card, player, layer],
+  playGreenRayArrest: [card, optional(player), optional(layer)],
   dreamMasterMove: [layer],
   playUnlock: [card],
   playHaleyImpact: [player],
@@ -176,7 +180,7 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   playAriesStardustActivate: [nightmareParams],
   respondTerroristDiscard: [card],
   respondVirgoPerfect: [oneOf('revive', 'draw_two', 'teleport', 'skip'), virgoParams],
-  playGaiaShift: [recordByPlayer(oneOf(-1, 1))],
+  playGaiaShift: [oneOf(-1, 1)],
   playDarwinEvolution: [cardList],
   playForgerExchangeSingle: [player, card],
   playLibraBalance: [player],

@@ -96,7 +96,7 @@ const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
   useAthenaWit: [],
   respondTerroristAccept: [],
   respondVirgoPerfect: ['choice', 'params'],
-  playGaiaShift: ['picks'],
+  playGaiaShift: ['gaiaDirection'],
   playDarwinEvolution: ['returnCards'],
   playShadeFollow: [],
   playForgerExchangeSingle: ['targetID', 'returnedCardId'],
@@ -332,6 +332,12 @@ function guessArg(name: string, G: SetupState, actor: string, rnd: Seq): unknown
     for (const id of subset(rnd, players, players.length)) out[id] = rnd() < 0.5 ? -1 : 1;
     return out;
   }
+  // 盖亚·撼动：从逐人选方向改为只选一个方向。为了让随机序列的消耗与改动前逐位一致
+  // （否则每一局都会从第一步起分叉），这里照旧抽取逐人方向，取第一个人的方向作为这次的方向
+  if (n === 'gaiadirection') {
+    const legacy = guessArg('picks', G, actor, rnd) as Record<string, number>;
+    return Object.values(legacy)[0] ?? 1;
+  }
   return undefined;
 }
 
@@ -385,6 +391,16 @@ function listAcceptable(state: MatchState<SetupState>, rnd: Seq): MoveRequest[] 
   for (const seat of seats) {
     for (const move of names) {
       if (!rightsAllow(state, seat, move)) continue;
+      // 空间女王·造物成为回合外 move 后，行动权表对所有旁观座位都放行。策略只在「旁观座位上真有空间女王、
+      // 且正处在别人的弃牌阶段」时才试它，其余座位不为它消耗随机序列，这样没有空间女王的对局轨迹不受影响
+      if (
+        move === 'useSpaceQueenStashTop' &&
+        seat !== state.ctx.currentPlayer &&
+        (state.G.turnPhase !== 'discard' ||
+          state.G.players[seat]?.characterId !== 'thief_space_queen')
+      ) {
+        continue;
+      }
       const attempts = SETTLE_MOVE.test(move) || move === 'doDiscard' ? 16 : 2;
       for (let i = 0; i < attempts; i++) {
         const cand = candidateFor(state, move, seat, rnd);

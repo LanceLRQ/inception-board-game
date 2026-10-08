@@ -58,14 +58,17 @@ export const thiefAttackSkillMoves = {
     client: false,
   },
 
-  // 格林射线·缉捕：弃穿梭剂 + SHOOT → 移到任意层 → 执行 SHOOT 效果
-  // 对照：docs/manual/05-dream-thieves.md 格林射线
+  // 格林射线·缉捕：弃 1 张穿梭剂和 1 张 SHOOT 类牌，可以移动到任意一层梦境，然后可以执行该 SHOOT 类牌的效果
+  // 移动与射击各自可选：targetLayer 省略（或等于当前所在层）= 不移动，targetPlayerID 省略 = 不射击；
+  // 两样都不做则不产生任何效果，不能发动。代价（穿梭剂 + SHOOT 类牌）无论怎么选都照付；
+  // 只移动时 SHOOT 牌只是被弃掉的代价，不算打出；射击时按该牌的参数表走共同结算。
+  // 对照：docs/manual/04-action-cards.md 梦境穿梭剂 / SHOOT；格林射线角色牌「缉捕」
   playGreenRayArrest: {
     move: (
       { G, ctx, random }: MoveCtx,
       shootCardId: CardID,
-      targetPlayerID: string,
-      targetLayer: number,
+      targetPlayerID?: string | null,
+      targetLayer?: number | null,
     ) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const self = G.players[ctx.currentPlayer];
@@ -75,16 +78,28 @@ export const thiefAttackSkillMoves = {
       if (!self.hand.includes(transitCard)) return INVALID_MOVE;
       if (!self.hand.includes(shootCardId)) return INVALID_MOVE;
       if (!isShootClassCard(shootCardId)) return INVALID_MOVE;
-      // target 基本校验（完整校验由 applyShootVariant 处理）
-      const target = G.players[targetPlayerID];
-      if (!target || !target.isAlive || targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
-      if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
 
-      // 1) 弃穿梭剂（SHOOT 牌留给 applyShootVariant 弃）
+      const wantsShoot = targetPlayerID !== undefined && targetPlayerID !== null;
+      if (wantsShoot) {
+        // target 基本校验（完整校验由 applyShootVariant 处理）
+        const target = G.players[targetPlayerID];
+        if (!target || !target.isAlive || targetPlayerID === ctx.currentPlayer) return INVALID_MOVE;
+      }
+      const hasLayer = targetLayer !== undefined && targetLayer !== null;
+      if (hasLayer && (!Number.isInteger(targetLayer) || targetLayer < 1 || targetLayer > 4)) {
+        return INVALID_MOVE;
+      }
+      const wantsMove = hasLayer && targetLayer !== self.currentLayer;
+      // 不移动也不射击：技能不产生任何效果，不能无故启动
+      if (!wantsMove && !wantsShoot) return INVALID_MOVE;
+
+      // 1) 弃穿梭剂（SHOOT 牌：射击时留给共同结算弃，只移动时作为代价直接弃）
       let s = discardCard(G, ctx.currentPlayer, transitCard);
       // 2) 移到目标层
-      s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer as Layer);
-      // 3) 按牌取 SHOOT 参数表 → 复用 SHOOT 结算
+      if (wantsMove) s = movePlayerToLayer(s, ctx.currentPlayer, targetLayer as Layer);
+      // 3) 只移动：弃掉 SHOOT 牌作为代价，不射击
+      if (!wantsShoot) return incrementMoveCounter(discardCard(s, ctx.currentPlayer, shootCardId));
+      // 4) 射击：按牌取 SHOOT 参数表 → 复用 SHOOT 结算
       const r = applyShootByCard(s, ctx, random, targetPlayerID, shootCardId);
       return r === INVALID_MOVE ? r : recordCardPlayed(r, shootCardId);
     },

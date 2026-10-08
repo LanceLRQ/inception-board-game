@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  ACTIVE_SKILL_DESCRIPTORS,
   APOLLO_WORSHIP,
+  ARIES_GLOW,
   ATHENA_AWE,
   BLACK_HOLE_ABSORB,
   CHEMIST_INJECT,
@@ -386,6 +388,53 @@ describe('背面技能与弃牌阶段技能', () => {
       enabled: true,
       remaining: null,
     });
+  });
+
+  it('空间女王·造物：别人的弃牌阶段也显示（回合外可发），别的阶段、没有手牌、死亡、有待结算都不显示', () => {
+    const c = ctx({
+      characterId: 'thief_space_queen',
+      hand: ['action_kick'],
+      turnPhase: 'discard',
+      isHumanTurn: false,
+    });
+    expect(entryFor(c, SPACE_QUEEN_STASH)).toMatchObject({ enabled: true, remaining: null });
+    for (const phase of ['draw', 'action']) {
+      expect(entryFor({ ...c, turnPhase: phase }, SPACE_QUEEN_STASH)).toBeUndefined();
+    }
+    expect(entryFor({ ...c, hand: [] }, SPACE_QUEEN_STASH)).toBeUndefined();
+    expect(getSkillEntries({ ...c, isAlive: false })).toEqual([]);
+    expect(getSkillEntries({ ...c, hasPending: true })).toEqual([]);
+  });
+
+  it('别人的回合里只有声明了 offTurn 的技能，其余主动技能一概不显示', () => {
+    const offTurn = ACTIVE_SKILL_DESCRIPTORS.filter((d) => d.offTurn).map((d) => d.id);
+    expect(offTurn).toEqual(['thief_space_queen.skill_1']);
+    const c = ctx({
+      characterId: 'thief_chemist',
+      hand: ['action_kick'],
+      discardPile: ['action_dream_transit'],
+      isHumanTurn: false,
+    });
+    expect(getSkillEntries(c)).toEqual([]);
+    expect(getSkillEntries({ ...c, turnPhase: 'discard' })).toEqual([]);
+  });
+
+  it('白羊·闪耀：抽牌阶段、有弃掉的梦魇时才显示；选项从抽满列到不多抽', () => {
+    const c = ctx({
+      characterId: 'thief_aries',
+      turnPhase: 'draw',
+      usedNightmareCount: 2,
+    });
+    const entry = entryFor(c, ARIES_GLOW);
+    expect(entry).toMatchObject({ enabled: true });
+    expect(ARIES_GLOW.choices!(c).map((x) => [x.value, x.labelKey, x.labelParams])).toEqual([
+      ['2', 'skill.choice.ariesGlow', { n: 2 }],
+      ['1', 'skill.choice.ariesGlow', { n: 1 }],
+      ['0', 'skill.choice.ariesGlowNone', { n: 0 }],
+    ]);
+    expect(entryFor({ ...c, usedNightmareCount: 0 }, ARIES_GLOW)).toBeUndefined();
+    expect(entryFor({ ...c, turnPhase: 'action' }, ARIES_GLOW)).toBeUndefined();
+    expect(entryFor({ ...c, characterId: 'thief_gaia' }, ARIES_GLOW)).toBeUndefined();
   });
 
   it('灵魂牧师·拯救：目标是迷失层的玩家，回合限 2 次', () => {

@@ -345,7 +345,6 @@
     "chooseHandCard": "Choose hand card:",
     "chooseMultiCards": "Multi-select hand cards:",
     "chooseLayer": "Choose layer:",
-    "chooseLayerShift": "Set +1/-1 per same-layer player (optional):",
     "chooseDiscardCard": "Pick 1 from discard pile:",
     "chooseBribe": "Choose bribe:",
     "chooseTwoNonShoot": "Discard 2 non-SHOOT cards:",
@@ -476,10 +475,16 @@
         "desc": "Discard 2 → pick 1 from discard pile (1/turn)"
       }
     },
+    "thief_aries": {
+      "skill_1": {
+        "name": "Aries · Brilliance",
+        "desc": "Each discarded nightmare lets you draw 1 extra card in your draw phase; you choose how many (default: all of them)"
+      }
+    },
     "thief_gaia": {
       "skill_0": {
         "name": "Gaia · Quake",
-        "desc": "Shift each same-layer player +1/-1 (up to 2/turn)"
+        "desc": "Pick one direction (-1 or +1): every other player in your layer moves to that layer. Limbo is off limits (up to 2/turn)"
       }
     },
     "dm_fortress": {
@@ -558,12 +563,15 @@
       "noFreshInDiscard": "No card in the discard pile that was unused this turn",
       "noKillThisTurn": "You have not killed anyone this turn",
       "nothingToMirror": "No SHOOT-type card or KICK has been played this turn, so there is nothing to copy",
-      "needTwoInHand": "Needs at least 2 cards in hand"
+      "needTwoInHand": "Needs at least 2 cards in hand",
+      "gaiaBottomLayer": "You are in layer 1: the others cannot be sent into limbo",
+      "gaiaTopLayer": "You are in layer 4: there is no deeper dream to go to",
+      "greenRayNothing": "Do at least one of move or shoot: change layer, or pick a target"
     },
     "thief_space_queen": {
       "skill_1": {
         "name": "Space Queen · Creation",
-        "desc": "In the discard phase, put 1 hand card on top of the deck"
+        "desc": "In any player's discard phase, put 1 hand card on top of the deck"
       }
     },
     "thief_black_hole": {
@@ -590,7 +598,11 @@
     },
     "choice": {
       "increaseLock": "Add 1 heart lock",
-      "decreaseLock": "Remove 1 heart lock"
+      "decreaseLock": "Remove 1 heart lock",
+      "ariesGlow": "Draw {{n}} extra",
+      "ariesGlowNone": "No extra cards",
+      "gaiaDown": "Every other player in your layer: -1 (to layer {{layer}})",
+      "gaiaUp": "Every other player in your layer: +1 (to layer {{layer}})"
     },
     "hint": {
       "darwinOrder": "Cards go back on top of the deck in the order you pick them: the first pick is on top. The 2 cards you draw are unknown before you commit, so you can only choose from your current hand."
@@ -604,6 +616,7 @@
       "nightmareParams": "Set the nightmare parameters:",
       "back": "Back",
       "noPlayers": "No player to choose",
+      "stayLayer": "(current layer, no move)",
       "noLayers": "No layer to choose"
     },
     "thief_pisces": {
@@ -615,7 +628,7 @@
     "thief_green_ray": {
       "skill_0": {
         "name": "Green Ray · Arrest",
-        "desc": "Discard 1 Dream Transit and 1 SHOOT-type card, move to any layer, then resolve that SHOOT on a target there"
+        "desc": "Discard 1 Dream Transit and 1 SHOOT-type card; you may move to any layer and may then resolve that SHOOT on a target (move and shoot are each optional, but do at least one)"
       }
     },
     "thief_aquarius": {
@@ -891,7 +904,7 @@
       },
       "virgoRevive": {
         "title": "Revive a player",
-        "desc": "The revived player returns to layer 1 with an empty hand.",
+        "desc": "Any dead player can be revived (either side, the Dream Master included). They return to your layer and keep their hand.",
         "confirm": "Confirm revive"
       },
       "virgoTeleport": {

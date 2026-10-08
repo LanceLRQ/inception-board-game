@@ -272,7 +272,7 @@ test.describe('触控目标 · 390×844', () => {
     await page.getByTestId('active-skill-step-next').click();
     await expectTouchClean(page, '分步表单（选层）');
     await page.getByTestId('active-skill-step-layer-1').click();
-    await expectTouchClean(page, '分步表单（选目标）');
+    await expectTouchClean(page, '分步表单（选目标，可不选）');
 
     await openScene(page, '/game/debug?skill=heart-lock');
     await page.getByTestId('dock-skill').click();

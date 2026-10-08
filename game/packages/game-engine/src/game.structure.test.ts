@@ -26,7 +26,7 @@ const SETUP_MOVE_ARITY: Record<string, number> = {
 
 const PLAYING_MOVE_ARITY: Record<string, number> = {
   doDiscard: 2,
-  doDraw: 1,
+  doDraw: 2,
   dreamMasterMove: 2,
   endActionPhase: 1,
   masterActivateNightmare: 3,

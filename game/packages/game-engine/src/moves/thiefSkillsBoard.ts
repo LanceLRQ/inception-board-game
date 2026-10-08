@@ -72,13 +72,12 @@ export const thiefBoardSkillMoves = {
     client: false,
   },
 
-  // 盖亚·大地：令同层其余玩家移到 ±1 层（限 2 次/回合）
+  // 盖亚·撼动：选一个方向（-1 / +1），令同层其余玩家全部移到那一层（限 2 次/回合）
   // 对照：docs/manual/05-dream-thieves.md 盖亚
   playGaiaShift: {
-    move: ({ G, ctx }: MoveCtx, picks: Record<string, -1 | 1>) => {
+    move: ({ G, ctx }: MoveCtx, delta: -1 | 1) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-      if (!picks || typeof picks !== 'object') return INVALID_MOVE;
-      const next = applyGaiaShift(G, ctx.currentPlayer, picks);
+      const next = applyGaiaShift(G, ctx.currentPlayer, delta);
       if (next === null) return INVALID_MOVE;
       return incrementMoveCounter(next);
     },

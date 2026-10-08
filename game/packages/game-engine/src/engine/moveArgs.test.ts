@@ -46,6 +46,10 @@ describe('checkMoveArgs', () => {
     ['playShootDreamTransit', ['action_shoot_dream_transit', 'transit', 3, null]],
     ['dreamMasterMove', [0]],
     ['dreamMasterMove', [4]],
+    ['playGreenRayArrest', ['action_shoot']],
+    ['playGreenRayArrest', ['action_shoot', null, 3]],
+    ['playGreenRayArrest', ['action_shoot', b]],
+    ['playGreenRayArrest', ['action_shoot', b, 4]],
     ['useSagittariusHeartLock', [2, -1]],
     ['masterActivateNightmare', [2]],
     ['masterActivateNightmare', [2, null]],
@@ -53,14 +57,17 @@ describe('checkMoveArgs', () => {
       'masterActivateNightmare',
       [2, { targetLayer: 3, action: 'add', bribedTargets: [a], other: 1 }],
     ],
-    ['playGaiaShift', [{ [a]: -1, [b]: 1 }]],
+    ['playGaiaShift', [-1]],
+    ['playGaiaShift', [1]],
     ['respondVirgoPerfect', ['revive', { targetID: b }]],
     ['respondVirgoPerfect', ['skip']],
     ['masterPeekBribeDecision', [false]],
     ['playPiscesBlessing', [null]],
     ['doDiscard', [['action_kick', 'action_shoot']]],
     ['doDraw', []],
-    ['doDraw', ['多余的参数']],
+    ['doDraw', [null]],
+    ['doDraw', [0]],
+    ['doDraw', [3]],
     ['未登记的move', [1, 2, 3]],
   ];
   for (const [move, args] of accepted) {
@@ -86,6 +93,11 @@ describe('checkMoveArgs', () => {
     ['playShootDreamTransit', ['action_shoot_dream_transit', 'shoot', 3]],
     ['playShootDreamTransit', ['action_shoot_dream_transit', 'transit', b]],
     ['playShootDreamTransit', ['action_shoot_dream_transit', 'fly', 3]],
+    ['playGreenRayArrest', []],
+    ['playGreenRayArrest', ['action_shoot', 5, 3]],
+    ['playGreenRayArrest', ['action_shoot', 'nobody']],
+    ['playGreenRayArrest', ['action_shoot', null, 5]],
+    ['playGreenRayArrest', ['action_shoot', null, '3']],
     ['dreamMasterMove', [5]],
     ['dreamMasterMove', [-1]],
     ['dreamMasterMove', [1.5]],
@@ -98,8 +110,11 @@ describe('checkMoveArgs', () => {
     ['masterActivateNightmare', [2, { targetLayer: 9 }]],
     ['masterActivateNightmare', [2, { action: 'steal' }]],
     ['masterActivateNightmare', [2, { bribedTargets: ['nobody'] }]],
-    ['playGaiaShift', [{ [a]: 2 }]],
-    ['playGaiaShift', [{ nobody: 1 }]],
+    ['playGaiaShift', []],
+    ['playGaiaShift', [0]],
+    ['playGaiaShift', [2]],
+    ['playGaiaShift', ['1']],
+    ['playGaiaShift', [{ [a]: -1, [b]: 1 }]],
     ['playGaiaShift', [[1]]],
     ['respondVirgoPerfect', ['revive', { targetID: 7 }]],
     ['respondVirgoPerfect', ['teleport', { layer: 'x' }]],
@@ -119,6 +134,10 @@ describe('checkMoveArgs', () => {
     ['doDiscard', [Array.from({ length: 1000 }, () => 'x')]],
     ['doDiscard', ['action_kick']],
     ['resolveSudgerPick', ['C']],
+    ['doDraw', ['多余的参数']],
+    ['doDraw', [-1]],
+    ['doDraw', [1.5]],
+    ['doDraw', [1000]],
   ];
   for (const [move, args] of rejected) {
     it(`拒绝畸形形状：${move} ${JSON.stringify(args).slice(0, 60)}`, () => {
@@ -128,10 +147,10 @@ describe('checkMoveArgs', () => {
 
   it('带 __proto__ 键的对象被拒绝，也不会污染原型', () => {
     const polluted: unknown = JSON.parse('{"__proto__":{"polluted":true}}');
-    expect(checkMoveArgs(G, 'playGaiaShift', [polluted])).toBe(false);
+    expect(checkMoveArgs(G, 'playBlackSwanTour', [polluted])).toBe(false);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
-    const withKey: unknown = JSON.parse(`{"__proto__":1,"${a}":1}`);
-    expect(checkMoveArgs(G, 'playGaiaShift', [withKey])).toBe(false);
+    const withKey: unknown = JSON.parse(`{"__proto__":["action_kick"],"${a}":["action_kick"]}`);
+    expect(checkMoveArgs(G, 'playBlackSwanTour', [withKey])).toBe(false);
   });
 });
 

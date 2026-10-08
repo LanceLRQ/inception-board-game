@@ -309,12 +309,14 @@ export const thiefCardSkillMoves = {
     client: false,
   },
 
-  // 空间女王·造物：弃牌阶段放 1 手牌到牌库顶
+  // 空间女王·造物：任意玩家的弃牌阶段，可以把 1 张手牌放到牌库顶
   // 对照：docs/manual/05-dream-thieves.md 空间女王
+  // 卡面没有写次数限制，所以不限次数；弃牌阶段可以是别人的，因此是回合外可发的 move
+  // （行动权表 engine/actionRights.ts 的 OFF_TURN_MOVES），发起者是空间女王本人，不要求是回合主人。
   useSpaceQueenStashTop: {
     move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+      if (G.phase !== 'playing') return INVALID_MOVE;
       if (G.turnPhase !== 'discard') return INVALID_MOVE;
-      if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
       const result = applySpaceQueenStashTop(G, ctx.currentPlayer, cardId);
       if (result === null) return INVALID_MOVE;
       return result;

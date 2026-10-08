@@ -119,8 +119,10 @@ export function SkillStepForm({
     setIndex(stepAt - 1);
   };
 
-  const ready = stepReady(step, skill, context, picks, paramsReady);
   const isLast = stepAt >= steps.length - 1;
+  // 全部选完仍发不出去的情形（格林射线·缉捕：移动与射击至少要做一样）只拦最后一步的确认
+  const blockedReason = isLast ? (skill.confirmBlocked?.(context, picks) ?? null) : null;
+  const ready = stepReady(step, skill, context, picks, paramsReady) && blockedReason === null;
 
   const renderStep = (spec: SkillStepSpec) => {
     switch (spec.kind) {
@@ -215,6 +217,9 @@ export function SkillStepForm({
                 data-testid={`active-skill-step-layer-${layer}`}
               >
                 {t('localMatch.layer', { defaultValue: '层' })} {layer}
+                {skill.layerStayCurrent && layer === context.humanLayer && (
+                  <span className="text-muted-foreground">{t('skill.step.stayLayer')}</span>
+                )}
               </button>
             ))}
           </div>
@@ -243,7 +248,7 @@ export function SkillStepForm({
                   data-testid={`active-skill-step-choice-${choice.value}`}
                 >
                   {why !== null && <Ban className="size-3 shrink-0" aria-hidden />}
-                  {t(choice.labelKey)}
+                  {t(choice.labelKey, choice.labelParams)}
                 </button>
               );
             })}
@@ -323,6 +328,11 @@ export function SkillStepForm({
         )}
       </div>
       {renderStep(step)}
+      {blockedReason && (
+        <p className="text-[12px] text-muted-foreground" data-testid="active-skill-step-blocked">
+          {reasonText(blockedReason)}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {!isInstantStep(step) && (
           <button

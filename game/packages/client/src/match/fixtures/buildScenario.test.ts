@@ -23,6 +23,8 @@ import {
   CHEMIST_INJECT,
   CHEMIST_REFINE,
   SPACE_QUEEN_STASH,
+  GAIA_SHIFT,
+  ARIES_GLOW,
   BLACK_HOLE_ABSORB,
   IMPERIAL_WORLD_SHOOT,
   SATURN_FREE_MOVE,
@@ -361,8 +363,10 @@ describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () =
   it('处女：本人是处女、有人死亡可复活，视图里别人看不到处女是谁', () => {
     const a = mineOf('thief-pending-virgo');
     expect(a).toMatchObject({ kind: 'virgo', alive: true, triggerRoll: 6 });
-    expect(a.kind === 'virgo' && a.reviveTargets.length).toBeGreaterThanOrEqual(1);
     const { state, viewer } = buildFixtureMatch('thief-pending-virgo');
+    // 一名盗梦者和梦主都已死亡，复活的对象不限阵营，两个人都可选
+    expect(a.kind === 'virgo' && a.reviveTargets.length).toBe(2);
+    expect(a.kind === 'virgo' && a.reviveTargets).toContain(state.G.dreamMasterID);
     const other = state.G.playerOrder.find((id) => id !== viewer)!;
     expect(viewFrom('thief-pending-virgo', other).pendingVirgoChoice!.virgoID).toBeNull();
     expect(awaitedResponse(viewFrom('thief-pending-virgo', other), other)).toEqual({
@@ -675,6 +679,43 @@ describe('buildFixtureScenario · 角色技能走查场景', () => {
     const { G } = skillEntriesOf('skill-space-queen');
     expect(G.turnPhase).toBe('discard');
     expect(enabledSkills('skill-space-queen')).toContain(SPACE_QUEEN_STASH);
+  });
+
+  it('空间女王（别人的弃牌阶段）：回合主人是别人，「造物」仍然可用', () => {
+    const sc = buildFixtureScenario('skill-space-queen-other');
+    const G = sc.view.G as MatchView;
+    expect(G.turnPhase).toBe('discard');
+    expect(G.currentPlayerID).not.toBe(sc.seat);
+    expect(G.players[sc.seat]!.characterId).toBe('thief_space_queen');
+    const ctx = buildActiveSkillContext({
+      G,
+      seat: sc.seat,
+      isMyTurn: false,
+      hand: G.players[sc.seat]!.hand ?? [],
+    });
+    expect(
+      getSkillEntries(ctx)
+        .filter((e) => e.enabled)
+        .map((e) => e.skill),
+    ).toEqual([SPACE_QUEEN_STASH]);
+  });
+
+  it('盖亚：本人所在层有两名同伴，「撼动」可用', () => {
+    const { sc, G } = skillEntriesOf('skill-gaia');
+    expect(G.players[sc.seat]!.characterId).toBe('thief_gaia');
+    const mates = Object.entries(G.players).filter(
+      ([id, p]) => id !== sc.seat && p.currentLayer === G.players[sc.seat]!.currentLayer,
+    );
+    expect(mates.length).toBeGreaterThanOrEqual(2);
+    expect(enabledSkills('skill-gaia')).toContain(GAIA_SHIFT);
+  });
+
+  it('白羊：抽牌阶段、弃掉过 2 张梦魇，「闪耀」可用', () => {
+    const { sc, G } = skillEntriesOf('skill-aries-glow');
+    expect(G.players[sc.seat]!.characterId).toBe('thief_aries');
+    expect(G.turnPhase).toBe('draw');
+    expect(G.usedNightmareCount).toBe(2);
+    expect(enabledSkills('skill-aries-glow')).toContain(ARIES_GLOW);
   });
 
   it('黑洞：「吸纳」可用', () => {

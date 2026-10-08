@@ -1537,36 +1537,35 @@ export function applyLunaFullMoon(
   return s;
 }
 
-// === 盖亚 · 大地 ===
-// 出牌阶段：令同层其余玩家移到 ±1 层（不入迷失层）。回合限 2 次
+// === 盖亚 · 撼动 ===
+// 出牌阶段：选定一个方向（-1 或 +1），令同层其余玩家全部移到「所在层数 ± 1」的梦境；盖亚自己不动。
+// 不能只挑部分人，也不能因此进入迷失层（第 1 层不能选 -1，第 4 层不能选 +1）。回合限 2 次。
+// 对照：docs/manual/05-dream-thieves.md 盖亚（第 30 行技能、第 33 行详述「所有当层其余玩家都必须到你指定的相邻一层梦境」）
 export const GAIA_SKILL_ID = 'thief_gaia.skill_0';
 const GAIA_LIMIT_PER_TURN = 2;
 
 export function applyGaiaShift(
   state: SetupState,
   selfID: string,
-  picks: Record<string, -1 | 1>, // 每玩家方向
+  delta: -1 | 1,
 ): SetupState | null {
   const player = state.players[selfID];
   if (!player || player.characterId !== 'thief_gaia') return null;
   if (!player.isAlive) return null;
+  if (delta !== -1 && delta !== 1) return null;
   if (!canUseSkill(player, GAIA_SKILL_ID, 'ownTurnLimitN', GAIA_LIMIT_PER_TURN)) return null;
   const layerInfo = state.layers[player.currentLayer];
   if (!layerInfo) return null;
+  // 目标层必须是梦境层（1-4），不能进入迷失层，也不能超出第 4 层
+  const targetLayer = player.currentLayer + delta;
+  if (targetLayer < 1 || targetLayer > 4) return null;
+  // 同层其余玩家全部移动；一个人都没有时技能不产生任何效果，不能发动
   const others = layerInfo.playersInLayer.filter((id) => id !== selfID);
-  // picks 必须仅含同层其他玩家
-  for (const id of Object.keys(picks)) {
-    if (!others.includes(id)) return null;
-    const dir = picks[id];
-    if (dir !== -1 && dir !== 1) return null;
-    const next = player.currentLayer + dir;
-    if (next < 1 || next > 4) return null; // 不入迷失层（0）也不超 4
-  }
+  if (others.length === 0) return null;
 
   let s = markSkillUsed(state, selfID, GAIA_SKILL_ID);
-  for (const [pid, dir] of Object.entries(picks)) {
-    const next = (player.currentLayer + dir) as Layer;
-    s = movePlayerToLayer(s, pid, next);
+  for (const pid of others) {
+    s = movePlayerToLayer(s, pid, targetLayer as Layer);
   }
   return s;
 }
@@ -1618,27 +1617,51 @@ export function applyDarwinEvolution(
 export const ARIES_REVEAL_SKILL_ID = 'thief_aries.skill_0';
 export const ARIES_DRAW_SKILL_ID = 'thief_aries.skill_1';
 
-/** 白羊·已弃梦魇加成抽 N（N = 已弃梦魇数） */
+/** 白羊·已弃梦魇加成抽 N（N = 已弃梦魇数）：发动过的和直接弃掉的梦魇牌都计入 */
 export function ariesExtraDrawCount(state: SetupState): number {
   return state.usedNightmareIds.length;
 }
 
+/** 这名玩家的抽牌阶段最多可以多抽几张：存活的白羊 = 已弃梦魇数，其他人（含已死亡的白羊）为 0 */
+export function ariesExtraDrawLimit(state: SetupState, playerID: string): number {
+  const player = state.players[playerID];
+  if (!player || !player.isAlive || player.characterId !== 'thief_aries') return 0;
+  return ariesExtraDrawCount(state);
+}
+
 /**
- * 白羊·弃梦魇加成：抽牌阶段由白羊本人（且必须是当前回合玩家、存活）额外抽 N 张（N = 已弃梦魇数）。
- * 对照：docs/manual/05-dream-thieves.md 白羊
+ * 白羊·闪耀：抽牌阶段由白羊本人（且必须是当前回合玩家、存活）多抽牌。
+ * chosen 是白羊自己选的多抽张数（0 到上限）；不给时抽满上限。超出上限的部分按上限截断，
+ * 参数是否合法由 doDraw 在抽牌前校验。
+ * 对照：docs/manual/05-dream-thieves.md 白羊（第 70 行「可以让玩家自行选择抽取数量」）
  * 按座次遍历存活玩家，只有「当前回合的白羊」满足条件，至多抽一次。
  */
-export function settleAriesExtraDraw(state: SetupState): SetupState {
+export function settleAriesExtraDraw(state: SetupState, chosen?: number | null): SetupState {
   let current = state;
   for (const playerID of state.playerOrder) {
-    const player = state.players[playerID];
-    if (!player || !player.isAlive) continue;
-    if (player.characterId !== 'thief_aries') continue;
     if (playerID !== current.currentPlayerID) continue;
-    const extra = ariesExtraDrawCount(current);
+    const limit = ariesExtraDrawLimit(current, playerID);
+    const extra = Math.min(chosen ?? limit, limit);
     if (extra > 0) current = drawCards(current, playerID, extra);
   }
   return current;
+}
+
+/** doDraw 带的多抽张数是否合法：没给（undefined / null）永远合法；给了就必须是存活白羊、整数且在 0 到上限之内 */
+export function isValidAriesExtraChoice(
+  state: SetupState,
+  playerID: string,
+  chosen: unknown,
+): boolean {
+  if (chosen === undefined || chosen === null) return true;
+  const player = state.players[playerID];
+  if (!player || !player.isAlive || player.characterId !== 'thief_aries') return false;
+  return (
+    typeof chosen === 'number' &&
+    Number.isInteger(chosen) &&
+    chosen >= 0 &&
+    chosen <= ariesExtraDrawLimit(state, playerID)
+  );
 }
 
 // === 射手 · 神射（纯函数） ===
