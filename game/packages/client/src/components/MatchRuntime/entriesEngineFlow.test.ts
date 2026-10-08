@@ -15,7 +15,20 @@ import { buildFixtureMatch } from '../../match/fixtures/buildScenario';
 import type { FixtureScenarioId } from '../../match/fixtures/scenarios';
 import { computeMasterBribeInspectState } from '../MasterBribeInspectBanner/logic';
 import { bribeHolderIds, buildPlayArgs, pendingPlayFor } from './controllerDerive';
-import { adjacentLayers, deriveDockEntries, reviveArgs } from './model/dockEntries';
+import {
+  BLACK_SWAN_SKILL_KEY,
+  adjacentLayers,
+  deriveDockEntries,
+  reviveArgs,
+} from './model/dockEntries';
+import {
+  EMPTY_TOUR,
+  buildDistribution,
+  canConfirmTour,
+  pickTourRecipient,
+  tapTourCard,
+  tourRecipientIds,
+} from './model/tourDistribution';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -187,5 +200,124 @@ describe('界面可点但必被拒的出牌', () => {
   it('梦主出【解封】：引擎拒绝（界面标为不可打）', () => {
     const { state, viewer } = sceneOf('master');
     expect(apply(state, viewer, 'playUnlock', ['action_unlock'])).toBeNull();
+  });
+});
+
+describe('黑天鹅·纷飞：界面拼的分发表引擎接受', () => {
+  /** 界面上的操作：选接收者、逐张点牌，直到全部分完 */
+  function distributeLikeUi(state: MatchState<SetupState>, seat: string) {
+    const G = viewMatch(game, state, seat).G as MatchView;
+    const hand = G.players[seat]!.hand ?? [];
+    const recipients = tourRecipientIds(G.players, seat, G.dreamMasterID);
+    let ui = EMPTY_TOUR;
+    hand.forEach((_, i) => {
+      // 手牌轮流分给各接收者
+      ui = pickTourRecipient(ui, recipients[i % recipients.length]!);
+      ui = tapTourCard(ui, i, hand.length);
+    });
+    return { hand, recipients, assigned: ui.assigned, G };
+  }
+
+  it('抽牌阶段：手牌分完后引擎接受，接收者收到牌，本人再抽 4 张', () => {
+    const { state, viewer } = sceneOf('skill-black-swan');
+    const { hand, recipients, assigned } = distributeLikeUi(state, viewer);
+    expect(canConfirmTour(assigned, hand.length, recipients)).toBe(true);
+    const dist = buildDistribution(hand, assigned);
+    const before = Object.fromEntries(
+      recipients.map((id) => [id, state.G.players[id]!.hand.length]),
+    );
+    const after = apply(state, viewer, 'playBlackSwanTour', [dist]);
+    expect(after).not.toBeNull();
+    for (const id of recipients) {
+      expect(after!.G.players[id]!.hand).toHaveLength(before[id]! + (dist[id]?.length ?? 0));
+    }
+    expect(after!.G.players[viewer]!.hand).toHaveLength(4);
+    expect(after!.G.players[viewer]!.skillUsedThisTurn[BLACK_SWAN_SKILL_KEY]).toBe(1);
+  });
+
+  it('没分完 / 分给自己 / 分给梦主 / 分给迷失层的人：界面不让确认，引擎也拒绝', () => {
+    const { state, viewer } = sceneOf('skill-black-swan');
+    const { hand, recipients, G } = distributeLikeUi(state, viewer);
+    const first = recipients[0]!;
+    const partial = buildDistribution(
+      hand,
+      hand.map((_, i) => (i === 0 ? first : null)),
+    );
+    expect(
+      canConfirmTour(
+        hand.map((_, i) => (i === 0 ? first : null)),
+        hand.length,
+        recipients,
+      ),
+    ).toBe(false);
+    expect(apply(state, viewer, 'playBlackSwanTour', [partial])).toBeNull();
+    for (const bad of [viewer, G.dreamMasterID]) {
+      expect(recipients).not.toContain(bad);
+      expect(apply(state, viewer, 'playBlackSwanTour', [{ [bad]: hand }])).toBeNull();
+    }
+    // 接收者已在迷失层：界面不列，引擎也拒绝
+    const dead = sceneOf('skill-luna');
+    const deadId = Object.keys(dead.state.G.players).find(
+      (id) => !dead.state.G.players[id]!.isAlive,
+    )!;
+    const swan = { ...dead.state, G: { ...dead.state.G, turnPhase: 'draw' as const } };
+    const swanG = {
+      ...swan,
+      G: {
+        ...swan.G,
+        players: {
+          ...swan.G.players,
+          [dead.viewer]: {
+            ...swan.G.players[dead.viewer]!,
+            characterId: 'thief_black_swan' as never,
+          },
+        },
+      },
+    };
+    const view = viewMatch(game, swanG, dead.viewer).G as MatchView;
+    expect(tourRecipientIds(view.players, dead.viewer, view.dreamMasterID)).not.toContain(deadId);
+    expect(
+      apply(swanG, dead.viewer, 'playBlackSwanTour', [
+        { [deadId]: swanG.G.players[dead.viewer]!.hand },
+      ]),
+    ).toBeNull();
+  });
+
+  it('本回合已发动：入口禁用（回合限一次），引擎也拒绝', () => {
+    const { state, viewer } = sceneOf('skill-black-swan');
+    const used = {
+      ...state,
+      G: {
+        ...state.G,
+        players: {
+          ...state.G.players,
+          [viewer]: {
+            ...state.G.players[viewer]!,
+            skillUsedThisTurn: { [BLACK_SWAN_SKILL_KEY]: 1 },
+          },
+        },
+      },
+    };
+    const entry = entriesFor(used, viewer).find((e) => e.kind === 'blackSwanTour')!;
+    expect(entry).toMatchObject({ enabled: false });
+    expect(entry.reason).toEqual({ key: 'entries.reason.tourUsed' });
+    const { hand, assigned } = distributeLikeUi(used, viewer);
+    expect(
+      apply(used, viewer, 'playBlackSwanTour', [buildDistribution(hand, assigned)]),
+    ).toBeNull();
+  });
+
+  it('没有手牌：入口禁用，引擎也拒绝', () => {
+    const { state, viewer } = sceneOf('skill-black-swan');
+    const empty = {
+      ...state,
+      G: {
+        ...state.G,
+        players: { ...state.G.players, [viewer]: { ...state.G.players[viewer]!, hand: [] } },
+      },
+    };
+    const entry = entriesFor(empty, viewer).find((e) => e.kind === 'blackSwanTour')!;
+    expect(entry.reason).toEqual({ key: 'entries.reason.tourNoHand' });
+    expect(apply(empty, viewer, 'playBlackSwanTour', [{}])).toBeNull();
   });
 });

@@ -132,6 +132,8 @@ export function useAwaitedResponse({
       pickTeleportLayer: (layer) => patchDraft({ teleportLayer: layer }),
       pickEchoLayer: (layer) => patchDraft({ echoLayer: layer }),
       pickEchoAction: (action) => patchDraft({ echoAction: action }),
+      setNightmareDraft: (next) =>
+        patchDraft({ echoLayer: next.echoLayer, echoAction: next.echoAction, bribed: next.bribed }),
       pickPile: (pile) => void pickPile(pile),
     },
   };

@@ -314,5 +314,72 @@ describe('底部坞入口 · 抽牌阶段', () => {
   it('入口的 data-testid', () => {
     expect(entryTestId('skipDraw')).toBe('dock-entry-skip-draw');
     expect(entryTestId('jokerGamble')).toBe('dock-entry-joker');
+    expect(entryTestId('blackSwanTour')).toBe('dock-entry-tour');
+  });
+});
+
+describe('底部坞入口 · 黑天鹅·纷飞（抽牌阶段）', () => {
+  const swan = (over: Partial<DockEntriesInput> = {}, me: Partial<EntryPlayer> = {}) =>
+    input({
+      turnPhase: 'draw',
+      players: {
+        p1: player({ characterId: 'thief_black_swan', skillUsedThisTurn: {}, ...me }),
+        p2: player(),
+        pM: player({ characterId: 'dm_neptune_ocean' }),
+      },
+      ...over,
+    });
+
+  it('黑天鹅有手牌、有活着的其他盗梦者：略过抽牌之外多一个「纷飞」且可用', () => {
+    expect(deriveDockEntries(swan()).map((e) => [e.kind, e.enabled])).toEqual([
+      ['skipDraw', true],
+      ['blackSwanTour', true],
+    ]);
+  });
+
+  it('其他角色没有这个入口', () => {
+    expect(deriveDockEntries(input({ turnPhase: 'draw' })).map((e) => e.kind)).toEqual([
+      'skipDraw',
+    ]);
+  });
+
+  it('没有手牌：入口仍在但禁用并说明', () => {
+    const e = deriveDockEntries(swan({ hand: [] })).find((x) => x.kind === 'blackSwanTour')!;
+    expect(e).toMatchObject({ enabled: false });
+    expect(e.reason).toEqual({ key: 'entries.reason.tourNoHand' });
+  });
+
+  it('本回合已发动过（回合限一次）：禁用并说明', () => {
+    const e = deriveDockEntries(
+      swan({}, { skillUsedThisTurn: { 'thief_black_swan.skill_0': 1 } }),
+    ).find((x) => x.kind === 'blackSwanTour')!;
+    expect(e).toMatchObject({ enabled: false });
+    expect(e.reason).toEqual({ key: 'entries.reason.tourUsed' });
+  });
+
+  it('没有别的存活的盗梦者（梦主不算）：禁用并说明', () => {
+    const e = deriveDockEntries(
+      swan({
+        players: {
+          p1: player({ characterId: 'thief_black_swan', skillUsedThisTurn: {} }),
+          p2: player({ isAlive: false, currentLayer: 0 }),
+          pM: player({ characterId: 'dm_neptune_ocean' }),
+        },
+      }),
+    ).find((x) => x.kind === 'blackSwanTour')!;
+    expect(e).toMatchObject({ enabled: false });
+    expect(e.reason).toEqual({ key: 'entries.reason.tourNoRecipient' });
+  });
+
+  it('黑天鹅在迷失层：没有这个入口', () => {
+    const kinds = deriveDockEntries(swan({}, { isAlive: false, currentLayer: 0 })).map(
+      (e) => e.kind,
+    );
+    expect(kinds).toEqual(['skipDraw']);
+  });
+
+  it('有别的待办占着界面：禁用并说明', () => {
+    const e = deriveDockEntries(swan({ busy: true })).find((x) => x.kind === 'blackSwanTour')!;
+    expect(e.reason).toEqual({ key: 'entries.reason.busy' });
   });
 });

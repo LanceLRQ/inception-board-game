@@ -11,6 +11,7 @@ import type { ReportOutcome, ReportReason } from '../../lib/reportApi';
 import type { ReportTarget } from './reportTargets';
 import type { ActiveSkillContext, ActiveSkillDescriptor } from '../../lib/activeSkills';
 import type { PlayRole } from '../../lib/cards';
+import type { NightmareParamDraft } from '../../lib/nightmareParams';
 import type { ChessVaultInfo } from '../ChessTransposeDialog';
 import type { GravityTargetOption } from '../GravityTargetPickerDialog';
 import type { AwaitingNotice } from './awaitingNotice';
@@ -225,6 +226,8 @@ export interface ResponseSheetModel {
   readonly pickTeleportLayer: (layer: number) => void;
   readonly pickEchoLayer: (layer: number) => void;
   readonly pickEchoAction: (action: 'restore' | 'add') => void;
+  /** 回音萦绕 / 邪念瘟疫的附加参数草稿整体更新（共用的参数表单用） */
+  readonly setNightmareDraft: (draft: NightmareParamDraft) => void;
   /** 天秤·挑一份：点哪份就发哪份 */
   readonly pickPile: (pile: 'pile1' | 'pile2') => void;
 }
@@ -277,6 +280,22 @@ export interface ReviveModel {
   readonly canConfirm: boolean;
   readonly pickTarget: (id: string) => void;
   readonly toggleCard: (index: number) => void;
+  readonly confirm: () => Promise<void>;
+  readonly cancel: () => void;
+}
+
+/** 黑天鹅·纷飞的分发弹层：选接收者，再逐张点手牌分给他 */
+export interface TourModel {
+  readonly open: boolean;
+  readonly hand: readonly string[];
+  readonly recipients: readonly { readonly id: string; readonly name: string }[];
+  readonly active: string | null;
+  /** 每张手牌分给了谁（按手牌位置），未分配为 null */
+  readonly assigned: readonly (string | null)[];
+  readonly progress: { readonly done: number; readonly total: number };
+  readonly canConfirm: boolean;
+  readonly pickRecipient: (id: string) => void;
+  readonly tapCard: (index: number) => void;
   readonly confirm: () => Promise<void>;
   readonly cancel: () => void;
 }
@@ -381,6 +400,7 @@ export interface MatchController {
   readonly entries: readonly DockEntry[];
   readonly revive: ReviveModel;
   readonly masterMove: MasterMoveModel;
+  readonly tour: TourModel;
   readonly response: ResponseModel;
   readonly shootDice: {
     readonly roll: number | null;

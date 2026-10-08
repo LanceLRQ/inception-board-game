@@ -446,6 +446,10 @@
       "skill_0": {
         "name": "露娜·月蚀",
         "desc": "弃 2 张 SHOOT → 击杀同层任意玩家"
+      },
+      "skill_1": {
+        "name": "露娜·满月",
+        "desc": "弃 2 张非 SHOOT 牌，把任意数量已在迷失层的玩家复活到你所在层（可以一个都不复活），然后翻面"
       }
     },
     "thief_athena": {
@@ -542,14 +546,19 @@
       "noShootInDiscard": "弃牌堆里没有 SHOOT 类牌",
       "noUnlockCard": "手里没有【解封】",
       "noRevealedNightmare": "没有已翻开的梦魇",
-      "echoNeedsParams": "已翻开的只有回音萦绕，它的效果要先选层与方式，这里暂不支持发动",
       "noNightmare": "没有可发动的梦魇",
       "deckShort": "牌库不足 2 张",
       "deckEmpty": "牌库已空",
       "discardEmpty": "弃牌堆是空的",
       "noAdjacentPlayers": "相邻的层里都没有存活的玩家",
       "noPlutoTarget": "没有手牌不足 2 张的存活盗梦者",
-      "noVaultPair": "未打开的金库不足 2 个"
+      "noVaultPair": "未打开的金库不足 2 个",
+      "piscesTopLayer": "在第 4 层无法发动（只能移到数字更大的相邻层）",
+      "needSameNamePair": "本回合每打出 2 张同名牌，才能发动一次",
+      "noFreshInDiscard": "弃牌堆里没有本回合未使用过的牌",
+      "noKillThisTurn": "本回合还没有击杀过玩家",
+      "nothingToMirror": "本回合还没有打出 SHOOT 类牌或 KICK，没有可复制的效果",
+      "needTwoInHand": "需要手里至少有 2 张牌"
     },
     "thief_space_queen": {
       "skill_1": {
@@ -567,12 +576,58 @@
       "skill_0": {
         "name": "金星·重影",
         "desc": "展示牌库顶与任意手牌，同名的牌收入手牌，其余混洗放回牌库顶（回合限 1 次）"
+      },
+      "worldview": {
+        "name": "镜界·复制",
+        "desc": "弃 2 张牌，复制本回合最后一张 SHOOT 类牌或 KICK 的效果（每人每回合一次）"
       }
     },
     "dm_secret_passage": {
       "skill_0": {
         "name": "密道·传送",
         "desc": "弃 1 张梦境穿梭剂，把 1 名盗梦者送入迷失层（回合限 2 次）"
+      }
+    },
+    "choice": {
+      "increaseLock": "增加 1 个心锁",
+      "decreaseLock": "减少 1 个心锁"
+    },
+    "hint": {
+      "darwinOrder": "按选牌的先后放回牌库顶：先选的在最顶。新抽的 2 张牌发动前看不到，这里只能从现有手牌里选。"
+    },
+    "step": {
+      "cards": "选择 {{need}} 张手牌（已选 {{picked}}）：",
+      "cardsAny": "选择手牌（已选 {{picked}}）：",
+      "playersMulti": "选择玩家（可不选，已选 {{picked}}）：",
+      "playerOptional": "选择玩家（可不选）：",
+      "choice": "选择方式：",
+      "nightmareParams": "补充梦魇的参数：",
+      "back": "上一步",
+      "noPlayers": "没有可选的玩家",
+      "noLayers": "没有可选的层"
+    },
+    "thief_pisces": {
+      "skill_1": {
+        "name": "双鱼·洗礼",
+        "desc": "移到数字更大的相邻层，并可复活一名迷失层的玩家到那一层，然后翻面（第 4 层无法发动）"
+      }
+    },
+    "thief_green_ray": {
+      "skill_0": {
+        "name": "格林射线·缉捕",
+        "desc": "弃 1 张梦境穿梭剂和 1 张 SHOOT 类牌，移到任意一层，再对那里的目标执行该 SHOOT 的效果"
+      }
+    },
+    "thief_aquarius": {
+      "skill_0": {
+        "name": "水瓶·凝聚",
+        "desc": "本回合每使用过 2 张同名牌，可从弃牌堆选 1 张本回合未使用过的牌收入手牌"
+      }
+    },
+    "thief_sagittarius": {
+      "skill_1": {
+        "name": "射手·穿心",
+        "desc": "本回合击杀过玩家后，增加或减少任意一层的 1 个心锁（不超过原有数量，回合限 1 次）"
       }
     }
   },
@@ -810,7 +865,7 @@
       "discard": "弃掉梦魇",
       "nightmare": "梦魇：{{name}}",
       "unknown": "这一层已没有可翻开的梦魇。",
-      "plague": "邪念瘟疫由你发动时不派发贿赂：本层的盗梦者没有贿赂牌，将进入迷失层。",
+      "plague": "邪念瘟疫由你点名要派发贿赂牌的盗梦者；没被点名且手里没有贿赂牌的盗梦者将进入迷失层。",
       "scope": "本回合结束前有效。"
     },
     "sheet": {
@@ -851,6 +906,11 @@
         "restore": "恢复原有心锁",
         "add": "增加 1 个心锁",
         "layer": "第 {{layer}} 层",
+        "confirm": "确认发动"
+      },
+      "ariesPlague": {
+        "title": "邪念瘟疫",
+        "desc": "点名要派发贿赂牌的盗梦者，也可以一个都不点名。",
         "confirm": "确认发动"
       }
     }
@@ -980,12 +1040,16 @@
       "reviveOther": "复活同伴",
       "masterMove": "移动",
       "skipDraw": "跳过抽牌",
-      "jokerGamble": "小丑·失控"
+      "jokerGamble": "小丑·失控",
+      "blackSwanTour": "黑天鹅·纷飞"
     },
     "reason": {
       "handShort": "复活要弃 {{count}} 张手牌，你只有 {{have}} 张",
       "transitShort": "密道世界观下复活只能弃 1 张梦境穿梭剂，你手里没有",
-      "busy": "有待处理的事项，先处理完再操作"
+      "busy": "有待处理的事项，先处理完再操作",
+      "tourNoHand": "手里没有牌可以分发（至少 1 张）",
+      "tourUsed": "本回合已发动过（每回合限一次）",
+      "tourNoRecipient": "没有其他存活的盗梦者可以接收"
     },
     "move": {
       "label": "移动",
@@ -1012,5 +1076,33 @@
     "preventMove": {
       "label": "射手·禁足：令目标不移动"
     }
+  },
+  "nightmare": {
+    "layer": "第 {{layer}} 层",
+    "echo": {
+      "desc": "选一层梦境：恢复该层原有的心锁，或在该层增加 1 个心锁。",
+      "layerLabel": "目标层：",
+      "actionLabel": "方式：",
+      "restore": "恢复原有心锁数",
+      "add": "心锁数 +1"
+    },
+    "plague": {
+      "desc": "点名要派发贿赂牌的盗梦者（贿赂池还剩 {{count}} 张）；没被点名且手里没有贿赂牌的盗梦者将进入迷失层，不算被击杀。",
+      "label": "派发贿赂牌的对象",
+      "none": "这一层没有可点名的盗梦者。",
+      "chosen": "已点名 {{count}} / {{max}}",
+      "poolFull": "贿赂池里的牌不够再派了"
+    }
+  },
+  "tour": {
+    "title": "黑天鹅·纷飞",
+    "desc": "略过抽牌，把全部手牌分给其他盗梦者，然后从牌库顶抽 4 张。先选一位接收者，再点手牌分给这位；再点一次取消。",
+    "recipient": "分给：",
+    "assignedTo": "→ {{name}}",
+    "unassigned": "未分配",
+    "progress": "已分配 {{done}} / {{total}} 张",
+    "confirm": "确认并抽 4 张",
+    "noRecipients": "没有可分给的盗梦者。",
+    "cardAria": "{{name}}，{{state}}"
   }
 }

@@ -10,7 +10,8 @@
 //   usage       次数限制：用完后仍显示，置灰并说明（键必须是引擎实际写入 skillUsedThisTurn / skillUsedThisGame 的键）
 //   blocked     其他引擎必拒的情形：仍显示，置灰并说明
 
-import { isShootClassCard } from '@icgame/game-engine';
+import { PLAYER_COUNT_CONFIGS, isShootClassCard } from '@icgame/game-engine';
+import { shootCrossLayerAllowed } from '../components/TargetPlayerPickerDialog/logic';
 
 export type ActiveSkillArgKind =
   | 'none'
@@ -26,7 +27,15 @@ export type ActiveSkillArgKind =
   | 'layerShiftPicks'
   | 'multiCardAndDiscardCard'
   | 'playerAndBribeIndex'
-  | 'twoCardsAndShoot';
+  | 'twoCardsAndShoot'
+  // 以下几种由 skillSteps.ts 的分步表单处理：按参数形态命名，步骤顺序见 STEP_FORMS
+  | 'multiCardAndPlayers'
+  | 'optionalPlayer'
+  | 'cardPlayerLayer'
+  | 'layerAndChoice'
+  | 'discardCard'
+  | 'playerAndMultiCard'
+  | 'layerAndParams';
 
 /** 技能此刻用不了的原因（i18n 键 + 参数） */
 export interface SkillReason {
@@ -41,6 +50,45 @@ export interface SkillUsage {
   readonly limit: number | ((ctx: ActiveSkillContext) => number);
   /** turn（缺省）= 读 skillUsedThisTurn；game = 读 skillUsedThisGame */
   readonly scope?: 'turn' | 'game';
+  /** 上限为 0（还没攒到发动机会）时的原因；不给就按「已用完」说明 */
+  readonly noQuota?: SkillReason;
+}
+
+/**
+ * 分步表单里已经选了什么（skillSteps.ts 的各步骤逐步填入）。
+ * 后一步的可选项可以取决于前面的选择（格林射线：选了牌和层才列该层的目标），
+ * 所以描述符里的 targets / layerChoices 可以读它。
+ */
+export interface SkillPicks {
+  /** 选中的手牌位置（同名牌各算一张） */
+  readonly cards: readonly number[];
+  /** 选中的玩家 */
+  readonly players: readonly string[];
+  readonly layer: number | null;
+  /** 二选一 / 多选一的取值（SkillChoice.value） */
+  readonly choice: string | null;
+  /** 弃牌堆里选中的牌 */
+  readonly discardCard: string | null;
+  /** 梦魇的附加参数（回音萦绕 / 邪念瘟疫）；不需要时为 null */
+  readonly params: Readonly<Record<string, unknown>> | null;
+}
+
+export const EMPTY_PICKS: SkillPicks = {
+  cards: [],
+  players: [],
+  layer: null,
+  choice: null,
+  discardCard: null,
+  params: null,
+};
+
+/** 分步表单里「选一项」步骤的选项 */
+export interface SkillChoice {
+  readonly value: string;
+  /** i18n 键 */
+  readonly labelKey: string;
+  /** 此刻选不了的原因；可选时为 null */
+  readonly disabled: SkillReason | null;
 }
 
 export interface ActiveSkillDescriptor {
@@ -67,16 +115,24 @@ export interface ActiveSkillDescriptor {
    * （灵魂牧师·拯救的目标必须已死亡）。只对声明了它的技能生效。
    */
   readonly targetScope?: 'alive' | 'lost';
-  /** 精确的可选目标；返回 null 表示没有额外信息，退回 targetScope 的范围 */
-  readonly targets?: (ctx: ActiveSkillContext) => readonly string[] | null;
+  /** 精确的可选目标；返回 null 表示没有额外信息，退回 targetScope 的范围；分步表单里 picks 是已选内容 */
+  readonly targets?: (ctx: ActiveSkillContext, picks?: SkillPicks) => readonly string[] | null;
   /** 可选的层（目标层、先选玩家再选层）；targetId 是已选的玩家，没有为 null；缺省 1–4 */
-  readonly layerChoices?: (ctx: ActiveSkillContext, targetId: string | null) => readonly number[];
+  readonly layerChoices?: (
+    ctx: ActiveSkillContext,
+    targetId: string | null,
+    picks?: SkillPicks,
+  ) => readonly number[];
   /** 手牌里哪些牌能被选作这个技能的代价 / 展示；缺省都能选 */
   readonly handPickable?: (card: string, ctx: ActiveSkillContext) => boolean;
   /** 多选手牌必须刚好选几张；缺省至少 1 张 */
   readonly pickCount?: number;
+  /** 选手牌时的补充说明（i18n 键）：达尔文·淘汰的选牌顺序就是放回牌库的顺序 */
+  readonly pickHintKey?: string;
   /** 弃牌堆里哪些牌能被选；缺省都能选 */
-  readonly discardPickable?: (card: string) => boolean;
+  readonly discardPickable?: (card: string, ctx: ActiveSkillContext) => boolean;
+  /** 分步表单里「选一项」步骤的选项（射手·穿心：增加 / 减少） */
+  readonly choices?: (ctx: ActiveSkillContext) => readonly SkillChoice[];
 }
 
 /** 一个技能可选的目标玩家：按描述符声明的范围，从存活目标与迷失层目标里取 */
@@ -153,6 +209,8 @@ export interface ActiveSkillContext {
   readonly skillUsedThisGame?: Record<string, number>;
   /** 还没打开的金库数量（棋局·易位至少要 2 个） */
   readonly unopenedVaults?: number;
+  /** 本回合已打出的牌（公开；水瓶·凝聚、金星·镜界复制据此判断） */
+  readonly playedCards?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -162,8 +220,6 @@ export interface ActiveSkillContext {
 const TRANSIT_CARD = 'action_dream_transit';
 const UNLOCK_CARD = 'action_unlock';
 const BASIC_SHOOT_CARD = 'action_shoot';
-/** 回音萦绕要附加参数（选层与方式），技能面板不提供，引擎缺参数必拒 */
-const NIGHTMARE_NEEDING_PARAMS = 'nightmare_echo';
 
 /** 本人是不是梦主座位；上下文没给就按阵营推 */
 export function isMasterSeat(ctx: ActiveSkillContext): boolean {
@@ -352,6 +408,9 @@ export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
     countCards(ctx.hand, (c) => isShootClassCard(c as never)) > 0 ? null : reason('noShootCard'),
 };
 
+// 达尔文·淘汰：抽牌库顶 2 张，再把 2 张手牌按任意顺序放回牌库顶；回合限 1 次
+// 引擎是一步完成的 move：放回的 2 张从「抽牌后」的手牌里选，而新抽的 2 张在发出 move 之前
+// 不在任何人的视图里，所以界面只能从现有手牌里选；选牌的先后就是放回的顺序（先选的在最顶）。
 export const DARWIN_EVOLUTION: ActiveSkillDescriptor = {
   id: 'thief_darwin.skill_0',
   characterId: 'thief_darwin',
@@ -359,9 +418,181 @@ export const DARWIN_EVOLUTION: ActiveSkillDescriptor = {
   nameKey: 'skill.thief_darwin.skill_0.name',
   descKey: 'skill.thief_darwin.skill_0.desc',
   argKind: 'multiCard',
+  pickCount: 2,
+  pickHintKey: 'skill.hint.darwinOrder',
   extraCheck: (ctx) => ctx.hand.length > 0,
   usage: { key: 'thief_darwin.skill_0', limit: 1 },
-  blocked: (ctx) => (ctx.deckCount !== undefined && ctx.deckCount < 2 ? reason('deckShort') : null),
+  blocked: (ctx) => {
+    if (ctx.deckCount !== undefined && ctx.deckCount < 2) return reason('deckShort');
+    return ctx.hand.length >= 2 ? null : reason('needTwoInHand');
+  },
+};
+
+// 露娜·满月（背面）：弃 2 张非 SHOOT 类牌，把任意数量（可以是 0）已死亡的玩家复活到自己所在层，然后翻面；回合限 1 次
+// 对照：docs/manual/05-dream-thieves.md 露娜 21-25 行；引擎的 applyLunaFullMoon
+export const LUNA_FULL_MOON: ActiveSkillDescriptor = {
+  id: 'thief_luna.skill_1',
+  characterId: 'thief_luna_back',
+  move: 'playLunaFullMoon',
+  nameKey: 'skill.thief_luna.skill_1.name',
+  descKey: 'skill.thief_luna.skill_1.desc',
+  argKind: 'multiCardAndPlayers',
+  extraCheck: (ctx) => ctx.humanLayer >= 1,
+  usage: { key: 'thief_luna.skill_1', limit: 1 },
+  pickCount: 2,
+  handPickable: (card) => !isShootClassCard(card as never),
+  // 复活的对象是已在迷失层的其他玩家；一个也不选就只翻面
+  targetScope: 'lost',
+  blocked: (ctx) =>
+    countCards(ctx.hand, (c) => !isShootClassCard(c as never)) >= 2
+      ? null
+      : reason('needTwoNonShoot'),
+};
+
+// 双鱼·洗礼（背面）：移到数字更大的相邻层，并可以复活一名玩家到那一层，然后翻面；回合限 1 次，第 4 层无法发动
+// 对照：docs/manual/05-dream-thieves.md 双鱼 52-60 行；引擎的 applyPiscesBlessing
+export const PISCES_BLESSING: ActiveSkillDescriptor = {
+  id: 'thief_pisces.skill_1',
+  characterId: 'thief_pisces_back',
+  move: 'playPiscesBlessing',
+  nameKey: 'skill.thief_pisces.skill_1.name',
+  descKey: 'skill.thief_pisces.skill_1.desc',
+  argKind: 'optionalPlayer',
+  extraCheck: (ctx) => ctx.humanLayer >= 1,
+  usage: { key: 'thief_pisces.skill_1', limit: 1 },
+  targetScope: 'lost',
+  blocked: (ctx) => (ctx.humanLayer >= 4 ? reason('piscesTopLayer') : null),
+};
+
+/** 格林射线·缉捕要弃的梦境穿梭剂（引擎写死这一张） */
+const GREEN_RAY_TRANSIT = TRANSIT_CARD;
+
+// 格林射线·缉捕：弃 1 张梦境穿梭剂和 1 张 SHOOT 类牌，移到任意一层，再对那里的目标执行该 SHOOT 的效果；不限次数
+// 参数顺序是 (SHOOT 牌, 目标, 层)，界面先选牌、再选层、再选该层的目标。
+// 目标的范围与普通出牌的 SHOOT 一致：要求同层的牌只能选移动后同层的人，刺客之王不限层，木星·巅峰世界观可选相邻层。
+// 对照：引擎的 playGreenRayArrest；SHOOT 的层数限制见 engine 的 violatesShootLayerLimit
+export const GREEN_RAY_ARREST: ActiveSkillDescriptor = {
+  id: 'thief_green_ray.skill_0',
+  characterId: 'thief_green_ray',
+  move: 'playGreenRayArrest',
+  nameKey: 'skill.thief_green_ray.skill_0.name',
+  descKey: 'skill.thief_green_ray.skill_0.desc',
+  argKind: 'cardPlayerLayer',
+  extraCheck: (ctx) => ctx.hand.length > 0,
+  pickCount: 1,
+  handPickable: (card) => isShootClassCard(card as never),
+  layerChoices: (ctx, _targetId, picks) => {
+    const card = picks ? greenRayShootCard(ctx, picks) : null;
+    return [1, 2, 3, 4].filter(
+      (layer) => card === null || greenRayTargets(ctx, card, layer).length > 0,
+    );
+  },
+  targets: (ctx, picks) => {
+    if (!picks || picks.layer === null) return null;
+    const card = greenRayShootCard(ctx, picks);
+    return card === null ? [] : greenRayTargets(ctx, card, picks.layer);
+  },
+  blocked: (ctx) => {
+    if (!ctx.hand.includes(GREEN_RAY_TRANSIT)) return reason('noTransitInHand');
+    return countCards(ctx.hand, (c) => isShootClassCard(c as never)) > 0
+      ? null
+      : reason('noShootCard');
+  },
+};
+
+/** 已选的 SHOOT 牌（按手牌位置） */
+function greenRayShootCard(ctx: ActiveSkillContext, picks: SkillPicks): string | null {
+  const at = picks.cards[0];
+  return at === undefined ? null : (ctx.hand[at] ?? null);
+}
+
+/** 移到 layer 层之后，这张 SHOOT 能打的人：存活的其他玩家，按牌的层数限制筛 */
+function greenRayTargets(ctx: ActiveSkillContext, card: string, layer: number): string[] {
+  const sameLayerOnly = card.startsWith('action_shoot') && card !== 'action_shoot_assassin';
+  return Object.entries(ctx.players ?? {})
+    .filter(([id, p]) => {
+      if (id === ctx.seat || !p.isAlive) return false;
+      if (!sameLayerOnly || p.currentLayer === layer) return true;
+      return shootCrossLayerAllowed({
+        viewerCharacterId: null,
+        viewerLayer: layer,
+        masterCharacterId: ctx.masterCharacterId,
+        targetLayer: p.currentLayer,
+      });
+    })
+    .map(([id]) => id);
+}
+
+/** 水瓶·凝聚的发动机会：本回合打出的牌里每 2 张同名牌一次 */
+export function aquariusCoherencePairs(playedCards: readonly string[] | undefined): number {
+  const counts = new Map<string, number>();
+  for (const card of playedCards ?? []) counts.set(card, (counts.get(card) ?? 0) + 1);
+  let pairs = 0;
+  for (const n of counts.values()) pairs += Math.floor(n / 2);
+  return pairs;
+}
+
+// 水瓶·凝聚：本回合每使用过 2 张同名牌，可从弃牌堆选 1 张本回合未使用过的牌收入手牌
+// 发动机会 = 同名对数 - 已发动次数，两者都在公开的出牌记录与本人视图的使用记录里
+// 对照：docs/manual/05-dream-thieves.md 水瓶 43-50 行；引擎的 availableAquariusCoherence / applyAquariusCoherence
+export const AQUARIUS_COHERENCE: ActiveSkillDescriptor = {
+  id: 'thief_aquarius.skill_0',
+  characterId: 'thief_aquarius',
+  move: 'playAquariusCoherence',
+  nameKey: 'skill.thief_aquarius.skill_0.name',
+  descKey: 'skill.thief_aquarius.skill_0.desc',
+  argKind: 'discardCard',
+  usage: {
+    key: 'thief_aquarius.skill_0',
+    limit: (ctx) => aquariusCoherencePairs(ctx.playedCards),
+    noQuota: reason('needSameNamePair'),
+  },
+  discardPickable: (card, ctx) => !(ctx.playedCards ?? []).includes(card),
+  blocked: (ctx) =>
+    (ctx.discardPile ?? []).some((c) => AQUARIUS_COHERENCE.discardPickable!(c, ctx))
+      ? null
+      : reason('noFreshInDiscard'),
+};
+
+/** 与引擎的 SAGITTARIUS_KILLS_THIS_TURN_KEY 一致（有测试对账）：射手本回合击杀过几名玩家 */
+export const SAGITTARIUS_KILLS_KEY = 'thief_sagittarius.kills';
+
+/** 某一层心锁的原有数量（射手·穿心的上限）；人数没有对应配置时与引擎一样取 3 */
+function originalHeartLocks(ctx: ActiveSkillContext, layer: number): number {
+  const count = Object.keys(ctx.players ?? {}).length;
+  return PLAYER_COUNT_CONFIGS[count]?.heartLocks[layer - 1] ?? 3;
+}
+
+// 射手·穿心：本回合击杀过玩家后，增加或减少任意一层的 1 个心锁，不能超过原有数量；回合限 1 次
+// 减少心锁算一次解封：本回合解封次数用尽时只能增加。
+// 对照：docs/manual/05-dream-thieves.md 射手 132-140 行；引擎的 canUseSagittariusHeartLock / applySagittariusHeartLock
+export const SAGITTARIUS_HEART_LOCK: ActiveSkillDescriptor = {
+  id: 'thief_sagittarius.skill_1',
+  characterId: 'thief_sagittarius',
+  move: 'useSagittariusHeartLock',
+  nameKey: 'skill.thief_sagittarius.skill_1.name',
+  descKey: 'skill.thief_sagittarius.skill_1.desc',
+  argKind: 'layerAndChoice',
+  usage: { key: 'thief_sagittarius.skill_1', limit: 1 },
+  blocked: (ctx) =>
+    (ctx.skillUsedThisTurn[SAGITTARIUS_KILLS_KEY] ?? 0) > 0 ? null : reason('noKillThisTurn'),
+  choices: (ctx) => [
+    { value: 'increase', labelKey: 'skill.choice.increaseLock', disabled: null },
+    {
+      value: 'decrease',
+      labelKey: 'skill.choice.decreaseLock',
+      disabled: ctx.unlockExhausted ? reason('unlockLimit') : null,
+    },
+  ],
+  // 增加：现有心锁低于原有数量的层；减少：还有心锁的层（引擎对没有变化的选择也会接受，但没有意义）
+  layerChoices: (ctx, _targetId, picks) =>
+    [1, 2, 3, 4].filter((layer) => {
+      const info = ctx.layers?.[layer];
+      if (!info) return false;
+      if (picks?.choice === 'decrease') return info.heartLockValue > 0;
+      if (picks?.choice === 'increase') return info.heartLockValue < originalHeartLocks(ctx, layer);
+      return true;
+    }),
 };
 
 // 哈雷·冲击 —— 每成功解封 1 次可触发 1 次，掷骰击杀 / 位移目标
@@ -611,19 +842,12 @@ export const MASTER_ACTIVATE_NIGHTMARE: ActiveSkillDescriptor = {
   move: 'masterActivateNightmare',
   nameKey: 'skill.master.activate_nightmare.name',
   descKey: 'skill.master.activate_nightmare.desc',
-  argKind: 'targetLayer',
+  // 选层之后，回音萦绕要再选层与方式，邪念瘟疫要点名派发贿赂牌（见 lib/nightmareParams.ts）
+  argKind: 'layerAndParams',
   extraCheck: (ctx) => isMasterSeat(ctx),
-  // 回音萦绕要附加参数（选层与方式），这里不提供，引擎缺参数必拒，所以不列
-  layerChoices: (ctx) =>
-    revealedNightmareLayers(ctx).filter(
-      (layer) => ctx.layers?.[layer]?.nightmareId !== NIGHTMARE_NEEDING_PARAMS,
-    ),
-  blocked: (ctx) => {
-    if (revealedNightmareLayers(ctx).length === 0) return reason('noRevealedNightmare');
-    return MASTER_ACTIVATE_NIGHTMARE.layerChoices!(ctx, null).length > 0
-      ? null
-      : reason('echoNeedsParams');
-  },
+  layerChoices: (ctx) => revealedNightmareLayers(ctx),
+  blocked: (ctx) =>
+    revealedNightmareLayers(ctx).length > 0 ? null : reason('noRevealedNightmare'),
 };
 
 export const MASTER_DISCARD_NIGHTMARE: ActiveSkillDescriptor = {
@@ -646,11 +870,10 @@ export const MARS_KILL: ActiveSkillDescriptor = {
   move: 'useMarsKill',
   nameKey: 'skill.dm_mars_battlefield.skill_0.name',
   descKey: 'skill.dm_mars_battlefield.skill_0.desc',
-  argKind: 'targetLayer',
+  argKind: 'layerAndParams',
   extraCheck: (ctx) => isMasterSeat(ctx),
-  // 梦主的视图里每层未发动的梦魇都看得见；回音萦绕要附加参数，不列
-  layerChoices: (ctx) =>
-    layerKeys(ctx, (l) => l.nightmareId !== null && l.nightmareId !== NIGHTMARE_NEEDING_PARAMS),
+  // 梦主的视图里每层未发动的梦魇都看得见
+  layerChoices: (ctx) => layerKeys(ctx, (l) => l.nightmareId !== null),
   blocked: (ctx) => {
     if (!ctx.hand.includes(UNLOCK_CARD)) return reason('noUnlockCard');
     return MARS_KILL.layerChoices!(ctx, null).length > 0 ? null : reason('noNightmare');
@@ -697,6 +920,32 @@ export const VENUS_DOUBLE: ActiveSkillDescriptor = {
   argKind: 'multiCard',
   extraCheck: (ctx) => isMasterSeat(ctx) && ctx.hand.length > 0,
   usage: { key: 'dm_venus_mirror.skill_0', limit: 1 },
+};
+
+/** 金星·镜界复制的牌：本回合最后一张 SHOOT 类牌或 KICK（引擎只复制这一张） */
+export function venusMirrorSource(playedCards: readonly string[] | undefined): string | null {
+  const mirrorable = (playedCards ?? []).filter(
+    (c) => isShootClassCard(c as never) || c === 'action_kick',
+  );
+  return mirrorable[mirrorable.length - 1] ?? null;
+}
+
+// 金星·镜界世界观：弃 2 张牌，重复执行本回合内打出的最后一张 SHOOT 类牌 / KICK 的效果；每人每回合一次
+// 对照：docs/manual/06-dream-master.md 金星·镜界 世界观；引擎的 applyVenusMirrorWorld（目标是任一存活的其他玩家）
+export const VENUS_MIRROR_COPY: ActiveSkillDescriptor = {
+  id: 'dm_venus_mirror.worldview',
+  characterId: '__any__',
+  move: 'useVenusMirrorWorld',
+  nameKey: 'skill.dm_venus_mirror.worldview.name',
+  descKey: 'skill.dm_venus_mirror.worldview.desc',
+  argKind: 'playerAndMultiCard',
+  extraCheck: (ctx) => ctx.masterCharacterId === 'dm_venus_mirror',
+  usage: { key: 'dm_venus_mirror.worldview', limit: 1 },
+  pickCount: 2,
+  blocked: (ctx) => {
+    if (venusMirrorSource(ctx.playedCards) === null) return reason('nothingToMirror');
+    return ctx.hand.length >= 2 ? null : reason('needTwoInHand');
+  },
 };
 
 // 要塞·冷酷：梦主在自己的出牌阶段每移动到另一层一次，可视为对任一盗梦者使用 1 张 SHOOT，不限次数
@@ -760,6 +1009,12 @@ const ALL_DESCRIPTORS: readonly ActiveSkillDescriptor[] = [
   FORGER_EXCHANGE,
   SPACE_QUEEN_STASH,
   BLACK_HOLE_ABSORB,
+  LUNA_FULL_MOON,
+  PISCES_BLESSING,
+  GREEN_RAY_ARREST,
+  AQUARIUS_COHERENCE,
+  SAGITTARIUS_HEART_LOCK,
+  VENUS_MIRROR_COPY,
 ];
 
 /** 供对账测试遍历：所有主动技能描述符 */
@@ -828,7 +1083,10 @@ export function getSkillEntries(ctx: ActiveSkillContext): SkillEntry[] {
     const usage = skillUsage(d, ctx);
     let blockedBy: SkillReason | null = null;
     if (usage && usage.used >= usage.limit) {
-      blockedBy = reason(d.usage?.scope === 'game' ? 'usedUpGame' : 'usedUp', usage);
+      blockedBy =
+        usage.limit === 0 && d.usage?.noQuota
+          ? d.usage.noQuota
+          : reason(d.usage?.scope === 'game' ? 'usedUpGame' : 'usedUp', usage);
     }
     if (!blockedBy && d.blocked) blockedBy = d.blocked(ctx);
     if (!blockedBy && NEEDS_TARGET.includes(d.argKind)) {

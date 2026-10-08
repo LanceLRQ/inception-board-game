@@ -39,6 +39,7 @@ import {
   TOURIST_ASSIST,
   type ActiveSkillContext,
   type SkillLayerInfo,
+  getSkillEntries,
 } from './activeSkills.js';
 
 function layerInfo(overrides: Partial<SkillLayerInfo> = {}): SkillLayerInfo {
@@ -241,8 +242,8 @@ describe('getAvailableActiveSkills · 火星·杀戮（梦主·targetLayer）', 
     expect(list).not.toContain(MARS_KILL);
   });
 
-  it('argKind = targetLayer', () => {
-    expect(MARS_KILL.argKind).toBe('targetLayer');
+  it('argKind = layerAndParams（选层之后，回音萦绕 / 邪念瘟疫再补参数）', () => {
+    expect(MARS_KILL.argKind).toBe('layerAndParams');
   });
 
   it('SATURN_FREE_MOVE argKind + move 正确', () => {
@@ -320,12 +321,22 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
 });
 
 describe('getAvailableActiveSkills · 达尔文·进化（multiCard）', () => {
-  it('达尔文 + 手牌 → 含', async () => {
+  it('达尔文 + 至少 2 张手牌 → 含；放回刚好 2 张', async () => {
     const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
     const list = getAvailableActiveSkills(
-      baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock'] }),
+      baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock', 'action_kick'] }),
     );
     expect(list).toContain(DARWIN_EVOLUTION);
+    expect(DARWIN_EVOLUTION.pickCount).toBe(2);
+  });
+
+  it('达尔文 + 只有 1 张手牌 → 仍显示但置灰并说明（放回的 2 张只能从现有手牌里选）', async () => {
+    const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
+    const c = baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock'] });
+    expect(getAvailableActiveSkills(c)).not.toContain(DARWIN_EVOLUTION);
+    const entry = getSkillEntries(c).find((e) => e.skill === DARWIN_EVOLUTION);
+    expect(entry).toMatchObject({ enabled: false });
+    expect(entry?.reason?.key).toBe('skill.reason.needTwoInHand');
   });
 
   it('达尔文 + 手牌空 → 不含', async () => {
@@ -970,11 +981,15 @@ describe('目标玩家的范围 · targetScope', () => {
     expect(targetIdsForSkill(TOURIST_ASSIST, alive, lost)).toEqual(alive);
   });
 
-  it('只有拯救一个技能声明了迷失层范围', () => {
+  it('声明了迷失层范围的只有目标必须已死亡的三个技能：灵魂牧师·拯救、露娜·满月、双鱼·洗礼', () => {
     const scopes = Object.values(activeSkillsModule).filter(
       (v) => typeof v === 'object' && v !== null && 'targetScope' in v && v.targetScope === 'lost',
     );
-    expect(scopes).toEqual([PAPRIK_SALVATION]);
+    expect(scopes).toEqual([
+      PAPRIK_SALVATION,
+      activeSkillsModule.LUNA_FULL_MOON,
+      activeSkillsModule.PISCES_BLESSING,
+    ]);
   });
 
   it('迷失层里没有别人时，灵魂牧师的拯救不可用；视图没给名单时不据此判断', () => {

@@ -16,6 +16,7 @@ import {
   derivePlayRules,
 } from '../../components/MatchRuntime/controllerDerive';
 import { deriveDockEntries } from '../../components/MatchRuntime/model/dockEntries';
+import { computeVaultDecisionState } from '../../components/MasterNightmareDecisionBanner/logic';
 import {
   getSkillEntries,
   GEMINI_CHOICE,
@@ -29,6 +30,13 @@ import {
   SECRET_PASSAGE_TELEPORT,
   MASTER_ACTIVATE_NIGHTMARE,
   MASTER_DISCARD_NIGHTMARE,
+  LUNA_FULL_MOON,
+  PISCES_BLESSING,
+  GREEN_RAY_ARREST,
+  DARWIN_EVOLUTION,
+  AQUARIUS_COHERENCE,
+  SAGITTARIUS_HEART_LOCK,
+  VENUS_MIRROR_COPY,
 } from '../../lib/activeSkills';
 import {
   buildActiveSkillContext,
@@ -377,6 +385,35 @@ describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () =
     expect(seen.pendingAriesChoice!.ariesID).toBeNull();
   });
 
+  it('白羊（邪念瘟疫）：发动要点名，候选是被击杀者所在层存活的盗梦者', () => {
+    const a = mineOf('thief-pending-aries-plague');
+    expect(a).toMatchObject({
+      kind: 'aries',
+      victimLayer: 2,
+      nightmareId: 'nightmare_plague',
+      params: 'plague',
+    });
+    if (a.kind !== 'aries') throw new Error('unreachable');
+    expect(a.candidates.length).toBeGreaterThanOrEqual(2);
+    expect(a.bribePoolCount).toBeGreaterThan(0);
+    expect(awaitedActions(a)[0]!.effect).toEqual({ type: 'sheet', sheet: 'aries-plague' });
+  });
+
+  it.each([
+    ['master-vault-echo', 'echo', 'nightmare_echo'],
+    ['master-vault-plague', 'plague', 'nightmare_plague'],
+  ] as const)('金库三选一场景 %s：梦主待决，发动梦魇要补参数 %s', (id, kind, nightmareId) => {
+    const sc = buildFixtureScenario(id);
+    const G = sc.view.G as MatchView;
+    expect(sc.seat).toBe(G.dreamMasterID);
+    const state = computeVaultDecisionState(G, sc.seat);
+    expect(state.visible).toBe(true);
+    expect(state.nightmareParams).toBe(kind);
+    expect(state.nightmareId).toBe(nightmareId);
+    expect(state.bribe.enabled).toBe(true);
+    if (kind === 'plague') expect(state.plagueCandidates.length).toBeGreaterThanOrEqual(1);
+  });
+
   it.each([
     'thief-pending-shoot',
     'thief-pending-terrorist',
@@ -385,6 +422,7 @@ describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () =
     'thief-pending-sudger',
     'thief-pending-virgo',
     'thief-pending-aries',
+    'thief-pending-aries-plague',
   ] as const)('场景 %s：本人是盗梦者，不带解封响应窗口', (id) => {
     const sc = buildFixtureScenario(id);
     const G = sc.view.G as MatchView;
@@ -650,15 +688,18 @@ describe('buildFixtureScenario · 角色技能走查场景', () => {
     expect(G.players[G.dreamMasterID]!.characterId).toBe('dm_saturn_territory');
   });
 
-  it('梦主走查：金星、密道各有自己的技能，梦魇场景有两层已翻开的梦魇', () => {
+  it('梦主走查：金星、密道各有自己的技能，梦魇场景有三层已翻开的梦魇', () => {
     expect(enabledSkills('skill-venus')).toContain(VENUS_DOUBLE);
     expect(enabledSkills('skill-passage')).toContain(SECRET_PASSAGE_TELEPORT);
     const night = skillEntriesOf('skill-nightmare');
     const skills = night.entries.filter((e) => e.enabled).map((e) => e.skill);
     expect(skills).toContain(MASTER_DISCARD_NIGHTMARE);
     expect(skills).toContain(MASTER_ACTIVATE_NIGHTMARE);
-    expect(night.G.layers[2]!.nightmareRevealed).toBe(true);
-    expect(night.G.layers[3]!.nightmareRevealed).toBe(true);
+    for (const layer of [1, 2, 3]) expect(night.G.layers[layer]!.nightmareRevealed).toBe(true);
+    // 梦主看得到翻开的梦魇是什么：邪念瘟疫、致命漩涡、回音萦绕各在一层
+    expect(night.G.layers[1]!.nightmareId).toBe('nightmare_plague');
+    expect(night.G.layers[2]!.nightmareId).toBe('nightmare_vortex');
+    expect(night.G.layers[3]!.nightmareId).toBe('nightmare_echo');
   });
 
   it('射手 / 恐怖分子：本人角色正确，手里有 SHOOT', () => {
@@ -684,9 +725,59 @@ describe('buildFixtureScenario · 角色技能走查场景', () => {
     ).toBe('unlockLimit');
   });
 
-  it('梦魇场景：梦主视角列出的暗置梦魇层不含已翻开的两层', () => {
+  it('梦魇场景：梦主视角列出的暗置梦魇层不含已翻开的三层', () => {
     const sc = buildFixtureScenario('skill-nightmare');
-    expect(nightmareUnlockLayers((sc.view.G as MatchView).layers)).toEqual([1, 4]);
+    expect(nightmareUnlockLayers((sc.view.G as MatchView).layers)).toEqual([4]);
+  });
+
+  it('黑天鹅场景：抽牌阶段，本人是黑天鹅，坞里有「纷飞」入口且可用', () => {
+    const sc = buildFixtureScenario('skill-black-swan');
+    const G = sc.view.G as MatchView;
+    expect(G.turnPhase).toBe('draw');
+    expect(G.players[sc.seat]!.characterId).toBe('thief_black_swan');
+    const entries = deriveDockEntries({
+      seat: sc.seat,
+      dreamMasterID: G.dreamMasterID,
+      players: G.players,
+      hand: G.players[sc.seat]!.hand ?? [],
+      isMyTurn: true,
+      turnPhase: G.turnPhase,
+      winner: null,
+      busy: false,
+    });
+    expect(entries.map((e) => [e.kind, e.enabled])).toEqual([
+      ['skipDraw', true],
+      ['blackSwanTour', true],
+    ]);
+  });
+
+  it('露娜 / 双鱼背面场景：本人是背面角色，有一名同伴在迷失层，满月 / 洗礼可用', () => {
+    for (const [id, character, skill] of [
+      ['skill-luna', 'thief_luna_back', LUNA_FULL_MOON],
+      ['skill-pisces', 'thief_pisces_back', PISCES_BLESSING],
+    ] as const) {
+      const { sc, G } = skillEntriesOf(id);
+      expect(G.players[sc.seat]!.characterId).toBe(character);
+      expect(Object.values(G.players).filter((p) => !p.isAlive)).toHaveLength(1);
+      expect(enabledSkills(id)).toContain(skill);
+    }
+  });
+
+  it('达尔文场景：本人是达尔文，手牌够放回 2 张，「淘汰」可用', () => {
+    const { sc, G } = skillEntriesOf('skill-darwin');
+    expect(G.players[sc.seat]!.characterId).toBe('thief_darwin');
+    expect(enabledSkills('skill-darwin')).toContain(DARWIN_EVOLUTION);
+  });
+
+  it('格林射线 / 水瓶 / 射手 / 金星复制场景：对应技能可用', () => {
+    expect(enabledSkills('skill-green-ray')).toContain(GREEN_RAY_ARREST);
+    expect(enabledSkills('skill-aquarius')).toContain(AQUARIUS_COHERENCE);
+    expect(enabledSkills('skill-heart-lock')).toContain(SAGITTARIUS_HEART_LOCK);
+    expect(enabledSkills('skill-venus-mirror')).toContain(VENUS_MIRROR_COPY);
+    const aq = skillEntriesOf('skill-aquarius');
+    expect(aq.G.playedCardsThisTurn).toEqual(['action_kick', 'action_kick']);
+    const sag = skillEntriesOf('skill-heart-lock');
+    expect(sag.G.players[sag.sc.seat]!.skillUsedThisTurn?.['thief_sagittarius.kills']).toBe(1);
   });
 
   it('盗梦者视角的角色走查场景里，视图看不到梦魇是什么、也看不到他人手牌', () => {

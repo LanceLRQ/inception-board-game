@@ -13,6 +13,7 @@ import {
   type VaultDecisionState,
 } from '../MasterNightmareDecisionBanner/logic.js';
 import { getCardName } from '../../lib/cards';
+import { NightmareParamsForm } from '../NightmareParamsForm';
 import { Dialog, DialogBody, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export interface MasterNightmareDecisionDialogProps {
@@ -23,8 +24,12 @@ export interface MasterNightmareDecisionDialogProps {
   makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
 }
 
-const EMPTY_DRAFT: VaultDecisionDraft = { poolIndex: null, echoLayer: null, echoAction: null };
-const ECHO_LAYERS = [1, 2, 3, 4] as const;
+const EMPTY_DRAFT: VaultDecisionDraft = {
+  poolIndex: null,
+  echoLayer: null,
+  echoAction: null,
+  bribed: [],
+};
 
 const OPTION_CLASS =
   'rounded-md border border-border bg-background px-3 py-2 text-left text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11';
@@ -38,14 +43,15 @@ function reasonText(reason: 'poolEmpty' | 'noNightmare'): string {
 interface BodyProps {
   state: VaultDecisionState;
   openerName: string;
+  nicknameOf: (playerID: string) => string;
   makeMove: MasterNightmareDecisionDialogProps['makeMove'];
 }
 
 /** 弹窗内容：挂载时草稿清零；换了一次决策（层或打开者变了）由外层的 key 重置 */
-function VaultDecisionBody({ state, openerName, makeMove }: BodyProps) {
+function VaultDecisionBody({ state, openerName, nicknameOf, makeMove }: BodyProps) {
   const [draft, setDraft] = useState<VaultDecisionDraft>(EMPTY_DRAFT);
-  // 回音萦绕要先选层与方式，展开后才出现确认按钮
-  const [echoOpen, setEchoOpen] = useState(false);
+  // 回音萦绕要先选层与方式、邪念瘟疫要先点名，展开后才出现确认按钮
+  const [paramsOpen, setParamsOpen] = useState(false);
 
   const send = (choice: VaultDecisionChoice) => {
     const cmd = computeVaultDecisionCommand(state, choice, draft);
@@ -119,7 +125,9 @@ function VaultDecisionBody({ state, openerName, makeMove }: BodyProps) {
         <button
           type="button"
           disabled={!state.nightmare.enabled}
-          onClick={() => (state.nightmareParams === 'echo' ? setEchoOpen(true) : send('nightmare'))}
+          onClick={() =>
+            state.nightmareParams !== 'none' ? setParamsOpen(true) : send('nightmare')
+          }
           className={OPTION_CLASS}
           data-testid="vault-decision-nightmare-activate"
         >
@@ -128,47 +136,26 @@ function VaultDecisionBody({ state, openerName, makeMove }: BodyProps) {
         {state.nightmare.reason && (
           <p className="text-[11px] text-muted-foreground">{reasonText(state.nightmare.reason)}</p>
         )}
-        {echoOpen && state.nightmareParams === 'echo' && (
+        {paramsOpen && state.nightmareParams !== 'none' && (
           <div
             className="space-y-1.5 rounded bg-background/60 p-2"
-            data-testid="vault-decision-echo"
+            data-testid="vault-decision-params"
           >
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-muted-foreground">目标层：</span>
-              {ECHO_LAYERS.map((layer) => (
-                <button
-                  key={layer}
-                  type="button"
-                  aria-pressed={draft.echoLayer === layer}
-                  onClick={() => setDraft({ ...draft, echoLayer: layer })}
-                  className={OPTION_CLASS}
-                  data-testid={`vault-decision-echo-layer-${layer}`}
-                >
-                  第 {layer} 层
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-muted-foreground">方式：</span>
-              {(['restore', 'add'] as const).map((action) => (
-                <button
-                  key={action}
-                  type="button"
-                  aria-pressed={draft.echoAction === action}
-                  onClick={() => setDraft({ ...draft, echoAction: action })}
-                  className={OPTION_CLASS}
-                  data-testid={`vault-decision-echo-${action}`}
-                >
-                  {action === 'restore' ? '恢复原有心锁数' : '心锁数 +1'}
-                </button>
-              ))}
-            </div>
+            <NightmareParamsForm
+              kind={state.nightmareParams}
+              draft={draft}
+              onChange={(next) => setDraft({ ...draft, ...next })}
+              candidates={state.plagueCandidates}
+              poolCount={state.poolCount}
+              nicknameOf={nicknameOf}
+              testIdPrefix="vault-decision"
+            />
             <button
               type="button"
               disabled={computeVaultDecisionCommand(state, 'nightmare', draft) === null}
               onClick={() => send('nightmare')}
               className={PRIMARY_CLASS}
-              data-testid="vault-decision-echo-confirm"
+              data-testid="vault-decision-params-confirm"
             >
               确认发动
             </button>
@@ -214,6 +201,7 @@ export function MasterNightmareDecisionDialog({
             key={`${state.layer}|${state.openerID}`}
             state={state}
             openerName={openerName}
+            nicknameOf={nicknameOf ?? ((id) => id)}
             makeMove={makeMove}
           />
         )}

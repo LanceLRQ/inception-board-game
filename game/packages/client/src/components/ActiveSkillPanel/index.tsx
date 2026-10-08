@@ -14,9 +14,10 @@ import {
   type SkillEntry,
 } from '../../lib/activeSkills';
 import { toast } from '@/lib/toast';
-import { getCardName } from '../../lib/cards';
-import { getCardImageUrl } from '../../lib/cardImages';
 import { toggleHandPick } from '../../lib/handPick';
+import { isStepSkill } from '../../lib/skillSteps';
+import { CardPickLabel } from './CardPickLabel';
+import { SkillStepForm } from './SkillStepForm';
 import {
   multiCardArgs,
   multiCardDiscardArgs,
@@ -24,25 +25,6 @@ import {
   twoCardsShootArgs,
 } from './skillArgs';
 
-/** picker 按钮内小缩略图 + 中文名。兼容原先纯文字布局：inline-flex 横向 */
-function CardPickLabel({ cardId }: { cardId: string }) {
-  const img = getCardImageUrl(cardId);
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {img && (
-        <img
-          src={img}
-          alt=""
-          className="h-6 w-[16px] flex-shrink-0 rounded-sm object-cover"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      )}
-      <span>{getCardName(cardId)}</span>
-    </span>
-  );
-}
 import { cn } from '../../lib/utils';
 
 interface ActiveSkillPanelProps {
@@ -116,6 +98,9 @@ export function ActiveSkillPanel({
     phase: 'cards' | 'shoot';
   } | null>(null);
 
+  // 分步表单类技能（露娜·满月、格林射线、射手·穿心、梦魇附加参数等）：整套选择由 SkillStepForm 承载
+  const [stepSkill, setStepSkill] = useState<ActiveSkillDescriptor | null>(null);
+
   const entries = getSkillEntries(context);
   const targetsOf = (skill: ActiveSkillDescriptor) =>
     targetIdsFor(skill, context, aliveTargetIds, lostTargetIds);
@@ -137,10 +122,15 @@ export function ActiveSkillPanel({
     !pendingLayerShiftSkill &&
     !pendingMultiCardDiscardSkill &&
     !pendingPlayerBribeSkill &&
-    !pendingTwoCardsShootSkill;
+    !pendingTwoCardsShootSkill &&
+    !stepSkill;
   if (entries.length === 0 && idle) return null;
 
   const handleClick = (skill: ActiveSkillDescriptor) => {
+    if (isStepSkill(skill)) {
+      setStepSkill(skill);
+      return;
+    }
     if (skill.argKind === 'none') {
       onInvoke(skill, []);
       return;
@@ -425,6 +415,22 @@ export function ActiveSkillPanel({
         </ul>
       )}
 
+      {stepSkill && (
+        <SkillStepForm
+          key={stepSkill.id}
+          skill={stepSkill}
+          context={context}
+          aliveTargetIds={aliveTargetIds}
+          lostTargetIds={lostTargetIds}
+          nicknames={playerNicknames}
+          onInvoke={(skill, args) => {
+            setStepSkill(null);
+            onInvoke(skill, args);
+          }}
+          onCancel={() => setStepSkill(null)}
+        />
+      )}
+
       {pendingChoiceSkill && (
         <div className="space-y-2" data-testid="active-skill-choice-picker">
           <div className="text-xs text-muted-foreground">
@@ -562,6 +568,11 @@ export function ActiveSkillPanel({
               ({pendingMultiCardSkill.selected.length})
             </span>
           </div>
+          {pendingMultiCardSkill.skill.pickHintKey && (
+            <p className="text-[11px] text-muted-foreground" data-testid="active-skill-pick-hint">
+              {t(pendingMultiCardSkill.skill.pickHintKey)}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {pickable(pendingMultiCardSkill.skill).map((idx) => {
               const cardId = context.hand[idx]!;
@@ -816,7 +827,7 @@ export function ActiveSkillPanel({
                 .map((cardId, idx) => [cardId, idx] as const)
                 .filter(
                   ([cardId]) =>
-                    pendingMultiCardDiscardSkill.skill.discardPickable?.(cardId) ?? true,
+                    pendingMultiCardDiscardSkill.skill.discardPickable?.(cardId, context) ?? true,
                 )
                 .map(([cardId, idx]) => (
                   <button
@@ -951,7 +962,8 @@ export function ActiveSkillPanel({
               (context.discardPile ?? [])
                 .map((cardId, idx) => [cardId, idx] as const)
                 .filter(
-                  ([cardId]) => pendingTwoCardsShootSkill.skill.discardPickable?.(cardId) ?? true,
+                  ([cardId]) =>
+                    pendingTwoCardsShootSkill.skill.discardPickable?.(cardId, context) ?? true,
                 )
                 .map(([cardId, idx]) => (
                   <button

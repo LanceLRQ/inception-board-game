@@ -59,10 +59,16 @@ const SCENES = [
   { name: '抽牌阶段（略过抽牌 + 小丑·失控）', url: '/game/debug?skill=joker', players: 6 },
   { name: '药剂师（技能面板里有置灰项）', url: '/game/debug?skill=chemist', players: 6 },
   { name: '梦主 · 密道（手牌里有梦境穿梭剂）', url: '/game/debug?skill=passage', players: 6 },
+  { name: '抽牌阶段（黑天鹅·纷飞）', url: '/game/debug?skill=black-swan', players: 6 },
+  {
+    name: '抽牌阶段 · 10 人（黑天鹅·纷飞）',
+    url: '/game/debug?skill=black-swan&players=10',
+    players: 10,
+  },
 ] as const;
 
 /** 有操作入口的场景：入口都在视口内、在手牌坞之内、彼此不重叠，也不压住同一操作区里的其他按钮 */
-const ENTRY_SCENE = /dead=|as=master|skill=(draw|joker)/;
+const ENTRY_SCENE = /dead=|as=master|skill=(draw|joker|black-swan)/;
 
 // eslint-disable-next-line no-empty-pattern -- Playwright 要求第一个参数是解构形式，这里只需要 testInfo
 test.beforeEach(({}, testInfo) => {
@@ -251,6 +257,49 @@ for (const vp of VIEWPORTS) {
         }
       });
     }
+
+    test('新入口的弹层不溢出视口：黑天鹅分发、技能分步表单、金库三选一的梦魇参数', async ({
+      page,
+    }) => {
+      const insideViewport = async (testId: string, what: string) => {
+        const box = await boxOf(page, testId);
+        await expectInViewport(page, box, what);
+        await expectNoPageScroll(page);
+      };
+
+      // 黑天鹅·纷飞：10 人局接收者最多，手牌全部分完
+      await openScene(page, '/game/debug?skill=black-swan&players=10', vp.layout);
+      await page.getByTestId('dock-entry-tour').click();
+      await expect(page.getByTestId('black-swan-tour-dialog')).toBeVisible();
+      await page.waitForTimeout(400);
+      await insideViewport('black-swan-tour-dialog', '黑天鹅分发弹层');
+      await expectInViewport(page, await boxOf(page, 'tour-confirm'), '分发弹层的确认按钮');
+      await expectInViewport(page, await boxOf(page, 'tour-cancel'), '分发弹层的取消按钮');
+
+      // 技能分步表单：露娜·满月选牌、格林射线选层
+      await openScene(page, '/game/debug?skill=luna', vp.layout);
+      await page.getByTestId('dock-skill').click();
+      await page.getByTestId('active-skill-playLunaFullMoon').click();
+      await expect(page.getByTestId('active-skill-step-form')).toBeVisible();
+      await page.waitForTimeout(400);
+      await expectInViewport(page, await boxOf(page, 'active-skill-step-form'), '分步表单（选牌）');
+      await expectNoPageScroll(page);
+
+      // 金库三选一：邪念瘟疫点名
+      await openScene(page, '/game/debug?as=master&vault=plague', vp.layout);
+      await page.getByTestId('vault-decision-nightmare-activate').click();
+      await expect(page.getByTestId('vault-decision-plague')).toBeVisible();
+      await page.waitForTimeout(400);
+      await insideViewport('master-nightmare-decision-dialog', '金库决策弹窗');
+      // 弹窗内容超出时在弹窗内滚动，确认按钮滚进来后完整在视口内
+      await page.getByTestId('vault-decision-params-confirm').scrollIntoViewIfNeeded();
+      await expectInViewport(
+        page,
+        await boxOf(page, 'vault-decision-params-confirm'),
+        '金库决策的确认发动按钮',
+      );
+      await expectNoPageScroll(page);
+    });
 
     test('选中一张牌后出现「打出」按钮，视口内可点，整页仍无滚动条', async ({ page }) => {
       await openScene(page, '/game/debug', vp.layout);

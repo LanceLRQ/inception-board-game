@@ -10,11 +10,17 @@
 
 import type { MatchView } from '@icgame/game-engine';
 import { imperialPoolChoices, type PoolChoice } from '../MasterPeekBribeBanner/logic.js';
+import {
+  nightmareParamKind,
+  nightmareParamsOf,
+  nightmareParamsReady,
+  plagueCandidates,
+  type NightmareParamKind,
+} from '../../lib/nightmareParams.js';
 
 export type VaultDecisionChoice = 'bribe' | 'nightmare' | 'discard';
 
-/** 发动梦魇时需要界面补充的参数：回音萦绕要选层与方式，其余梦魇不需要（邪念瘟疫不派发贿赂） */
-export type NightmareParamKind = 'none' | 'echo';
+export type { NightmareParamKind };
 
 export interface VaultDecisionOption {
   enabled: boolean;
@@ -34,7 +40,10 @@ export interface VaultDecisionState {
   poolCount: number;
   /** 皇城梦主能看到池内每张的成败时，可指定的牌；否则为 null（只能随机派发） */
   poolChoices: PoolChoice[] | null;
+  /** 发动梦魇时要补充的参数：回音萦绕选层与方式，邪念瘟疫点名派发贿赂牌的盗梦者 */
   nightmareParams: NightmareParamKind;
+  /** 邪念瘟疫能点名的盗梦者（该层存活的非梦主座位） */
+  plagueCandidates: string[];
   bribe: VaultDecisionOption;
   nightmare: VaultDecisionOption;
 }
@@ -48,6 +57,7 @@ const HIDDEN: VaultDecisionState = {
   poolCount: 0,
   poolChoices: null,
   nightmareParams: 'none',
+  plagueCandidates: [],
   bribe: { enabled: false, reason: null },
   nightmare: { enabled: false, reason: null },
 };
@@ -79,7 +89,12 @@ export function computeVaultDecisionState(
     nightmareId,
     poolCount,
     poolChoices: imperialPoolChoices(G),
-    nightmareParams: nightmareId === 'nightmare_echo' ? 'echo' : 'none',
+    nightmareParams: nightmareParamKind(nightmareId),
+    plagueCandidates: plagueCandidates(
+      G.layers[pending.layer]?.playersInLayer ?? [],
+      G.players ?? {},
+      G.dreamMasterID,
+    ),
     bribe:
       poolCount > 0 ? { enabled: true, reason: null } : { enabled: false, reason: 'poolEmpty' },
     nightmare: hasNightmare
@@ -88,11 +103,12 @@ export function computeVaultDecisionState(
   };
 }
 
-/** 弹窗里的草稿：指定的贿赂牌下标、回音萦绕的目标层与方式 */
+/** 弹窗里的草稿：指定的贿赂牌下标、回音萦绕的目标层与方式、邪念瘟疫点名的盗梦者 */
 export interface VaultDecisionDraft {
   poolIndex: number | null;
   echoLayer: number | null;
   echoAction: 'restore' | 'add' | null;
+  bribed: readonly string[];
 }
 
 export interface VaultDecisionCommand {
@@ -116,11 +132,11 @@ export function computeVaultDecisionCommand(
       };
     case 'nightmare':
       if (!state.nightmare.enabled) return null;
-      if (state.nightmareParams === 'echo') {
-        if (draft.echoLayer === null || draft.echoAction === null) return null;
+      if (state.nightmareParams !== 'none') {
+        if (!nightmareParamsReady(state.nightmareParams, draft)) return null;
         return {
           move: 'masterVaultDecision',
-          args: ['nightmare', { targetLayer: draft.echoLayer, action: draft.echoAction }],
+          args: ['nightmare', nightmareParamsOf(state.nightmareParams, draft)],
         };
       }
       return { move: 'masterVaultDecision', args: ['nightmare'] };

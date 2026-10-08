@@ -15,6 +15,7 @@ import {
   IMPERIAL_WORLD_SHOOT,
   MARS_BATTLEFIELD_EXCHANGE,
   MASTER_ACTIVATE_NIGHTMARE,
+  MASTER_DISCARD_NIGHTMARE,
   PAPRIK_SALVATION,
   SATURN_FREE_MOVE,
   SECRET_PASSAGE_TELEPORT,
@@ -253,7 +254,7 @@ describe('技能项：其他引擎必拒的情形置灰并说明', () => {
     expect(entryFor({ ...c, imperialShootCharges: 0 }, IMPERIAL_WORLD_SHOOT)).toBeUndefined();
   });
 
-  it('梦魇：发动不列回音萦绕，弃掉全列；已被清走的层不算', () => {
+  it('梦魇：发动与弃掉都列已翻开的层（回音萦绕、邪念瘟疫发动时另选参数）；已被清走的层不算', () => {
     const c = ctx({
       faction: 'master',
       isDreamMaster: true,
@@ -265,13 +266,16 @@ describe('技能项：其他引擎必拒的情形置灰并说明', () => {
         4: layer({ nightmareTriggered: true }),
       },
     });
-    expect(layerChoicesFor(MASTER_ACTIVATE_NIGHTMARE, c)).toEqual([1]);
+    expect(layerChoicesFor(MASTER_ACTIVATE_NIGHTMARE, c)).toEqual([1, 2]);
+    expect(layerChoicesFor(MASTER_DISCARD_NIGHTMARE, c)).toEqual([1, 2]);
     const onlyEcho = {
       ...c,
       layers: { 2: layer({ nightmareRevealed: true, nightmareId: 'nightmare_echo' }) },
     };
-    expect(entryFor(onlyEcho, MASTER_ACTIVATE_NIGHTMARE)?.reason?.key).toBe(
-      'skill.reason.echoNeedsParams',
+    expect(entryFor(onlyEcho, MASTER_ACTIVATE_NIGHTMARE)?.enabled).toBe(true);
+    const none = { ...c, layers: { 4: layer({ nightmareTriggered: true }) } };
+    expect(entryFor(none, MASTER_ACTIVATE_NIGHTMARE)?.reason?.key).toBe(
+      'skill.reason.noRevealedNightmare',
     );
   });
 
@@ -313,8 +317,8 @@ describe('技能项：其他引擎必拒的情形置灰并说明', () => {
     });
     expect(entryFor(c, MARS_BATTLEFIELD_EXCHANGE)?.enabled).toBe(true);
     expect(pickableHandIndexes(MARS_BATTLEFIELD_EXCHANGE, c)).toEqual([1, 2]);
-    expect(MARS_BATTLEFIELD_EXCHANGE.discardPickable?.('action_shoot_assassin')).toBe(true);
-    expect(MARS_BATTLEFIELD_EXCHANGE.discardPickable?.('action_kick')).toBe(false);
+    expect(MARS_BATTLEFIELD_EXCHANGE.discardPickable?.('action_shoot_assassin', c)).toBe(true);
+    expect(MARS_BATTLEFIELD_EXCHANGE.discardPickable?.('action_kick', c)).toBe(false);
     expect(
       entryFor({ ...c, hand: ['action_shoot', 'action_kick'] }, MARS_BATTLEFIELD_EXCHANGE)?.reason
         ?.key,

@@ -136,6 +136,9 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   'dm_fortress.skill_0.chances':
     '技能使用记录里的内部计数键：要塞·冷酷本回合的发动机会数，不是技能标识',
   thief_gemini_back: '双子翻到背面后玩家的角色 id（牌 id + _back，运行时状态，不是另一张牌）',
+  thief_luna_back: '露娜翻到背面后玩家的角色 id（牌 id + _back，运行时状态，不是另一张牌）',
+  thief_pisces_back: '双鱼翻到背面后玩家的角色 id（牌 id + _back，运行时状态，不是另一张牌）',
+  'thief_sagittarius.kills': '技能使用记录里的内部计数键：射手本回合击杀过几名玩家，不是技能标识',
   thief_char: '卡牌类别名',
   master_char: '卡牌类别名',
 };

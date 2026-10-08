@@ -241,23 +241,82 @@ test.describe('界面可点但引擎必拒：按引擎条件过滤', () => {
     expect(sent[0]!.args[1]).toBe('action_dream_transit');
   });
 
-  test('梦魇：弃掉列出两层已翻开的梦魇，发动不列回音萦绕那一层', async ({ page }) => {
+  test('梦魇：弃掉与发动都列出三层已翻开的梦魇；不需要参数的梦魇直接发动', async ({ page }) => {
     const sent = recordMoves(page);
     await openScene(page, '/game/debug?skill=nightmare');
     await openSkillPanel(page);
 
     await skillButton(page, 'masterDiscardNightmare').click();
-    await expect(page.getByTestId('active-skill-layer-2')).toBeVisible();
-    await expect(page.getByTestId('active-skill-layer-3')).toBeVisible();
-    await expect(page.getByTestId('active-skill-layer-1')).toHaveCount(0);
+    for (const layer of [1, 2, 3]) {
+      await expect(page.getByTestId(`active-skill-layer-${layer}`)).toBeVisible();
+    }
+    await expect(page.getByTestId('active-skill-layer-4')).toHaveCount(0);
     await page.getByTestId('active-skill-cancel-layer').click();
 
     await skillButton(page, 'masterActivateNightmare').click();
-    await expect(page.getByTestId('active-skill-layer-2')).toBeVisible();
-    await expect(page.getByTestId('active-skill-layer-3')).toHaveCount(0);
-    await page.getByTestId('active-skill-layer-2').click();
+    for (const layer of [1, 2, 3]) {
+      await expect(page.getByTestId(`active-skill-step-layer-${layer}`)).toBeVisible();
+    }
+    await expect(page.getByTestId('active-skill-step-layer-4')).toHaveCount(0);
+    // 第 2 层是致命漩涡，不需要参数：点层就发动
+    await page.getByTestId('active-skill-step-layer-2').click();
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
     expect(sent[0]).toEqual({ move: 'masterActivateNightmare', args: [2] });
+  });
+
+  test('梦魇：回音萦绕发动要先选层与方式，选完才能确认', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=nightmare');
+    await openSkillPanel(page);
+
+    await skillButton(page, 'masterActivateNightmare').click();
+    await page.getByTestId('active-skill-step-layer-3').click();
+    const confirm = page.getByTestId('active-skill-step-next');
+    await expect(page.getByTestId('active-skill-nm-echo')).toBeVisible();
+    await expect(confirm).toBeDisabled();
+    await page.getByTestId('active-skill-nm-echo-layer-2').click();
+    await expect(confirm).toBeDisabled();
+    await page.getByTestId('active-skill-nm-echo-restore').click();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({
+      move: 'masterActivateNightmare',
+      args: [3, { targetLayer: 2, action: 'restore' }],
+    });
+  });
+
+  test('梦魇：邪念瘟疫发动要点名派发贿赂牌的盗梦者；可以不点名；能退回上一步', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=nightmare');
+    await openSkillPanel(page);
+
+    await skillButton(page, 'masterActivateNightmare').click();
+    await page.getByTestId('active-skill-step-layer-1').click();
+    await expect(page.getByTestId('active-skill-nm-plague')).toBeVisible();
+    const candidates = page.getByTestId(/^active-skill-nm-plague-\d+$/);
+    expect(await candidates.count()).toBeGreaterThanOrEqual(2);
+    const first = candidates.first();
+    const id = ((await first.getAttribute('data-testid')) ?? '').replace(
+      'active-skill-nm-plague-',
+      '',
+    );
+    await first.click();
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('active-skill-nm-plague-count')).toContainText('1');
+    // 退回上一步重选层
+    await page.getByTestId('active-skill-step-back').click();
+    await expect(page.getByTestId('active-skill-step-layers')).toBeVisible();
+    await page.getByTestId('active-skill-step-layer-1').click();
+    // 回到参数步骤时，之前的点名已清空
+    await expect(page.getByTestId('active-skill-nm-plague-count')).toContainText('0');
+    await candidates.first().click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({
+      move: 'masterActivateNightmare',
+      args: [1, { bribedTargets: [id] }],
+    });
   });
 
   test('【解封】：所在层心锁为 0 时打不出', async ({ page }) => {
@@ -342,5 +401,315 @@ test.describe('SHOOT 的目标限制与射手·禁足', () => {
     await selectAndPlayCard(page, await handIndexOf(page, 'SHOOT'));
     await expect(page.getByTestId('target-player-picker-dialog')).toBeVisible();
     await expect(page.getByTestId('prevent-move-toggle')).toHaveCount(0);
+  });
+});
+
+test.describe('黑天鹅·纷飞（抽牌阶段）', () => {
+  test('抽牌阶段的黑天鹅多一个「纷飞」入口：选接收者、把手牌分完才能确认，发出分发表', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=black-swan');
+    await expect(page.getByTestId('dock-entry-skip-draw')).toBeVisible();
+    const entry = page.getByTestId('dock-entry-tour');
+    await expect(entry).toBeVisible();
+    await expect(entry).not.toHaveAttribute('aria-disabled', 'true');
+    await entry.click();
+
+    await expect(page.getByTestId('black-swan-tour-dialog')).toBeVisible();
+    const confirm = page.getByTestId('tour-confirm');
+    await expect(confirm).toBeDisabled();
+    const recipients = page.getByTestId(/^tour-recipient-\d+$/);
+    expect(await recipients.count()).toBeGreaterThanOrEqual(2);
+    const cards = page.getByTestId(/^tour-card-\d+$/);
+    const total = await cards.count();
+    expect(total).toBeGreaterThanOrEqual(2);
+
+    // 还没选接收者时点牌没有效果
+    await cards.first().click();
+    await expect(cards.first()).toHaveAttribute('data-assigned', '');
+    // 第一位接收者收前一半，第二位收其余
+    const firstId = ((await recipients.nth(0).getAttribute('data-testid')) ?? '').replace(
+      'tour-recipient-',
+      '',
+    );
+    const secondId = ((await recipients.nth(1).getAttribute('data-testid')) ?? '').replace(
+      'tour-recipient-',
+      '',
+    );
+    await recipients.nth(0).click();
+    for (let i = 0; i < total - 1; i++) await cards.nth(i).click();
+    await expect(confirm).toBeDisabled();
+    await recipients.nth(1).click();
+    await cards.nth(total - 1).click();
+    await expect(confirm).toBeEnabled();
+    await expect(page.getByTestId('tour-progress')).toContainText(`${total} / ${total}`);
+    await confirm.click();
+
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]!.move).toBe('playBlackSwanTour');
+    const dist = sent[0]!.args[0] as Record<string, string[]>;
+    expect(Object.keys(dist).sort()).toEqual([firstId, secondId].sort());
+    expect(dist[firstId]).toHaveLength(total - 1);
+    expect(dist[secondId]).toHaveLength(1);
+  });
+
+  test('再点一次已分配的牌取消；取消按钮关闭弹层且不发 move', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=black-swan');
+    await page.getByTestId('dock-entry-tour').click();
+    await page
+      .getByTestId(/^tour-recipient-\d+$/)
+      .first()
+      .click();
+    const card = page.getByTestId('tour-card-0');
+    await card.click();
+    await expect(card).not.toHaveAttribute('data-assigned', '');
+    await card.click();
+    await expect(card).toHaveAttribute('data-assigned', '');
+    await page.getByTestId('tour-cancel').click();
+    await expect(page.getByTestId('black-swan-tour-dialog')).toHaveCount(0);
+    expect(sent).toEqual([]);
+  });
+
+  test('其他角色的抽牌阶段没有「纷飞」', async ({ page }) => {
+    await openScene(page, '/game/debug?skill=draw');
+    await expect(page.getByTestId('dock-entry-tour')).toHaveCount(0);
+  });
+});
+
+test.describe('背面技能与分步表单技能', () => {
+  test('露娜·满月：只能选非 SHOOT 牌，凑够 2 张才能下一步；复活对象可以不选', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=luna');
+    await openSkillPanel(page);
+    await skillButton(page, 'playLunaFullMoon').click();
+
+    await expect(page.getByTestId('active-skill-step-form')).toHaveAttribute(
+      'data-step',
+      'handCards',
+    );
+    // 手里有 SHOOT、解封、梦境穿梭剂、KICK：SHOOT 不可选
+    await expect(page.getByTestId(/^active-skill-step-card-\d+$/)).toHaveCount(3);
+    const next = page.getByTestId('active-skill-step-next');
+    await expect(next).toBeDisabled();
+    const cards = page.getByTestId(/^active-skill-step-card-\d+$/);
+    await cards.nth(0).click();
+    await expect(next).toBeDisabled();
+    await cards.nth(1).click();
+    await expect(next).toBeEnabled();
+    // 第 3 张点不动（刚好 2 张）
+    await cards.nth(2).click();
+    await expect(cards.nth(2)).toHaveAttribute('aria-pressed', 'false');
+    await next.click();
+
+    // 复活对象：迷失层的那位同伴；先选，再确认
+    const targets = page.getByTestId(/^active-skill-step-player-\d+$/);
+    await expect(targets).toHaveCount(1);
+    const id = ((await targets.first().getAttribute('data-testid')) ?? '').replace(
+      'active-skill-step-player-',
+      '',
+    );
+    await targets.first().click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]!.move).toBe('playLunaFullMoon');
+    const [discards, revives] = sent[0]!.args as [string[], string[]];
+    expect(discards).toHaveLength(2);
+    expect(discards).not.toContain('action_shoot');
+    expect(revives).toEqual([id]);
+  });
+
+  test('露娜·满月：一个都不复活也能确认，参数里复活列表为空', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=luna');
+    await openSkillPanel(page);
+    await skillButton(page, 'playLunaFullMoon').click();
+    const cards = page.getByTestId(/^active-skill-step-card-\d+$/);
+    await cards.nth(0).click();
+    await cards.nth(1).click();
+    await page.getByTestId('active-skill-step-next').click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]!.args[1]).toEqual([]);
+  });
+
+  test('双鱼·洗礼：可以不复活；也可以点名迷失层的同伴', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=pisces');
+    await openSkillPanel(page);
+    await skillButton(page, 'playPiscesBlessing').click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playPiscesBlessing', args: [null] });
+
+    await openSkillPanel(page).catch(() => undefined);
+    await skillButton(page, 'playPiscesBlessing').click();
+    const target = page.getByTestId(/^active-skill-step-player-\d+$/).first();
+    const id = ((await target.getAttribute('data-testid')) ?? '').replace(
+      'active-skill-step-player-',
+      '',
+    );
+    await target.click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(2);
+    expect(sent[1]).toEqual({ move: 'playPiscesBlessing', args: [id] });
+  });
+
+  test('格林射线·缉捕：先选 SHOOT 牌、再选层、再选该层的目标，参数顺序是 (牌, 目标, 层)', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=green-ray');
+    await openSkillPanel(page);
+    await skillButton(page, 'playGreenRayArrest').click();
+
+    // 手牌里只有基础 SHOOT 一张 SHOOT 类牌
+    const cards = page.getByTestId(/^active-skill-step-card-\d+$/);
+    await expect(cards).toHaveCount(1);
+    await cards.first().click();
+    await page.getByTestId('active-skill-step-next').click();
+
+    const layers = page.getByTestId(/^active-skill-step-layer-\d$/);
+    expect(await layers.count()).toBeGreaterThanOrEqual(2);
+    await page.getByTestId('active-skill-step-layer-1').click();
+    const targets = page.getByTestId(/^active-skill-step-player-\d+$/);
+    expect(await targets.count()).toBeGreaterThanOrEqual(1);
+    const id = ((await targets.first().getAttribute('data-testid')) ?? '').replace(
+      'active-skill-step-player-',
+      '',
+    );
+    await targets.first().click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playGreenRayArrest', args: ['action_shoot', id, 1] });
+  });
+
+  test('水瓶·凝聚：弃牌堆里本回合用过的牌不列；选一张发出 playAquariusCoherence', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=aquarius');
+    await openSkillPanel(page);
+    const button = skillButton(page, 'playAquariusCoherence');
+    await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+    await button.click();
+    const options = page.getByTestId(/^active-skill-step-discard-/);
+    expect(await options.count()).toBeGreaterThanOrEqual(1);
+    await expect(page.getByTestId('active-skill-step-discard-action_kick')).toHaveCount(0);
+    const first = options.first();
+    const card = ((await first.getAttribute('data-testid')) ?? '').replace(
+      'active-skill-step-discard-',
+      '',
+    );
+    await first.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playAquariusCoherence', args: [card] });
+  });
+
+  test('射手·穿心：先选增减、再选层；没有击杀过玩家时置灰并说明', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=sagittarius');
+    await openSkillPanel(page);
+    const locked = skillButton(page, 'useSagittariusHeartLock');
+    await expect(locked).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByTestId('active-skill-reason-useSagittariusHeartLock')).toContainText(
+      '本回合还没有击杀过玩家',
+    );
+
+    await openScene(page, '/game/debug?skill=heart-lock');
+    await openSkillPanel(page);
+    await skillButton(page, 'useSagittariusHeartLock').click();
+    // 开局每层心锁都是原有数量：增加没有可选的层
+    await page.getByTestId('active-skill-step-choice-increase').click();
+    await expect(page.getByTestId('active-skill-step-empty')).toBeVisible();
+    await page.getByTestId('active-skill-step-back').click();
+    await page.getByTestId('active-skill-step-choice-decrease').click();
+    await page.getByTestId('active-skill-step-layer-2').click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'useSagittariusHeartLock', args: [2, -1] });
+  });
+
+  test('金星·镜界复制：先选目标、再选 2 张牌弃掉', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=venus-mirror');
+    await openSkillPanel(page);
+    await skillButton(page, 'useVenusMirrorWorld').click();
+    const targets = page.getByTestId(/^active-skill-step-player-\d+$/);
+    expect(await targets.count()).toBeGreaterThanOrEqual(2);
+    const first = targets.first();
+    const id = ((await first.getAttribute('data-testid')) ?? '').replace(
+      'active-skill-step-player-',
+      '',
+    );
+    await first.click();
+    const cards = page.getByTestId(/^active-skill-step-card-\d+$/);
+    await cards.nth(0).click();
+    const next = page.getByTestId('active-skill-step-next');
+    await expect(next).toBeDisabled();
+    await cards.nth(1).click();
+    await next.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]!.move).toBe('useVenusMirrorWorld');
+    expect(sent[0]!.args[0]).toBe(id);
+    expect(sent[0]!.args[1]).toHaveLength(2);
+  });
+
+  test('取消：回到技能列表，不发 move', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=luna');
+    await openSkillPanel(page);
+    await skillButton(page, 'playLunaFullMoon').click();
+    await page.getByTestId('active-skill-step-cancel').click();
+    await expect(page.getByTestId('active-skill-buttons')).toBeVisible();
+    expect(sent).toEqual([]);
+  });
+});
+
+test.describe('金库三选一 · 发动梦魇的附加参数', () => {
+  test('回音萦绕：展开后选层与方式，选完才能确认，发出 masterVaultDecision', async ({ page }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?as=master&vault=echo');
+    await expect(page.getByTestId('master-nightmare-decision-dialog')).toBeVisible();
+    await page.getByTestId('vault-decision-nightmare-activate').click();
+    const confirm = page.getByTestId('vault-decision-params-confirm');
+    await expect(page.getByTestId('vault-decision-echo')).toBeVisible();
+    await expect(confirm).toBeDisabled();
+    await page.getByTestId('vault-decision-echo-layer-4').click();
+    await expect(confirm).toBeDisabled();
+    await page.getByTestId('vault-decision-echo-add').click();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({
+      move: 'masterVaultDecision',
+      args: ['nightmare', { targetLayer: 4, action: 'add' }],
+    });
+  });
+
+  test('邪念瘟疫：展开后点名派发贿赂牌的盗梦者（可以不点名），发出 bribedTargets', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?as=master&vault=plague');
+    await expect(page.getByTestId('master-nightmare-decision-dialog')).toBeVisible();
+    await page.getByTestId('vault-decision-nightmare-activate').click();
+    await expect(page.getByTestId('vault-decision-plague')).toBeVisible();
+    const confirm = page.getByTestId('vault-decision-params-confirm');
+    await expect(confirm).toBeEnabled();
+    const candidates = page.getByTestId(/^vault-decision-plague-\d+$/);
+    expect(await candidates.count()).toBeGreaterThanOrEqual(2);
+    const first = candidates.first();
+    const id = ((await first.getAttribute('data-testid')) ?? '').replace(
+      'vault-decision-plague-',
+      '',
+    );
+    await first.click();
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
+    await confirm.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({
+      move: 'masterVaultDecision',
+      args: ['nightmare', { bribedTargets: [id] }],
+    });
   });
 });

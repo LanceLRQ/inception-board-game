@@ -10,6 +10,7 @@
 //       天秤（113-120 行）、恐怖分子（239-248 行）、意念判官（258-265 行）；梦魇效果见 docs/manual/07-nightmare-cards.md
 
 import type { MatchView } from '@icgame/game-engine';
+import { nightmareParamKind, plagueCandidates } from '../../../lib/nightmareParams';
 
 export type AwaitedKind =
   | 'shoot-evade'
@@ -101,8 +102,12 @@ export interface AriesAwaited {
   readonly victimLayer: number;
   /** 白羊翻开的梦魇；视图里看不到时为 null */
   readonly nightmareId: string | null;
-  /** 发动时是否需要选择：回音萦绕要选层与方式，邪念瘟疫不派发贿赂 */
+  /** 发动时是否需要选择：回音萦绕要选层与方式，邪念瘟疫要点名派发贿赂牌的盗梦者 */
   readonly params: 'none' | 'echo' | 'plague';
+  /** 邪念瘟疫能点名的盗梦者：被击杀者所在层存活的非梦主座位 */
+  readonly candidates: readonly string[];
+  /** 贿赂池里还没派出的张数（点名人数上限） */
+  readonly bribePoolCount: number;
 }
 
 export type MineAwaited =
@@ -139,9 +144,7 @@ export function shootResultOf(
 
 /** 由梦魇牌 ID 推出白羊发动时是否需要选择 */
 export function ariesParamsOf(nightmareId: string | null): AriesAwaited['params'] {
-  if (nightmareId === 'nightmare_echo') return 'echo';
-  if (nightmareId === 'nightmare_plague') return 'plague';
-  return 'none';
+  return nightmareParamKind(nightmareId);
 }
 
 const other: OtherAwaited = { mine: false };
@@ -246,7 +249,8 @@ export function awaitedResponse(view: MatchView, seat: string | null): AwaitedRe
   const aries = view.pendingAriesChoice;
   if (aries) {
     if (seat === null || aries.ariesID === null || aries.ariesID !== seat) return other;
-    const nightmareId = view.layers[aries.victimLayer]?.nightmareId ?? null;
+    const layer = view.layers[aries.victimLayer];
+    const nightmareId = layer?.nightmareId ?? null;
     return {
       mine: true,
       kind: 'aries',
@@ -254,6 +258,8 @@ export function awaitedResponse(view: MatchView, seat: string | null): AwaitedRe
       victimLayer: aries.victimLayer,
       nightmareId,
       params: ariesParamsOf(nightmareId),
+      candidates: plagueCandidates(layer?.playersInLayer ?? [], view.players, view.dreamMasterID),
+      bribePoolCount: (view.bribePool ?? []).filter((b) => b.status === 'inPool').length,
     };
   }
 
@@ -271,7 +277,8 @@ export type AwaitedSheet =
   | 'libra-pick'
   | 'virgo-revive'
   | 'virgo-teleport'
-  | 'aries-echo';
+  | 'aries-echo'
+  | 'aries-plague';
 
 /** 点击一个操作按钮的效果：直接发 move，或打开弹窗 */
 export type AwaitedEffect =
@@ -412,7 +419,12 @@ export function awaitedActions(awaited: MineAwaited): AwaitedAction[] {
         },
       ];
     case 'aries': {
-      const needsSheet = awaited.params === 'echo';
+      const activateSheet: AwaitedSheet | null =
+        awaited.params === 'echo'
+          ? 'aries-echo'
+          : awaited.params === 'plague'
+            ? 'aries-plague'
+            : null;
       return [
         {
           id: 'activate',
@@ -421,7 +433,7 @@ export function awaitedActions(awaited: MineAwaited): AwaitedAction[] {
           // 看不到梦魇或该层已没有梦魇时，发动无从谈起（引擎会拒绝）
           disabled: awaited.nightmareId === null,
           decline: false,
-          effect: needsSheet ? sheet('aries-echo') : move('playAriesStardustActivate'),
+          effect: activateSheet ? sheet(activateSheet) : move('playAriesStardustActivate'),
         },
         {
           id: 'discard',
@@ -452,6 +464,8 @@ export interface AwaitedDraft {
   /** 回音萦绕的目标层与方式 */
   readonly echoLayer: number | null;
   readonly echoAction: 'restore' | 'add' | null;
+  /** 邪念瘟疫点名要派发贿赂牌的盗梦者 */
+  readonly bribed: readonly string[];
 }
 
 export const EMPTY_DRAFT: AwaitedDraft = {
@@ -461,6 +475,7 @@ export const EMPTY_DRAFT: AwaitedDraft = {
   teleportLayer: null,
   echoLayer: null,
   echoAction: null,
+  bribed: [],
 };
 
 /** 切换一个位置是否在列表里（保持升序、不重复） */
@@ -523,6 +538,13 @@ export function sheetCommand(
       return {
         move: 'playAriesStardustActivate',
         args: [{ targetLayer: draft.echoLayer, action: draft.echoAction }],
+      };
+    }
+    case 'aries-plague': {
+      if (awaited.kind !== 'aries' || awaited.params !== 'plague') return null;
+      return {
+        move: 'playAriesStardustActivate',
+        args: [{ bribedTargets: [...draft.bribed] }],
       };
     }
     case 'libra-pick':

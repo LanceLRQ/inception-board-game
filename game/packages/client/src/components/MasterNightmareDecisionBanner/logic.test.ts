@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import type { MatchView } from '@icgame/game-engine';
 import { computeVaultDecisionState, computeVaultDecisionCommand } from './logic.js';
 
-const EMPTY_DRAFT = { poolIndex: null, echoLayer: null, echoAction: null } as const;
+const EMPTY_DRAFT = { poolIndex: null, echoLayer: null, echoAction: null, bribed: [] } as const;
 
 function makeView(overrides: Partial<MatchView> = {}): MatchView {
   return {
@@ -79,6 +79,28 @@ describe('computeVaultDecisionState', () => {
     } as unknown as Partial<MatchView>);
     expect(computeVaultDecisionState(echo, 'pM').nightmareParams).toBe('echo');
     expect(computeVaultDecisionState(makeView(), 'pM').nightmareParams).toBe('none');
+  });
+
+  it('邪念瘟疫发动要点名派发贿赂牌的盗梦者：候选是该层存活的非梦主座位', () => {
+    const plague = makeView({
+      layers: {
+        2: {
+          layer: 2,
+          nightmareId: 'nightmare_plague',
+          nightmareRevealed: false,
+          playersInLayer: ['pM', 'p1', 'p2', 'p3'],
+        },
+      },
+      players: {
+        pM: { isAlive: true },
+        p1: { isAlive: true },
+        p2: { isAlive: false },
+        p3: { isAlive: true },
+      },
+    } as unknown as Partial<MatchView>);
+    const s = computeVaultDecisionState(plague, 'pM');
+    expect(s.nightmareParams).toBe('plague');
+    expect(s.plagueCandidates).toEqual(['p1', 'p3']);
   });
 
   it('池内成败看不到（非皇城）：不提供指定', () => {
@@ -166,6 +188,31 @@ describe('computeVaultDecisionCommand', () => {
       move: 'masterVaultDecision',
       args: ['nightmare', { targetLayer: 3, action: 'add' }],
     });
+  });
+
+  it('发动邪念瘟疫：不点名也能发，点名带上 bribedTargets', () => {
+    const view = makeView({
+      layers: {
+        2: {
+          layer: 2,
+          nightmareId: 'nightmare_plague',
+          nightmareRevealed: false,
+          playersInLayer: ['p1', 'p3'],
+        },
+      },
+      players: { p1: { isAlive: true }, p3: { isAlive: true } },
+    } as unknown as Partial<MatchView>);
+    const s = computeVaultDecisionState(view, 'pM');
+    expect(computeVaultDecisionCommand(s, 'nightmare', EMPTY_DRAFT)).toEqual({
+      move: 'masterVaultDecision',
+      args: ['nightmare', { bribedTargets: [] }],
+    });
+    expect(computeVaultDecisionCommand(s, 'nightmare', { ...EMPTY_DRAFT, bribed: ['p3'] })).toEqual(
+      {
+        move: 'masterVaultDecision',
+        args: ['nightmare', { bribedTargets: ['p3'] }],
+      },
+    );
   });
 
   it('弃掉梦魇 / 不派发：始终可发，不带参数', () => {

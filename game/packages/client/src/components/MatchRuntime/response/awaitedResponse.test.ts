@@ -392,6 +392,32 @@ describe('awaitedResponse · 白羊', () => {
     });
   });
 
+  it('邪念瘟疫：发动要先点名派发贿赂牌的盗梦者（可以一个都不点），候选是被击杀者所在层存活的非梦主座位', () => {
+    const layers = {
+      2: {
+        layer: 2,
+        nightmareId: 'nightmare_plague',
+        playersInLayer: ['0', '1', '2', '9'],
+      },
+    } as unknown as MatchView['layers'];
+    const a = mine(ariesView('0', layers), '0');
+    expect(a).toMatchObject({ kind: 'aries', params: 'plague', candidates: ['0', '1'] });
+    const activate = awaitedActions(a)[0]!;
+    expect(activate.effect).toEqual({ type: 'sheet', sheet: 'aries-plague' });
+    expect(sheetCommand(a, 'aries-plague', EMPTY_DRAFT)).toEqual({
+      move: 'playAriesStardustActivate',
+      args: [{ bribedTargets: [] }],
+    });
+    expect(sheetCommand(a, 'aries-plague', { ...EMPTY_DRAFT, bribed: ['1'] })).toEqual({
+      move: 'playAriesStardustActivate',
+      args: [{ bribedTargets: ['1'] }],
+    });
+    // 回音萦绕的弹窗命令不会用在邪念瘟疫上
+    expect(
+      sheetCommand(a, 'aries-echo', { ...EMPTY_DRAFT, echoLayer: 1, echoAction: 'add' }),
+    ).toBeNull();
+  });
+
   it('看不到梦魇（该层已没有）时两个按钮都不可点', () => {
     const layers = { 2: { layer: 2, nightmareId: null } } as unknown as MatchView['layers'];
     const actions = awaitedActions(mine(ariesView('0', layers), '0'));

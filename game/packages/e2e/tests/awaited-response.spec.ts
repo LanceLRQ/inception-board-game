@@ -194,6 +194,41 @@ test.describe('固定场景 · 应答窗口', () => {
     });
   });
 
+  test('白羊·星尘（邪念瘟疫）：发动要先点名派发贿赂牌的盗梦者，也可以一个都不点名', async ({
+    page,
+  }) => {
+    const sent = await openScene(page, '/game/debug?pending=aries-plague');
+    await expect(panelOf(page)).toHaveAttribute('data-kind', 'aries', { timeout: 10_000 });
+    await expect(panelOf(page)).toContainText('邪念瘟疫');
+
+    await action(page, 'activate').click();
+    const confirm = page.getByTestId('awaited-sheet-confirm');
+    await expect(page.getByTestId('awaited-nm-plague')).toBeVisible();
+    // 一个都不点名也可以确认
+    await expect(confirm).toBeEnabled();
+    const candidates = page.getByTestId(/^awaited-nm-plague-\d+$/);
+    expect(await candidates.count()).toBeGreaterThanOrEqual(2);
+    const first = candidates.first();
+    const id = ((await first.getAttribute('data-testid')) ?? '').replace('awaited-nm-plague-', '');
+    await first.click();
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
+    await confirm.click();
+    expect(await lastMove(sent, 1)).toEqual({
+      move: 'playAriesStardustActivate',
+      args: [{ bribedTargets: [id] }],
+    });
+
+    // 固定场景不推进状态：弹窗再打开时草稿还在，取消点名后一个都不点名也能确认
+    await action(page, 'activate').click();
+    await candidates.first().click();
+    await expect(candidates.first()).toHaveAttribute('aria-pressed', 'false');
+    await page.getByTestId('awaited-sheet-confirm').click();
+    expect(await lastMove(sent, 2)).toEqual({
+      move: 'playAriesStardustActivate',
+      args: [{ bribedTargets: [] }],
+    });
+  });
+
   test('应答窗口不挡住别的界面：舞台仍在，页面没有报错', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));

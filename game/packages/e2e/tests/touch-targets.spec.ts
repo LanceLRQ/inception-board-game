@@ -78,6 +78,9 @@ const SCENES = [
   ['抽牌阶段（略过抽牌）', '/game/debug?skill=draw'],
   ['抽牌阶段（略过抽牌 + 小丑·失控）', '/game/debug?skill=joker'],
   ['【解封】打不出（心锁为 0）', '/game/debug?skill=unlock-none'],
+  ['抽牌阶段（黑天鹅·纷飞）', '/game/debug?skill=black-swan'],
+  ['应答：白羊·星尘（邪念瘟疫）', '/game/debug?pending=aries-plague'],
+  ['金库三选一（回音萦绕）', '/game/debug?as=master&vault=echo'],
 ] as const;
 
 test.describe('触控目标 · 390×844', () => {
@@ -227,6 +230,77 @@ test.describe('触控目标 · 390×844', () => {
       .first()
       .click();
     await expectTouchClean(page, '技能面板（选牌）');
+  });
+
+  test('对局：黑天鹅·纷飞的分发弹层', async ({ page }) => {
+    await openScene(page, '/game/debug?skill=black-swan');
+    await page.getByTestId('dock-entry-tour').click();
+    await expect(page.getByTestId('black-swan-tour-dialog')).toBeVisible();
+    await expectTouchClean(page, '分发弹层（未选）');
+    await page
+      .getByTestId(/^tour-recipient-\d+$/)
+      .first()
+      .click();
+    await page.getByTestId('tour-card-0').click();
+    await expectTouchClean(page, '分发弹层（已分配一张）');
+  });
+
+  test('对局：分步表单技能（露娜、格林射线、射手、水瓶、金星复制）', async ({ page }) => {
+    await openScene(page, '/game/debug?skill=luna');
+    await page.getByTestId('dock-skill').click();
+    await page.getByTestId('active-skill-playLunaFullMoon').click();
+    await expect(page.getByTestId('active-skill-step-form')).toBeVisible();
+    await page
+      .getByTestId(/^active-skill-step-card-\d+$/)
+      .nth(0)
+      .click();
+    await expectTouchClean(page, '分步表单（选牌）');
+    await page
+      .getByTestId(/^active-skill-step-card-\d+$/)
+      .nth(1)
+      .click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expectTouchClean(page, '分步表单（选可不选的玩家）');
+
+    await openScene(page, '/game/debug?skill=green-ray');
+    await page.getByTestId('dock-skill').click();
+    await page.getByTestId('active-skill-playGreenRayArrest').click();
+    await page
+      .getByTestId(/^active-skill-step-card-\d+$/)
+      .first()
+      .click();
+    await page.getByTestId('active-skill-step-next').click();
+    await expectTouchClean(page, '分步表单（选层）');
+    await page.getByTestId('active-skill-step-layer-1').click();
+    await expectTouchClean(page, '分步表单（选目标）');
+
+    await openScene(page, '/game/debug?skill=heart-lock');
+    await page.getByTestId('dock-skill').click();
+    await page.getByTestId('active-skill-useSagittariusHeartLock').click();
+    await expectTouchClean(page, '分步表单（选增减）');
+
+    await openScene(page, '/game/debug?skill=aquarius');
+    await page.getByTestId('dock-skill').click();
+    await page.getByTestId('active-skill-playAquariusCoherence').click();
+    await expectTouchClean(page, '分步表单（选弃牌堆里的牌）');
+
+    await openScene(page, '/game/debug?skill=nightmare');
+    await page.getByTestId('dock-skill').click();
+    await page.getByTestId('active-skill-masterActivateNightmare').click();
+    await page.getByTestId('active-skill-step-layer-1').click();
+    await expect(page.getByTestId('active-skill-nm-plague')).toBeVisible();
+    await expectTouchClean(page, '分步表单（邪念瘟疫点名）');
+  });
+
+  test('对局：金库三选一展开发动梦魇的参数', async ({ page }) => {
+    await openScene(page, '/game/debug?as=master&vault=plague');
+    await page.getByTestId('vault-decision-nightmare-activate').click();
+    await expect(page.getByTestId('vault-decision-plague')).toBeVisible();
+    await expectTouchClean(page, '金库三选一（邪念瘟疫点名）');
+    await openScene(page, '/game/debug?as=master&vault=echo');
+    await page.getByTestId('vault-decision-nightmare-activate').click();
+    await expect(page.getByTestId('vault-decision-echo')).toBeVisible();
+    await expectTouchClean(page, '金库三选一（回音萦绕）');
   });
 
   test('对局：射手的选目标弹窗（禁足开关）', async ({ page }) => {

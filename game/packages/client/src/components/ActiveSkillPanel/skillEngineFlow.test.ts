@@ -21,6 +21,7 @@ import { buildActiveSkillContext } from '../MatchRuntime/controllerDerive';
 import {
   ACTIVE_SKILL_DESCRIPTORS,
   APOLLO_WORSHIP,
+  AQUARIUS_COHERENCE,
   ARCHITECT_MAZE,
   ATHENA_AWE,
   BLACK_HOLE_ABSORB,
@@ -32,22 +33,28 @@ import {
   GAIA_SHIFT,
   GEMINI_CHOICE,
   GEMINI_SYNC,
+  GREEN_RAY_ARREST,
   HALEY_IMPACT,
   IMPERIAL_WORLD_SHOOT,
   LIBRA_BALANCE,
   LORD_OF_WAR_BLACK_MARKET,
   LUNA_ECLIPSE,
+  LUNA_FULL_MOON,
   MARS_BATTLEFIELD_EXCHANGE,
   MARS_KILL,
   MASTER_ACTIVATE_NIGHTMARE,
   MASTER_DISCARD_NIGHTMARE,
   PAPRIK_SALVATION,
+  PISCES_BLESSING,
   PLUTO_BURNING,
+  SAGITTARIUS_HEART_LOCK,
   SATURN_FREE_MOVE,
   SECRET_PASSAGE_TELEPORT,
   SPACE_QUEEN_STASH,
   URANUS_POWER,
   VENUS_DOUBLE,
+  VENUS_MIRROR_COPY,
+  EMPTY_PICKS,
   getSkillEntries,
   layerChoicesFor,
   pickableHandIndexes,
@@ -56,6 +63,19 @@ import {
   type ActiveSkillDescriptor,
 } from '../../lib/activeSkills';
 import { activeSkillLostTargetIds, activeSkillTargetIds } from '../MatchRuntime/controllerDerive';
+import {
+  buildStepArgs,
+  handChoicesFor,
+  layerStepChoices,
+  nightmareKindAt,
+  playerChoicesFor,
+  discardChoicesFor,
+} from '../../lib/skillSteps';
+import {
+  EMPTY_NIGHTMARE_DRAFT,
+  nightmareParamsOf,
+  type NightmareParamDraft,
+} from '../../lib/nightmareParams';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 type S = MatchState<SetupState>;
@@ -435,6 +455,103 @@ const ROWS: Row[] = [
     },
   },
   {
+    name: '露娜·满月（背面）',
+    skill: LUNA_FULL_MOON,
+    build: () => {
+      const s = asThief('thief_luna_back', cards('action_kick', 'action_unlock', 'action_shoot'));
+      const dead = s.others[2]!;
+      const state = patchPlayer(moveTo(s.state, dead, 0), dead, { isAlive: false });
+      const ctx = contextOf(state, s.me);
+      // 界面：手牌里只有非 SHOOT 牌（位置 0、1）能选，复活对象从迷失层的玩家里点名
+      const args = buildStepArgs(LUNA_FULL_MOON, ctx, {
+        ...EMPTY_PICKS,
+        cards: handChoicesFor(LUNA_FULL_MOON, ctx),
+        players: [dead],
+      })!;
+      return { state, seat: s.me, args };
+    },
+  },
+  {
+    name: '双鱼·洗礼（背面）',
+    skill: PISCES_BLESSING,
+    build: () => {
+      const s = asThief('thief_pisces_back', cards('action_kick'));
+      const dead = s.others[2]!;
+      const state = patchPlayer(moveTo(s.state, dead, 0), dead, { isAlive: false });
+      const args = buildStepArgs(PISCES_BLESSING, contextOf(state, s.me), {
+        ...EMPTY_PICKS,
+        players: [dead],
+      })!;
+      return { state, seat: s.me, args };
+    },
+  },
+  {
+    name: '格林射线·缉捕',
+    skill: GREEN_RAY_ARREST,
+    build: () => {
+      const s = asThief('thief_green_ray', cards('action_dream_transit', 'action_shoot'));
+      const target = s.others[2]!;
+      const layer = s.state.G.players[target]!.currentLayer;
+      const ctx = contextOf(s.state, s.me);
+      const args = buildStepArgs(GREEN_RAY_ARREST, ctx, {
+        ...EMPTY_PICKS,
+        cards: [1],
+        layer,
+        players: [target],
+      })!;
+      return { state: s.state, seat: s.me, args };
+    },
+  },
+  {
+    name: '水瓶·凝聚',
+    skill: AQUARIUS_COHERENCE,
+    build: () => {
+      const s = asThief('thief_aquarius', cards('action_kick'));
+      let state = setDiscard(s.state, cards('action_kick', 'action_unlock'));
+      state = editG(state, (G) => ({
+        ...G,
+        playedCardsThisTurn: cards('action_kick', 'action_kick'),
+      }));
+      const args = buildStepArgs(AQUARIUS_COHERENCE, contextOf(state, s.me), {
+        ...EMPTY_PICKS,
+        discardCard: 'action_unlock',
+      })!;
+      return { state, seat: s.me, args };
+    },
+  },
+  {
+    name: '射手·穿心',
+    skill: SAGITTARIUS_HEART_LOCK,
+    build: () => {
+      const s = asThief('thief_sagittarius', cards('action_kick'));
+      const layer = s.state.G.players[s.me]!.currentLayer;
+      const state = patchPlayer(s.state, s.me, {
+        skillUsedThisTurn: { 'thief_sagittarius.kills': 1 },
+      });
+      const args = buildStepArgs(SAGITTARIUS_HEART_LOCK, contextOf(state, s.me), {
+        ...EMPTY_PICKS,
+        choice: 'decrease',
+        layer,
+      })!;
+      return { state, seat: s.me, args };
+    },
+  },
+  {
+    name: '金星·镜界：复制',
+    skill: VENUS_MIRROR_COPY,
+    build: () => {
+      const s = asThief('thief_aries', cards('action_kick', 'action_unlock'));
+      let state = setCharacter(s.state, s.master, 'dm_venus_mirror');
+      state = editG(state, (G) => ({ ...G, playedCardsThisTurn: cards('action_kick') }));
+      const args = buildStepArgs(VENUS_MIRROR_COPY, contextOf(state, s.me), {
+        ...EMPTY_PICKS,
+        players: [s.others[0]!],
+        cards: [0, 1],
+      })!;
+      return { state, seat: s.me, args };
+    },
+  },
+  {
     name: '梦魇：弃掉已翻开的梦魇',
     skill: MASTER_DISCARD_NIGHTMARE,
     build: () => {
@@ -590,7 +707,7 @@ describe('可选目标与层', () => {
     ).toBeNull();
   });
 
-  it('梦魇：弃掉 / 发动只列已翻开的梦魇所在层；回音萦绕缺参数，不列入发动', () => {
+  it('梦魇：弃掉 / 发动都列已翻开的梦魇所在层；回音萦绕不带参数发动被引擎拒绝，带参数则接受', () => {
     const s = asMaster('dm_neptune_ocean', cards('action_kick'));
     expect(entryOf(s.state, s.me, MASTER_DISCARD_NIGHTMARE)!.reason?.key).toBe(
       'skill.reason.noRevealedNightmare',
@@ -605,24 +722,63 @@ describe('可选目标与层', () => {
     });
     const ctx = contextOf(state, s.me);
     expect(layerChoicesFor(MASTER_DISCARD_NIGHTMARE, ctx)).toEqual([2, 3]);
-    expect(layerChoicesFor(MASTER_ACTIVATE_NIGHTMARE, ctx)).toEqual([2]);
+    expect(layerChoicesFor(MASTER_ACTIVATE_NIGHTMARE, ctx)).toEqual([2, 3]);
+    // 第 3 层的回音萦绕要附加参数，第 2 层的致命漩涡不要
+    expect(nightmareKindAt(ctx, 3)).toBe('echo');
+    expect(nightmareKindAt(ctx, 2)).toBe('none');
     // 引擎：回音萦绕不带参数发动被拒，弃掉被接受
     expect(apply(state, s.me, 'masterActivateNightmare', [3])).toBeNull();
     expect(apply(state, s.me, 'masterDiscardNightmare', [3])).not.toBeNull();
     // 没翻开的层引擎拒绝
     expect(apply(state, s.me, 'masterDiscardNightmare', [1])).toBeNull();
+    // 界面按参数形态拼出的参数引擎接受，心锁按所选方式改变
+    const echo: NightmareParamDraft = { ...EMPTY_NIGHTMARE_DRAFT, echoLayer: 1, echoAction: 'add' };
+    const args = buildStepArgs(MASTER_ACTIVATE_NIGHTMARE, ctx, {
+      ...EMPTY_PICKS,
+      layer: 3,
+      params: nightmareParamsOf('echo', echo)!,
+    })!;
+    expect(args).toEqual([3, { targetLayer: 1, action: 'add' }]);
+    const after = apply(state, s.me, 'masterActivateNightmare', args)!;
+    expect(after).not.toBeNull();
+    expect(after.G.layers[1]!.heartLockValue).toBe(state.G.layers[1]!.heartLockValue + 1);
+    // 参数没选完时拼不出参数
+    expect(
+      buildStepArgs(MASTER_ACTIVATE_NIGHTMARE, ctx, { ...EMPTY_PICKS, layer: 3 }, false),
+    ).toBeNull();
   });
 
-  it('火星·杀戮：需要手里有【解封】，层只列还有梦魇的（回音萦绕除外）', () => {
+  it('梦魇：邪念瘟疫点名的盗梦者收到贿赂牌，没点名又没有贿赂牌的进迷失层', () => {
+    const s = asMaster('dm_neptune_ocean', cards('action_kick'));
+    const onLayer2 = s.thieves.filter((id) => s.state.G.players[id]!.currentLayer === 2);
+    expect(onLayer2.length).toBeGreaterThanOrEqual(2);
+    const state = setLayer(s.state, 2, {
+      nightmareId: 'nightmare_plague' as CardID,
+      nightmareRevealed: true,
+    });
+    const ctx = contextOf(state, s.me);
+    expect(nightmareKindAt(ctx, 2)).toBe('plague');
+    const [named, ...unnamed] = onLayer2;
+    const args = buildStepArgs(MASTER_ACTIVATE_NIGHTMARE, ctx, {
+      ...EMPTY_PICKS,
+      layer: 2,
+      params: nightmareParamsOf('plague', { ...EMPTY_NIGHTMARE_DRAFT, bribed: [named!] })!,
+    })!;
+    expect(args).toEqual([2, { bribedTargets: [named] }]);
+    const after = apply(state, s.me, 'masterActivateNightmare', args)!;
+    expect(after).not.toBeNull();
+    expect(after.G.players[named!]!.bribeReceived).toBe(1);
+    expect(after.G.players[named!]!.isAlive).toBe(true);
+    for (const id of unnamed) expect(after.G.players[id]!.isAlive).toBe(false);
+  });
+
+  it('火星·杀戮：需要手里有【解封】，层列出所有还有梦魇的层（回音萦绕、邪念瘟疫发动时另选参数）', () => {
     const noUnlock = asMaster('dm_mars_battlefield', cards('action_kick'));
     expect(entryOf(noUnlock.state, noUnlock.me, MARS_KILL)!.reason?.key).toBe(
       'skill.reason.noUnlockCard',
     );
     const s = asMaster('dm_mars_battlefield', cards('action_unlock'));
-    const withNightmares = [1, 2, 3, 4].filter(
-      (l) =>
-        s.state.G.layers[l]!.nightmareId && s.state.G.layers[l]!.nightmareId !== 'nightmare_echo',
-    );
+    const withNightmares = [1, 2, 3, 4].filter((l) => s.state.G.layers[l]!.nightmareId);
     expect(layerChoicesFor(MARS_KILL, contextOf(s.state, s.me))).toEqual(withNightmares);
   });
 
@@ -745,6 +901,269 @@ describe('可选目标与层', () => {
     const state = moveTo(s.state, s.me, 4);
     expect(entryOf(state, s.me, GEMINI_CHOICE)).toBeUndefined();
     expect(apply(state, s.me, 'playGeminiChoice', [])).toBeNull();
+  });
+});
+
+describe('分步表单技能 · 界面可选项与引擎一致', () => {
+  it('火星·杀戮：回音萦绕带参数发动被引擎接受，不带参数被拒', () => {
+    const s = asMaster('dm_mars_battlefield', cards('action_unlock', 'action_kick'));
+    const state = setLayer(s.state, 3, { nightmareId: 'nightmare_echo' as CardID });
+    const ctx = contextOf(state, s.me);
+    expect(nightmareKindAt(ctx, 3)).toBe('echo');
+    expect(apply(state, s.me, 'useMarsKill', [3])).toBeNull();
+    const args = buildStepArgs(MARS_KILL, ctx, {
+      ...EMPTY_PICKS,
+      layer: 3,
+      params: nightmareParamsOf('echo', {
+        ...EMPTY_NIGHTMARE_DRAFT,
+        echoLayer: 2,
+        echoAction: 'restore',
+      })!,
+    })!;
+    expect(args).toEqual([3, { targetLayer: 2, action: 'restore' }]);
+    expect(apply(state, s.me, 'useMarsKill', args)).not.toBeNull();
+  });
+
+  it('露娜·满月：手牌只能选非 SHOOT，对象是迷失层的玩家；不复活任何人也能发动', () => {
+    const s = asThief('thief_luna_back', cards('action_shoot', 'action_kick', 'action_unlock'));
+    const dead = s.others[2]!;
+    const state = patchPlayer(moveTo(s.state, dead, 0), dead, { isAlive: false });
+    const view = viewOf(state, s.me);
+    const ctx = contextOf(state, s.me);
+    expect(handChoicesFor(LUNA_FULL_MOON, ctx)).toEqual([1, 2]);
+    expect(
+      playerChoicesFor(
+        LUNA_FULL_MOON,
+        ctx,
+        EMPTY_PICKS,
+        activeSkillTargetIds(view.players, s.me),
+        activeSkillLostTargetIds(view.players, s.me),
+      ),
+    ).toEqual([dead]);
+    // 复活 0 人：引擎接受，并且翻面
+    const args = buildStepArgs(LUNA_FULL_MOON, ctx, { ...EMPTY_PICKS, cards: [1, 2] })!;
+    expect(args).toEqual([['action_kick', 'action_unlock'], []]);
+    const after = apply(state, s.me, 'playLunaFullMoon', args)!;
+    expect(after).not.toBeNull();
+    expect(after.G.players[s.me]!.characterId).toBe('thief_luna');
+    // 弃 SHOOT 或只选一张：引擎拒绝（界面也拼不出参数）
+    expect(
+      apply(state, s.me, 'playLunaFullMoon', [['action_shoot', 'action_kick'], []]),
+    ).toBeNull();
+    expect(buildStepArgs(LUNA_FULL_MOON, ctx, { ...EMPTY_PICKS, cards: [1] })).toBeNull();
+  });
+
+  it('露娜·满月：非 SHOOT 牌不足 2 张时置灰，引擎也拒绝', () => {
+    const s = asThief('thief_luna_back', cards('action_shoot', 'action_shoot', 'action_kick'));
+    expect(entryOf(s.state, s.me, LUNA_FULL_MOON)!.reason?.key).toBe(
+      'skill.reason.needTwoNonShoot',
+    );
+    expect(
+      apply(s.state, s.me, 'playLunaFullMoon', [['action_shoot', 'action_kick'], []]),
+    ).toBeNull();
+  });
+
+  it('双鱼·洗礼：不复活也能发动；在第 4 层置灰，引擎也拒绝', () => {
+    const s = asThief('thief_pisces_back', cards('action_kick'));
+    const ctx = contextOf(s.state, s.me);
+    expect(buildStepArgs(PISCES_BLESSING, ctx, EMPTY_PICKS)).toEqual([null]);
+    const moved = apply(s.state, s.me, 'playPiscesBlessing', [null])!;
+    expect(moved.G.players[s.me]!.currentLayer).toBe(s.state.G.players[s.me]!.currentLayer + 1);
+    const top = moveTo(s.state, s.me, 4);
+    expect(entryOf(top, s.me, PISCES_BLESSING)!.reason?.key).toBe('skill.reason.piscesTopLayer');
+    expect(apply(top, s.me, 'playPiscesBlessing', [null])).toBeNull();
+  });
+
+  it('双鱼·洗礼：复活的对象必须已死亡；点名活人引擎拒绝', () => {
+    const s = asThief('thief_pisces_back', cards('action_kick'));
+    expect(apply(s.state, s.me, 'playPiscesBlessing', [s.others[0]!])).toBeNull();
+  });
+
+  it('格林射线·缉捕：缺梦境穿梭剂或 SHOOT 类牌时置灰，引擎也拒绝', () => {
+    const noTransit = asThief('thief_green_ray', cards('action_shoot', 'action_kick'));
+    expect(entryOf(noTransit.state, noTransit.me, GREEN_RAY_ARREST)!.reason?.key).toBe(
+      'skill.reason.noTransitInHand',
+    );
+    const mate = noTransit.others[0]!;
+    expect(
+      apply(noTransit.state, noTransit.me, 'playGreenRayArrest', ['action_shoot', mate, 2]),
+    ).toBeNull();
+    const noShoot = asThief('thief_green_ray', cards('action_dream_transit', 'action_kick'));
+    expect(entryOf(noShoot.state, noShoot.me, GREEN_RAY_ARREST)!.reason?.key).toBe(
+      'skill.reason.noShootCard',
+    );
+  });
+
+  it('格林射线·缉捕：只能选 SHOOT 类牌；层只列有目标的层，目标是移动后同层的存活玩家', () => {
+    const s = asThief(
+      'thief_green_ray',
+      cards('action_dream_transit', 'action_kick', 'action_shoot'),
+    );
+    const ctx = contextOf(s.state, s.me);
+    expect(handChoicesFor(GREEN_RAY_ARREST, ctx)).toEqual([2]);
+    const picks = { ...EMPTY_PICKS, cards: [2] };
+    const layers = layerStepChoices(GREEN_RAY_ARREST, ctx, picks);
+    // 每个列出的层上都有至少一名其他存活玩家；没人的层不列
+    for (const layer of layers) {
+      expect(
+        s.state.G.layers[layer]!.playersInLayer.filter((id) => id !== s.me).length,
+      ).toBeGreaterThan(0);
+    }
+    for (const layer of [1, 2, 3, 4].filter((l) => !layers.includes(l))) {
+      expect(s.state.G.layers[layer]!.playersInLayer.filter((id) => id !== s.me)).toEqual([]);
+    }
+    const layer = layers[0]!;
+    const targets = playerChoicesFor(GREEN_RAY_ARREST, ctx, { ...picks, layer }, [], []);
+    expect(targets).toEqual(s.state.G.layers[layer]!.playersInLayer.filter((id) => id !== s.me));
+    // 引擎对不在该层的目标拒绝
+    const elsewhere = Object.keys(s.state.G.players).find(
+      (id) => id !== s.me && !targets.includes(id),
+    )!;
+    expect(
+      apply(s.state, s.me, 'playGreenRayArrest', ['action_shoot', elsewhere, layer]),
+    ).toBeNull();
+  });
+
+  it('格林射线·缉捕：刺客之王不限层，所有存活的其他玩家都可选', () => {
+    const s = asThief('thief_green_ray', cards('action_dream_transit', 'action_shoot_assassin'));
+    const ctx = contextOf(s.state, s.me);
+    const targets = playerChoicesFor(
+      GREEN_RAY_ARREST,
+      ctx,
+      { ...EMPTY_PICKS, cards: [1], layer: 4 },
+      [],
+      [],
+    );
+    expect([...targets].sort()).toEqual(
+      Object.keys(s.state.G.players)
+        .filter((id) => id !== s.me)
+        .sort(),
+    );
+    const far = targets.find((id) => s.state.G.players[id]!.currentLayer !== 4)!;
+    expect(
+      apply(s.state, s.me, 'playGreenRayArrest', ['action_shoot_assassin', far, 4]),
+    ).not.toBeNull();
+  });
+
+  it('水瓶·凝聚：本回合没有同名牌对时置灰并说明，引擎也拒绝', () => {
+    const s = asThief('thief_aquarius', cards('action_kick'));
+    const state = setDiscard(s.state, cards('action_unlock'));
+    const entry = entryOf(state, s.me, AQUARIUS_COHERENCE)!;
+    expect(entry.enabled).toBe(false);
+    expect(entry.reason?.key).toBe('skill.reason.needSameNamePair');
+    expect(apply(state, s.me, 'playAquariusCoherence', ['action_unlock'])).toBeNull();
+  });
+
+  it('水瓶·凝聚：弃牌堆里本回合已用过的牌不可选，引擎也拒绝；同名牌合并显示张数', () => {
+    const s = asThief('thief_aquarius', cards('action_kick'));
+    let state = setDiscard(s.state, cards('action_kick', 'action_unlock', 'action_unlock'));
+    state = editG(state, (G) => ({
+      ...G,
+      playedCardsThisTurn: cards('action_kick', 'action_kick'),
+    }));
+    const ctx = contextOf(state, s.me);
+    expect(discardChoicesFor(AQUARIUS_COHERENCE, ctx)).toEqual([
+      { card: 'action_unlock', count: 2 },
+    ]);
+    expect(apply(state, s.me, 'playAquariusCoherence', ['action_kick'])).toBeNull();
+    expect(entryOf(state, s.me, AQUARIUS_COHERENCE)).toMatchObject({ enabled: true, remaining: 1 });
+  });
+
+  it('水瓶·凝聚：弃牌堆里全是本回合用过的牌时置灰', () => {
+    const s = asThief('thief_aquarius', cards('action_kick'));
+    let state = setDiscard(s.state, cards('action_kick'));
+    state = editG(state, (G) => ({
+      ...G,
+      playedCardsThisTurn: cards('action_kick', 'action_kick'),
+    }));
+    expect(entryOf(state, s.me, AQUARIUS_COHERENCE)!.reason?.key).toBe(
+      'skill.reason.noFreshInDiscard',
+    );
+  });
+
+  it('射手·穿心：本回合没有击杀过玩家时置灰，引擎也拒绝', () => {
+    const s = asThief('thief_sagittarius', cards('action_kick'));
+    const layer = s.state.G.players[s.me]!.currentLayer;
+    expect(entryOf(s.state, s.me, SAGITTARIUS_HEART_LOCK)!.reason?.key).toBe(
+      'skill.reason.noKillThisTurn',
+    );
+    expect(apply(s.state, s.me, 'useSagittariusHeartLock', [layer, -1])).toBeNull();
+  });
+
+  it('射手·穿心：解封次数用尽时不能减少，只能增加；减少只列还有心锁的层，增加只列没满的层', () => {
+    const s = asThief('thief_sagittarius', cards('action_kick'));
+    const layer = s.state.G.players[s.me]!.currentLayer;
+    let state = patchPlayer(s.state, s.me, {
+      skillUsedThisTurn: { 'thief_sagittarius.kills': 1 },
+      successfulUnlocksThisTurn: 1,
+    });
+    const ctx = contextOf(state, s.me);
+    const choices = SAGITTARIUS_HEART_LOCK.choices!(ctx);
+    expect(choices.find((c) => c.value === 'decrease')!.disabled?.key).toBe(
+      'skill.reason.unlockLimit',
+    );
+    expect(choices.find((c) => c.value === 'increase')!.disabled).toBeNull();
+    // 引擎：减少被拒
+    expect(apply(state, s.me, 'useSagittariusHeartLock', [layer, -1])).toBeNull();
+    // 开局每层都是原有数量：增加没有可选的层（界面不列），减少四层都可选
+    expect(
+      layerStepChoices(SAGITTARIUS_HEART_LOCK, ctx, { ...EMPTY_PICKS, choice: 'increase' }),
+    ).toEqual([]);
+    expect(
+      layerStepChoices(SAGITTARIUS_HEART_LOCK, ctx, { ...EMPTY_PICKS, choice: 'decrease' }),
+    ).toEqual([1, 2, 3, 4]);
+    // 把第 2 层心锁削掉 1 个后，增加只列这一层，引擎接受
+    state = setLayer(state, 2, { heartLockValue: state.G.layers[2]!.heartLockValue - 1 });
+    const ctx2 = contextOf(state, s.me);
+    expect(
+      layerStepChoices(SAGITTARIUS_HEART_LOCK, ctx2, { ...EMPTY_PICKS, choice: 'increase' }),
+    ).toEqual([2]);
+    const after = apply(state, s.me, 'useSagittariusHeartLock', [2, 1])!;
+    expect(after.G.layers[2]!.heartLockValue).toBe(state.G.layers[2]!.heartLockValue + 1);
+  });
+
+  it('金星·镜界复制：只有梦主是金星才有；本回合没有 SHOOT / KICK 时置灰，引擎也拒绝', () => {
+    const s = asThief('thief_aries', cards('action_kick', 'action_unlock'));
+    expect(entryOf(s.state, s.me, VENUS_MIRROR_COPY)).toBeUndefined();
+    const venus = setCharacter(s.state, s.master, 'dm_venus_mirror');
+    expect(entryOf(venus, s.me, VENUS_MIRROR_COPY)!.reason?.key).toBe(
+      'skill.reason.nothingToMirror',
+    );
+    expect(
+      apply(venus, s.me, 'useVenusMirrorWorld', [s.others[0], ['action_kick', 'action_unlock']]),
+    ).toBeNull();
+  });
+
+  it('金星·镜界复制：梦主本人也能用（世界观对所有存活玩家生效）', () => {
+    const s = asMaster('dm_venus_mirror', cards('action_kick', 'action_unlock'));
+    const state = editG(s.state, (G) => ({ ...G, playedCardsThisTurn: cards('action_kick') }));
+    const entry = entryOf(state, s.me, VENUS_MIRROR_COPY)!;
+    expect(entry.enabled).toBe(true);
+    expect(
+      apply(state, s.me, 'useVenusMirrorWorld', [s.thieves[0], ['action_kick', 'action_unlock']]),
+    ).not.toBeNull();
+  });
+
+  it('达尔文·淘汰：必须刚好放回 2 张，手牌不足 2 张时置灰', () => {
+    expect(DARWIN_EVOLUTION.pickCount).toBe(2);
+    const one = asThief('thief_darwin', cards('action_kick'));
+    expect(entryOf(one.state, one.me, DARWIN_EVOLUTION)!.reason?.key).toBe(
+      'skill.reason.needTwoInHand',
+    );
+    const three = asThief('thief_darwin', cards('action_kick', 'action_unlock', 'action_shoot'));
+    expect(entryOf(three.state, three.me, DARWIN_EVOLUTION)!.enabled).toBe(true);
+    // 引擎要求恰好 2 张：1 张或 3 张都拒绝
+    expect(apply(three.state, three.me, 'playDarwinEvolution', [['action_kick']])).toBeNull();
+    expect(
+      apply(three.state, three.me, 'playDarwinEvolution', [
+        ['action_kick', 'action_unlock', 'action_shoot'],
+      ]),
+    ).toBeNull();
+    // 放回的顺序：先选的在最顶
+    const after = apply(three.state, three.me, 'playDarwinEvolution', [
+      ['action_unlock', 'action_kick'],
+    ])!;
+    expect(after.G.deck.cards.slice(0, 2)).toEqual(['action_unlock', 'action_kick']);
   });
 });
 

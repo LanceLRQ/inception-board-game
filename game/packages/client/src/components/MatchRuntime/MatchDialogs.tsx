@@ -20,6 +20,7 @@ import { GravityTargetPickerDialog } from '../GravityTargetPickerDialog';
 import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
 import { ReviveDialog } from '../ReviveDialog';
+import { BlackSwanTourDialog } from '../BlackSwanTourDialog';
 import { ShootDiceOverlay } from '../ShootDiceOverlay';
 import { AwaitedResponseSheet } from './shared/AwaitedResponseSheet';
 import type { MatchController } from './controllerTypes';
@@ -31,7 +32,7 @@ interface MatchDialogsProps {
 export function MatchDialogs({ controller }: MatchDialogsProps) {
   const { t } = useTranslation();
   const { view, viewerSeat, viewerLayer, makeMove, nicknameOf } = controller;
-  const { play, gravity, chess, graft, revive, masterMove } = controller;
+  const { play, gravity, chess, graft, revive, masterMove, tour } = controller;
   const { decree } = play;
 
   return (
@@ -177,6 +178,21 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         onToggleCard={revive.toggleCard}
         onConfirm={() => void revive.confirm()}
         onCancel={revive.cancel}
+      />
+
+      {/* 黑天鹅·纷飞：抽牌阶段把全部手牌分给其他盗梦者 */}
+      <BlackSwanTourDialog
+        open={tour.open}
+        hand={tour.hand}
+        recipients={tour.recipients}
+        active={tour.active}
+        assigned={tour.assigned}
+        progress={tour.progress}
+        canConfirm={tour.canConfirm}
+        onPickRecipient={tour.pickRecipient}
+        onTapCard={tour.tapCard}
+        onConfirm={() => void tour.confirm()}
+        onCancel={tour.cancel}
       />
 
       {/* SHOOT·梦境穿梭剂 mode 选择 */}

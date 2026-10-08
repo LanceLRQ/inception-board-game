@@ -446,6 +446,10 @@
       "skill_0": {
         "name": "Luna · Eclipse",
         "desc": "Discard 2 SHOOTs → kill any same-layer player"
+      },
+      "skill_1": {
+        "name": "Luna · Full Moon",
+        "desc": "Discard 2 non-SHOOT cards and revive any number of players from limbo to your layer (possibly none), then flip"
       }
     },
     "thief_athena": {
@@ -542,14 +546,19 @@
       "noShootInDiscard": "No SHOOT-type card in the discard pile",
       "noUnlockCard": "You have no Unlock in hand",
       "noRevealedNightmare": "No nightmare is face up",
-      "echoNeedsParams": "The only face-up nightmare is Echo, which needs a layer and mode first; not supported here yet",
       "noNightmare": "No nightmare to activate",
       "deckShort": "The deck has fewer than 2 cards",
       "deckEmpty": "The deck is empty",
       "discardEmpty": "The discard pile is empty",
       "noAdjacentPlayers": "No living player on the adjacent layers",
       "noPlutoTarget": "No living thief with fewer than 2 cards",
-      "noVaultPair": "Fewer than 2 vaults are still unopened"
+      "noVaultPair": "Fewer than 2 vaults are still unopened",
+      "piscesTopLayer": "Cannot be used on layer 4 (you can only move to a higher adjacent layer)",
+      "needSameNamePair": "Needs 2 same-name cards played this turn for each use",
+      "noFreshInDiscard": "No card in the discard pile that was unused this turn",
+      "noKillThisTurn": "You have not killed anyone this turn",
+      "nothingToMirror": "No SHOOT-type card or KICK has been played this turn, so there is nothing to copy",
+      "needTwoInHand": "Needs at least 2 cards in hand"
     },
     "thief_space_queen": {
       "skill_1": {
@@ -567,12 +576,58 @@
       "skill_0": {
         "name": "Venus · Double",
         "desc": "Reveal the top of the deck and any hand cards; same-name cards go to your hand, the rest are shuffled back (once per turn)"
+      },
+      "worldview": {
+        "name": "Mirror World · Copy",
+        "desc": "Discard 2 cards to repeat the effect of the last SHOOT-type card or KICK played this turn (once per player per turn)"
       }
     },
     "dm_secret_passage": {
       "skill_0": {
         "name": "Secret Passage · Teleport",
         "desc": "Discard 1 Dream Transit to send a thief to the Lost layer (up to 2/turn)"
+      }
+    },
+    "choice": {
+      "increaseLock": "Add 1 heart lock",
+      "decreaseLock": "Remove 1 heart lock"
+    },
+    "hint": {
+      "darwinOrder": "Cards go back on top of the deck in the order you pick them: the first pick is on top. The 2 cards you draw are unknown before you commit, so you can only choose from your current hand."
+    },
+    "step": {
+      "cards": "Choose {{need}} cards from your hand ({{picked}} chosen):",
+      "cardsAny": "Choose cards from your hand ({{picked}} chosen):",
+      "playersMulti": "Choose players (optional, {{picked}} chosen):",
+      "playerOptional": "Choose a player (optional):",
+      "choice": "Choose how:",
+      "nightmareParams": "Set the nightmare parameters:",
+      "back": "Back",
+      "noPlayers": "No player to choose",
+      "noLayers": "No layer to choose"
+    },
+    "thief_pisces": {
+      "skill_1": {
+        "name": "Pisces · Baptism",
+        "desc": "Move to the higher adjacent layer and optionally revive one player from limbo there, then flip (unavailable on layer 4)"
+      }
+    },
+    "thief_green_ray": {
+      "skill_0": {
+        "name": "Green Ray · Arrest",
+        "desc": "Discard 1 Dream Transit and 1 SHOOT-type card, move to any layer, then resolve that SHOOT on a target there"
+      }
+    },
+    "thief_aquarius": {
+      "skill_0": {
+        "name": "Aquarius · Cohere",
+        "desc": "For every 2 same-name cards you played this turn, take 1 card from the discard pile that was not played this turn"
+      }
+    },
+    "thief_sagittarius": {
+      "skill_1": {
+        "name": "Sagittarius · Piercing Shot",
+        "desc": "After killing someone this turn, add or remove 1 heart lock on any layer (never above the original count, once per turn)"
       }
     }
   },
@@ -810,7 +865,7 @@
       "discard": "Discard nightmare",
       "nightmare": "Nightmare: {{name}}",
       "unknown": "There is no nightmare left to flip on this layer.",
-      "plague": "When you activate Plague no bribes are dealt: the thieves on that layer hold none and go to limbo.",
+      "plague": "You name the thieves who receive a bribe card; thieves who are not named and hold no bribe card go to limbo.",
       "scope": "Valid until the end of this turn."
     },
     "sheet": {
@@ -852,6 +907,11 @@
         "add": "Add 1 heart lock",
         "layer": "Layer {{layer}}",
         "confirm": "Confirm"
+      },
+      "ariesPlague": {
+        "title": "Plague",
+        "desc": "Name the thieves who receive a bribe card, or name none.",
+        "confirm": "Activate"
       }
     }
   },
@@ -980,12 +1040,16 @@
       "reviveOther": "Revive ally",
       "masterMove": "Move",
       "skipDraw": "Skip draw",
-      "jokerGamble": "Joker · Wild"
+      "jokerGamble": "Joker · Wild",
+      "blackSwanTour": "Black Swan · Scatter"
     },
     "reason": {
       "handShort": "Reviving costs {{count}} cards from your hand; you have {{have}}",
       "transitShort": "Under the Secret Passage world view reviving costs 1 Dream Transit; you have none",
-      "busy": "Something else is pending; finish it first"
+      "busy": "Something else is pending; finish it first",
+      "tourNoHand": "You have no card to hand out (at least 1 is needed)",
+      "tourUsed": "Already used this turn (once per turn)",
+      "tourNoRecipient": "No other living thief can receive cards"
     },
     "move": {
       "label": "Move",
@@ -1012,5 +1076,33 @@
     "preventMove": {
       "label": "Sagittarius · Hold: the target does not move"
     }
+  },
+  "nightmare": {
+    "layer": "Layer {{layer}}",
+    "echo": {
+      "desc": "Choose a layer: restore its original heart locks, or add 1 heart lock to it.",
+      "layerLabel": "Layer:",
+      "actionLabel": "How:",
+      "restore": "Restore original locks",
+      "add": "Add 1 heart lock"
+    },
+    "plague": {
+      "desc": "Name the thieves who receive a bribe card ({{count}} left in the pool). Thieves who are not named and hold no bribe card go to limbo (not counted as killed).",
+      "label": "Who receives a bribe card",
+      "none": "There is no thief on this layer to name.",
+      "chosen": "{{count}} / {{max}} named",
+      "poolFull": "The bribe pool has no more cards to deal"
+    }
+  },
+  "tour": {
+    "title": "Black Swan · Scatter",
+    "desc": "Skip your draw, hand out your whole hand to other thieves, then draw 4 from the deck. Pick a recipient first, then tap cards to give them to that player; tap again to undo.",
+    "recipient": "Give to:",
+    "assignedTo": "→ {{name}}",
+    "unassigned": "Unassigned",
+    "progress": "{{done}} / {{total}} cards assigned",
+    "confirm": "Confirm and draw 4",
+    "noRecipients": "There is no thief to give cards to.",
+    "cardAria": "{{name}}, {{state}}"
   }
 }

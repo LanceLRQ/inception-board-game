@@ -65,6 +65,17 @@ import {
   reviveTargetIds,
   type DockEntryKind,
 } from './model/dockEntries';
+import {
+  EMPTY_TOUR,
+  buildDistribution,
+  canConfirmTour,
+  pickTourRecipient,
+  tapTourCard,
+  tourProgress,
+  tourRecipientIds,
+  validTourState,
+  type TourState,
+} from './model/tourDistribution';
 import type {
   DockEntry,
   MatchController,
@@ -533,6 +544,8 @@ export function useMatchController(source: MatchSource): MatchController {
     picked: number[];
   } | null>(null);
   const [moveOpenStamp, setMoveOpenStamp] = useState<string | null>(null);
+  // 黑天鹅·纷飞的分发草稿，同样跟着回合与阶段走
+  const [tourDraft, setTourDraft] = useState<{ stamp: string; state: TourState } | null>(null);
   const entrySpecs = useMemo(
     () =>
       G && mySeat !== null && players
@@ -559,6 +572,16 @@ export function useMatchController(source: MatchSource): MatchController {
         : [],
     [mySeat, players],
   );
+  const tourRecipients = useMemo(
+    () =>
+      mySeat !== null && players
+        ? tourRecipientIds(players, mySeat, dreamMasterID).map((id) => ({
+            id,
+            name: (players[id]?.nickname as string | undefined) ?? id,
+          }))
+        : [],
+    [mySeat, players, dreamMasterID],
+  );
   const passage = useMemo(
     () => (players ? isSecretPassageActive(players, dreamMasterID) : false),
     [players, dreamMasterID],
@@ -579,6 +602,17 @@ export function useMatchController(source: MatchSource): MatchController {
         void makeMove(move);
         return;
       }
+      if (kind === 'blackSwanTour') {
+        // 只有一位接收者时直接选中他
+        setTourDraft({
+          stamp: dockStamp,
+          state: {
+            ...EMPTY_TOUR,
+            active: tourRecipients.length === 1 ? tourRecipients[0]!.id : null,
+          },
+        });
+        return;
+      }
       const mode = kind === 'reviveSelf' ? 'self' : 'other';
       setReviveDraft({
         stamp: dockStamp,
@@ -587,7 +621,16 @@ export function useMatchController(source: MatchSource): MatchController {
         picked: [],
       });
     },
-    [cancelPlay, dockStamp, makeMove, reviveTargets, setMoveOpenStamp, setReviveDraft],
+    [
+      cancelPlay,
+      dockStamp,
+      makeMove,
+      reviveTargets,
+      setMoveOpenStamp,
+      setReviveDraft,
+      setTourDraft,
+      tourRecipients,
+    ],
   );
   const entries: DockEntry[] = entrySpecs.map((spec) => ({
     ...spec,
@@ -664,6 +707,33 @@ export function useMatchController(source: MatchSource): MatchController {
     makeMove,
     setReviveDraft,
   ]);
+
+  const tourOpen =
+    tourDraft !== null &&
+    tourDraft.stamp === dockStamp &&
+    entrySpecs.some((e) => e.kind === 'blackSwanTour' && e.enabled);
+  const tourState = validTourState(
+    tourDraft?.state ?? EMPTY_TOUR,
+    humanHand.length,
+    tourRecipients.map((r) => r.id),
+  );
+  const tourCanConfirm =
+    tourOpen &&
+    canConfirmTour(
+      tourState.assigned,
+      humanHand.length,
+      tourRecipients.map((r) => r.id),
+    );
+  const confirmTour = useCallback(async () => {
+    if (!tourCanConfirm) return;
+    const distribution = buildDistribution(humanHand, tourState.assigned);
+    logger.flow('game/move', 'black swan tour', {
+      recipients: Object.keys(distribution),
+      cards: humanHand.length,
+    });
+    const outcome = await makeMove('playBlackSwanTour', [distribution]);
+    if (outcome.ok) setTourDraft(null);
+  }, [tourCanConfirm, humanHand, tourState.assigned, makeMove, setTourDraft]);
 
   const masterMoveOpen =
     moveOpenStamp === dockStamp && entrySpecs.some((e) => e.kind === 'masterMove' && e.enabled);
@@ -849,6 +919,38 @@ export function useMatchController(source: MatchSource): MatchController {
       toggleCard: toggleRevivePick,
       confirm: confirmRevive,
       cancel: () => setReviveDraft(null),
+    },
+    tour: {
+      open: tourOpen,
+      hand: humanHand,
+      recipients: tourRecipients,
+      active: tourState.active,
+      assigned: tourState.assigned,
+      progress: tourProgress(tourState.assigned),
+      canConfirm: tourCanConfirm,
+      pickRecipient: (id: string) =>
+        setTourDraft((prev) =>
+          prev ? { ...prev, state: pickTourRecipient(prev.state, id) } : prev,
+        ),
+      tapCard: (index: number) =>
+        setTourDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                state: tapTourCard(
+                  validTourState(
+                    prev.state,
+                    humanHand.length,
+                    tourRecipients.map((r) => r.id),
+                  ),
+                  index,
+                  humanHand.length,
+                ),
+              }
+            : prev,
+        ),
+      confirm: confirmTour,
+      cancel: () => setTourDraft(null),
     },
     masterMove: {
       open: masterMoveOpen,

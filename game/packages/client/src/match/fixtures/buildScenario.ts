@@ -182,6 +182,44 @@ function withoutTransitInDiscard(G: SetupState): SetupState {
   };
 }
 
+/** 把指定的牌从牌库挪进弃牌堆（从真实牌库里取，不凭空造牌）；牌库里没有就说明场景写错了 */
+function discardSpecific(G: SetupState, wanted: CardID[]): SetupState {
+  const deck = [...G.deck.cards];
+  for (const card of wanted) {
+    const at = deck.indexOf(card);
+    if (at < 0) throw new Error(`固定场景弃牌失败：牌库里没有 ${card}`);
+    deck.splice(at, 1);
+  }
+  return { ...G, deck: { cards: deck, discardPile: [...G.deck.discardPile, ...wanted] } };
+}
+
+/** 本回合已打出的牌：记进出牌记录（对应的牌已经在弃牌堆里，由 discardSpecific 保证） */
+function withPlayedCards(G: SetupState, played: CardID[]): SetupState {
+  return {
+    ...G,
+    playedCardsThisTurn: played,
+    lastPlayedCardThisTurn: played[played.length - 1] ?? null,
+  };
+}
+
+/** 本人在本回合的技能使用记录里加几个键 */
+function withSkillUsed(G: SetupState, seat: string, used: Record<string, number>): SetupState {
+  const p = G.players[seat]!;
+  return {
+    ...G,
+    players: {
+      ...G.players,
+      [seat]: { ...p, skillUsedThisTurn: { ...p.skillUsedThisTurn, ...used } },
+    },
+  };
+}
+
+/** 最后一名盗梦者（不是本人）被击杀，进了迷失层：走查复活类技能的复活对象 */
+function withDeadMate(G: SetupState, who: { viewer: string; master: string }): SetupState {
+  const mate = G.playerOrder.filter((id) => id !== who.master && id !== who.viewer).pop()!;
+  return killPlayer(G, mate);
+}
+
 const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
   // 抽牌阶段：略过抽牌的入口
   'skill-draw': { viewer: 'thief', character: 'thief_aries', phase: 'draw' },
@@ -246,6 +284,47 @@ const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
       players: { ...G.players, [viewer]: { ...G.players[viewer]!, successfulUnlocksThisTurn: 1 } },
     }),
   },
+  // 黑天鹅：抽牌阶段，手里有牌，同桌有存活的盗梦者可以接收
+  'skill-black-swan': { viewer: 'thief', character: 'thief_black_swan', phase: 'draw' },
+  // 露娜翻到背面：手里有非 SHOOT 牌，一名盗梦者同伴在迷失层（满月的复活对象）
+  'skill-luna': {
+    viewer: 'thief',
+    character: 'thief_luna_back',
+    adjust: (G, who) => withDeadMate(G, who),
+  },
+  // 双鱼翻到背面：一名盗梦者同伴在迷失层（洗礼可以顺便复活）
+  'skill-pisces': {
+    viewer: 'thief',
+    character: 'thief_pisces_back',
+    adjust: (G, who) => withDeadMate(G, who),
+  },
+  // 达尔文：手里有 4 张牌，放回的 2 张从中选
+  'skill-darwin': { viewer: 'thief', character: 'thief_darwin' },
+  // 格林射线：手里有梦境穿梭剂和 SHOOT
+  'skill-green-ray': { viewer: 'thief', character: 'thief_green_ray' },
+  // 水瓶：本回合打出过两张 KICK，弃牌堆里还有别的牌
+  'skill-aquarius': {
+    viewer: 'thief',
+    character: 'thief_aquarius',
+    adjust: (G) =>
+      withPlayedCards(
+        discardSpecific(G, cards('action_kick', 'action_kick')),
+        cards('action_kick', 'action_kick'),
+      ),
+  },
+  // 射手：本回合击杀过玩家，可以发动穿心
+  'skill-heart-lock': {
+    viewer: 'thief',
+    character: 'thief_sagittarius',
+    adjust: (G, { viewer }) => withSkillUsed(G, viewer, { 'thief_sagittarius.kills': 1 }),
+  },
+  // 金星·镜界世界观：本回合打出过一张 KICK，可以弃 2 张牌复制它
+  'skill-venus-mirror': {
+    viewer: 'thief',
+    character: 'thief_aries',
+    masterCharacter: 'dm_venus_mirror',
+    adjust: (G) => withPlayedCards(discardSpecific(G, cards('action_kick')), cards('action_kick')),
+  },
   'skill-venus': { viewer: 'master', character: 'dm_venus_mirror' },
   // 密道：手里有梦境穿梭剂
   'skill-passage': {
@@ -253,17 +332,20 @@ const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
     character: 'dm_secret_passage',
     adjust: (G, { viewer }) => dealSpecific(G, viewer, cards('action_dream_transit')),
   },
-  // 梦主：第 2 层的梦魇已翻开（致命漩涡），第 3 层的梦魇已翻开（回音萦绕，发动要附加参数）
+  // 梦主：第 2 层的梦魇已翻开（致命漩涡），第 3 层的梦魇已翻开（回音萦绕，发动要选层与方式），
+  // 第 1 层的梦魇已翻开（邪念瘟疫，发动要点名派发贿赂牌的盗梦者）
   'skill-nightmare': {
     viewer: 'master',
     character: PLAIN_MASTER,
     adjust: (G) => {
       let s = placeNightmare(G, 2, 'nightmare_vortex' as CardID);
       s = placeNightmare(s, 3, 'nightmare_echo' as CardID);
+      s = placeNightmare(s, 1, 'nightmare_plague' as CardID);
       return {
         ...s,
         layers: {
           ...s.layers,
+          1: { ...s.layers[1]!, nightmareRevealed: true },
           2: { ...s.layers[2]!, nightmareRevealed: true },
           3: { ...s.layers[3]!, nightmareRevealed: true },
         },
@@ -278,7 +360,9 @@ const isMasterScenario = (id: FixtureScenarioId): boolean =>
   id === 'master-pending' ||
   id === 'master-chess' ||
   id === 'master-mate-dead' ||
-  id === 'master-bribe';
+  id === 'master-bribe' ||
+  id === 'master-vault-echo' ||
+  id === 'master-vault-plague';
 const isDiscardScenario = (id: FixtureScenarioId): boolean => id === 'thief-discard';
 /** 弃牌场景里本人多摸的牌数：缺省 4 张手牌 + 3 = 7 张，超出手牌上限（5）2 张 */
 const DISCARD_EXTRA_CARDS = 3;
@@ -310,11 +394,14 @@ const RESPONSE_SPECS: Partial<Record<FixtureScenarioId, ResponseSpec>> = {
   'thief-pending-virgo': { viewerCharacter: 'thief_virgo', turnOwner: 'other' },
   // 一名盗梦者被击杀：本人是白羊，该层的梦魇是回音萦绕
   'thief-pending-aries': { viewerCharacter: 'thief_aries', turnOwner: 'other' },
+  // 同上，该层的梦魇是邪念瘟疫（发动要点名派发贿赂牌的盗梦者）
+  'thief-pending-aries-plague': { viewerCharacter: 'thief_aries', turnOwner: 'other' },
 };
 
-/** 白羊场景里被击杀者原来所在的层、以及那一层的梦魇 */
+/** 白羊场景里被击杀者原来所在的层 */
 const ARIES_VICTIM_LAYER: Layer = 2;
-const ARIES_NIGHTMARE = 'nightmare_echo' as CardID;
+/** 金库三选一场景里被打开的金库所在的层 */
+const VAULT_LAYER: Layer = 2;
 
 /** 把角色给某人；原来拿着这个角色的人换到他原来的角色，保证全桌没有重复角色 */
 function assignCharacter(G: SetupState, seat: string, characterId: string): SetupState {
@@ -512,10 +599,15 @@ export function buildFixtureMatch(
       state = { ...state, G: G2 };
       break;
     }
-    case 'thief-pending-aries': {
+    case 'thief-pending-aries':
+    case 'thief-pending-aries-plague': {
       // 引擎里这一步由 SHOOT 击杀盗梦者触发；这里直接摆出结果：被击杀者在迷失层，白羊的选择待决
       let G2 = killPlayer(state.G, lastThief);
-      G2 = placeNightmare(G2, ARIES_VICTIM_LAYER, ARIES_NIGHTMARE);
+      G2 = placeNightmare(
+        G2,
+        ARIES_VICTIM_LAYER,
+        (id === 'thief-pending-aries' ? 'nightmare_echo' : 'nightmare_plague') as CardID,
+      );
       G2 = {
         ...G2,
         pendingAriesChoice: {
@@ -524,6 +616,18 @@ export function buildFixtureMatch(
           victimID: lastThief,
         },
       };
+      state = { ...state, G: G2 };
+      break;
+    }
+    case 'master-vault-echo':
+    case 'master-vault-plague': {
+      // 引擎里这一步由盗梦者打开金币金库触发；这里直接摆出结果：第一名盗梦者在 VAULT_LAYER 层开箱，梦主待三选一
+      let G2 = placeNightmare(
+        state.G,
+        VAULT_LAYER,
+        (id === 'master-vault-echo' ? 'nightmare_echo' : 'nightmare_plague') as CardID,
+      );
+      G2 = { ...G2, pendingVaultDecision: { layer: VAULT_LAYER, openerID: thieves[0]! } };
       state = { ...state, G: G2 };
       break;
     }

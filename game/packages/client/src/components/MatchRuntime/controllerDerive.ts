@@ -506,6 +506,7 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
       !!players && !!dreamMasterID && players[dreamMasterID]?.characterId === 'dm_mars_battlefield',
     skillUsedThisGame: humanPlayer?.skillUsedThisGame ?? {},
     unopenedVaults: Array.isArray(G.vaults) ? unopenedVaultCount(G.vaults) : 0,
+    playedCards: Array.isArray(G.playedCardsThisTurn) ? G.playedCardsThisTurn : [],
     ...(seat !== null ? { seat } : {}),
     isDreamMaster: seat !== null && seat === dreamMasterID,
     dreamMasterID,

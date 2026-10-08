@@ -87,6 +87,8 @@ describe('awaitedCopy', () => {
       victimLayer: 3,
       nightmareId: 'nightmare_plague',
       params: 'plague',
+      candidates: [],
+      bribePoolCount: 0,
     } as const;
     const copy = awaitedCopy(base, deps);
     expect(copy.bodyParams).toEqual({ name: '玩家2', layer: 3 });

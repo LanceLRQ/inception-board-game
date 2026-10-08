@@ -21,6 +21,14 @@ describe('resolveFixtureScenario · skill=', () => {
     ['terrorist', 'skill-terrorist'],
     ['sagittarius', 'skill-sagittarius'],
     ['venus', 'skill-venus'],
+    ['black-swan', 'skill-black-swan'],
+    ['luna', 'skill-luna'],
+    ['pisces', 'skill-pisces'],
+    ['darwin', 'skill-darwin'],
+    ['green-ray', 'skill-green-ray'],
+    ['aquarius', 'skill-aquarius'],
+    ['heart-lock', 'skill-heart-lock'],
+    ['venus-mirror', 'skill-venus-mirror'],
     ['passage', 'skill-passage'],
     ['imperial', 'skill-imperial'],
     ['saturn', 'skill-saturn'],
@@ -101,6 +109,17 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('pending=sudger')).toBe('thief-pending-sudger');
     expect(idOf('pending=virgo')).toBe('thief-pending-virgo');
     expect(idOf('pending=aries')).toBe('thief-pending-aries');
+    expect(idOf('pending=aries-plague')).toBe('thief-pending-aries-plague');
+  });
+
+  it('vault=echo|plague 与 as=master 叠加：梦主待金库三选一，该层梦魇是回音萦绕 / 邪念瘟疫', () => {
+    expect(idOf('as=master&vault=echo')).toBe('master-vault-echo');
+    expect(idOf('as=master&vault=plague')).toBe('master-vault-plague');
+    expect(idOf('as=master&vault=other')).toBe('master');
+    // 盗梦者视角、响应窗口、棋局参数让位
+    expect(idOf('vault=echo')).toBe('thief');
+    expect(idOf('as=master&vault=echo&pending=1')).toBe('master-pending');
+    expect(idOf('as=master&vault=echo&chess=1')).toBe('master-chess');
   });
 
   it('待应答场景只在盗梦者视角：as=master 时忽略；弃牌参数让位于待应答', () => {

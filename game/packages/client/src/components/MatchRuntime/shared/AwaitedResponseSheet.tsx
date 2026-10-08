@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog';
 import { ECHO_LAYERS, splitPiles } from '../response/awaitedResponse';
+import { NightmareParamsForm } from '../../NightmareParamsForm';
 import type { MatchController } from '../controllerTypes';
 
 interface ChoiceProps {
@@ -231,6 +232,21 @@ export function AwaitedResponseSheet({ controller }: AwaitedResponseSheetProps) 
           ))}
         </div>
       </>
+    );
+  } else if (awaited !== null && mode === 'aries-plague' && awaited.kind === 'aries') {
+    title = t('awaited.sheet.ariesPlague.title');
+    description = t('awaited.sheet.ariesPlague.desc');
+    confirmLabel = t('awaited.sheet.ariesPlague.confirm');
+    body = (
+      <NightmareParamsForm
+        kind="plague"
+        draft={draft}
+        onChange={(next) => sheet.setNightmareDraft(next)}
+        candidates={awaited.candidates}
+        poolCount={awaited.bribePoolCount}
+        nicknameOf={controller.nicknameOf}
+        testIdPrefix="awaited-nm"
+      />
     );
   }
 

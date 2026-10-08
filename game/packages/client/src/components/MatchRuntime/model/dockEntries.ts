@@ -2,7 +2,7 @@
 // 纯函数：只读按座位裁剪的视图里公开的字段（谁在迷失层、梦主是谁与角色、本人手牌与本人回合计数），
 // 与布局无关；引擎的合法性判定在服务端，这里只把「引擎必拒」的入口提前置灰并说明原因。
 //
-// 抽牌阶段还有：略过抽牌、小丑·失控（略过抽牌后掷骰决定抽几张）。
+// 抽牌阶段还有：略过抽牌、小丑·失控（略过抽牌后掷骰决定抽几张）、黑天鹅·纷飞（把全部手牌分给其他盗梦者再抽 4 张）。
 //
 // 对照：docs/manual/03-game-flow.md:65-67 复活（出牌阶段弃 2 张手牌复活自己或他人；复活自己到第 1 层、
 //       复活他人到自己所在层；自己在迷失层不能复活他人）；
@@ -34,10 +34,15 @@ export type DockEntryKind =
   | 'reviveOther'
   | 'masterMove'
   | 'skipDraw'
-  | 'jokerGamble';
+  | 'jokerGamble'
+  | 'blackSwanTour';
 
 /** 小丑的角色标识：抽牌阶段可以改掷骰抽牌（小丑·失控） */
 export const JOKER_CHARACTER_ID = 'thief_joker';
+/** 黑天鹅的角色标识：抽牌阶段可以把全部手牌分给其他盗梦者再抽 4 张（黑天鹅·纷飞） */
+export const BLACK_SWAN_CHARACTER_ID = 'thief_black_swan';
+/** 黑天鹅·纷飞的技能使用记录键（与引擎的 BLACK_SWAN_SKILL_ID 一致，有测试对账）：回合限一次 */
+export const BLACK_SWAN_SKILL_KEY = 'thief_black_swan.skill_0';
 
 /** 入口不可用的原因（i18n 键 + 参数） */
 export interface EntryReason {
@@ -152,7 +157,9 @@ export function deriveDockEntries(input: DockEntriesInput): DockEntrySpec[] {
   const me = players[seat];
   if (!me) return [];
 
-  if (turnPhase === 'draw') return deriveDrawEntries(me, busy);
+  if (turnPhase === 'draw') {
+    return deriveDrawEntries({ seat, dreamMasterID, players, me, hand, busy });
+  }
   if (turnPhase !== 'action') return [];
 
   const passage = isSecretPassageActive(players, dreamMasterID);
@@ -187,18 +194,43 @@ export function deriveDockEntries(input: DockEntriesInput): DockEntrySpec[] {
 }
 
 /**
- * 抽牌阶段的入口：略过抽牌（任何人都可以）；小丑存活时多一个小丑·失控。
- * 对照：docs/manual/05-dream-thieves.md 小丑；引擎的 skipDraw / playJokerGamble（只认抽牌阶段与本人回合）
+ * 抽牌阶段的入口：略过抽牌（任何人都可以）；小丑存活时多一个小丑·失控；黑天鹅存活时多一个黑天鹅·纷飞。
+ * 黑天鹅·纷飞引擎要求：存活、手里至少 1 张牌、本回合没发动过、有别的存活盗梦者可以接收（梦主不算）。
+ * 对照：docs/manual/05-dream-thieves.md 小丑、黑天鹅；引擎的 skipDraw / playJokerGamble / playBlackSwanTour（只认抽牌阶段与本人回合）
  */
-function deriveDrawEntries(me: EntryPlayer, busy: boolean): DockEntrySpec[] {
-  const reason: EntryReason | null = busy ? { key: 'entries.reason.busy' } : null;
-  const entry = (kind: DockEntryKind): DockEntrySpec => ({
+function deriveDrawEntries(input: {
+  readonly seat: string;
+  readonly dreamMasterID: string;
+  readonly players: Readonly<Record<string, EntryPlayer | undefined>>;
+  readonly me: EntryPlayer;
+  readonly hand: readonly string[];
+  readonly busy: boolean;
+}): DockEntrySpec[] {
+  const { seat, dreamMasterID, players, me, hand, busy } = input;
+  const busyReason: EntryReason | null = busy ? { key: 'entries.reason.busy' } : null;
+  const entry = (kind: DockEntryKind, reason: EntryReason | null = busyReason): DockEntrySpec => ({
     kind,
     enabled: reason === null,
     reason,
   });
   const out = [entry('skipDraw')];
   if (me.isAlive && me.characterId === JOKER_CHARACTER_ID) out.push(entry('jokerGamble'));
+  if (me.isAlive && me.characterId === BLACK_SWAN_CHARACTER_ID) {
+    const recipients = Object.entries(players).filter(
+      ([id, p]) => id !== seat && id !== dreamMasterID && p?.isAlive === true,
+    ).length;
+    const used = (me.skillUsedThisTurn?.[BLACK_SWAN_SKILL_KEY] ?? 0) > 0;
+    const reason: EntryReason | null = busyReason
+      ? busyReason
+      : hand.length === 0
+        ? { key: 'entries.reason.tourNoHand' }
+        : used
+          ? { key: 'entries.reason.tourUsed' }
+          : recipients === 0
+            ? { key: 'entries.reason.tourNoRecipient' }
+            : null;
+    out.push(entry('blackSwanTour', reason));
+  }
   return out;
 }
 
@@ -215,5 +247,7 @@ export function entryTestId(kind: DockEntryKind): string {
       return 'dock-entry-skip-draw';
     case 'jokerGamble':
       return 'dock-entry-joker';
+    case 'blackSwanTour':
+      return 'dock-entry-tour';
   }
 }
