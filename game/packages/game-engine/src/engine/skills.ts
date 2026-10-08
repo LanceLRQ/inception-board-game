@@ -938,22 +938,48 @@ export function applyKickEffect(
 }
 
 // === 雅典娜 · 急智 ===
-// 同层盗梦者对你用行动牌时，可先抽弃牌堆 1 张。回合限 1 次（每个对手回合）
+// 每当另一同层盗梦者对你使用行动牌时，你可以先从弃牌堆选取 1 张牌收入手牌。回合限 1 次。
+// 详述：在每个不同玩家的回合都能使用一次；使用时机仅限同层的盗梦者，使用时检定。
+// 触发与挂起见 engine/athenaWit.ts；这里是选牌与次数的纯函数。
+// 对照：docs/manual/05-dream-thieves.md:160-170 雅典娜
 export const ATHENA_WIT_SKILL_ID = 'thief_athena.skill_0';
+/**
+ * 急智最近一次用在哪个回合（回合号），记在雅典娜的 skillUsedThisGame 里。
+ * 每个不同玩家的回合各能用一次，所以不能用「在雅典娜自己的回合开始清零」的 skillUsedThisTurn：
+ * 别人的回合里那张表不会被清零，同一个值会一直挡到她自己的回合。
+ */
+export const ATHENA_WIT_TURN_KEY = 'thief_athena.skill_0.turn';
 
-/** 雅典娜·急智：从弃牌堆顶抽 1 张到 selfID 手牌（纯函数） */
-export function applyAthenaWit(state: SetupState, selfID: string): SetupState | null {
+/** 雅典娜在回合号 turnNumber 这个回合里是否已经用过急智 */
+export function athenaWitUsedInTurn(player: PlayerSetup, turnNumber: number): boolean {
+  return player.skillUsedThisGame[ATHENA_WIT_TURN_KEY] === turnNumber;
+}
+
+/** 雅典娜·急智：从弃牌堆里选取 cardId 这一张收入手牌，并记下本回合已用（纯函数） */
+export function applyAthenaWitPick(
+  state: SetupState,
+  selfID: string,
+  cardId: CardID,
+): SetupState | null {
   const player = state.players[selfID];
   if (!player || player.characterId !== 'thief_athena') return null;
   if (!player.isAlive) return null;
-  if (state.deck.discardPile.length === 0) return null;
-
-  const top = state.deck.discardPile[state.deck.discardPile.length - 1]!;
-  const newDiscard = state.deck.discardPile.slice(0, -1);
+  if (athenaWitUsedInTurn(player, state.turnNumber)) return null;
+  const at = state.deck.discardPile.indexOf(cardId);
+  if (at === -1) return null;
+  const discardPile = [...state.deck.discardPile];
+  discardPile.splice(at, 1);
   return {
     ...state,
-    players: { ...state.players, [selfID]: { ...player, hand: [...player.hand, top] } },
-    deck: { ...state.deck, discardPile: newDiscard },
+    players: {
+      ...state.players,
+      [selfID]: {
+        ...player,
+        hand: [...player.hand, cardId],
+        skillUsedThisGame: { ...player.skillUsedThisGame, [ATHENA_WIT_TURN_KEY]: state.turnNumber },
+      },
+    },
+    deck: { ...state.deck, discardPile },
   };
 }
 
@@ -1112,48 +1138,69 @@ export function jokerDrawCount(roll: number): number {
   return Math.max(1, Math.min(6, roll));
 }
 
-// === 黑洞 · 征收（抽牌阶段所有同层玩家给 1 张）（纯函数） ===
+// === 黑洞 · 吞噬 ===
+// 抽牌阶段可以放弃抽牌，改为令所有当层的玩家各给你 1 张手牌。回合限 1 次。
+// 有手牌的同层玩家（含梦主）各自选 1 张交出，没手牌的不用给；同层没有任何人给得出牌时不能发动。
+// 放弃抽牌：不抽牌，也不受任何抽牌数增加效果影响。
+// 对照：docs/manual/05-dream-thieves.md:150-158 黑洞（技能与详述）
 export const BLACK_HOLE_LEVY_SKILL_ID = 'thief_black_hole.skill_0';
 
-export function applyBlackHoleLevy(
-  state: SetupState,
-  selfID: string,
-  giverPicks: Record<string, CardID>, // each player's chosen card to give
-): SetupState | null {
+/** 黑洞发动吞噬时需要交牌的人：同层、存活、手里有牌的其他玩家，按座次排列 */
+export function blackHoleLevyGivers(state: SetupState, blackHoleID: string): string[] {
+  const holder = state.players[blackHoleID];
+  if (!holder) return [];
+  return state.playerOrder.filter((id) => {
+    const p = state.players[id];
+    return (
+      id !== blackHoleID &&
+      p !== undefined &&
+      p.isAlive &&
+      p.currentLayer === holder.currentLayer &&
+      p.hand.length > 0
+    );
+  });
+}
+
+/** 第 1 步：黑洞发动。记一次使用，挂起交牌等待；牌和抽牌阶段都还没动 */
+export function startBlackHoleLevy(state: SetupState, selfID: string): SetupState | null {
   const player = state.players[selfID];
   if (!player || player.characterId !== 'thief_black_hole') return null;
   if (!player.isAlive) return null;
   if (!canUseSkill(player, BLACK_HOLE_LEVY_SKILL_ID, 'ownTurnOncePerTurn')) return null;
-  const layerInfo = state.layers[player.currentLayer];
-  if (!layerInfo) return null;
-  const otherPlayers = layerInfo.playersInLayer.filter((id) => id !== selfID);
-  if (otherPlayers.length === 0) return null;
-  // 校验所有 giverPicks 都来自同层玩家
-  for (const giverId of otherPlayers) {
-    const card = giverPicks[giverId];
-    if (!card) return null;
-    const giver = state.players[giverId];
-    if (!giver || !giver.isAlive) return null;
-    if (!giver.hand.includes(card)) return null;
-  }
+  const givers = blackHoleLevyGivers(state, selfID);
+  if (givers.length === 0) return null;
+  const used = markSkillUsed(state, selfID, BLACK_HOLE_LEVY_SKILL_ID);
+  return { ...used, pendingBlackHoleLevy: { blackHoleID: selfID, waiting: givers } };
+}
 
-  const s = markSkillUsed(state, selfID, BLACK_HOLE_LEVY_SKILL_ID);
-  const newPlayers = { ...s.players };
-  const totalCollected: CardID[] = [];
-  for (const giverId of otherPlayers) {
-    const card = giverPicks[giverId]!;
-    const giver = newPlayers[giverId]!;
-    const idx = giver.hand.indexOf(card);
-    const newHand = [...giver.hand];
-    newHand.splice(idx, 1);
-    newPlayers[giverId] = { ...giver, hand: newHand };
-    totalCollected.push(card);
-  }
-  newPlayers[selfID] = {
-    ...newPlayers[selfID]!,
-    hand: [...newPlayers[selfID]!.hand, ...totalCollected],
+/**
+ * 第 2 步：名单里的一个人交出自己选的 1 张手牌。牌立即转进黑洞手里，交牌人移出名单；
+ * 名单空了就清除等待（抽牌阶段由调用方结束）。牌不在手里、不在名单里返回 null。
+ */
+export function applyBlackHoleLevyGive(
+  state: SetupState,
+  giverID: string,
+  cardId: CardID,
+): SetupState | null {
+  const levy = state.pendingBlackHoleLevy;
+  if (!levy || !levy.waiting.includes(giverID)) return null;
+  const giver = state.players[giverID];
+  const holder = state.players[levy.blackHoleID];
+  if (!giver || !holder) return null;
+  const at = giver.hand.indexOf(cardId);
+  if (at === -1) return null;
+  const hand = [...giver.hand];
+  hand.splice(at, 1);
+  const waiting = levy.waiting.filter((id) => id !== giverID);
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [giverID]: { ...giver, hand },
+      [levy.blackHoleID]: { ...holder, hand: [...holder.hand, cardId] },
+    },
+    pendingBlackHoleLevy: waiting.length === 0 ? null : { ...levy, waiting },
   };
-  return { ...s, players: newPlayers };
 }
 
 // === 黑洞 · 吸纳（出牌阶段，指定相邻层，该层所有玩家移到黑洞所在层） ===
@@ -1570,40 +1617,58 @@ export function applyGaiaShift(
   return s;
 }
 
-// === 达尔文 · 进化 ===
-// 出牌阶段：抽牌库顶 2 张 → 任意 2 张手牌按任意顺序放回牌库顶。每回合 1 次
-// MVP：一步式 — 输入 returnCards（要放回顶的 2 张，第一张为最顶）
+// === 达尔文 · 淘汰（引擎里叫进化） ===
+// 卡面：「你的出牌阶段，你可以将牌库顶2张牌收为手牌，然后将2张手牌按任意顺序放回牌库顶。每回合仅可使用一次。」
+// 分两步：发动时先抽牌库顶 2 张并挂起；达尔文再从抽牌后的手牌里选刚好 2 张按顺序放回（第一张在最上面）。
+// 所以放回的牌可以是刚抽到的，也可以是原有的手牌。
+// 扩展角色，说明书没有收录，规则以卡面为准。
 export const DARWIN_SKILL_ID = 'thief_darwin.skill_0';
+const DARWIN_DRAW_COUNT = 2;
 
-export function applyDarwinEvolution(
+/** 第 1 步：发动。记一次使用，牌库顶 2 张收入手牌，挂起等达尔文选牌 */
+export function startDarwinEvolution(state: SetupState, selfID: string): SetupState | null {
+  const player = state.players[selfID];
+  if (!player || player.characterId !== 'thief_darwin') return null;
+  if (!player.isAlive) return null;
+  if (state.deck.cards.length < DARWIN_DRAW_COUNT) return null;
+  if (!canUseSkill(player, DARWIN_SKILL_ID, 'ownTurnOncePerTurn')) return null;
+
+  const drawn = state.deck.cards.slice(0, DARWIN_DRAW_COUNT);
+  const used = markSkillUsed(state, selfID, DARWIN_SKILL_ID);
+  const owner = used.players[selfID]!;
+  return {
+    ...used,
+    players: { ...used.players, [selfID]: { ...owner, hand: [...owner.hand, ...drawn] } },
+    deck: { ...used.deck, cards: used.deck.cards.slice(DARWIN_DRAW_COUNT) },
+    pendingDarwinReturn: { playerID: selfID },
+  };
+}
+
+/**
+ * 第 2 步：达尔文选刚好 2 张手牌按顺序（第一张在最上面）放回牌库顶，清除等待。
+ * 张数不对、牌不在手里（按张数计，同名牌要有足够的张数）返回 null。
+ */
+export function applyDarwinReturn(
   state: SetupState,
   selfID: string,
   returnCards: readonly CardID[],
 ): SetupState | null {
+  const pending = state.pendingDarwinReturn;
+  if (!pending || pending.playerID !== selfID) return null;
   const player = state.players[selfID];
-  if (!player || player.characterId !== 'thief_darwin') return null;
-  if (!player.isAlive) return null;
-  if (state.deck.cards.length < 2) return null;
-  if (returnCards.length !== 2) return null;
-  if (!canUseSkill(player, DARWIN_SKILL_ID, 'ownTurnOncePerTurn')) return null;
-
-  // 抽牌库顶 2 张
-  const drawn = state.deck.cards.slice(0, 2);
-  const remainingDeck = state.deck.cards.slice(2);
-  const tempHand = [...player.hand, ...drawn];
-  // 校验 returnCards 都在 tempHand
-  const handCopy = [...tempHand];
+  if (!player) return null;
+  if (!Array.isArray(returnCards) || returnCards.length !== DARWIN_DRAW_COUNT) return null;
+  const rest = [...player.hand];
   for (const cid of returnCards) {
-    const idx = handCopy.indexOf(cid);
-    if (idx === -1) return null;
-    handCopy.splice(idx, 1);
+    const at = rest.indexOf(cid);
+    if (at === -1) return null;
+    rest.splice(at, 1);
   }
-
-  const s = markSkillUsed(state, selfID, DARWIN_SKILL_ID);
   return {
-    ...s,
-    players: { ...s.players, [selfID]: { ...s.players[selfID]!, hand: handCopy } },
-    deck: { ...s.deck, cards: [...returnCards, ...remainingDeck] },
+    ...state,
+    players: { ...state.players, [selfID]: { ...player, hand: rest } },
+    deck: { ...state.deck, cards: [...returnCards, ...state.deck.cards] },
+    pendingDarwinReturn: null,
   };
 }
 

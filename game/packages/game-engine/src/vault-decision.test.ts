@@ -254,7 +254,7 @@ describe('挂起期间的行动权', () => {
 
   it('其他人的 move 被拒绝', () => {
     const G = pendingScene();
-    expect(run(G, 'p2', 'useAthenaWit').ok).toBe(false);
+    expect(run(G, 'p2', 'respondAthenaWit', [null]).ok).toBe(false);
   });
 
   it('盗梦者发 masterVaultDecision 被拒绝，状态不变', () => {

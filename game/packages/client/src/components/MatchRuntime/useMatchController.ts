@@ -596,9 +596,15 @@ export function useMatchController(source: MatchSource): MatchController {
         setMoveOpenStamp(dockStamp);
         return;
       }
-      // 抽牌阶段的两个入口不需要选参数，直接发 move
-      if (kind === 'skipDraw' || kind === 'jokerGamble') {
-        const move = kind === 'skipDraw' ? 'skipDraw' : 'playJokerGamble';
+      // 抽牌阶段的这几个入口不需要选参数，直接发 move
+      // 黑洞·吞噬发动时也不带实参：各人交哪张牌由交牌的人自己在应答里选
+      if (kind === 'skipDraw' || kind === 'jokerGamble' || kind === 'blackHoleLevy') {
+        const move =
+          kind === 'skipDraw'
+            ? 'skipDraw'
+            : kind === 'jokerGamble'
+              ? 'playJokerGamble'
+              : 'playBlackHoleLevy';
         logger.flow('game/move', 'draw phase entry', { move });
         void makeMove(move);
         return;

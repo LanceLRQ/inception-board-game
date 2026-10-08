@@ -15,7 +15,8 @@ import {
   applyForgerExchange,
   isTerroristCrossLayerActive,
   jokerDrawCount,
-  applyBlackHoleLevy,
+  startBlackHoleLevy,
+  applyBlackHoleLevyGive,
   applyBlackSwanTour,
   applySpaceQueenObserve,
   applySpaceQueenStashTop,
@@ -293,30 +294,33 @@ describe('小丑 · 赌博（thief_joker）', () => {
 });
 
 // ============================================================================
-// 黑洞 · 征收（纯函数）
+// 黑洞 · 吞噬（纯函数）
 // ============================================================================
-describe('黑洞 · 征收（thief_black_hole · 1/2）', () => {
-  it('成功：所有同层玩家各给 1 张', () => {
+describe('黑洞 · 吞噬（thief_black_hole · 1/2）', () => {
+  it('成功：发动后挂起，同层有手牌的人各自交出 1 张，交齐后清除等待', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_black_hole' as CardID);
     s = setHand(s, 'p2', ['action_unlock'] as CardID[]);
     s = setHand(s, 'pM', ['action_kick'] as CardID[]);
-    const r = applyBlackHoleLevy(s, 'p1', {
-      p2: 'action_unlock' as CardID,
-      pM: 'action_kick' as CardID,
-    });
-    expect(r).not.toBeNull();
-    expect(r!.players.p1!.hand).toEqual(['action_unlock', 'action_kick']);
-    expect(r!.players.p2!.hand).toEqual([]);
-    expect(r!.players.pM!.hand).toEqual([]);
-    expect(r!.players.p1!.skillUsedThisTurn[BLACK_HOLE_LEVY_SKILL_ID]).toBe(1);
+    const started = startBlackHoleLevy(s, 'p1');
+    expect(started).not.toBeNull();
+    expect(started!.pendingBlackHoleLevy).toEqual({ blackHoleID: 'p1', waiting: ['p2', 'pM'] });
+    expect(started!.players.p1!.skillUsedThisTurn[BLACK_HOLE_LEVY_SKILL_ID]).toBe(1);
+    const first = applyBlackHoleLevyGive(started!, 'p2', 'action_unlock' as CardID)!;
+    expect(first.pendingBlackHoleLevy).toEqual({ blackHoleID: 'p1', waiting: ['pM'] });
+    const done = applyBlackHoleLevyGive(first, 'pM', 'action_kick' as CardID)!;
+    expect(done.pendingBlackHoleLevy).toBeNull();
+    expect(done.players.p1!.hand).toEqual(['action_unlock', 'action_kick']);
+    expect(done.players.p2!.hand).toEqual([]);
+    expect(done.players.pM!.hand).toEqual([]);
   });
 
-  it('拒绝：缺少某玩家的 pick', () => {
+  it('拒绝：同层没人有手牌', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_black_hole' as CardID);
-    s = setHand(s, 'p2', ['action_unlock'] as CardID[]);
-    expect(applyBlackHoleLevy(s, 'p1', {})).toBeNull();
+    s = setHand(s, 'p2', []);
+    s = setHand(s, 'pM', []);
+    expect(startBlackHoleLevy(s, 'p1')).toBeNull();
   });
 });
 

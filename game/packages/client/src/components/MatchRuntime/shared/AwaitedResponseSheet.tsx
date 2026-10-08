@@ -1,4 +1,5 @@
-// 应答弹窗：需要选牌、分牌、选层的应答（狂热弃牌、天秤分牌 / 挑一份、处女复活 / 传送、白羊·回音萦绕）。
+// 应答弹窗：需要选牌、分牌、选层的应答（狂热弃牌、天秤分牌 / 挑一份、处女复活 / 传送、白羊·回音萦绕、
+// 黑洞·吞噬交牌、达尔文·淘汰放回牌库顶、雅典娜·急智选弃牌堆里的牌）。
 // 窗口 / 响应条上的按钮打开它；选择只存在控制层的草稿里，确认后才发 move。样式钩子类名：ms-btn。
 
 import type { ReactNode } from 'react';
@@ -14,7 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../ui/dialog';
-import { ECHO_LAYERS, splitPiles } from '../response/awaitedResponse';
+import {
+  DARWIN_RETURN_COUNT,
+  ECHO_LAYERS,
+  groupDiscard,
+  splitPiles,
+} from '../response/awaitedResponse';
 import { NightmareParamsForm } from '../../NightmareParamsForm';
 import type { MatchController } from '../controllerTypes';
 
@@ -232,6 +238,86 @@ export function AwaitedResponseSheet({ controller }: AwaitedResponseSheetProps) 
           ))}
         </div>
       </>
+    );
+  } else if (awaited !== null && mode === 'levy-give' && awaited.kind === 'levy') {
+    title = t('awaited.sheet.levyGive.title');
+    description = t('awaited.sheet.levyGive.desc', {
+      name: controller.nicknameOf(awaited.blackHoleID),
+    });
+    confirmLabel = t('awaited.sheet.levyGive.confirm');
+    body = (
+      <div className="flex flex-wrap gap-2" data-testid="awaited-sheet-hand">
+        {awaited.hand.map((card, i) => (
+          <Choice
+            key={`give-${i}-${card}`}
+            selected={draft.giveIndex === i}
+            onPress={() => sheet.pickGive(i)}
+            testId={`awaited-card-${i}`}
+          >
+            {getCardName(card)}
+          </Choice>
+        ))}
+      </div>
+    );
+  } else if (awaited !== null && mode === 'darwin-return' && awaited.kind === 'darwin') {
+    title = t('awaited.sheet.darwinReturn.title');
+    description = t('awaited.sheet.darwinReturn.desc');
+    confirmLabel = t('awaited.sheet.darwinReturn.confirm');
+    body = (
+      <>
+        <div className="flex flex-wrap gap-2" data-testid="awaited-sheet-hand">
+          {awaited.hand.map((card, i) => {
+            const order = draft.returnPicks.indexOf(i);
+            return (
+              <Choice
+                key={`return-${i}-${card}`}
+                selected={order >= 0}
+                onPress={() => sheet.toggleReturn(i)}
+                testId={`awaited-card-${i}`}
+              >
+                {order >= 0 && (
+                  <span className="font-mono text-[11px]" data-testid={`awaited-order-${i}`}>
+                    {order + 1}
+                  </span>
+                )}
+                {getCardName(card)}
+              </Choice>
+            );
+          })}
+        </div>
+        <p className="text-[12px] text-dim" data-testid="awaited-return-progress">
+          {t('awaited.sheet.darwinReturn.progress', {
+            count: draft.returnPicks.length,
+            total: DARWIN_RETURN_COUNT,
+          })}
+        </p>
+      </>
+    );
+  } else if (awaited !== null && mode === 'athena-pick' && awaited.kind === 'athena') {
+    const groups = groupDiscard(awaited.discard);
+    title = t('awaited.sheet.athenaPick.title');
+    description = t('awaited.sheet.athenaPick.desc', {
+      name: controller.nicknameOf(awaited.userID),
+      card: getCardName(awaited.cardId),
+    });
+    confirmLabel = t('awaited.sheet.athenaPick.confirm');
+    body = (
+      <div
+        className="flex max-h-64 flex-wrap gap-2 overflow-y-auto"
+        data-testid="awaited-sheet-discard"
+      >
+        {groups.map(({ card, count }) => (
+          <Choice
+            key={`discard-${card}`}
+            selected={draft.athenaCard === card}
+            onPress={() => sheet.pickAthenaCard(card)}
+            testId={`awaited-discard-${card}`}
+          >
+            {getCardName(card)}
+            {count > 1 && <span className="font-mono text-[11px]">×{count}</span>}
+          </Choice>
+        ))}
+      </div>
     );
   } else if (awaited !== null && mode === 'aries-plague' && awaited.kind === 'aries') {
     title = t('awaited.sheet.ariesPlague.title');

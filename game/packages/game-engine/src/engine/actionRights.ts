@@ -37,10 +37,11 @@ interface RightsRule {
 
 /**
  * 非回合主人在没有待结算时可以发的 move：
- *   雅典娜·急智（别人对她使用行动牌时）、空间女王·造物（任意玩家的弃牌阶段，阶段由 move 自己检查）
- * 对照：docs/manual/05-dream-thieves.md 雅典娜、空间女王
+ *   空间女王·造物（任意玩家的弃牌阶段，阶段由 move 自己检查）
+ * 雅典娜·急智不在其中：它只在别人对她使用行动牌时作为应答出现（pendingAthenaWit）。
+ * 对照：docs/manual/05-dream-thieves.md 空间女王、雅典娜
  */
-export const OFF_TURN_MOVES: readonly string[] = ['useAthenaWit', 'useSpaceQueenStashTop'];
+export const OFF_TURN_MOVES: readonly string[] = ['useSpaceQueenStashTop'];
 
 const RIGHTS_RULES: readonly RightsRule[] = [
   {
@@ -136,6 +137,27 @@ const RIGHTS_RULES: readonly RightsRule[] = [
       'respondTerroristAccept',
     ],
     actors: (G) => (G.pendingShootResponse ? [G.pendingShootResponse.targetPlayerID] : null),
+  },
+  {
+    // 黑洞·吞噬：名单里还没交牌的每个人都可以交，不限先后
+    field: 'pendingBlackHoleLevy',
+    blocking: true,
+    moves: ['respondBlackHoleLevy'],
+    actors: (G) => (G.pendingBlackHoleLevy ? G.pendingBlackHoleLevy.waiting : null),
+  },
+  {
+    // 雅典娜·急智：行动牌打在雅典娜身上、结算之前，由雅典娜选牌或放弃
+    field: 'pendingAthenaWit',
+    blocking: true,
+    moves: ['respondAthenaWit'],
+    actors: (G) => (G.pendingAthenaWit ? [G.pendingAthenaWit.athenaID] : null),
+  },
+  {
+    // 达尔文·淘汰：只有达尔文本人选放回的牌
+    field: 'pendingDarwinReturn',
+    blocking: true,
+    moves: ['respondDarwinReturn'],
+    actors: (G) => (G.pendingDarwinReturn ? [G.pendingDarwinReturn.playerID] : null),
   },
   {
     // 白羊·星尘：白羊在别人的回合也能发动 / 放弃，但不挡住回合主人

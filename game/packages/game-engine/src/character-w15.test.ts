@@ -14,7 +14,8 @@ import {
   canPiscesEvade,
   applyLunaEclipse,
   applyGaiaShift,
-  applyDarwinEvolution,
+  startDarwinEvolution,
+  applyDarwinReturn,
   isAquariusUnlimitedActive,
   ariesExtraDrawCount,
   applySagittariusHeartLock,
@@ -242,10 +243,10 @@ describe('盖亚 · 撼动（thief_gaia）纯函数', () => {
 });
 
 // ============================================================================
-// 达尔文 · 进化
+// 达尔文 · 淘汰（卡面；引擎里叫进化）
 // ============================================================================
-describe('达尔文 · 进化（thief_darwin）', () => {
-  it('成功：抽 2 + 还 2 到顶', () => {
+describe('达尔文 · 淘汰（thief_darwin）', () => {
+  it('成功：先抽 2 张挂起，再选 2 张按顺序放回牌库顶（可以选刚抽到的）', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_darwin' as CardID);
     s = setHand(s, 'p1', ['action_kick'] as CardID[]);
@@ -256,28 +257,49 @@ describe('达尔文 · 进化（thief_darwin）', () => {
         discardPile: [],
       },
     };
-    // 抽顶 2 = action_creation, action_peek
-    // 手牌临时：[kick, creation, peek]
+    // 抽顶 2 = action_creation, action_peek；手牌临时：[kick, creation, peek]
+    const started = startDarwinEvolution(s, 'p1');
+    expect(started).not.toBeNull();
+    expect(started!.players.p1!.hand).toEqual(['action_kick', 'action_creation', 'action_peek']);
+    expect(started!.pendingDarwinReturn).toEqual({ playerID: 'p1' });
+    expect(started!.players.p1!.skillUsedThisTurn[DARWIN_SKILL_ID]).toBe(1);
     // 还回 [kick, peek]，留下 creation 在手中
-    const r = applyDarwinEvolution(s, 'p1', ['action_kick', 'action_peek'] as CardID[]);
+    const r = applyDarwinReturn(started!, 'p1', ['action_kick', 'action_peek'] as CardID[]);
     expect(r).not.toBeNull();
     expect(r!.players.p1!.hand).toEqual(['action_creation']);
     expect(r!.deck.cards).toEqual(['action_kick', 'action_peek', 'action_unlock']);
-    expect(r!.players.p1!.skillUsedThisTurn[DARWIN_SKILL_ID]).toBe(1);
+    expect(r!.pendingDarwinReturn).toBeNull();
   });
 
   it('拒绝：牌库不足 2', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_darwin' as CardID);
     s = { ...s, deck: { cards: ['action_kick'] as CardID[], discardPile: [] } };
-    expect(applyDarwinEvolution(s, 'p1', ['action_kick', 'action_kick'] as CardID[])).toBeNull();
+    expect(startDarwinEvolution(s, 'p1')).toBeNull();
   });
 
-  it('move 接入：playDarwinEvolution', () => {
+  it('拒绝：放回的不是刚好 2 张 / 不在手里 / 没有挂起', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_darwin' as CardID);
+    s = setHand(s, 'p1', ['action_kick'] as CardID[]);
+    s = { ...s, deck: { cards: ['action_creation', 'action_peek'] as CardID[], discardPile: [] } };
+    expect(applyDarwinReturn(s, 'p1', ['action_kick', 'action_creation'] as CardID[])).toBeNull();
+    const started = startDarwinEvolution(s, 'p1')!;
+    expect(applyDarwinReturn(started, 'p1', ['action_kick'] as CardID[])).toBeNull();
+    expect(applyDarwinReturn(started, 'p1', ['action_kick', 'action_kick'] as CardID[])).toBeNull();
+    expect(applyDarwinReturn(started, 'p2', ['action_kick', 'action_peek'] as CardID[])).toBeNull();
+  });
+
+  it('move 接入：playDarwinEvolution 只抽牌并挂起，respondDarwinReturn 放回', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_darwin' as CardID);
     s = { ...s, deck: { cards: ['action_creation', 'action_peek'] as CardID[], discardPile: [] } };
-    const r = callMove(s, 'playDarwinEvolution', [['action_creation', 'action_peek'] as CardID[]]);
+    const started = callMove(s, 'playDarwinEvolution', []);
+    expectMoveOk(started);
+    expect(started.deck.cards).toEqual([]);
+    const r = callMove(started, 'respondDarwinReturn', [
+      ['action_creation', 'action_peek'] as CardID[],
+    ]);
     expectMoveOk(r);
     expect(r.deck.cards).toEqual(['action_creation', 'action_peek']);
   });

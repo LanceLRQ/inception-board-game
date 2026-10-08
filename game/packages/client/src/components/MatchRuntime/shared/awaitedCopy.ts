@@ -78,6 +78,27 @@ export function awaitedCopy(awaited: MineAwaited, deps: AwaitedCopyDeps): Awaite
         notes,
       };
     }
+    case 'levy':
+      return {
+        titleKey: 'awaited.levy.title',
+        bodyKey: 'awaited.levy.body',
+        bodyParams: { name: nicknameOf(awaited.blackHoleID) },
+        notes: awaited.hand.length === 0 ? [{ key: 'awaited.levy.noHand' }] : [],
+      };
+    case 'darwin':
+      return {
+        titleKey: 'awaited.darwin.title',
+        bodyKey: 'awaited.darwin.body',
+        bodyParams: {},
+        notes: [],
+      };
+    case 'athena':
+      return {
+        titleKey: 'awaited.athena.title',
+        bodyKey: 'awaited.athena.body',
+        bodyParams: { name: nicknameOf(awaited.userID), card: cardNameOf(awaited.cardId) },
+        notes: [],
+      };
     case 'aries': {
       const notes: { key: string; params?: Record<string, string> }[] = [];
       if (awaited.nightmareId === null) notes.push({ key: 'awaited.aries.unknown' });

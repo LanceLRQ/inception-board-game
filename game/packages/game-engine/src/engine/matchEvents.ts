@@ -61,11 +61,20 @@ function newlyPlayed(before: SetupState, after: SetupState): CardID[] {
 export const MASKED_ACTOR_FIELDS: ReadonlySet<string> = new Set([
   'pendingAriesChoice',
   'pendingVirgoChoice',
+  'pendingAthenaWit',
 ]);
 
 export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   const { before, after, ctxBefore, ctxAfter, request } = args;
-  const mover = request.playerID;
+  // 雅典娜应答之后，被挂起的出牌在同一步里重放：这一步的动作者是出牌者，不是应答的雅典娜
+  const replayed =
+    request.move === 'respondAthenaWit' &&
+    before.pendingAthenaWit &&
+    !after.pendingAthenaWit &&
+    before.playedCardsThisTurn.length < after.playedCardsThisTurn.length
+      ? before.pendingAthenaWit.userID
+      : null;
+  const mover = replayed ?? request.playerID;
   const events: DescribedEvent[] = [];
   const order = after.playerOrder;
 

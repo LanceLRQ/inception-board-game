@@ -426,23 +426,18 @@ export const ARCHITECT_MAZE: ActiveSkillDescriptor = {
 };
 
 // 达尔文·淘汰：抽牌库顶 2 张，再把 2 张手牌按任意顺序放回牌库顶；回合限 1 次
-// 引擎是一步完成的 move：放回的 2 张从「抽牌后」的手牌里选，而新抽的 2 张在发出 move 之前
-// 不在任何人的视图里，所以界面只能从现有手牌里选；选牌的先后就是放回的顺序（先选的在最顶）。
+// 卡面：「你的出牌阶段，你可以将牌库顶2张牌收为手牌，然后将2张手牌按任意顺序放回牌库顶。每回合仅可使用一次。」
+// 发动不带实参：引擎先抽 2 张并挂起，达尔文再在应答弹窗里从抽牌后的手牌（含新抽的）里选刚好 2 张
+// 按顺序放回（先选的在最顶），见 components/MatchRuntime/response/awaitedResponse.ts 的 darwin。
 export const DARWIN_EVOLUTION: ActiveSkillDescriptor = {
   id: 'thief_darwin.skill_0',
   characterId: 'thief_darwin',
   move: 'playDarwinEvolution',
   nameKey: 'skill.thief_darwin.skill_0.name',
   descKey: 'skill.thief_darwin.skill_0.desc',
-  argKind: 'multiCard',
-  pickCount: 2,
-  pickHintKey: 'skill.hint.darwinOrder',
-  extraCheck: (ctx) => ctx.hand.length > 0,
+  argKind: 'none',
   usage: { key: 'thief_darwin.skill_0', limit: 1 },
-  blocked: (ctx) => {
-    if (ctx.deckCount !== undefined && ctx.deckCount < 2) return reason('deckShort');
-    return ctx.hand.length >= 2 ? null : reason('needTwoInHand');
-  },
+  blocked: (ctx) => (ctx.deckCount !== undefined && ctx.deckCount < 2 ? reason('deckShort') : null),
 };
 
 // 露娜·满月（背面）：弃 2 张非 SHOOT 类牌，把任意数量（可以是 0）已死亡的玩家复活到自己所在层，然后翻面；回合限 1 次

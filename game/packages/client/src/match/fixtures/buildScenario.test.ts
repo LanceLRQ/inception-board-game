@@ -403,6 +403,90 @@ describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () =
     expect(awaitedActions(a)[0]!.effect).toEqual({ type: 'sheet', sheet: 'aries-plague' });
   });
 
+  it('黑洞·吞噬：对方（黑洞）真的发动，本人与另一名同层玩家在名单里；别人看到的名单相同、看不到牌', () => {
+    const a = mineOf('thief-pending-levy');
+    expect(a.kind).toBe('levy');
+    const { state, viewer } = buildFixtureMatch('thief-pending-levy');
+    const levy = state.G.pendingBlackHoleLevy!;
+    expect(state.G.players[levy.blackHoleID]!.characterId).toBe('thief_black_hole');
+    expect(state.G.turnPhase).toBe('draw');
+    expect(levy.waiting).toHaveLength(2);
+    expect(levy.waiting).toContain(viewer);
+    expect(a.kind === 'levy' && a.hand).toEqual(state.G.players[viewer]!.hand);
+    expect(a.kind === 'levy' && a.blackHoleID).toBe(levy.blackHoleID);
+    expect(awaitedActions(a).map((x) => x.id)).toEqual(['give']);
+    // 名单里的另一个人只需要等自己的那份：对他来说本人是「别人」，但他自己也在应答
+    const mate = levy.waiting.find((id) => id !== viewer)!;
+    expect(awaitedResponse(viewFrom('thief-pending-levy', mate), mate)).toMatchObject({
+      mine: true,
+      kind: 'levy',
+    });
+    // 黑洞本人与不在名单里的人只能等
+    for (const seat of [levy.blackHoleID, state.G.dreamMasterID]) {
+      expect(awaitedResponse(viewFrom('thief-pending-levy', seat), seat)).toEqual({ mine: false });
+    }
+    // 别的座位的视图里看不到本人的手牌
+    expect(viewFrom('thief-pending-levy', mate).players[viewer]!.hand).toBeNull();
+  });
+
+  it('达尔文·淘汰：本人真的发动，已抽到 2 张，手牌里含新抽的牌；别人看不到', () => {
+    const a = mineOf('thief-pending-darwin');
+    expect(a.kind).toBe('darwin');
+    const { state, viewer } = buildFixtureMatch('thief-pending-darwin');
+    expect(state.G.players[viewer]!.characterId).toBe('thief_darwin');
+    expect(state.G.pendingDarwinReturn).toEqual({ playerID: viewer });
+    expect(a.kind === 'darwin' && a.hand).toEqual(state.G.players[viewer]!.hand);
+    expect(a.kind === 'darwin' && a.hand.length).toBe(6);
+    expect(awaitedActions(a).map((x) => x.id)).toEqual(['return']);
+    const other = state.G.playerOrder.find((id) => id !== viewer)!;
+    expect(awaitedResponse(viewFrom('thief-pending-darwin', other), other)).toEqual({
+      mine: false,
+    });
+    expect(viewFrom('thief-pending-darwin', other).players[viewer]!.hand).toBeNull();
+  });
+
+  it('雅典娜·急智：同层盗梦者对本人打出 KICK，弃牌堆公开可选；别人看不到雅典娜是谁', () => {
+    const a = mineOf('thief-pending-athena');
+    expect(a.kind).toBe('athena');
+    const { state, viewer } = buildFixtureMatch('thief-pending-athena');
+    const wit = state.G.pendingAthenaWit!;
+    expect(wit).toMatchObject({ athenaID: viewer, move: 'playKick', cardId: 'action_kick' });
+    expect(state.G.players[viewer]!.characterId).toBe('thief_athena');
+    // 该牌还没有结算：仍在出牌者手里
+    expect(state.G.players[wit.userID]!.hand).toContain('action_kick');
+    if (a.kind !== 'athena') return;
+    expect(a.userID).toBe(wit.userID);
+    expect(a.discard).toEqual(state.G.deck.discardPile);
+    expect(new Set(a.discard).size).toBeGreaterThanOrEqual(3);
+    expect(awaitedActions(a).map((x) => x.id)).toEqual(['take', 'pass']);
+    const other = state.G.playerOrder.find((id) => id !== viewer && id !== wit.userID)!;
+    const seen = viewFrom('thief-pending-athena', other);
+    expect(seen.pendingAthenaWit).toEqual({
+      athenaID: null,
+      userID: wit.userID,
+      cardId: 'action_kick',
+    });
+    expect(awaitedResponse(seen, other)).toEqual({ mine: false });
+  });
+
+  it('skill-black-hole-draw：抽牌阶段的黑洞，同层有人有手牌，「吞噬」入口可用', () => {
+    const sc = buildFixtureScenario('skill-black-hole-draw');
+    const G = sc.view.G as MatchView;
+    expect(G.turnPhase).toBe('draw');
+    expect(G.players[sc.seat]!.characterId).toBe('thief_black_hole');
+    const entries = deriveDockEntries({
+      seat: sc.seat,
+      dreamMasterID: G.dreamMasterID,
+      players: G.players,
+      hand: G.players[sc.seat]!.hand ?? [],
+      isMyTurn: true,
+      turnPhase: G.turnPhase,
+      winner: null,
+      busy: false,
+    });
+    expect(entries.find((e) => e.kind === 'blackHoleLevy')).toMatchObject({ enabled: true });
+  });
+
   it.each([
     ['master-vault-echo', 'echo', 'nightmare_echo'],
     ['master-vault-plague', 'plague', 'nightmare_plague'],

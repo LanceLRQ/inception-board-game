@@ -113,6 +113,14 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('pending=virgo')).toBe('thief-pending-virgo');
     expect(idOf('pending=aries')).toBe('thief-pending-aries');
     expect(idOf('pending=aries-plague')).toBe('thief-pending-aries-plague');
+    expect(idOf('pending=levy')).toBe('thief-pending-levy');
+    expect(idOf('pending=darwin')).toBe('thief-pending-darwin');
+    expect(idOf('pending=athena')).toBe('thief-pending-athena');
+  });
+
+  it('skill=black-hole-draw 进入抽牌阶段的黑洞场景', () => {
+    expect(idOf('skill=black-hole-draw')).toBe('skill-black-hole-draw');
+    expect(idOf('skill=black-hole-draw&pending=levy')).toBe('thief-pending-levy');
   });
 
   it('vault=echo|plague 与 as=master 叠加：梦主待金库三选一，该层梦魇是回音萦绕 / 邪念瘟疫', () => {

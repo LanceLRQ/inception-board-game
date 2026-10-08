@@ -446,6 +446,20 @@ function checkPending(c: Collector, G: Rec): void {
       c.add('pendingShootResponse.cardId', '没有实体牌当且仅当技能来源为哈雷·冲击或要塞·冷酷');
     }
   });
+  c.optional('pendingBlackHoleLevy', G.pendingBlackHoleLevy, (o) => {
+    c.player('pendingBlackHoleLevy.blackHoleID', o.blackHoleID);
+    c.players('pendingBlackHoleLevy.waiting', o.waiting);
+  });
+  c.optional('pendingDarwinReturn', G.pendingDarwinReturn, (o) =>
+    c.player('pendingDarwinReturn.playerID', o.playerID),
+  );
+  c.optional('pendingAthenaWit', G.pendingAthenaWit, (o) => {
+    c.player('pendingAthenaWit.athenaID', o.athenaID);
+    c.player('pendingAthenaWit.userID', o.userID);
+    c.card('pendingAthenaWit.cardId', o.cardId);
+    c.card('pendingAthenaWit.move', o.move);
+    if (!Array.isArray(o.args)) c.add('pendingAthenaWit.args', '必须是数组');
+  });
 }
 
 function checkExtraOnMove(c: Collector, path: string, value: unknown): void {

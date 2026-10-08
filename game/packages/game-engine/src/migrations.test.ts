@@ -490,4 +490,54 @@ describe('migrations', () => {
       });
     });
   });
+
+  describe('v13 → v16 · 黑洞吞噬 / 达尔文淘汰 / 雅典娜急智的等待态', () => {
+    function stateAt(version: number): Record<string, unknown> {
+      const fresh = createInitialState({
+        playerCount: 5,
+        playerIds: ['0', '1', '2', '3', '4'],
+        nicknames: ['a', 'b', 'c', 'd', 'e'],
+        rngSeed: 'wait-fields',
+      }) as unknown as Record<string, unknown>;
+      const {
+        pendingBlackHoleLevy: _a,
+        pendingDarwinReturn: _b,
+        pendingAthenaWit: _c,
+        ...older
+      } = fresh;
+      void _a;
+      void _b;
+      void _c;
+      return { ...older, schemaVersion: version };
+    }
+
+    it('版本号升到 16', () => {
+      expect(CURRENT_SCHEMA_VERSION).toBe(16);
+    });
+
+    it('旧存档补齐三个等待字段为 null，并升到当前版本', () => {
+      const migrated = migrateGameState(stateAt(13));
+      expect(migrated.schemaVersion).toBe(16);
+      expect(migrated.pendingBlackHoleLevy).toBeNull();
+      expect(migrated.pendingDarwinReturn).toBeNull();
+      expect(migrated.pendingAthenaWit).toBeNull();
+    });
+
+    it('从 14、15 版出发只补缺的字段，已有的等待态原样保留', () => {
+      const levy = { blackHoleID: '0', waiting: ['1'] };
+      const fromFourteen = migrateGameState({ ...stateAt(14), pendingBlackHoleLevy: levy });
+      expect(fromFourteen.pendingBlackHoleLevy).toEqual(levy);
+      expect(fromFourteen.pendingDarwinReturn).toBeNull();
+      expect(fromFourteen.pendingAthenaWit).toBeNull();
+      const darwin = { playerID: '0' };
+      const fromFifteen = migrateGameState({ ...stateAt(15), pendingDarwinReturn: darwin });
+      expect(fromFifteen.pendingDarwinReturn).toEqual(darwin);
+      expect(fromFifteen.pendingAthenaWit).toBeNull();
+    });
+
+    it('当前版本的状态原样通过', () => {
+      const current = migrateGameState(stateAt(13));
+      expect(migrateGameState(current as unknown as Record<string, unknown>)).toEqual(current);
+    });
+  });
 });

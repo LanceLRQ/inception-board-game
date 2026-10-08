@@ -60,6 +60,7 @@ const SCENES = [
   { name: '药剂师（技能面板里有置灰项）', url: '/game/debug?skill=chemist', players: 6 },
   { name: '梦主 · 密道（手牌里有梦境穿梭剂）', url: '/game/debug?skill=passage', players: 6 },
   { name: '抽牌阶段（黑天鹅·纷飞）', url: '/game/debug?skill=black-swan', players: 6 },
+  { name: '抽牌阶段（黑洞·吞噬）', url: '/game/debug?skill=black-hole-draw', players: 6 },
   {
     name: '抽牌阶段 · 10 人（黑天鹅·纷飞）',
     url: '/game/debug?skill=black-swan&players=10',
@@ -68,7 +69,7 @@ const SCENES = [
 ] as const;
 
 /** 有操作入口的场景：入口都在视口内、在手牌坞之内、彼此不重叠，也不压住同一操作区里的其他按钮 */
-const ENTRY_SCENE = /dead=|as=master|skill=(draw|joker|black-swan)/;
+const ENTRY_SCENE = /dead=|as=master|skill=(draw|joker|black-swan|black-hole-draw)/;
 
 // eslint-disable-next-line no-empty-pattern -- Playwright 要求第一个参数是解构形式，这里只需要 testInfo
 test.beforeEach(({}, testInfo) => {

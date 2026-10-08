@@ -7,11 +7,14 @@ import {
   type VirgoPerfectChoice,
   applyAriesStardustDiscard,
   applyAriesStardustReveal,
+  applyBlackHoleLevyGive,
+  applyDarwinReturn,
   applyPiscesEvade,
   applyVirgoDrawTwo,
   applyVirgoResurrect,
   applyVirgoTeleport,
   canPiscesEvade,
+  endDrawPhase,
 } from '../engine/skills.js';
 import type { SetupState } from '../setup.js';
 import { discardCard, incrementMoveCounter } from '../stateOps.js';
@@ -158,6 +161,35 @@ export const responseMoves = {
 
       if (next === null) return INVALID_MOVE;
       return incrementMoveCounter({ ...next, pendingVirgoChoice: null });
+    },
+    client: false,
+  },
+
+  // 黑洞·吞噬（skill_0）· 交牌：名单里还没交牌的人，选自己手里的 1 张交给黑洞
+  // 对照：docs/manual/05-dream-thieves.md:150-158 黑洞
+  // 约束：
+  //   - 发起者必须在 pendingBlackHoleLevy.waiting 里（行动权表放行名单里的每个人，不限先后）
+  //   - 牌必须在发起者手里；这张牌是哪张只有交牌人与黑洞知道（牌立即转进黑洞手里）
+  //   - 名单交齐后抽牌阶段结束，回合继续到出牌阶段；黑洞放弃抽牌，不抽任何牌
+  respondBlackHoleLevy: {
+    move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
+      if (G.phase !== 'playing') return INVALID_MOVE;
+      const next = applyBlackHoleLevyGive(G, ctx.currentPlayer, cardId);
+      if (next === null) return INVALID_MOVE;
+      return incrementMoveCounter(next.pendingBlackHoleLevy === null ? endDrawPhase(next) : next);
+    },
+    client: false,
+  },
+
+  // 达尔文·淘汰 · 选牌放回：达尔文从抽牌后的手牌里选刚好 2 张按顺序放回牌库顶（第一张在最上面）
+  // 对照：卡面「淘汰」（扩展角色，说明书没有收录）
+  // 约束：只有 pendingDarwinReturn.playerID 本人能发；牌可以是刚抽到的，也可以是原有的手牌
+  respondDarwinReturn: {
+    move: ({ G, ctx }: MoveCtx, returnCards: CardID[]) => {
+      if (G.phase !== 'playing') return INVALID_MOVE;
+      const next = applyDarwinReturn(G, ctx.currentPlayer, returnCards);
+      if (next === null) return INVALID_MOVE;
+      return incrementMoveCounter(next);
     },
     client: false,
   },

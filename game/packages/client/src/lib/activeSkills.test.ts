@@ -320,34 +320,28 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
   });
 });
 
-describe('getAvailableActiveSkills · 达尔文·进化（multiCard）', () => {
-  it('达尔文 + 至少 2 张手牌 → 含；放回刚好 2 张', async () => {
+describe('getAvailableActiveSkills · 达尔文·淘汰（发动不带实参）', () => {
+  it('达尔文 + 任意手牌（含空手）→ 可用；发动时先抽牌，放回的牌在应答里选', async () => {
     const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
-    const list = getAvailableActiveSkills(
-      baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock', 'action_kick'] }),
-    );
-    expect(list).toContain(DARWIN_EVOLUTION);
-    expect(DARWIN_EVOLUTION.pickCount).toBe(2);
+    for (const hand of [[], ['action_unlock'], ['action_unlock', 'action_kick']]) {
+      expect(getAvailableActiveSkills(baseCtx({ characterId: 'thief_darwin', hand }))).toContain(
+        DARWIN_EVOLUTION,
+      );
+    }
   });
 
-  it('达尔文 + 只有 1 张手牌 → 仍显示但置灰并说明（放回的 2 张只能从现有手牌里选）', async () => {
+  it('牌库不足 2 张 → 仍显示但置灰并说明', async () => {
     const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
-    const c = baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock'] });
+    const c = baseCtx({ characterId: 'thief_darwin', hand: ['action_unlock'], deckCount: 1 });
     expect(getAvailableActiveSkills(c)).not.toContain(DARWIN_EVOLUTION);
     const entry = getSkillEntries(c).find((e) => e.skill === DARWIN_EVOLUTION);
     expect(entry).toMatchObject({ enabled: false });
-    expect(entry?.reason?.key).toBe('skill.reason.needTwoInHand');
+    expect(entry?.reason?.key).toBe('skill.reason.deckShort');
   });
 
-  it('达尔文 + 手牌空 → 不含', async () => {
+  it('argKind = none：不选牌，直接发动', async () => {
     const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
-    const list = getAvailableActiveSkills(baseCtx({ characterId: 'thief_darwin', hand: [] }));
-    expect(list).not.toContain(DARWIN_EVOLUTION);
-  });
-
-  it('argKind = multiCard', async () => {
-    const { DARWIN_EVOLUTION } = await import('./activeSkills.js');
-    expect(DARWIN_EVOLUTION.argKind).toBe('multiCard');
+    expect(DARWIN_EVOLUTION.argKind).toBe('none');
   });
 });
 

@@ -71,10 +71,12 @@ const MOVE_PRIORITY: Record<string, number> = {
   //   优先级 7：高于 doDraw(10) 但低于 SHOOT/Unlock 类（让 bot 优先打出 SHOOT 凑同名 pair 再回收）
   //   实际可用性由 engine availableAquariusCoherence(state, playerID) 守卫，bot 看到合法即触发
   playAquariusCoherence: 7,
-  // 雅典娜·急智（useAthenaWit）回合外主动 move
-  //   优先级 999：bot 自己回合 engine 会拒（已 guard "非 currentPlayerID 才能用"）
-  //   目前没有调度方替他发这个 move；此处 999 防 SimpleBot 主动选
-  useAthenaWit: 999,
+  // 雅典娜·急智的应答（respondAthenaWit）、黑洞·吞噬的交牌（respondBlackHoleLevy）、
+  //   达尔文·淘汰的选牌（respondDarwinReturn）都是待应答 move，由自动行动判定以应答者本人的名义发；
+  //   此处 999 防 SimpleBot 主动选
+  respondAthenaWit: 999,
+  respondBlackHoleLevy: 999,
+  respondDarwinReturn: 999,
 };
 
 /**

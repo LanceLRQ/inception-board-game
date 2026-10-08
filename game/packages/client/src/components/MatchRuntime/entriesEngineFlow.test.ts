@@ -16,6 +16,14 @@ import type { FixtureScenarioId } from '../../match/fixtures/scenarios';
 import { computeMasterBribeInspectState } from '../MasterBribeInspectBanner/logic';
 import { bribeHolderIds, buildPlayArgs, pendingPlayFor } from './controllerDerive';
 import {
+  EMPTY_DRAFT,
+  awaitedActions,
+  awaitedResponse,
+  sheetCommand,
+  type MineAwaited,
+} from './response/awaitedResponse';
+import {
+  BLACK_HOLE_LEVY_SKILL_KEY,
   BLACK_SWAN_SKILL_KEY,
   adjacentLayers,
   deriveDockEntries,
@@ -319,5 +327,126 @@ describe('黑天鹅·纷飞：界面拼的分发表引擎接受', () => {
     const entry = entriesFor(empty, viewer).find((e) => e.kind === 'blackSwanTour')!;
     expect(entry.reason).toEqual({ key: 'entries.reason.tourNoHand' });
     expect(apply(empty, viewer, 'playBlackSwanTour', [{}])).toBeNull();
+  });
+});
+
+describe('黑洞·吞噬：界面入口与应答经真实引擎', () => {
+  it('抽牌阶段入口可用时，不带实参的发动被引擎接受，同层有手牌的人进入等待名单', () => {
+    const { state, viewer } = sceneOf('skill-black-hole-draw');
+    const entry = entriesFor(state, viewer).find((e) => e.kind === 'blackHoleLevy')!;
+    expect(entry).toMatchObject({ enabled: true, reason: null });
+    const started = apply(state, viewer, 'playBlackHoleLevy', [])!;
+    expect(started).not.toBeNull();
+    const waiting = started.G.pendingBlackHoleLevy!.waiting;
+    expect(waiting.length).toBeGreaterThan(0);
+    for (const id of waiting) {
+      expect(started.G.players[id]!.currentLayer).toBe(state.G.players[viewer]!.currentLayer);
+      expect(started.G.players[id]!.hand.length).toBeGreaterThan(0);
+    }
+    expect(started.G.players[viewer]!.skillUsedThisTurn[BLACK_HOLE_LEVY_SKILL_KEY]).toBe(1);
+  });
+
+  it('同层没有人有手牌：入口禁用并说明，引擎也拒绝', () => {
+    const { state, viewer } = sceneOf('skill-black-hole-draw');
+    const mates = state.G.playerOrder.filter(
+      (id) =>
+        id !== viewer &&
+        state.G.players[id]!.currentLayer === state.G.players[viewer]!.currentLayer,
+    );
+    const players = { ...state.G.players };
+    for (const id of mates) players[id] = { ...players[id]!, hand: [] };
+    const empty = { ...state, G: { ...state.G, players } };
+    const entry = entriesFor(empty, viewer).find((e) => e.kind === 'blackHoleLevy')!;
+    expect(entry).toMatchObject({ enabled: false });
+    expect(entry.reason).toEqual({ key: 'entries.reason.levyNoGiver' });
+    expect(apply(empty, viewer, 'playBlackHoleLevy', [])).toBeNull();
+  });
+
+  it('本回合已发动：入口禁用，引擎也拒绝', () => {
+    const { state, viewer } = sceneOf('skill-black-hole-draw');
+    const used = {
+      ...state,
+      G: {
+        ...state.G,
+        players: {
+          ...state.G.players,
+          [viewer]: {
+            ...state.G.players[viewer]!,
+            skillUsedThisTurn: { [BLACK_HOLE_LEVY_SKILL_KEY]: 1 },
+          },
+        },
+      },
+    };
+    const entry = entriesFor(used, viewer).find((e) => e.kind === 'blackHoleLevy')!;
+    expect(entry.reason).toEqual({ key: 'entries.reason.levyUsed' });
+    expect(apply(used, viewer, 'playBlackHoleLevy', [])).toBeNull();
+  });
+
+  it('界面构造的交牌命令引擎接受：名单交齐后抽牌阶段结束', () => {
+    let { state } = sceneOf('thief-pending-levy');
+    const levy = state.G.pendingBlackHoleLevy!;
+    for (const seat of [...levy.waiting]) {
+      const view = viewMatch(game, state, seat).G as MatchView;
+      const awaited = awaitedResponse(view, seat);
+      expect(awaited).toMatchObject({ mine: true, kind: 'levy' });
+      const cmd = sheetCommand(awaited as MineAwaited, 'levy-give', {
+        ...EMPTY_DRAFT,
+        giveIndex: 0,
+      })!;
+      const next = apply(state, seat, cmd.move, [...cmd.args]);
+      expect(next, seat).not.toBeNull();
+      state = next!;
+    }
+    expect(state.G.pendingBlackHoleLevy ?? null).toBeNull();
+    expect(state.G.turnPhase).toBe('action');
+  });
+});
+
+describe('雅典娜·急智：界面构造的应答经真实引擎', () => {
+  it('选弃牌堆里的牌：引擎接受，牌入手后那张 KICK 照常结算', () => {
+    const { state, viewer } = sceneOf('thief-pending-athena');
+    const view = viewMatch(game, state, viewer).G as MatchView;
+    const awaited = awaitedResponse(view, viewer) as MineAwaited;
+    expect(awaited.kind).toBe('athena');
+    const pick = awaited.kind === 'athena' ? awaited.discard[1]! : '';
+    const cmd = sheetCommand(awaited, 'athena-pick', { ...EMPTY_DRAFT, athenaCard: pick })!;
+    const wit = state.G.pendingAthenaWit!;
+    const handBefore = state.G.players[viewer]!.hand.length;
+    const next = apply(state, viewer, cmd.move, [...cmd.args])!;
+    expect(next).not.toBeNull();
+    expect(next.G.players[viewer]!.hand.length).toBe(handBefore + 1);
+    expect(next.G.pendingAthenaWit ?? null).toBeNull();
+    // KICK 已结算：出牌者的 KICK 进了弃牌堆
+    expect(next.G.players[wit.userID]!.hand).not.toContain('action_kick');
+  });
+
+  it('放弃：界面按钮发 respondAthenaWit null，引擎接受', () => {
+    const { state, viewer } = sceneOf('thief-pending-athena');
+    const view = viewMatch(game, state, viewer).G as MatchView;
+    const awaited = awaitedResponse(view, viewer) as MineAwaited;
+    const pass = awaitedActions(awaited).find((a) => a.id === 'pass')!;
+    expect(pass.effect.type).toBe('move');
+    if (pass.effect.type !== 'move') return;
+    const next = apply(state, viewer, pass.effect.move, [...pass.effect.args]);
+    expect(next).not.toBeNull();
+    expect(next!.G.pendingAthenaWit ?? null).toBeNull();
+  });
+});
+
+describe('达尔文·淘汰：界面构造的放回命令经真实引擎', () => {
+  it('选刚好 2 张（可含新抽的）按顺序放回：引擎接受，牌库顶就是选的顺序', () => {
+    const { state, viewer } = sceneOf('thief-pending-darwin');
+    const view = viewMatch(game, state, viewer).G as MatchView;
+    const awaited = awaitedResponse(view, viewer) as MineAwaited;
+    const hand = awaited.kind === 'darwin' ? awaited.hand : [];
+    // 最后两张是刚抽到的
+    const cmd = sheetCommand(awaited, 'darwin-return', {
+      ...EMPTY_DRAFT,
+      returnPicks: [hand.length - 1, 0],
+    })!;
+    const next = apply(state, viewer, cmd.move, [...cmd.args])!;
+    expect(next).not.toBeNull();
+    expect(next.G.deck.cards.slice(0, 2)).toEqual([hand[hand.length - 1], hand[0]]);
+    expect(next.G.players[viewer]!.hand).toHaveLength(hand.length - 2);
   });
 });

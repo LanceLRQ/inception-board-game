@@ -471,6 +471,45 @@ test.describe('SHOOT 的目标限制与射手·禁足', () => {
   });
 });
 
+test.describe('黑洞·吞噬（抽牌阶段）', () => {
+  test('抽牌阶段的黑洞多一个「吞噬」入口：不需要选任何牌，点一下直接发 playBlackHoleLevy', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=black-hole-draw');
+    await expect(page.getByTestId('dock-entry-skip-draw')).toBeVisible();
+    const entry = page.getByTestId('dock-entry-levy');
+    await expect(entry).toBeVisible();
+    await expect(entry).not.toHaveAttribute('aria-disabled', 'true');
+    await entry.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playBlackHoleLevy', args: [] });
+  });
+
+  test('其他角色的抽牌阶段、黑洞的出牌阶段都没有这个入口', async ({ page }) => {
+    await openScene(page, '/game/debug?skill=draw');
+    await expect(page.getByTestId('dock-entry-levy')).toHaveCount(0);
+    await openScene(page, '/game/debug?skill=black-hole');
+    await expect(page.getByTestId('dock-entry-levy')).toHaveCount(0);
+  });
+});
+
+test.describe('达尔文·淘汰（出牌阶段）', () => {
+  test('技能面板里的「淘汰」不再要求先选牌：点一下发动，发出不带实参的 playDarwinEvolution', async ({
+    page,
+  }) => {
+    const sent = recordMoves(page);
+    await openScene(page, '/game/debug?skill=darwin');
+    await openSkillPanel(page);
+    const button = skillButton(page, 'playDarwinEvolution');
+    await expect(button).toBeVisible();
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
+    expect(sent[0]).toEqual({ move: 'playDarwinEvolution', args: [] });
+  });
+});
+
 test.describe('黑天鹅·纷飞（抽牌阶段）', () => {
   test('抽牌阶段的黑天鹅多一个「纷飞」入口：选接收者、把手牌分完才能确认，发出分发表', async ({
     page,

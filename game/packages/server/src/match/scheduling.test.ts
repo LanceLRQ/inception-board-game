@@ -133,6 +133,25 @@ describe('planNext', () => {
         { pendingVirgoChoice: { virgoID: human, triggerRoll: 6, shooterID: owner } },
         'respondVirgoPerfect',
       ],
+      [
+        '黑洞·吞噬的交牌',
+        { turnPhase: 'draw', pendingBlackHoleLevy: { blackHoleID: owner, waiting: [human] } },
+        'respondBlackHoleLevy',
+      ],
+      ['达尔文·淘汰的选牌', { pendingDarwinReturn: { playerID: human } }, 'respondDarwinReturn'],
+      [
+        '雅典娜·急智的应答',
+        {
+          pendingAthenaWit: {
+            athenaID: human,
+            userID: owner,
+            cardId: 'action_kick',
+            move: 'playKick',
+            args: ['action_kick', human],
+          },
+        },
+        'respondAthenaWit',
+      ],
     ];
     for (const [label, patch, timeoutMove] of pendings) {
       const state = {

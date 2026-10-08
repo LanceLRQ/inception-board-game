@@ -41,12 +41,12 @@ const PLAYING_MOVE_ARITY: Record<string, number> = {
   playAriesStardustActivate: 2,
   playAriesStardustDiscard: 1,
   playAthenaAwe: 3,
-  playBlackHoleLevy: 2,
+  playBlackHoleLevy: 1,
   playBlackSwanTour: 2,
   playChemistInject: 3,
   playChemistRefine: 2,
   playCreation: 2,
-  playDarwinEvolution: 2,
+  playDarwinEvolution: 1,
   playDreamTransit: 3,
   playForgerExchangeSingle: 3,
   playGaiaShift: 2,
@@ -90,7 +90,10 @@ const PLAYING_MOVE_ARITY: Record<string, number> = {
   resolveShootMove: 2,
   resolveSudgerPick: 2,
   resolveUnlock: 1,
+  respondAthenaWit: 2,
+  respondBlackHoleLevy: 2,
   respondCancelUnlock: 1,
+  respondDarwinReturn: 2,
   respondShootEvade: 1,
   respondShootPass: 1,
   respondTerroristAccept: 1,
@@ -98,7 +101,6 @@ const PLAYING_MOVE_ARITY: Record<string, number> = {
   respondVirgoPerfect: 3,
   skipDiscard: 1,
   skipDraw: 1,
-  useAthenaWit: 1,
   useBlackHoleAbsorb: 2,
   useChessTranspose: 3,
   useFortressColdness: 2,
@@ -160,7 +162,7 @@ describe('对局定义的结构', () => {
     expect(sortedEntries(arityTable(phases.setup!.moves))).toEqual(sortedEntries(SETUP_MOVE_ARITY));
   });
 
-  it('对局阶段的 move 名与参数个数不变（共 87 个）', () => {
+  it('对局阶段的 move 名与参数个数不变（共 89 个）', () => {
     expect(sortedEntries(arityTable(phases.playing!.moves))).toEqual(
       sortedEntries(PLAYING_MOVE_ARITY),
     );

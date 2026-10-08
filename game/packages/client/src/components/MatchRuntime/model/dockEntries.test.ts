@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  BLACK_HOLE_LEVY_SKILL_ID as ENGINE_LEVY_KEY,
   MASTER_FREE_MOVE_KEY as ENGINE_FREE_MOVE_KEY,
   REVIVED_SELF_THIS_TURN_KEY as ENGINE_REVIVED_SELF_KEY,
 } from '@icgame/game-engine';
 import {
+  BLACK_HOLE_LEVY_SKILL_KEY as CLIENT_LEVY_KEY,
   MASTER_FREE_MOVE_KEY as CLIENT_FREE_MOVE_KEY,
   REVIVED_SELF_KEY as CLIENT_REVIVED_SELF_KEY,
   adjacentLayers,
@@ -381,5 +383,99 @@ describe('底部坞入口 · 黑天鹅·纷飞（抽牌阶段）', () => {
   it('有别的待办占着界面：禁用并说明', () => {
     const e = deriveDockEntries(swan({ busy: true })).find((x) => x.kind === 'blackSwanTour')!;
     expect(e.reason).toEqual({ key: 'entries.reason.busy' });
+  });
+});
+
+describe('底部坞入口 · 黑洞·吞噬（抽牌阶段）', () => {
+  it('技能使用记录键与引擎一致', () => {
+    expect(CLIENT_LEVY_KEY).toBe(ENGINE_LEVY_KEY);
+  });
+
+  const hole = (over: Partial<DockEntriesInput> = {}, me: Partial<EntryPlayer> = {}) =>
+    input({
+      turnPhase: 'draw',
+      players: {
+        p1: player({ characterId: 'thief_black_hole', skillUsedThisTurn: {}, ...me }),
+        p2: player({ handCount: 3 }),
+        pM: player({ characterId: 'dm_neptune_ocean', handCount: 0 }),
+      },
+      ...over,
+    });
+  const levy = (entries: ReturnType<typeof deriveDockEntries>) =>
+    entries.find((x) => x.kind === 'blackHoleLevy');
+
+  it('同层有人有手牌：略过抽牌之外多一个「吞噬」且可用', () => {
+    expect(deriveDockEntries(hole()).map((e) => [e.kind, e.enabled])).toEqual([
+      ['skipDraw', true],
+      ['blackHoleLevy', true],
+    ]);
+  });
+
+  it('不带任何别人的牌：入口不需要参数，data-testid 固定', () => {
+    expect(entryTestId('blackHoleLevy')).toBe('dock-entry-levy');
+  });
+
+  it('其他角色没有这个入口', () => {
+    expect(deriveDockEntries(input({ turnPhase: 'draw' })).map((e) => e.kind)).toEqual([
+      'skipDraw',
+    ]);
+  });
+
+  it('同层没有人手里有牌（别层的人有牌不算，没牌的不算）：禁用并说明', () => {
+    const noCards = hole({
+      players: {
+        p1: player({ characterId: 'thief_black_hole', skillUsedThisTurn: {} }),
+        p2: player({ handCount: 0 }),
+        p3: player({ handCount: 4, currentLayer: 3 }),
+        pM: player({ characterId: 'dm_neptune_ocean', handCount: 0 }),
+      },
+    });
+    const e = levy(deriveDockEntries(noCards))!;
+    expect(e).toMatchObject({ enabled: false });
+    expect(e.reason).toEqual({ key: 'entries.reason.levyNoGiver' });
+  });
+
+  it('同层有牌的人是梦主也算（令所有当层的玩家各给一张）', () => {
+    const e = levy(
+      deriveDockEntries(
+        hole({
+          players: {
+            p1: player({ characterId: 'thief_black_hole', skillUsedThisTurn: {} }),
+            p2: player({ handCount: 0 }),
+            pM: player({ characterId: 'dm_neptune_ocean', handCount: 2 }),
+          },
+        }),
+      ),
+    )!;
+    expect(e.enabled).toBe(true);
+  });
+
+  it('迷失层的人不算；本回合已发动过：禁用并说明', () => {
+    const dead = levy(
+      deriveDockEntries(
+        hole({
+          players: {
+            p1: player({ characterId: 'thief_black_hole', skillUsedThisTurn: {} }),
+            p2: player({ handCount: 3, isAlive: false, currentLayer: 0 }),
+            pM: player({ characterId: 'dm_neptune_ocean', handCount: 0 }),
+          },
+        }),
+      ),
+    )!;
+    expect(dead.reason).toEqual({ key: 'entries.reason.levyNoGiver' });
+    const used = levy(
+      deriveDockEntries(hole({}, { skillUsedThisTurn: { [CLIENT_LEVY_KEY]: 1 } })),
+    )!;
+    expect(used).toMatchObject({ enabled: false });
+    expect(used.reason).toEqual({ key: 'entries.reason.levyUsed' });
+  });
+
+  it('黑洞在迷失层：没有这个入口；有别的待办占着界面：禁用并说明', () => {
+    expect(
+      deriveDockEntries(hole({}, { isAlive: false, currentLayer: 0 })).map((e) => e.kind),
+    ).toEqual(['skipDraw']);
+    expect(levy(deriveDockEntries(hole({ busy: true })))!.reason).toEqual({
+      key: 'entries.reason.busy',
+    });
   });
 });

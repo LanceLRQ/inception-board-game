@@ -85,9 +85,14 @@ describe('SimpleBot L0', () => {
       expect(choice).toBe('endActionPhase');
     });
     // 雅典娜·急智
-    it('endActionPhase 优先于 useAthenaWit', () => {
-      const choice = bot.play(null, ['endActionPhase', 'useAthenaWit']);
+    it('endActionPhase 优先于 respondAthenaWit', () => {
+      const choice = bot.play(null, ['endActionPhase', 'respondAthenaWit']);
       expect(choice).toBe('endActionPhase');
+    });
+    // 黑洞·吞噬 / 达尔文·淘汰
+    it('endActionPhase 优先于 respondBlackHoleLevy / respondDarwinReturn', () => {
+      expect(bot.play(null, ['endActionPhase', 'respondBlackHoleLevy'])).toBe('endActionPhase');
+      expect(bot.play(null, ['endActionPhase', 'respondDarwinReturn'])).toBe('endActionPhase');
     });
   });
 

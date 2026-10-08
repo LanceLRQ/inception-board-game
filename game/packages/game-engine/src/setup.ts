@@ -258,6 +258,37 @@ export interface SetupState {
      */
     skill?: ShootSkillSource;
   } | null;
+  /**
+   * 黑洞·吞噬：黑洞放弃抽牌后，同层有手牌的每个其他玩家各自选 1 张交给黑洞。
+   * waiting 是还没交牌的人（按座次排列），同时发起、不限先后；每人交出牌时牌立即转到黑洞手里并移出名单，
+   * 名单清空时清空本字段并结束抽牌阶段。交出的是哪张只有交牌人与黑洞知道，所以状态里不存牌。
+   * 对照：docs/manual/05-dream-thieves.md:150-158 黑洞
+   */
+  pendingBlackHoleLevy?: {
+    blackHoleID: string;
+    waiting: string[];
+  } | null;
+  /**
+   * 达尔文·淘汰：发动时先抽牌库顶 2 张收入手牌，再等达尔文从抽牌后的手牌里选刚好 2 张按顺序放回牌库顶。
+   * 对照：卡面「淘汰」（扩展角色，说明书没有收录）
+   */
+  pendingDarwinReturn?: {
+    playerID: string;
+  } | null;
+  /**
+   * 雅典娜·急智：另一同层盗梦者对雅典娜使用行动牌时，该牌在结算前挂起，等雅典娜选择
+   * 从弃牌堆选取 1 张收入手牌（或放弃）。应答之后再用同样的 move 与实参重放这次出牌。
+   * move / args 是出牌者原样发来的出牌 move 名与实参（可能含展示的死亡宣言等），只存在状态里，不进视图；
+   * cardId 是被打出的那张行动牌（出牌本来就公开）。
+   * 对照：docs/manual/05-dream-thieves.md:160-170 雅典娜
+   */
+  pendingAthenaWit?: {
+    athenaID: string;
+    userID: string;
+    cardId: CardID;
+    move: string;
+    args: unknown[];
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -484,6 +515,9 @@ export function createInitialState(options: {
     pendingAriesChoice: null,
     pendingVirgoChoice: null,
     pendingShootResponse: null,
+    pendingBlackHoleLevy: null,
+    pendingDarwinReturn: null,
+    pendingAthenaWit: null,
     winner: null,
     winReason: null,
     endTurn: null,

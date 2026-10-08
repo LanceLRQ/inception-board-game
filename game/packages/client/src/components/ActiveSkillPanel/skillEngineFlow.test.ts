@@ -19,6 +19,12 @@ import type { CardID } from '@icgame/shared';
 import { buildFixtureMatch } from '../../match/fixtures/buildScenario';
 import { buildActiveSkillContext } from '../MatchRuntime/controllerDerive';
 import {
+  EMPTY_DRAFT,
+  awaitedResponse,
+  sheetCommand,
+  type MineAwaited,
+} from '../MatchRuntime/response/awaitedResponse';
+import {
   ACTIVE_SKILL_DESCRIPTORS,
   APOLLO_WORSHIP,
   AQUARIUS_COHERENCE,
@@ -265,11 +271,11 @@ const ROWS: Row[] = [
     },
   },
   {
-    name: '达尔文·进化',
+    name: '达尔文·淘汰',
     skill: DARWIN_EVOLUTION,
     build: () => {
       const s = asThief('thief_darwin', cards('action_kick', 'action_unlock', 'action_shoot'));
-      return { state: s.state, seat: s.me, args: [cards('action_kick', 'action_unlock')] };
+      return { state: s.state, seat: s.me, args: [] };
     },
   },
   {
@@ -1297,26 +1303,36 @@ describe('分步表单技能 · 界面可选项与引擎一致', () => {
     ).not.toBeNull();
   });
 
-  it('达尔文·淘汰：必须刚好放回 2 张，手牌不足 2 张时置灰', () => {
-    expect(DARWIN_EVOLUTION.pickCount).toBe(2);
-    const one = asThief('thief_darwin', cards('action_kick'));
-    expect(entryOf(one.state, one.me, DARWIN_EVOLUTION)!.reason?.key).toBe(
-      'skill.reason.needTwoInHand',
-    );
-    const three = asThief('thief_darwin', cards('action_kick', 'action_unlock', 'action_shoot'));
-    expect(entryOf(three.state, three.me, DARWIN_EVOLUTION)!.enabled).toBe(true);
-    // 引擎要求恰好 2 张：1 张或 3 张都拒绝
-    expect(apply(three.state, three.me, 'playDarwinEvolution', [['action_kick']])).toBeNull();
-    expect(
-      apply(three.state, three.me, 'playDarwinEvolution', [
-        ['action_kick', 'action_unlock', 'action_shoot'],
-      ]),
-    ).toBeNull();
-    // 放回的顺序：先选的在最顶
-    const after = apply(three.state, three.me, 'playDarwinEvolution', [
-      ['action_unlock', 'action_kick'],
-    ])!;
-    expect(after.G.deck.cards.slice(0, 2)).toEqual(['action_unlock', 'action_kick']);
+  it('达尔文·淘汰：发动不带实参，手牌再少也能发动；放回的牌在应答里从抽牌后的手牌里选', () => {
+    expect(DARWIN_EVOLUTION.argKind).toBe('none');
+    const empty = asThief('thief_darwin', cards());
+    expect(entryOf(empty.state, empty.me, DARWIN_EVOLUTION)!.enabled).toBe(true);
+    const s = asThief('thief_darwin', cards('action_kick'));
+    const started = apply(s.state, s.me, 'playDarwinEvolution', [])!;
+    expect(started.G.pendingDarwinReturn).toEqual({ playerID: s.me });
+    const hand = started.G.players[s.me]!.hand;
+    expect(hand).toHaveLength(3);
+    // 界面构造的放回命令被引擎接受，新抽的牌也能选；先选的在最顶
+    const view = viewOf(started, s.me);
+    const awaited = awaitedResponse(view, s.me);
+    expect(awaited).toMatchObject({ mine: true, kind: 'darwin' });
+    const cmd = sheetCommand(awaited as MineAwaited, 'darwin-return', {
+      ...EMPTY_DRAFT,
+      returnPicks: [2, 0],
+    })!;
+    expect(cmd.move).toBe('respondDarwinReturn');
+    const after = apply(started, s.me, cmd.move, [...cmd.args])!;
+    expect(after.G.deck.cards.slice(0, 2)).toEqual([hand[2], hand[0]]);
+    expect(after.G.pendingDarwinReturn ?? null).toBeNull();
+  });
+
+  it('达尔文·淘汰：牌库不足 2 张时置灰', () => {
+    const s = asThief('thief_darwin', cards('action_kick', 'action_unlock'));
+    const state = editG(s.state, (G) => ({
+      ...G,
+      deck: { ...G.deck, cards: cards('action_kick') },
+    }));
+    expect(entryOf(state, s.me, DARWIN_EVOLUTION)!.reason?.key).toBe('skill.reason.deckShort');
   });
 });
 

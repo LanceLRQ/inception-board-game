@@ -2,12 +2,14 @@
 // 纯函数：只读按座位裁剪的视图里公开的字段（谁在迷失层、梦主是谁与角色、本人手牌与本人回合计数），
 // 与布局无关；引擎的合法性判定在服务端，这里只把「引擎必拒」的入口提前置灰并说明原因。
 //
-// 抽牌阶段还有：略过抽牌、小丑·失控（略过抽牌后掷骰决定抽几张）、黑天鹅·纷飞（把全部手牌分给其他盗梦者再抽 4 张）。
+// 抽牌阶段还有：略过抽牌、小丑·失控（略过抽牌后掷骰决定抽几张）、黑天鹅·纷飞（把全部手牌分给其他盗梦者再抽 4 张）、
+// 黑洞·吞噬（放弃抽牌，令同层有手牌的玩家各交 1 张手牌给自己）。
 //
 // 对照：docs/manual/03-game-flow.md:65-67 复活（出牌阶段弃 2 张手牌复活自己或他人；复活自己到第 1 层、
 //       复活他人到自己所在层；自己在迷失层不能复活他人）；
 //       docs/manual/06-dream-master.md:90 密道世界观（只能弃 1 张梦境穿梭剂复活）；
-//       docs/manual/03-game-flow.md:82 梦主每回合可免费移动到相邻层一次。
+//       docs/manual/03-game-flow.md:82 梦主每回合可免费移动到相邻层一次；
+//       docs/manual/05-dream-thieves.md:150-158 黑洞·吞噬。
 
 /** 与引擎的 MASTER_FREE_MOVE_KEY 一致（有测试对账）：梦主本回合已用过免费移动 */
 export const MASTER_FREE_MOVE_KEY = 'master.freeMove';
@@ -25,6 +27,8 @@ export interface EntryPlayer {
   readonly currentLayer: number;
   readonly nickname?: string | null;
   readonly characterId?: string | null;
+  /** 手牌张数（公开）；黑洞·吞噬据此判断同层有没有人交得出牌 */
+  readonly handCount?: number | null;
   /** 只有本人的视图里有 */
   readonly skillUsedThisTurn?: Readonly<Record<string, number>> | null;
 }
@@ -35,7 +39,13 @@ export type DockEntryKind =
   | 'masterMove'
   | 'skipDraw'
   | 'jokerGamble'
-  | 'blackSwanTour';
+  | 'blackSwanTour'
+  | 'blackHoleLevy';
+
+/** 黑洞的角色标识：抽牌阶段可以放弃抽牌，令同层有手牌的玩家各交 1 张（黑洞·吞噬） */
+export const BLACK_HOLE_CHARACTER_ID = 'thief_black_hole';
+/** 黑洞·吞噬的技能使用记录键（与引擎的 BLACK_HOLE_LEVY_SKILL_ID 一致，有测试对账）：回合限一次 */
+export const BLACK_HOLE_LEVY_SKILL_KEY = 'thief_black_hole.skill_0';
 
 /** 小丑的角色标识：抽牌阶段可以改掷骰抽牌（小丑·失控） */
 export const JOKER_CHARACTER_ID = 'thief_joker';
@@ -194,7 +204,8 @@ export function deriveDockEntries(input: DockEntriesInput): DockEntrySpec[] {
 }
 
 /**
- * 抽牌阶段的入口：略过抽牌（任何人都可以）；小丑存活时多一个小丑·失控；黑天鹅存活时多一个黑天鹅·纷飞。
+ * 抽牌阶段的入口：略过抽牌（任何人都可以）；小丑存活时多一个小丑·失控；黑天鹅存活时多一个黑天鹅·纷飞；
+ * 黑洞存活时多一个黑洞·吞噬。
  * 黑天鹅·纷飞引擎要求：存活、手里至少 1 张牌、本回合没发动过、有别的存活盗梦者可以接收（梦主不算）。
  * 对照：docs/manual/05-dream-thieves.md 小丑、黑天鹅；引擎的 skipDraw / playJokerGamble / playBlackSwanTour（只认抽牌阶段与本人回合）
  */
@@ -231,6 +242,25 @@ function deriveDrawEntries(input: {
             : null;
     out.push(entry('blackSwanTour', reason));
   }
+  if (me.isAlive && me.characterId === BLACK_HOLE_CHARACTER_ID) {
+    // 引擎要求：本回合没发动过，且同层至少有一名存活的其他玩家手里有牌（手牌张数是公开信息）
+    const givers = Object.entries(players).filter(
+      ([id, p]) =>
+        id !== seat &&
+        p?.isAlive === true &&
+        p.currentLayer === me.currentLayer &&
+        (p.handCount ?? 0) > 0,
+    ).length;
+    const used = (me.skillUsedThisTurn?.[BLACK_HOLE_LEVY_SKILL_KEY] ?? 0) > 0;
+    const reason: EntryReason | null = busyReason
+      ? busyReason
+      : used
+        ? { key: 'entries.reason.levyUsed' }
+        : givers === 0
+          ? { key: 'entries.reason.levyNoGiver' }
+          : null;
+    out.push(entry('blackHoleLevy', reason));
+  }
   return out;
 }
 
@@ -249,5 +279,7 @@ export function entryTestId(kind: DockEntryKind): string {
       return 'dock-entry-joker';
     case 'blackSwanTour':
       return 'dock-entry-tour';
+    case 'blackHoleLevy':
+      return 'dock-entry-levy';
   }
 }

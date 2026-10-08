@@ -484,8 +484,8 @@ describe('回合外响应 · 白羊星尘', () => {
 // ---------------------------------------------------------------------------
 
 describe('回合外响应 · 雅典娜急智', () => {
-  /** p1 是回合主人；p2 是雅典娜，弃牌堆顶是 SHOOT。尚无任何待结算 */
-  function athenaOffTurn(turnOwner = 'p1'): MatchState<SetupState> {
+  /** p1 是回合主人；p2 是雅典娜，弃牌堆 [KICK, SHOOT]。尚无任何待结算 */
+  function athenaScene(turnOwner = 'p1'): MatchState<SetupState> {
     const base = createTestState({
       phase: 'playing',
       turnPhase: 'action',
@@ -518,39 +518,41 @@ describe('回合外响应 · 雅典娜急智', () => {
     return load(G);
   }
 
-  it('不是回合主人的雅典娜以自己的名义发动：拿到弃牌堆顶的牌，回合归属不变', () => {
-    const s = athenaOffTurn();
-    expect(awaitingOf(s.G)).toEqual([]);
-    const after = mustApply(s, 'p2', 'useAthenaWit');
-    expect(after.G.players.p2!.hand).toEqual([SHOOT]);
-    expect(after.G.deck.discardPile).toEqual([KICK]);
+  /** p1 用 KICK 打雅典娜 p2，挂起 p2 的应答 */
+  function afterKickOnAthena(): MatchState<SetupState> {
+    const s = mustApply(athenaScene(), 'p1', 'playKick', [KICK, 'p2']);
+    expect(s.G.pendingAthenaWit).toMatchObject({ athenaID: 'p2', userID: 'p1' });
+    expect(awaitingOf(s.G)).toEqual([{ field: 'pendingAthenaWit', actors: ['p2'] }]);
+    return s;
+  }
+
+  it('雅典娜在别人的回合以自己的名义应答：选弃牌堆里的牌，随后那张牌照常结算，回合归属不变', () => {
+    const after = mustApply(afterKickOnAthena(), 'p2', 'respondAthenaWit', [KICK]);
+    expect(after.G.players.p2!.hand).toEqual([KICK]);
+    expect(after.G.pendingAthenaWit ?? null).toBeNull();
     expect(after.ctx.currentPlayer).toBe('p1');
+    // 出牌者打出的 KICK 已进弃牌堆
+    expect(after.G.deck.discardPile).toEqual([SHOOT, KICK]);
   });
 
-  it('回合主人自己是雅典娜时发动被拒绝（move 自己的守卫，状态不变）', () => {
-    const s = athenaOffTurn('p2');
-    const res = applyMove(game, s, { playerID: 'p2', move: 'useAthenaWit', args: [] });
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('invalid_move');
-    expect(res.state).toBe(s);
+  it('雅典娜可以放弃：那张牌照常结算', () => {
+    const after = mustApply(afterKickOnAthena(), 'p2', 'respondAthenaWit', [null]);
+    expect(after.G.players.p2!.hand).toEqual([]);
+    expect(after.G.deck.discardPile).toEqual([KICK, SHOOT, KICK]);
   });
 
-  it('不是雅典娜的人发动被拒绝', () => {
-    const s = athenaOffTurn();
-    const res = applyMove(game, s, { playerID: 'p3', move: 'useAthenaWit', args: [] });
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('invalid_move');
-    expect(res.state).toBe(s);
+  it('别人冒充雅典娜、出牌者自己替她应答都被行动权拒绝，状态不变', () => {
+    const s = afterKickOnAthena();
+    for (const who of ['p1', 'p3', 'pM']) expectNotActive(s, who, 'respondAthenaWit', [KICK]);
   });
 
-  it('同一回合再发动一次被拒绝', () => {
-    const after = mustApply(athenaOffTurn(), 'p2', 'useAthenaWit');
-    const res = applyMove(game, after, { playerID: 'p2', move: 'useAthenaWit', args: [] });
-    expect(res.ok).toBe(false);
+  it('没有挂起时，雅典娜不能凭空发起急智', () => {
+    expectNotActive(athenaScene(), 'p2', 'respondAthenaWit', [KICK]);
   });
 
-  it('雅典娜在别人回合只能发动急智，不能发其他 move', () => {
-    expectNotActive(athenaOffTurn(), 'p2', 'endActionPhase');
+  it('雅典娜在别人的回合只能应答，不能发其他 move', () => {
+    expectNotActive(athenaScene(), 'p2', 'endActionPhase');
+    expectNotActive(afterKickOnAthena(), 'p2', 'endActionPhase');
   });
 });
 

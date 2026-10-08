@@ -299,6 +299,16 @@ describe('checkStateInvariants', () => {
       (G, a) => (G.pendingAriesChoice = { ariesID: a, victimLayer: 1, victimID: 'x' }),
     ],
     [
+      '黑洞吞噬的等待名单里有不存在的玩家',
+      'pendingBlackHoleLevy.waiting',
+      (G, a) => (G.pendingBlackHoleLevy = { blackHoleID: a, waiting: ['x'] }),
+    ],
+    [
+      '达尔文淘汰的选牌者不存在',
+      'pendingDarwinReturn.playerID',
+      (G) => (G.pendingDarwinReturn = { playerID: 'x' }),
+    ],
+    [
       '处女待选的射手是数字',
       'pendingVirgoChoice',
       (G, a) => (G.pendingVirgoChoice = { virgoID: a, triggerRoll: 6, shooterID: 1 as never }),
@@ -356,6 +366,30 @@ describe('checkStateInvariants', () => {
           cardId: 3 as never,
           extraOnMove: null,
           choices: [1],
+        }),
+    ],
+    [
+      '雅典娜急智的出牌者不存在',
+      'pendingAthenaWit.userID',
+      (G, a) =>
+        (G.pendingAthenaWit = {
+          athenaID: a,
+          userID: 'x',
+          cardId: 'action_kick' as never,
+          move: 'playKick',
+          args: [],
+        }),
+    ],
+    [
+      '雅典娜急智的重放实参不是数组',
+      'pendingAthenaWit.args',
+      (G, a, b) =>
+        (G.pendingAthenaWit = {
+          athenaID: a,
+          userID: b,
+          cardId: 'action_kick' as never,
+          move: 'playKick',
+          args: 'x' as never,
         }),
     ],
     ['换位快照里有数字牌', 'shiftSnapshot', (G, a) => (G.shiftSnapshot = { [a]: 3 as never })],

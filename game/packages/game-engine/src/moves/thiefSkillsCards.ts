@@ -1,18 +1,14 @@
 // 盗梦者处理手牌与牌库的主动技能：替代抽牌、换牌、取弃牌堆、窥探与整理牌库。
 
 import type { CardID } from '@icgame/shared';
-import { isRecordOf, isString, isStringArray } from '../engine/argShape.js';
+import { isRecordOf, isStringArray } from '../engine/argShape.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import {
-  ATHENA_WIT_SKILL_ID,
   LIBRA_SKILL_ID,
   applyApolloWorship,
   applyAquariusCoherence,
-  applyAthenaWit,
-  applyBlackHoleLevy,
   applyBlackSwanTour,
   applyChemistRefine,
-  applyDarwinEvolution,
   applyForgerExchange,
   applyGeminiChoice,
   applyLordOfWarBlackMarket,
@@ -23,6 +19,8 @@ import {
   libraResolvePick,
   libraValidateSplit,
   markSkillUsed,
+  startBlackHoleLevy,
+  startDarwinEvolution,
 } from '../engine/skills.js';
 import { drawCards, incrementMoveCounter } from '../stateOps.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
@@ -69,15 +67,17 @@ export const thiefCardSkillMoves = {
     client: false,
   },
 
-  // 黑洞·吞噬（抽牌阶段替代 doDraw：同层每个玩家给 1 张手牌）
-  // 对照：docs/manual/05-dream-thieves.md 黑洞
+  // 黑洞·吞噬（抽牌阶段替代 doDraw，两步）：
+  //   第 1 步 playBlackHoleLevy：发动，放弃抽牌，挂起；同层有手牌的每个其他玩家各自选 1 张交出
+  //   第 2 步 respondBlackHoleLevy：名单里的人交出自己选的牌（见 moves/responses.ts），交齐后抽牌阶段结束
+  // 发动者不指明别人的牌：别人的手牌客户端看不到，发动者指牌会泄露手牌信息，也由交牌人自己决定交哪张。
+  // 对照：docs/manual/05-dream-thieves.md:150-158 黑洞
   playBlackHoleLevy: {
-    move: ({ G, ctx }: MoveCtx, giverPicks: Record<string, CardID>) => {
-      if (!isRecordOf(giverPicks, isString)) return INVALID_MOVE;
+    move: ({ G, ctx }: MoveCtx) => {
       if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
-      const applied = applyBlackHoleLevy(G, G.currentPlayerID, giverPicks);
-      if (applied === null) return INVALID_MOVE;
-      return endDrawPhase(applied);
+      const started = startBlackHoleLevy(G, G.currentPlayerID);
+      if (started === null) return INVALID_MOVE;
+      return incrementMoveCounter(started);
     },
     client: false,
   },
@@ -96,15 +96,16 @@ export const thiefCardSkillMoves = {
     client: false,
   },
 
-  // 达尔文·进化：抽牌库顶 2 + 还 2 任意顺序到顶（限 1 次/回合）
-  // 对照：docs/manual/05-dream-thieves.md 达尔文
+  // 达尔文·淘汰（两步，限 1 次/回合）：
+  //   第 1 步 playDarwinEvolution：发动，先抽牌库顶 2 张收入手牌，挂起
+  //   第 2 步 respondDarwinReturn：从抽牌后的手牌里选刚好 2 张按顺序放回牌库顶（见 moves/responses.ts）
+  // 对照：卡面「淘汰」（扩展角色，说明书没有收录）
   playDarwinEvolution: {
-    move: ({ G, ctx }: MoveCtx, returnCards: CardID[]) => {
+    move: ({ G, ctx }: MoveCtx) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-      if (!Array.isArray(returnCards)) return INVALID_MOVE;
-      const next = applyDarwinEvolution(G, ctx.currentPlayer, returnCards);
-      if (next === null) return INVALID_MOVE;
-      return incrementMoveCounter(next);
+      const started = startDarwinEvolution(G, ctx.currentPlayer);
+      if (started === null) return INVALID_MOVE;
+      return incrementMoveCounter(started);
     },
     client: false,
   },
@@ -271,40 +272,6 @@ export const thiefCardSkillMoves = {
       const next = applyLordOfWarBlackMarket(G, ctx.currentPlayer, discardIds, pickFromDiscard);
       if (next === null) return INVALID_MOVE;
       return next;
-    },
-    client: false,
-  },
-
-  // 雅典娜·急智（skill_0）· 主动 move（回合外可发起）
-  // 对照：docs/manual/05-dream-thieves.md 雅典娜
-  // 规则："当其他盗梦者对你使用行动牌时，你可以先从弃牌堆顶部摸 1 张牌"
-  // 实装策略：
-  //   - 主动 move（不强制响应窗口模式），雅典娜玩家在他人回合任意时机可发起
-  //   - perTurn 限制：每回合最多 1 次（natural 通过 skillUsedThisTurn 实现，
-  //     turn.onBegin 重置 → 自然实现"每个对手回合限 1 次"）
-  //   - UI 层在检测到"他人对己出行动牌"时高亮提示，引导玩家点击使用
-  // 守卫：
-  //   - 雅典娜本人 + 存活 + 角色匹配（applyAthenaWit 内部校验）
-  //   - 弃牌堆非空（同上内部校验）
-  //   - perTurn 限制：未超 1 次（markSkillUsed 限制）
-  //   - 不要求 turnPhase（回合外可发起）
-  useAthenaWit: {
-    move: ({ G, ctx }: MoveCtx) => {
-      if (G.phase !== 'playing') return INVALID_MOVE;
-      const player = G.players[ctx.currentPlayer];
-      if (!player || !player.isAlive) return INVALID_MOVE;
-      if (player.characterId !== 'thief_athena') return INVALID_MOVE;
-      // 每回合限 1 次（自然实现"每个对手回合限 1 次"，因 skillUsedThisTurn 在 turn.onBegin 重置）
-      if ((player.skillUsedThisTurn[ATHENA_WIT_SKILL_ID] ?? 0) >= 1) {
-        return INVALID_MOVE;
-      }
-      // 自己回合不允许（"其他玩家对你使用行动牌时"语义）
-      if (ctx.currentPlayer === G.currentPlayerID) return INVALID_MOVE;
-
-      const next = applyAthenaWit(G, ctx.currentPlayer);
-      if (next === null) return INVALID_MOVE;
-      const counted = markSkillUsed(next, ctx.currentPlayer, ATHENA_WIT_SKILL_ID);
-      return incrementMoveCounter(counted);
     },
     client: false,
   },

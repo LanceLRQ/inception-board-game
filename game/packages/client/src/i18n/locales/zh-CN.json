@@ -604,9 +604,7 @@
       "gaiaDown": "同层其余玩家全部 -1 层（去第 {{layer}} 层）",
       "gaiaUp": "同层其余玩家全部 +1 层（去第 {{layer}} 层）"
     },
-    "hint": {
-      "darwinOrder": "按选牌的先后放回牌库顶：先选的在最顶。新抽的 2 张牌发动前看不到，这里只能从现有手牌里选。"
-    },
+    "hint": {},
     "step": {
       "cards": "选择 {{need}} 张手牌（已选 {{picked}}）：",
       "cardsAny": "选择手牌（已选 {{picked}}）：",
@@ -881,6 +879,23 @@
       "plague": "邪念瘟疫由你点名要派发贿赂牌的盗梦者；没被点名且手里没有贿赂牌的盗梦者将进入迷失层。",
       "scope": "本回合结束前有效。"
     },
+    "levy": {
+      "title": "黑洞 · 吞噬",
+      "body": "{{name}} 放弃抽牌，令同层的玩家各给 TA 1 张手牌。请选 1 张手牌交出。",
+      "give": "选 1 张手牌交出…",
+      "noHand": "你没有手牌可交。"
+    },
+    "darwin": {
+      "title": "达尔文 · 淘汰",
+      "body": "你已将牌库顶 2 张牌收入手牌。请从手牌里选 2 张，按顺序放回牌库顶。",
+      "open": "选择放回的牌…"
+    },
+    "athena": {
+      "title": "雅典娜 · 急智",
+      "body": "{{name}} 对你使用【{{card}}】。该牌结算前，你可以先从弃牌堆选取 1 张牌收入手牌。",
+      "take": "从弃牌堆选 1 张…",
+      "pass": "不发动"
+    },
     "sheet": {
       "back": "返回",
       "zealotDiscard": {
@@ -925,6 +940,22 @@
         "title": "邪念瘟疫",
         "desc": "点名要派发贿赂牌的盗梦者，也可以一个都不点名。",
         "confirm": "确认发动"
+      },
+      "levyGive": {
+        "title": "交出一张手牌",
+        "desc": "选 1 张手牌交给 {{name}}；交出的是哪张，只有你和 TA 知道。",
+        "confirm": "确认交出"
+      },
+      "darwinReturn": {
+        "title": "放回牌库顶",
+        "desc": "手牌里包括刚抽到的 2 张。选刚好 2 张按顺序放回牌库顶：先选的在最上面。",
+        "confirm": "确认放回",
+        "progress": "已选 {{count}} / {{total}} 张"
+      },
+      "athenaPick": {
+        "title": "从弃牌堆选取 1 张牌",
+        "desc": "选中的牌先收入手牌，再结算 {{name}} 的【{{card}}】。",
+        "confirm": "确认选取"
       }
     }
   },
@@ -1054,7 +1085,8 @@
       "masterMove": "移动",
       "skipDraw": "跳过抽牌",
       "jokerGamble": "小丑·失控",
-      "blackSwanTour": "黑天鹅·纷飞"
+      "blackSwanTour": "黑天鹅·纷飞",
+      "blackHoleLevy": "黑洞·吞噬"
     },
     "reason": {
       "handShort": "复活要弃 {{count}} 张手牌，你只有 {{have}} 张",
@@ -1062,7 +1094,9 @@
       "busy": "有待处理的事项，先处理完再操作",
       "tourNoHand": "手里没有牌可以分发（至少 1 张）",
       "tourUsed": "本回合已发动过（每回合限一次）",
-      "tourNoRecipient": "没有其他存活的盗梦者可以接收"
+      "tourNoRecipient": "没有其他存活的盗梦者可以接收",
+      "levyUsed": "本回合已发动过（每回合限一次）",
+      "levyNoGiver": "同层没有其他玩家手里有牌，无人可交"
     },
     "move": {
       "label": "移动",

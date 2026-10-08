@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import type { MatchView, PlayerView } from '@icgame/game-engine';
 import {
   EMPTY_DRAFT,
+  groupDiscard,
   awaitedActions,
   awaitedKey,
   awaitedResponse,
@@ -484,5 +485,163 @@ describe('草稿工具', () => {
   it('草稿类型可以不带可选项直接用 EMPTY_DRAFT 展开', () => {
     const d: AwaitedDraft = { ...EMPTY_DRAFT, secondPile: [1] };
     expect(d.discardIndex).toBeNull();
+  });
+});
+
+describe('awaitedResponse · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智', () => {
+  it('黑洞·吞噬：名单里的每个人都轮到本人；不在名单里（含黑洞自己）与旁观者只需要等', () => {
+    const view = viewWith({
+      pendingBlackHoleLevy: { blackHoleID: '9', waiting: ['0', '1'] },
+    } as Partial<MatchView>);
+    expect(awaitedResponse(view, '0')).toEqual({
+      mine: true,
+      kind: 'levy',
+      blackHoleID: '9',
+      hand: ['a', 'b'],
+    });
+    expect(awaitedResponse(view, '1')).toMatchObject({ mine: true, kind: 'levy' });
+    expect(awaitedResponse(view, '2')).toEqual({ mine: false });
+    expect(awaitedResponse(view, '9')).toEqual({ mine: false });
+    expect(awaitedResponse(view, null)).toEqual({ mine: false });
+  });
+
+  it('黑洞·吞噬：交牌是必须的，只有一个按钮（打开选牌弹窗），没有放弃', () => {
+    const view = viewWith({
+      pendingBlackHoleLevy: { blackHoleID: '9', waiting: ['0'] },
+    } as Partial<MatchView>);
+    const a = awaitedResponse(view, '0') as MineAwaited;
+    const actions = awaitedActions(a);
+    expect(actions.map((x) => [x.id, x.decline, x.disabled, x.effect])).toEqual([
+      ['give', false, false, { type: 'sheet', sheet: 'levy-give' }],
+    ]);
+    expect(hasOwnDeadline(a)).toBe(true);
+  });
+
+  it('黑洞·吞噬：选中的手牌位置换成牌 id 发 respondBlackHoleLevy；没选 / 越界不能确认', () => {
+    const view = viewWith({
+      pendingBlackHoleLevy: { blackHoleID: '9', waiting: ['0'] },
+    } as Partial<MatchView>);
+    const a = awaitedResponse(view, '0') as MineAwaited;
+    expect(sheetCommand(a, 'levy-give', EMPTY_DRAFT)).toBeNull();
+    expect(sheetCommand(a, 'levy-give', { ...EMPTY_DRAFT, giveIndex: 1 })).toEqual({
+      move: 'respondBlackHoleLevy',
+      args: ['b'],
+    });
+    expect(sheetCommand(a, 'levy-give', { ...EMPTY_DRAFT, giveIndex: 7 })).toBeNull();
+    // 弹窗与待决状态对不上
+    expect(sheetCommand(a, 'darwin-return', { ...EMPTY_DRAFT, returnPicks: [0, 1] })).toBeNull();
+  });
+
+  it('达尔文·淘汰：只有达尔文本人；手牌包含新抽的牌，选 2 张按选择顺序放回', () => {
+    const view = viewWith({ pendingDarwinReturn: { playerID: '0' } } as Partial<MatchView>);
+    const a = awaitedResponse(view, '0') as MineAwaited;
+    expect(a).toEqual({ mine: true, kind: 'darwin', hand: ['a', 'b'] });
+    expect(awaitedResponse(view, '1')).toEqual({ mine: false });
+    expect(awaitedActions(a)[0]).toMatchObject({
+      id: 'return',
+      decline: false,
+      effect: { type: 'sheet', sheet: 'darwin-return' },
+    });
+    // 先选的在最顶：选 [1, 0] 就是 b 在最上面
+    expect(sheetCommand(a, 'darwin-return', { ...EMPTY_DRAFT, returnPicks: [1, 0] })).toEqual({
+      move: 'respondDarwinReturn',
+      args: [['b', 'a']],
+    });
+    // 必须刚好 2 张
+    expect(sheetCommand(a, 'darwin-return', { ...EMPTY_DRAFT, returnPicks: [0] })).toBeNull();
+    expect(sheetCommand(a, 'darwin-return', EMPTY_DRAFT)).toBeNull();
+    expect(sheetCommand(a, 'darwin-return', { ...EMPTY_DRAFT, returnPicks: [0, 5] })).toBeNull();
+  });
+
+  it('达尔文·淘汰：手牌不足 2 张时按钮置灰（引擎不会出现这种局面，仅作防御）', () => {
+    const view = viewWith({
+      pendingDarwinReturn: { playerID: '2' },
+      players: { ...viewWith().players, '2': player('2', { hand: ['x'] }) },
+    } as Partial<MatchView>);
+    const a = awaitedResponse(view, '2') as MineAwaited;
+    expect(awaitedActions(a)[0]!.disabled).toBe(true);
+  });
+
+  it('雅典娜·急智：只有雅典娜本人的视图里点了名；别人（athenaID 为 null）只需要等', () => {
+    const own = viewWith({
+      pendingAthenaWit: { athenaID: '0', userID: '1', cardId: 'action_kick' },
+      deck: { cardCount: 5, discardPile: ['x', 'y', 'x'] },
+    } as Partial<MatchView>);
+    expect(awaitedResponse(own, '0')).toEqual({
+      mine: true,
+      kind: 'athena',
+      userID: '1',
+      cardId: 'action_kick',
+      discard: ['x', 'y', 'x'],
+    });
+    const hidden = viewWith({
+      pendingAthenaWit: { athenaID: null, userID: '1', cardId: 'action_kick' },
+      deck: { cardCount: 5, discardPile: ['x'] },
+    } as Partial<MatchView>);
+    for (const seat of ['0', '1', '2', null]) {
+      expect(awaitedResponse(hidden, seat)).toEqual({ mine: false });
+    }
+  });
+
+  it('雅典娜·急智：可以放弃（respondAthenaWit null），或打开选牌弹窗', () => {
+    const view = viewWith({
+      pendingAthenaWit: { athenaID: '0', userID: '1', cardId: 'action_kick' },
+      deck: { cardCount: 5, discardPile: ['x', 'y'] },
+    } as Partial<MatchView>);
+    const a = awaitedResponse(view, '0') as MineAwaited;
+    const actions = awaitedActions(a);
+    expect(actions.map((x) => [x.id, x.decline, x.disabled])).toEqual([
+      ['take', false, false],
+      ['pass', true, false],
+    ]);
+    expect(actions[0]!.effect).toEqual({ type: 'sheet', sheet: 'athena-pick' });
+    expect(actions[1]!.effect).toEqual({ type: 'move', move: 'respondAthenaWit', args: [null] });
+  });
+
+  it('雅典娜·急智：选的牌必须在弃牌堆里才能确认，命令带牌 id', () => {
+    const view = viewWith({
+      pendingAthenaWit: { athenaID: '0', userID: '1', cardId: 'action_kick' },
+      deck: { cardCount: 5, discardPile: ['x', 'y'] },
+    } as Partial<MatchView>);
+    const a = awaitedResponse(view, '0') as MineAwaited;
+    expect(sheetCommand(a, 'athena-pick', EMPTY_DRAFT)).toBeNull();
+    expect(sheetCommand(a, 'athena-pick', { ...EMPTY_DRAFT, athenaCard: 'y' })).toEqual({
+      move: 'respondAthenaWit',
+      args: ['y'],
+    });
+    expect(sheetCommand(a, 'athena-pick', { ...EMPTY_DRAFT, athenaCard: 'z' })).toBeNull();
+  });
+
+  it('groupDiscard：弃牌堆按牌种归并，保持首次出现的顺序', () => {
+    expect(groupDiscard(['x', 'y', 'x', 'z', 'x'])).toEqual([
+      { card: 'x', count: 3 },
+      { card: 'y', count: 1 },
+      { card: 'z', count: 1 },
+    ]);
+    expect(groupDiscard([])).toEqual([]);
+  });
+
+  it('awaitedKey：换了一次待决状态（回合 / 出牌者 / 手牌）就换识别串', () => {
+    const levy = awaitedResponse(
+      viewWith({
+        pendingBlackHoleLevy: { blackHoleID: '9', waiting: ['0'] },
+      } as Partial<MatchView>),
+      '0',
+    ) as MineAwaited;
+    expect(awaitedKey(levy, 5)).toBe('levy|5|9|a,b');
+    expect(awaitedKey(levy, 6)).not.toBe(awaitedKey(levy, 5));
+    const darwin = awaitedResponse(
+      viewWith({ pendingDarwinReturn: { playerID: '0' } } as Partial<MatchView>),
+      '0',
+    ) as MineAwaited;
+    expect(awaitedKey(darwin, 5)).toBe('darwin|5|a,b');
+    const athena = awaitedResponse(
+      viewWith({
+        pendingAthenaWit: { athenaID: '0', userID: '1', cardId: 'action_kick' },
+        deck: { cardCount: 1, discardPile: ['x'] },
+      } as Partial<MatchView>),
+      '0',
+    ) as MineAwaited;
+    expect(awaitedKey(athena, 5)).toBe('athena|5|1|action_kick');
   });
 });

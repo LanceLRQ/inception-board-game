@@ -230,9 +230,15 @@ export interface ResponseSheetModel {
   readonly setNightmareDraft: (draft: NightmareParamDraft) => void;
   /** 天秤·挑一份：点哪份就发哪份 */
   readonly pickPile: (pile: 'pile1' | 'pile2') => void;
+  /** 黑洞·吞噬：选要交出的手牌位置 */
+  readonly pickGive: (index: number) => void;
+  /** 达尔文·淘汰：切换一张手牌是否放回牌库顶（最多 2 张，选的先后就是放回的顺序） */
+  readonly toggleReturn: (index: number) => void;
+  /** 雅典娜·急智：选弃牌堆里的一张牌（再点同一张取消） */
+  readonly pickAthenaCard: (card: string) => void;
 }
 
-/** 被 SHOOT 时的响应、天秤、意念判官、处女、白羊：轮到本人时的操作界面 */
+/** 被 SHOOT 时的响应、天秤、意念判官、处女、白羊、黑洞·吞噬、达尔文·淘汰、雅典娜·急智：轮到本人时的操作界面 */
 export interface ResponseModel {
   /** 轮到本人应答的情形；没有待决状态或轮到别人为 null */
   readonly awaited: MineAwaited | null;

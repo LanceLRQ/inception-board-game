@@ -1167,3 +1167,140 @@ describe('MatchRoom 存储不可用时的排程', () => {
     expect(h.timers.pending().map((p) => p.at)).toEqual(before);
   });
 });
+
+describe('MatchRoom 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智的截止与代答', () => {
+  const KICK = 'action_kick';
+  const SHOOT = 'action_shoot';
+  const UNLOCK = 'action_unlock';
+  const GRAFT = 'action_graft';
+  const PEEK = 'action_dream_peek';
+
+  /** 把某个盗梦者设为回合主人（抽牌阶段），再改写玩家 */
+  function thiefTurn(
+    patches: (
+      owner: string,
+      others: string[],
+    ) => Record<string, Partial<SetupState['players'][string]>>,
+  ): { state: MatchState<SetupState>; owner: string; others: string[] } {
+    const base = stateAfterSetup(5);
+    const owner = base.G.playerOrder.find((id) => id !== base.G.dreamMasterID)!;
+    const others = base.G.playerOrder.filter((id) => id !== owner);
+    const players = { ...base.G.players };
+    for (const [id, patch] of Object.entries(patches(owner, others))) {
+      players[id] = { ...players[id]!, ...patch };
+    }
+    const state: MatchState<SetupState> = {
+      ...base,
+      G: { ...base.G, currentPlayerID: owner, turnPhase: 'draw', players },
+      ctx: { ...base.ctx, currentPlayer: owner, playOrderPos: base.ctx.playOrder.indexOf(owner) },
+    };
+    return { state, owner, others };
+  }
+
+  function must(
+    state: MatchState<SetupState>,
+    playerID: string,
+    move: string,
+    args: unknown[] = [],
+  ) {
+    const out = applyMove(game, state, { playerID, move, args });
+    if (!out.ok) throw new Error(`${move} 被拒绝：${out.reason}`);
+    return out.state;
+  }
+
+  it('黑洞·吞噬：名单里全是真人，挂待结算时限；到时限逐个代交，交齐后抽牌阶段结束', async () => {
+    const { state, owner, others } = thiefTurn((o, rest) => ({
+      [o]: { characterId: 'thief_black_hole' as never, hand: [UNLOCK] as never },
+      [rest[0]!]: { hand: [KICK, SHOOT] as never },
+      [rest[1]!]: { hand: [PEEK] as never },
+      [rest[2]!]: { hand: [] },
+      [rest[3]!]: { hand: [] },
+    }));
+    const pending = must(state, owner, 'playBlackHoleLevy');
+    expect(pending.G.pendingBlackHoleLevy!.waiting).toEqual([others[0], others[1]]);
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, pending);
+    h.room.start();
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.pendingTimeoutMs);
+
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps).toHaveLength(1);
+    expect(h.steps[0]!.source).toBe('timeout');
+    expect(h.room.current().G.pendingBlackHoleLevy!.waiting).toEqual([others[1]]);
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.pendingTimeoutMs);
+
+    h.timers.fireNext();
+    await h.room.idle();
+    const done = h.room.current().G;
+    expect(done.pendingBlackHoleLevy ?? null).toBeNull();
+    expect(done.turnPhase).toBe('action');
+    expect(done.players[owner]!.hand.length).toBe(3);
+  });
+
+  it('黑洞·吞噬：名单里是 Bot 座位，短延迟内以 Bot 的名义代交，不等待时限', async () => {
+    const { state, owner } = thiefTurn((o, rest) => ({
+      [o]: { characterId: 'thief_black_hole' as never, hand: [] },
+      [rest[0]!]: { hand: [KICK] as never },
+    }));
+    const pending = must(state, owner, 'playBlackHoleLevy');
+    const h = makeHarness(5, [owner], {}, pending);
+    h.room.start();
+    expect(h.timers.pending()[0]!.at).toBe(h.timers.now() + timing.botStepDelayMs);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('bot');
+    expect(h.room.current().G.pendingBlackHoleLevy ?? null).toBeNull();
+  });
+
+  it('达尔文·淘汰：真人达尔文超时，系统代选并放回牌库顶', async () => {
+    const { state, owner } = thiefTurn((o) => ({
+      [o]: { characterId: 'thief_darwin' as never, hand: [KICK, SHOOT, UNLOCK] as never },
+    }));
+    let s = must(state, owner, 'doDraw');
+    s = {
+      ...s,
+      G: { ...s.G, deck: { ...s.G.deck, cards: [GRAFT, PEEK, ...s.G.deck.cards] as never } },
+    };
+    const pending = must(s, owner, 'playDarwinEvolution');
+    expect(pending.G.pendingDarwinReturn).toEqual({ playerID: owner });
+    const deckCount = pending.G.deck.cards.length;
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, pending);
+    h.room.start();
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.pendingTimeoutMs);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+    const after = h.room.current().G;
+    expect(after.pendingDarwinReturn ?? null).toBeNull();
+    expect(after.deck.cards.length).toBe(deckCount + 2);
+  });
+
+  it('雅典娜·急智：真人雅典娜超时视为放弃，被挂起的出牌随后照常结算', async () => {
+    const { state, owner } = thiefTurn((o) => ({ [o]: { hand: [KICK] as never } }));
+    const master = state.G.dreamMasterID;
+    const athena = state.G.playerOrder.find((id) => id !== owner && id !== master)!;
+    let s: MatchState<SetupState> = {
+      ...state,
+      G: {
+        ...state.G,
+        turnPhase: 'action',
+        deck: { ...state.G.deck, discardPile: [GRAFT, PEEK] as never },
+        players: {
+          ...state.G.players,
+          [athena]: { ...state.G.players[athena]!, characterId: 'thief_athena' as never },
+        },
+      },
+    };
+    s = must(s, owner, 'playKick', [KICK, athena]);
+    expect(s.G.pendingAthenaWit).toMatchObject({ athenaID: athena });
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, s);
+    h.room.start();
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.pendingTimeoutMs);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+    const after = h.room.current().G;
+    expect(after.pendingAthenaWit ?? null).toBeNull();
+    expect(after.deck.discardPile).toContain(KICK);
+  });
+});

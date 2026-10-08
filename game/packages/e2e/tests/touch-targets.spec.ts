@@ -80,6 +80,10 @@ const SCENES = [
   ['【解封】打不出（心锁为 0）', '/game/debug?skill=unlock-none'],
   ['抽牌阶段（黑天鹅·纷飞）', '/game/debug?skill=black-swan'],
   ['应答：白羊·星尘（邪念瘟疫）', '/game/debug?pending=aries-plague'],
+  ['应答：黑洞·吞噬', '/game/debug?pending=levy'],
+  ['应答：达尔文·淘汰', '/game/debug?pending=darwin'],
+  ['应答：雅典娜·急智', '/game/debug?pending=athena'],
+  ['抽牌阶段（黑洞·吞噬）', '/game/debug?skill=black-hole-draw'],
   ['金库三选一（回音萦绕）', '/game/debug?as=master&vault=echo'],
 ] as const;
 

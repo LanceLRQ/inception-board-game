@@ -326,6 +326,131 @@ describe('LocalMatchSession · 轮到真人应答时不代答', () => {
   });
 });
 
+describe('LocalMatchSession · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智的应答', () => {
+  /** 把某个座位的手牌改成指定的牌（只在测试里这样做） */
+  function setHands(session: LocalMatchSession, hands: Record<string, string[]>): void {
+    const inner = session as unknown as {
+      state: { G: { players: Record<string, Record<string, unknown>> } };
+    };
+    const players = { ...inner.state.G.players };
+    for (const [id, hand] of Object.entries(hands)) players[id] = { ...players[id]!, hand };
+    patchState(session, { players });
+  }
+
+  it('黑洞·吞噬：名单里的 Bot 先代交，只剩真人时停下等真人，真人交牌后结束抽牌阶段', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    // 构造：座位 1 是黑洞、回合主人、抽牌阶段；真人与座位 2 都在同层且有手牌
+    setHands(session, {
+      '1': ['action_kick'],
+      '2': ['action_unlock', 'action_kick'],
+      [HUMAN]: ['action_shoot', 'action_kick'],
+    });
+    const inner = session as unknown as {
+      state: {
+        G: Record<string, unknown> & { players: Record<string, Record<string, unknown>> };
+        ctx: Record<string, unknown>;
+      };
+    };
+    const layerOf = inner.state.G.players[HUMAN]!.currentLayer;
+    const players = { ...inner.state.G.players };
+    for (const id of ['1', '2'])
+      players[id] = { ...players[id]!, currentLayer: layerOf, isAlive: true };
+    players['1'] = { ...players['1']!, characterId: 'thief_black_hole' };
+    const layers = Object.fromEntries(
+      Object.entries(inner.state.G.layers as Record<string, Record<string, unknown>>).map(
+        ([k, l]) => [
+          k,
+          {
+            ...l,
+            playersInLayer: Object.keys(players).filter(
+              (id) => players[id]!.currentLayer === l.layer,
+            ),
+          },
+        ],
+      ),
+    );
+    patchState(session, {
+      players,
+      layers,
+      turnPhase: 'draw',
+      currentPlayerID: '1',
+      pendingBlackHoleLevy: { blackHoleID: '1', waiting: [HUMAN, '2'] },
+    });
+    inner.state = {
+      ...inner.state,
+      ctx: { ...inner.state.ctx, currentPlayer: '1' },
+    } as typeof inner.state;
+
+    const first = session.step();
+    expect(first.action).toMatchObject({ playerID: '2', move: 'respondBlackHoleLevy' });
+    expect(first.ok).toBe(true);
+    const wait = session.step();
+    expect(wait.action).toBeNull();
+    expect(wait.continue).toBe(false);
+    expect(session.view().G.pendingBlackHoleLevy?.waiting).toEqual([HUMAN]);
+
+    expect(session.humanMove('respondBlackHoleLevy', ['action_shoot']).ok).toBe(true);
+    const done = session.view().G;
+    expect(done.pendingBlackHoleLevy).toBeNull();
+    expect(done.turnPhase).toBe('action');
+  });
+
+  it('达尔文·淘汰：真人是达尔文时停下等真人选牌；Bot 达尔文由 Bot 代选', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    setHands(session, { [HUMAN]: ['action_kick', 'action_unlock', 'action_shoot'] });
+    const human = session.view().G.players[HUMAN]!.hand as string[];
+    patchState(session, { turnPhase: 'action', pendingDarwinReturn: { playerID: HUMAN } });
+    const r = session.step();
+    expect(r.action).toBeNull();
+    expect(r.continue).toBe(false);
+    expect(session.humanMove('respondDarwinReturn', [human.slice(0, 2)]).ok).toBe(true);
+    expect(session.view().G.pendingDarwinReturn).toBeNull();
+
+    const bot = makeSession();
+    runUntilIdle(bot);
+    setHands(bot, { '2': ['action_kick', 'action_unlock', 'action_shoot'] });
+    patchState(bot, { turnPhase: 'action', pendingDarwinReturn: { playerID: '2' } });
+    const s = bot.step();
+    expect(s.action).toMatchObject({ playerID: '2', move: 'respondDarwinReturn' });
+  });
+
+  it('雅典娜·急智：真人是雅典娜时停下等真人（可以放弃）；Bot 雅典娜由 Bot 代为放弃', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    patchState(session, {
+      turnPhase: 'action',
+      pendingAthenaWit: {
+        athenaID: HUMAN,
+        userID: '1',
+        cardId: 'action_kick',
+        move: 'playKick',
+        args: ['action_kick', HUMAN],
+      },
+    });
+    expect(session.step().action).toBeNull();
+
+    const bot = makeSession();
+    runUntilIdle(bot);
+    patchState(bot, {
+      turnPhase: 'action',
+      pendingAthenaWit: {
+        athenaID: '2',
+        userID: HUMAN,
+        cardId: 'action_kick',
+        move: 'playKick',
+        args: ['action_kick', '2'],
+      },
+    });
+    expect(bot.step().action).toMatchObject({
+      playerID: '2',
+      move: 'respondAthenaWit',
+      args: [null],
+    });
+  });
+});
+
 describe('LocalMatchSession · 真人白羊的宽限期', () => {
   it('Bot 的回合里真人白羊有选择：宽限期内先等，到点后继续；真人处理后立即解除', () => {
     let clock = 1_000;

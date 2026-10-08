@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 16;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -233,6 +233,35 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
   ],
   // v12 → v13：牌与技能标识统一成一套（见 RENAMED_IDS），状态里的旧写法一并改过来
   [13, (state) => renameIdsDeep(state, RENAMED_IDS) as Record<string, unknown>],
+  // v13 → v14：新增 pendingBlackHoleLevy（黑洞·吞噬的交牌等待态），旧存档补 null。
+  //   旧版本里黑洞发动是一步完成（由发动者指明别人的牌），不会留下进行中的吞噬，所以只需补字段
+  //   对照：docs/manual/05-dream-thieves.md:150-158 黑洞
+  [
+    14,
+    (state) => ({
+      ...state,
+      pendingBlackHoleLevy: state.pendingBlackHoleLevy ?? null,
+    }),
+  ],
+  // v14 → v15：新增 pendingDarwinReturn（达尔文·淘汰的选牌等待态），旧存档补 null。
+  //   旧版本里达尔文发动是一步完成（发动者一次指明放回哪两张），不会留下进行中的发动，所以只需补字段
+  [
+    15,
+    (state) => ({
+      ...state,
+      pendingDarwinReturn: state.pendingDarwinReturn ?? null,
+    }),
+  ],
+  // v15 → v16：新增 pendingAthenaWit（雅典娜·急智的应答等待态），旧存档补 null。
+  //   旧版本的急智是回合外随时可发的 move，不会留下进行中的应答，所以只需补字段。
+  //   雅典娜的使用次数改按回合号记录（thief_athena.skill_0.turn），旧存档里没有这条记录等于本回合还没用过
+  [
+    16,
+    (state) => ({
+      ...state,
+      pendingAthenaWit: state.pendingAthenaWit ?? null,
+    }),
+  ],
 ]);
 
 // 错误信息里展示收到的值：字符串带引号以区分 '3' 与 3，数组、null 等用 JSON 表示

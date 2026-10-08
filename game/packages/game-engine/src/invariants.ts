@@ -209,6 +209,82 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
+  // ---------- 14. 黑洞·吞噬的交牌等待 ----------
+  // 黑洞是回合主人、仍在抽牌阶段；名单里的人不重复、不含黑洞、与黑洞同层、存活且手里还有牌
+  const levy = state.pendingBlackHoleLevy;
+  if (levy) {
+    const holder = state.players[levy.blackHoleID];
+    if (levy.blackHoleID !== state.currentPlayerID || state.turnPhase !== 'draw') {
+      push('pending_levy_turn', `黑洞 ${levy.blackHoleID} 的吞噬只能挂在其抽牌阶段`);
+    }
+    if (!holder || !holder.isAlive || holder.characterId !== 'thief_black_hole') {
+      push(
+        'pending_levy_holder',
+        `pendingBlackHoleLevy.blackHoleID=${levy.blackHoleID} 不是存活的黑洞`,
+      );
+    }
+    if (new Set(levy.waiting).size !== levy.waiting.length) {
+      push('pending_levy_duplicate', 'pendingBlackHoleLevy.waiting 有重复的玩家');
+    }
+    for (const id of levy.waiting) {
+      const giver = state.players[id];
+      if (id === levy.blackHoleID || !giver) {
+        push('pending_levy_waiting', `waiting 里的 ${id} 不是黑洞以外的玩家`);
+        continue;
+      }
+      if (!giver.isAlive || !holder || giver.currentLayer !== holder.currentLayer) {
+        push('pending_levy_layer', `waiting 里的 ${id} 不是黑洞同层的存活玩家`);
+      }
+      if (giver.hand.length === 0) {
+        push('pending_levy_hand', `waiting 里的 ${id} 没有手牌，不应继续等待`);
+      }
+    }
+    if (levy.waiting.length === 0) {
+      push('pending_levy_empty', '名单已空的吞噬应当已经结算并清除');
+    }
+  }
+
+  // ---------- 15. 达尔文·淘汰的选牌等待 ----------
+  // 达尔文是回合主人、处于出牌阶段、存活，且手里至少有要放回的 2 张
+  const darwin = state.pendingDarwinReturn;
+  if (darwin) {
+    const owner = state.players[darwin.playerID];
+    if (darwin.playerID !== state.currentPlayerID || state.turnPhase !== 'action') {
+      push('pending_darwin_turn', `达尔文 ${darwin.playerID} 的淘汰只能挂在其出牌阶段`);
+    }
+    if (!owner || !owner.isAlive || owner.characterId !== 'thief_darwin') {
+      push(
+        'pending_darwin_owner',
+        `pendingDarwinReturn.playerID=${darwin.playerID} 不是存活的达尔文`,
+      );
+    } else if (owner.hand.length < 2) {
+      push('pending_darwin_hand', `达尔文手牌不足 2 张（${owner.hand.length}），无法放回`);
+    }
+  }
+
+  // ---------- 16. 雅典娜·急智的应答等待 ----------
+  // 出牌者是回合主人、在出牌阶段；雅典娜存活、与出牌者同层且不是同一个人
+  const wit = state.pendingAthenaWit;
+  if (wit) {
+    const athena = state.players[wit.athenaID];
+    const user = state.players[wit.userID];
+    if (wit.userID !== state.currentPlayerID || state.turnPhase !== 'action') {
+      push('pending_wit_turn', `雅典娜的急智应答只能挂在出牌者 ${wit.userID} 的出牌阶段`);
+    }
+    if (!athena || !athena.isAlive || athena.characterId !== 'thief_athena') {
+      push('pending_wit_athena', `pendingAthenaWit.athenaID=${wit.athenaID} 不是存活的雅典娜`);
+    }
+    if (wit.athenaID === wit.userID) {
+      push('pending_wit_self', '急智只在「另一」玩家对雅典娜用牌时触发');
+    }
+    if (athena && user && athena.currentLayer !== user.currentLayer) {
+      push('pending_wit_layer', '急智只在同层玩家对雅典娜用牌时触发');
+    }
+    if (wit.userID === state.dreamMasterID) {
+      push('pending_wit_master', '急智只在盗梦者对雅典娜用牌时触发，出牌者不应是梦主');
+    }
+  }
+
   return out;
 }
 

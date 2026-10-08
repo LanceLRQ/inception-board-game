@@ -134,6 +134,44 @@ export function nextAutoAction(
     };
   }
 
+  // 黑洞·吞噬：名单里的每个人各自交 1 张牌，不限先后。Bot 座位以本人的名义代交，
+  // 真人座位等他们自己选；名单里只剩真人时整体等待。
+  const levy = G.pendingBlackHoleLevy;
+  if (levy) {
+    const giver = levy.waiting.find((id) => !isHuman(id));
+    if (giver === undefined) return null;
+    return {
+      playerID: giver,
+      move: 'respondBlackHoleLevy',
+      args: defaultArgsFor('respondBlackHoleLevy', G, giver),
+      why: `代 ${giver} 向黑洞交牌`,
+    };
+  }
+
+  // 达尔文·淘汰：从抽牌后的手牌里选 2 张放回牌库顶；达尔文是真人就等他选。
+  const darwin = G.pendingDarwinReturn;
+  if (darwin) {
+    if (isHuman(darwin.playerID)) return null;
+    return {
+      playerID: darwin.playerID,
+      move: 'respondDarwinReturn',
+      args: defaultArgsFor('respondDarwinReturn', G, darwin.playerID),
+      why: `代 ${darwin.playerID} 选牌放回牌库顶`,
+    };
+  }
+
+  // 雅典娜·急智：Bot 一律放弃，以雅典娜本人的名义应答；雅典娜是真人就等她选择。
+  const wit = G.pendingAthenaWit;
+  if (wit) {
+    if (isHuman(wit.athenaID)) return null;
+    return {
+      playerID: wit.athenaID,
+      move: 'respondAthenaWit',
+      args: [null],
+      why: `${wit.athenaID} 放弃急智`,
+    };
+  }
+
   // 回合主人是真人：等他操作
   if (isHuman(owner)) return null;
 

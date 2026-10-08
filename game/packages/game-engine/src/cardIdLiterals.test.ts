@@ -27,6 +27,8 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   'thief_sagittarius.kills': '技能使用记录里的内部计数键：射手本回合的击杀数，不是技能标识',
   'dm_fortress.skill_0.chances':
     '技能使用记录里的内部计数键：要塞本回合出牌阶段换层产生的冷酷发动机会数，不是技能标识',
+  'thief_athena.skill_0.turn':
+    '技能使用记录里的内部记录键：雅典娜·急智最近一次使用所在的回合号，不是技能标识',
   'dm_pluto_hell.world.marked':
     '技能使用记录里的内部标记键：冥王星已在本回合抽牌阶段检视过手牌，不是技能标识',
   nightmare_discarded: '领域事件类型：梦魇牌被弃',

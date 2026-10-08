@@ -604,9 +604,7 @@
       "gaiaDown": "Every other player in your layer: -1 (to layer {{layer}})",
       "gaiaUp": "Every other player in your layer: +1 (to layer {{layer}})"
     },
-    "hint": {
-      "darwinOrder": "Cards go back on top of the deck in the order you pick them: the first pick is on top. The 2 cards you draw are unknown before you commit, so you can only choose from your current hand."
-    },
+    "hint": {},
     "step": {
       "cards": "Choose {{need}} cards from your hand ({{picked}} chosen):",
       "cardsAny": "Choose cards from your hand ({{picked}} chosen):",
@@ -881,6 +879,23 @@
       "plague": "You name the thieves who receive a bribe card; thieves who are not named and hold no bribe card go to limbo.",
       "scope": "Valid until the end of this turn."
     },
+    "levy": {
+      "title": "Black Hole · Devour",
+      "body": "{{name}} gives up drawing and makes every player on the same layer give them 1 card. Pick 1 card from your hand to hand over.",
+      "give": "Pick a card to hand over…",
+      "noHand": "You have no card to hand over."
+    },
+    "darwin": {
+      "title": "Darwin · Cull",
+      "body": "You have taken the top 2 cards of the deck into your hand. Choose 2 cards from your hand to put back on top of the deck, in order.",
+      "open": "Choose cards to put back…"
+    },
+    "athena": {
+      "title": "Athena · Quick Wit",
+      "body": "{{name}} plays [{{card}}] on you. Before it resolves, you may take 1 card of your choice from the discard pile into your hand.",
+      "take": "Take 1 from the discard pile…",
+      "pass": "Decline"
+    },
     "sheet": {
       "back": "Back",
       "zealotDiscard": {
@@ -925,6 +940,22 @@
         "title": "Plague",
         "desc": "Name the thieves who receive a bribe card, or name none.",
         "confirm": "Activate"
+      },
+      "levyGive": {
+        "title": "Hand over a card",
+        "desc": "Pick 1 card to give to {{name}}. Only you and they will know which one it was.",
+        "confirm": "Hand over"
+      },
+      "darwinReturn": {
+        "title": "Put back on top of the deck",
+        "desc": "Your hand includes the 2 cards you just drew. Choose exactly 2 to put back on top of the deck: the first you pick goes on top.",
+        "confirm": "Put back",
+        "progress": "Picked {{count}} / {{total}}"
+      },
+      "athenaPick": {
+        "title": "Take 1 card from the discard pile",
+        "desc": "The chosen card goes into your hand first, then {{name}}'s [{{card}}] resolves.",
+        "confirm": "Take card"
       }
     }
   },
@@ -1054,7 +1085,8 @@
       "masterMove": "Move",
       "skipDraw": "Skip draw",
       "jokerGamble": "Joker · Wild",
-      "blackSwanTour": "Black Swan · Scatter"
+      "blackSwanTour": "Black Swan · Scatter",
+      "blackHoleLevy": "Black Hole · Devour"
     },
     "reason": {
       "handShort": "Reviving costs {{count}} cards from your hand; you have {{have}}",
@@ -1062,7 +1094,9 @@
       "busy": "Something else is pending; finish it first",
       "tourNoHand": "You have no card to hand out (at least 1 is needed)",
       "tourUsed": "Already used this turn (once per turn)",
-      "tourNoRecipient": "No other living thief can receive cards"
+      "tourNoRecipient": "No other living thief can receive cards",
+      "levyUsed": "Already used this turn (once per turn)",
+      "levyNoGiver": "No other player on your layer has a card to give"
     },
     "move": {
       "label": "Move",

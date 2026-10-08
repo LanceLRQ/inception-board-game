@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Layer, CardID } from '@icgame/shared';
 import { checkInvariants, assertInvariants } from './invariants.js';
+import type { SetupState } from './setup.js';
 import {
   createTestState,
   makePlayer,
@@ -374,6 +375,113 @@ describe('checkInvariants - rule 11: bribe pool', () => {
     const s = withBribes(scenarioStartOfGame3p(), [{ id: 'b-3', status: 'inPool', heldBy: null }]);
     const v = checkInvariants(s);
     expect(v.some((x) => x.rule.startsWith('bribe_'))).toBe(false);
+  });
+});
+
+describe('checkInvariants - 待应答状态的规则', () => {
+  function playing(extra: Partial<SetupState>): SetupState {
+    return createTestState({ phase: 'playing', turnPhase: 'action', ...extra });
+  }
+  const asChar = (state: SetupState, id: string, characterId: string): SetupState => ({
+    ...state,
+    players: {
+      ...state.players,
+      [id]: { ...state.players[id]!, characterId: characterId as never },
+    },
+  });
+  const withHand = (state: SetupState, id: string, hand: string[]): SetupState => ({
+    ...state,
+    players: { ...state.players, [id]: { ...state.players[id]!, hand: hand as never } },
+  });
+  const rules = (state: SetupState) => checkInvariants(state).map((v) => v.rule);
+
+  it('黑洞·吞噬：合法的等待名单没有违规', () => {
+    let G = playing({
+      turnPhase: 'draw',
+      pendingBlackHoleLevy: { blackHoleID: 'p1', waiting: ['p2'] },
+    });
+    G = asChar(G, 'p1', 'thief_black_hole');
+    G = withHand(G, 'p2', ['action_kick']);
+    expect(rules(G)).toEqual([]);
+  });
+
+  it('黑洞·吞噬：不在抽牌阶段、黑洞不是回合主人、名单里有跨层 / 没牌 / 重复 / 黑洞自己 / 空名单都要点名', () => {
+    let G = asChar(
+      withHand(playing({ pendingBlackHoleLevy: { blackHoleID: 'p1', waiting: ['p2'] } }), 'p2', [
+        'action_kick',
+      ]),
+      'p1',
+      'thief_black_hole',
+    );
+    expect(rules(G)).toContain('pending_levy_turn');
+    G = { ...G, turnPhase: 'draw', currentPlayerID: 'p3' };
+    expect(rules(G)).toContain('pending_levy_turn');
+    const base = asChar(playing({ turnPhase: 'draw' }), 'p1', 'thief_black_hole');
+    const mk = (waiting: string[]) => ({
+      ...base,
+      pendingBlackHoleLevy: { blackHoleID: 'p1', waiting },
+    });
+    expect(rules(mk(['p2']))).toContain('pending_levy_hand');
+    expect(rules(mk(['p1']))).toContain('pending_levy_waiting');
+    expect(rules(mk(['p2', 'p2']))).toContain('pending_levy_duplicate');
+    expect(rules(mk([]))).toContain('pending_levy_empty');
+    const far: SetupState = {
+      ...withHand(mk(['p2']), 'p2', ['action_kick']),
+    };
+    const farther = {
+      ...far,
+      players: { ...far.players, p2: { ...far.players.p2!, currentLayer: 3 as never } },
+    };
+    expect(rules(farther)).toContain('pending_levy_layer');
+    expect(
+      rules({
+        ...mk(['p2']),
+        players: {
+          ...mk(['p2']).players,
+          p1: { ...mk(['p2']).players.p1!, characterId: 'thief_kick' as never },
+        },
+      }),
+    ).toContain('pending_levy_holder');
+  });
+
+  it('达尔文·淘汰：合法的选牌等待没有违规；不在出牌阶段、不是达尔文、手牌不足都要点名', () => {
+    const G = asChar(
+      withHand(playing({ pendingDarwinReturn: { playerID: 'p1' } }), 'p1', [
+        'action_kick',
+        'action_shoot',
+      ]),
+      'p1',
+      'thief_darwin',
+    );
+    expect(rules(G)).toEqual([]);
+    expect(rules({ ...G, turnPhase: 'draw' })).toContain('pending_darwin_turn');
+    expect(rules({ ...G, currentPlayerID: 'p2' })).toContain('pending_darwin_turn');
+    expect(rules(asChar(G, 'p1', 'thief_architect'))).toContain('pending_darwin_owner');
+    expect(rules(withHand(G, 'p1', ['action_kick']))).toContain('pending_darwin_hand');
+  });
+
+  it('雅典娜·急智：合法的应答等待没有违规；出牌者是梦主 / 跨层 / 自己对自己 / 雅典娜不是雅典娜都要点名', () => {
+    const wit = {
+      athenaID: 'p2',
+      userID: 'p1',
+      cardId: 'action_kick' as never,
+      move: 'playKick',
+      args: ['action_kick', 'p2'],
+    };
+    const G = asChar(playing({ pendingAthenaWit: wit }), 'p2', 'thief_athena');
+    expect(rules(G)).toEqual([]);
+    expect(rules({ ...G, turnPhase: 'draw' })).toContain('pending_wit_turn');
+    expect(rules(asChar(G, 'p2', 'thief_architect'))).toContain('pending_wit_athena');
+    expect(
+      rules({ ...G, pendingAthenaWit: { ...wit, userID: 'p2' }, currentPlayerID: 'p2' }),
+    ).toContain('pending_wit_self');
+    expect(
+      rules({
+        ...G,
+        players: { ...G.players, p1: { ...G.players.p1!, currentLayer: 2 as never } },
+      }),
+    ).toContain('pending_wit_layer');
+    expect(rules({ ...G, dreamMasterID: 'p1' })).toContain('pending_wit_master');
   });
 });
 

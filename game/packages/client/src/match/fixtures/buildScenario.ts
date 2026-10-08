@@ -273,6 +273,8 @@ const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
     },
   },
   'skill-black-hole': { viewer: 'thief', character: 'thief_black_hole' },
+  // 黑洞在抽牌阶段：同层有手牌的玩家可以交牌，「吞噬」入口可用
+  'skill-black-hole-draw': { viewer: 'thief', character: 'thief_black_hole', phase: 'draw' },
   'skill-terrorist': { viewer: 'thief', character: 'thief_terrorist' },
   'skill-sagittarius': { viewer: 'thief', character: 'thief_sagittarius' },
   // 皇城世界观：本人收过贿赂牌，有一次 SHOOT 机会
@@ -431,6 +433,12 @@ const RESPONSE_SPECS: Partial<Record<FixtureScenarioId, ResponseSpec>> = {
   'thief-pending-aries': { viewerCharacter: 'thief_aries', turnOwner: 'other' },
   // 同上，该层的梦魇是邪念瘟疫（发动要点名派发贿赂牌的盗梦者）
   'thief-pending-aries-plague': { viewerCharacter: 'thief_aries', turnOwner: 'other' },
+  // 对方是黑洞，抽牌阶段放弃抽牌：本人与另一名同层玩家各交 1 张手牌
+  'thief-pending-levy': { viewerCharacter: 'thief_dream_interpreter', turnOwner: 'other' },
+  // 本人是达尔文，出牌阶段发动【淘汰】：已抽到牌库顶 2 张，等本人选 2 张放回
+  'thief-pending-darwin': { viewerCharacter: 'thief_darwin', turnOwner: 'viewer' },
+  // 本人是雅典娜，同层的对方对本人打出 KICK：结算前可从弃牌堆选 1 张
+  'thief-pending-athena': { viewerCharacter: 'thief_athena', turnOwner: 'other' },
 };
 
 /** 白羊场景里被击杀者原来所在的层 */
@@ -583,10 +591,24 @@ export function buildFixtureMatch(
   if (id === 'master-bribe') G = giveBribe(G, thieves[1]!);
   if (id === 'thief-pending-terrorist') G = assignCharacter(G, actor, 'thief_terrorist');
   if (id === 'thief-pending-libra-split') G = assignCharacter(G, actor, 'thief_libra');
+  if (id === 'thief-pending-levy') {
+    G = assignCharacter(G, actor, 'thief_black_hole');
+    // 再有一名玩家与黑洞同层，名单里有两个人
+    G = placePlayers(G, { [thieves[2]!]: { layer: 2 as Layer, revealed: false } });
+  }
+  if (id === 'thief-pending-athena') {
+    // 弃牌堆里多放几张不同的牌，选牌弹窗里才有东西可挑
+    G = discardSpecific(
+      G,
+      cards('action_shoot', 'action_kick', 'action_dream_peek', 'action_kick'),
+    );
+  }
 
   let state = giveTurn(base, G, actor);
   if (isDiscardScenario(id)) state = { ...state, G: { ...state.G, turnPhase: 'discard' } };
   if (skillScene?.phase) state = { ...state, G: { ...state.G, turnPhase: skillScene.phase } };
+  // 黑洞·吞噬发生在抽牌阶段
+  if (id === 'thief-pending-levy') state = { ...state, G: { ...state.G, turnPhase: 'draw' } };
 
   if (isPendingScenario(id)) {
     const played = applyMove(game, state, {
@@ -616,6 +638,18 @@ export function buildFixtureMatch(
       state = mustApply(state, other, 'resolveLibraSplit', [hand.slice(0, half), hand.slice(half)]);
       break;
     }
+    case 'thief-pending-levy':
+      // 对方（黑洞）真的发动，引擎挂起同层有手牌的人的交牌
+      state = mustApply(state, actor, 'playBlackHoleLevy', []);
+      break;
+    case 'thief-pending-darwin':
+      // 本人（达尔文）真的发动：引擎先抽 2 张，再等本人选牌
+      state = mustApply(state, viewer, 'playDarwinEvolution', []);
+      break;
+    case 'thief-pending-athena':
+      // 对方真的对本人打出 KICK：引擎在结算前挂起雅典娜的应答
+      state = mustApply(state, actor, 'playKick', ['action_kick', viewer]);
+      break;
     case 'thief-pending-sudger': {
       state = mustApply(state, viewer, 'playShootSudger', [other, 'action_shoot']);
       // 两颗骰子由引擎掷出；固定场景把点数定为一个击杀、一个移动，两种结果都能走查

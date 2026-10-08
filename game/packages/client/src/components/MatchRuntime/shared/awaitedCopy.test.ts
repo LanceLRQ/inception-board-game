@@ -119,4 +119,39 @@ describe('awaitedCopy', () => {
     );
     expect(copy.bodyParams).toEqual({ name: '玩家5', card: '牌:action_shoot' });
   });
+
+  it('黑洞·吞噬：说明里带黑洞的昵称；没有手牌时提示无牌可交', () => {
+    const copy = awaitedCopy({ mine: true, kind: 'levy', blackHoleID: '3', hand: ['a'] }, deps);
+    expect(copy).toEqual({
+      titleKey: 'awaited.levy.title',
+      bodyKey: 'awaited.levy.body',
+      bodyParams: { name: '玩家3' },
+      notes: [],
+    });
+    expect(
+      awaitedCopy({ mine: true, kind: 'levy', blackHoleID: '3', hand: [] }, deps).notes,
+    ).toEqual([{ key: 'awaited.levy.noHand' }]);
+  });
+
+  it('达尔文·淘汰：固定文案，没有参数', () => {
+    expect(awaitedCopy({ mine: true, kind: 'darwin', hand: ['a', 'b'] }, deps)).toEqual({
+      titleKey: 'awaited.darwin.title',
+      bodyKey: 'awaited.darwin.body',
+      bodyParams: {},
+      notes: [],
+    });
+  });
+
+  it('雅典娜·急智：说明里带出牌者与那张牌的名字', () => {
+    const copy = awaitedCopy(
+      { mine: true, kind: 'athena', userID: '1', cardId: 'action_kick', discard: ['x'] },
+      deps,
+    );
+    expect(copy).toEqual({
+      titleKey: 'awaited.athena.title',
+      bodyKey: 'awaited.athena.body',
+      bodyParams: { name: '玩家1', card: '牌:action_kick' },
+      notes: [],
+    });
+  });
 });

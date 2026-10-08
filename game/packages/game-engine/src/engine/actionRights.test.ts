@@ -4,7 +4,13 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
 import { createTestState } from '../testing/fixtures.js';
-import { BLOCKING_FIELDS, RESTRICTED_MOVES, denyAction, listAwaiting } from './actionRights.js';
+import {
+  BLOCKING_FIELDS,
+  OFF_TURN_MOVES,
+  RESTRICTED_MOVES,
+  denyAction,
+  listAwaiting,
+} from './actionRights.js';
 
 // 默认状态：玩家顺序 p1 p2 p3 p4 pM，回合主人 p1，梦主 pM
 const OWNER = 'p1';
@@ -94,6 +100,21 @@ const shootResponse: Partial<SetupState> = {
     moveFaces: [2],
     extraOnMove: null,
   },
+};
+const blackHoleLevy: Partial<SetupState> = {
+  pendingBlackHoleLevy: { blackHoleID: 'p1', waiting: ['p2', 'p3'] },
+};
+const athenaWit: Partial<SetupState> = {
+  pendingAthenaWit: {
+    athenaID: 'p3',
+    userID: 'p1',
+    cardId: 'action_kick',
+    move: 'playKick',
+    args: ['action_kick', 'p3'],
+  },
+};
+const darwinReturn: Partial<SetupState> = {
+  pendingDarwinReturn: { playerID: 'p1' },
 };
 const aries: Partial<SetupState> = {
   pendingAriesChoice: { ariesID: 'p3', victimLayer: 2, victimID: 'p4' },
@@ -191,6 +212,27 @@ const blockingRows: BlockingRow[] = [
       'respondTerroristDiscard',
       'respondTerroristAccept',
     ],
+    other: 'p2',
+  },
+  {
+    name: 'pendingBlackHoleLevy（名单里的人都可以交牌）',
+    patch: blackHoleLevy,
+    actor: 'p3',
+    moves: ['respondBlackHoleLevy'],
+    other: 'p4',
+  },
+  {
+    name: 'pendingAthenaWit',
+    patch: athenaWit,
+    actor: 'p3',
+    moves: ['respondAthenaWit'],
+    other: 'p2',
+  },
+  {
+    name: 'pendingDarwinReturn',
+    patch: darwinReturn,
+    actor: 'p1',
+    moves: ['respondDarwinReturn'],
     other: 'p2',
   },
 ];
@@ -298,9 +340,14 @@ describe('行动权表 · 没有待结算', () => {
     expect(denyAction(s, 'pM', 'playKick')).toBe('not_turn_owner');
   });
 
-  it('别人可以发 useAthenaWit', () => {
-    expect(denyAction(s, 'p2', 'useAthenaWit')).toBeNull();
-    expect(denyAction(s, 'pM', 'useAthenaWit')).toBeNull();
+  it('雅典娜·急智不再是回合外随时可发的 move：没有挂起时别人发应答被拒', () => {
+    expect(denyAction(s, 'p2', 'respondAthenaWit')).toBe('not_turn_owner');
+    expect(denyAction(s, OWNER, 'respondAthenaWit')).toBe('nothing_to_settle');
+  });
+
+  it('回合外只有空间女王·造物可以不经待结算而发', () => {
+    expect(denyAction(s, 'p2', 'useSpaceQueenStashTop')).toBeNull();
+    expect(OFF_TURN_MOVES).toEqual(['useSpaceQueenStashTop']);
   });
 
   it('回合主人发「仅限待结算时」的 move 被拒', () => {
@@ -403,6 +450,9 @@ describe('行动权表 · 一致性', () => {
           ...peekReveal,
           ...virgo,
           ...shootResponse,
+          ...blackHoleLevy,
+          ...darwinReturn,
+          ...athenaWit,
           ...responseWindow,
         }),
         base(unlockOnly),

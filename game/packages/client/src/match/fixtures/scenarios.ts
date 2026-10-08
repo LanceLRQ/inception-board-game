@@ -5,7 +5,7 @@ import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 /**
  * 盗梦者 / 梦主视角，各有一个「无待办」与「有待应答的解封响应窗口」的版本；
  * 另有盗梦者的「弃牌阶段」场景（手牌超出上限，必须选牌弃置）、
- * 盗梦者轮到本人应答的各种待决状态（被 SHOOT 时的响应、天秤、意念判官、处女、白羊），
+ * 盗梦者轮到本人应答的各种待决状态（被 SHOOT 时的响应、天秤、意念判官、处女、白羊、黑洞·吞噬、达尔文·淘汰、雅典娜·急智），
  * 以及梦主是「棋局」的场景
  */
 export const FIXTURE_SCENARIO_IDS = [
@@ -24,6 +24,9 @@ export const FIXTURE_SCENARIO_IDS = [
   'thief-pending-virgo',
   'thief-pending-aries',
   'thief-pending-aries-plague',
+  'thief-pending-levy',
+  'thief-pending-darwin',
+  'thief-pending-athena',
   'master-chess',
   'thief-dead',
   'thief-mate-dead',
@@ -40,6 +43,7 @@ export const FIXTURE_SCENARIO_IDS = [
   'skill-gaia',
   'skill-aries-glow',
   'skill-black-hole',
+  'skill-black-hole-draw',
   'skill-terrorist',
   'skill-sagittarius',
   'skill-venus',
@@ -95,6 +99,9 @@ const PENDING_RESPONSE_SCENARIOS = {
   virgo: 'thief-pending-virgo',
   aries: 'thief-pending-aries',
   'aries-plague': 'thief-pending-aries-plague',
+  levy: 'thief-pending-levy',
+  darwin: 'thief-pending-darwin',
+  athena: 'thief-pending-athena',
 } as const satisfies Record<string, FixtureScenarioId>;
 
 /** ?skill= 的取值与场景的对应：走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面 */
@@ -108,6 +115,7 @@ export const SKILL_SCENARIOS = {
   gaia: 'skill-gaia',
   'aries-glow': 'skill-aries-glow',
   'black-hole': 'skill-black-hole',
+  'black-hole-draw': 'skill-black-hole-draw',
   terrorist: 'skill-terrorist',
   sagittarius: 'skill-sagittarius',
   venus: 'skill-venus',
@@ -138,16 +146,17 @@ export function parseFixturePlayers(raw: string | null): number {
  * 按地址参数选场景：
  *   ?as=master   梦主视角（缺省为盗梦者）
  *   ?pending=1   场景里有一个等待本人应答的【解封】响应窗口（可与 as=master 叠加）
- *   ?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries|aries-plague
+ *   ?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries|aries-plague|levy|darwin|athena
  *                盗梦者视角，轮到本人应答对应的待决状态：被 SHOOT 时的双鱼·游离 / 恐怖分子·狂热、
- *                天秤分牌 / 天秤挑一份、意念判官选骰、处女·完美、白羊·星尘（梦魇为回音萦绕；aries-plague 为邪念瘟疫）；
- *                不与 as=master 叠加
+ *                天秤分牌 / 天秤挑一份、意念判官选骰、处女·完美、白羊·星尘（梦魇为回音萦绕；aries-plague 为邪念瘟疫）、
+ *                黑洞·吞噬（levy，本人与另一名同层玩家各交 1 张手牌）、达尔文·淘汰（darwin，已抽到 2 张、选 2 张放回）、
+ *                雅典娜·急智（athena，同层盗梦者对本人打出 KICK，结算前可从弃牌堆选 1 张）；不与 as=master 叠加
  *   ?character=sudger  盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的发动入口）；
  *                      梦主视角、响应窗口与待应答参数优先，忽略它
  *   ?skill=名    走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面（视角由场景决定，响应窗口与待应答参数优先）：
  *                draw 抽牌阶段（略过抽牌）· joker 抽牌阶段的小丑 · gemini-back 翻到背面的双子 · chemist 药剂师
  *                · space-queen 弃牌阶段的空间女王 · space-queen-other 别人的弃牌阶段里的空间女王 · gaia 同层有两名同伴的盖亚
- *                · aries-glow 抽牌阶段、弃掉过 2 张梦魇的白羊 · black-hole 黑洞 · terrorist 恐怖分子 · sagittarius 射手
+ *                · aries-glow 抽牌阶段、弃掉过 2 张梦魇的白羊 · black-hole 黑洞 · black-hole-draw 抽牌阶段的黑洞（吞噬入口）· terrorist 恐怖分子 · sagittarius 射手
  *                · imperial 皇城世界观下有 SHOOT 机会 · saturn 土星世界观下持贿赂 · unlock-none 所在层心锁为 0
  *                · unlock-spent 本回合已成功解封 · black-swan 抽牌阶段的黑天鹅 · luna 翻到背面的露娜（有同伴在迷失层）
  *                · pisces 翻到背面的双鱼（有同伴在迷失层）· darwin 达尔文 · green-ray 格林射线 · aquarius 本回合打出过两张同名牌的水瓶

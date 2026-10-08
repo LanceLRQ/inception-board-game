@@ -13,7 +13,8 @@ import {
   applyHarborTsunami,
   checkHarborWin,
   checkNeptuneWin,
-  applyDarwinEvolution,
+  startDarwinEvolution,
+  applyDarwinReturn,
   applyGeminiSync,
   applyLunaEclipse,
   shouldJupiterThunderKill,
@@ -49,11 +50,12 @@ import {
   applyChemistRefine,
   applyTouristAssist,
   applyLeoKingdom,
-  applyBlackHoleLevy,
+  startBlackHoleLevy,
+  applyBlackHoleLevyGive,
   applyUranusPower,
   applyPlutoBurning,
   isUranusFirmamentWorldActive,
-  applyAthenaWit,
+  applyAthenaWitPick,
   applyShadeFollow,
   applySaturnFreeMove,
   applyUranusFirmamentMoveDiscard,
@@ -560,7 +562,9 @@ describe('达尔文·进化 + 木星 SHOOT', () => {
       },
     };
     // 达尔文进化：抽 2 张，把其中 2 张放回（这里把抽到的两张 unlock 放回，留 0 在手）
-    const evolved = applyDarwinEvolution(s, 'p1', ['action_unlock', 'action_unlock']);
+    const drawnAndPending = startDarwinEvolution(s, 'p1');
+    expect(drawnAndPending).not.toBeNull();
+    const evolved = applyDarwinReturn(drawnAndPending!, 'p1', ['action_unlock', 'action_unlock']);
     expect(evolved).not.toBeNull();
     // 抽 2 + 弃 2（放回牌库），手牌净变化 0
     expect(evolved!.players.p1!.hand.length).toBe(0);
@@ -1345,12 +1349,10 @@ describe('狮子·王道触发分支', () => {
   });
 });
 
-describe('黑洞·征收 apply 分支', () => {
+describe('黑洞·吞噬 apply 分支', () => {
   it('非黑洞角色 → null', () => {
     const s = scenarioStartOfGame3p();
-    const picks: Record<string, CardID> = { p2: 'action_unlock' as CardID };
-    const r = applyBlackHoleLevy(s, 'p1', picks);
-    expect(r).toBeNull();
+    expect(startBlackHoleLevy(s, 'p1')).toBeNull();
   });
 
   it('黑洞 + 同层无其他玩家 → null', () => {
@@ -1358,28 +1360,26 @@ describe('黑洞·征收 apply 分支', () => {
     s = setCharacter(s, 'p1', 'thief_black_hole');
     // 把 p2 移到其他层
     s = setLayer(s, 'p2', 3 as Layer);
-    const picks: Record<string, CardID> = {};
-    const r = applyBlackHoleLevy(s, 'p1', picks);
-    expect(r).toBeNull();
+    expect(startBlackHoleLevy(s, 'p1')).toBeNull();
   });
 
-  it('黑洞 + giverPicks 缺失某玩家 → null（必须全齐）', () => {
+  it('黑洞 + 同层其他人都没有手牌 → null（没有任何人给得出牌，不能发动）', () => {
+    let s = scenarioStartOfGame3p();
+    s = setCharacter(s, 'p1', 'thief_black_hole');
+    s = setHand(s, 'p2', []);
+    s = setHand(s, 'pM', []);
+    expect(startBlackHoleLevy(s, 'p1')).toBeNull();
+  });
+
+  it('交牌人交出不在手里的牌 / 不在名单里的人交牌 → null', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_black_hole');
     s = setHand(s, 'p2', ['action_unlock' as CardID]);
-    // 空 picks（p2 存在于同层但未提供 pick）
-    const picks: Record<string, CardID> = {};
-    const r = applyBlackHoleLevy(s, 'p1', picks);
-    expect(r).toBeNull();
-  });
-
-  it('黑洞 + pick 不在 giver 手中 → null', () => {
-    let s = scenarioStartOfGame3p();
-    s = setCharacter(s, 'p1', 'thief_black_hole');
-    s = setHand(s, 'p2', ['action_unlock' as CardID]);
-    const picks: Record<string, CardID> = { p2: 'action_shoot' as CardID, pM: 'x' as CardID };
-    const r = applyBlackHoleLevy(s, 'p1', picks);
-    expect(r).toBeNull();
+    s = setHand(s, 'pM', []);
+    const started = startBlackHoleLevy(s, 'p1')!;
+    expect(started.pendingBlackHoleLevy).toEqual({ blackHoleID: 'p1', waiting: ['p2'] });
+    expect(applyBlackHoleLevyGive(started, 'p2', 'action_shoot' as CardID)).toBeNull();
+    expect(applyBlackHoleLevyGive(started, 'pM', 'action_shoot' as CardID)).toBeNull();
   });
 });
 
@@ -1517,19 +1517,17 @@ describe('雅典娜·急智 apply 分支', () => {
   it('非雅典娜 → null', () => {
     let s = scenarioStartOfGame3p();
     s = { ...s, deck: { ...s.deck, discardPile: ['action_unlock' as CardID] } };
-    const r = applyAthenaWit(s, 'p1');
-    expect(r).toBeNull();
+    expect(applyAthenaWitPick(s, 'p1', 'action_unlock' as CardID)).toBeNull();
   });
 
   it('雅典娜 + 弃牌堆空 → null', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_athena');
     s = { ...s, deck: { ...s.deck, discardPile: [] } };
-    const r = applyAthenaWit(s, 'p1');
-    expect(r).toBeNull();
+    expect(applyAthenaWitPick(s, 'p1', 'action_unlock' as CardID)).toBeNull();
   });
 
-  it('雅典娜 + 弃牌堆有牌 → 取顶 1 张到手', () => {
+  it('雅典娜 + 弃牌堆有牌 → 选取指定的 1 张到手', () => {
     let s = scenarioStartOfGame3p();
     s = setCharacter(s, 'p1', 'thief_athena');
     s = setHand(s, 'p1', []);
@@ -1540,10 +1538,10 @@ describe('雅典娜·急智 apply 分支', () => {
         discardPile: ['action_unlock' as CardID, 'action_shoot' as CardID],
       },
     };
-    const r = applyAthenaWit(s, 'p1');
+    const r = applyAthenaWitPick(s, 'p1', 'action_unlock' as CardID);
     expect(r).not.toBeNull();
-    expect(r!.players.p1!.hand).toEqual(['action_shoot']);
-    expect(r!.deck.discardPile).toEqual(['action_unlock']);
+    expect(r!.players.p1!.hand).toEqual(['action_unlock']);
+    expect(r!.deck.discardPile).toEqual(['action_shoot']);
   });
 
   it('雅典娜 + 死亡 → null', () => {
@@ -1554,8 +1552,7 @@ describe('雅典娜·急智 apply 分支', () => {
       players: { ...s.players, p1: { ...s.players.p1!, isAlive: false } },
       deck: { ...s.deck, discardPile: ['action_unlock' as CardID] },
     };
-    const r = applyAthenaWit(s, 'p1');
-    expect(r).toBeNull();
+    expect(applyAthenaWitPick(s, 'p1', 'action_unlock' as CardID)).toBeNull();
   });
 });
 

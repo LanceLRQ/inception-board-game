@@ -15,7 +15,8 @@ import {
   applySoulSculptorCarve,
   applyHaleyImpact,
   applyAthenaAwe,
-  applyAthenaWit,
+  applyAthenaWitPick,
+  athenaWitUsedInTurn,
   checkAthenaAweCondition,
   isVirgoPerfectTriggered,
   isShootClassCard,
@@ -420,29 +421,39 @@ describe('筑梦师 · 迷宫 SHOOT 类判定（thief_architect）', () => {
 // ============================================================================
 // Tier B · 雅典娜 · 急智（纯函数）
 // ============================================================================
-describe('雅典娜 · 急智 抽弃牌堆（thief_athena · 1/2 技能）', () => {
-  it('成功：取弃牌堆顶 1 张', () => {
+describe('雅典娜 · 急智 选取弃牌堆的牌（thief_athena · 1/2 技能）', () => {
+  it('成功：从弃牌堆里选取指定的 1 张（不限最上面），并记下本回合已用', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_athena' as CardID);
     s = {
       ...s,
       deck: { cards: [] as CardID[], discardPile: ['action_kick', 'action_unlock'] as CardID[] },
     };
-    const r = applyAthenaWit(s, 'p1');
+    const r = applyAthenaWitPick(s, 'p1', 'action_kick' as CardID);
     expect(r).not.toBeNull();
-    expect(r!.players.p1!.hand).toEqual(['action_unlock']);
-    expect(r!.deck.discardPile).toEqual(['action_kick']);
+    expect(r!.players.p1!.hand).toEqual(['action_kick']);
+    expect(r!.deck.discardPile).toEqual(['action_unlock']);
+    expect(athenaWitUsedInTurn(r!.players.p1!, s.turnNumber)).toBe(true);
+    expect(athenaWitUsedInTurn(r!.players.p1!, s.turnNumber + 1)).toBe(false);
   });
 
-  it('拒绝：弃牌堆为空', () => {
+  it('拒绝：选的牌不在弃牌堆 / 弃牌堆为空', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_athena' as CardID);
-    expect(applyAthenaWit(s, 'p1')).toBeNull();
+    expect(applyAthenaWitPick(s, 'p1', 'action_kick' as CardID)).toBeNull();
+    s = { ...s, deck: { cards: [] as CardID[], discardPile: ['action_unlock'] as CardID[] } };
+    expect(applyAthenaWitPick(s, 'p1', 'action_kick' as CardID)).toBeNull();
   });
 
-  it('拒绝：非雅典娜', () => {
+  it('拒绝：非雅典娜 / 这个回合已经用过', () => {
     let s = scenarioActionPhase();
-    s = { ...s, deck: { cards: [] as CardID[], discardPile: ['action_kick'] as CardID[] } };
-    expect(applyAthenaWit(s, 'p1')).toBeNull();
+    s = {
+      ...s,
+      deck: { cards: [] as CardID[], discardPile: ['action_kick', 'action_unlock'] as CardID[] },
+    };
+    expect(applyAthenaWitPick(s, 'p1', 'action_kick' as CardID)).toBeNull();
+    s = setCharacter(s, 'p1', 'thief_athena' as CardID);
+    const once = applyAthenaWitPick(s, 'p1', 'action_kick' as CardID)!;
+    expect(applyAthenaWitPick(once, 'p1', 'action_unlock' as CardID)).toBeNull();
   });
 });

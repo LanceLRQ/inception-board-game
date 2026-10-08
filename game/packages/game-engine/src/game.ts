@@ -24,6 +24,7 @@ import { denyAction } from './engine/actionRights.js';
 import { viewFor } from './engine/matchView.js';
 import { describeMatchEvents } from './engine/matchEvents.js';
 import { matchOutcome } from './engine/outcome.js';
+import { withAthenaWit } from './engine/athenaWit.js';
 import { recordPlayedCards } from './engine/recordPlayedCards.js';
 import { withSettleGate } from './engine/settleGate.js';
 import { matchEndIf } from './endCondition.js';
@@ -66,21 +67,24 @@ export const InceptionCityGame = {
 
     playing: {
       turn: playingTurn,
-      // 所有 move 扁平化（不用 BGIO stages）；出牌 move 统一记录打出的牌，再统一套上待结算闸门
+      // 所有 move 扁平化（不用 BGIO stages）；出牌 move 统一记录打出的牌，
+      // 以玩家为目标的出牌再套上雅典娜·急智的判定（也提供雅典娜的应答 move），最后统一套上待结算闸门
       moves: withSettleGate(
-        recordPlayedCards({
-          ...turnFlowMoves,
-          ...shootMoves,
-          ...unlockMoves,
-          ...actionCardMoves,
-          ...peekMoves,
-          ...masterMoves,
-          ...masterSkillMoves,
-          ...thiefAttackSkillMoves,
-          ...thiefBoardSkillMoves,
-          ...thiefCardSkillMoves,
-          ...responseMoves,
-        }),
+        withAthenaWit(
+          recordPlayedCards({
+            ...turnFlowMoves,
+            ...shootMoves,
+            ...unlockMoves,
+            ...actionCardMoves,
+            ...peekMoves,
+            ...masterMoves,
+            ...masterSkillMoves,
+            ...thiefAttackSkillMoves,
+            ...thiefBoardSkillMoves,
+            ...thiefCardSkillMoves,
+            ...responseMoves,
+          }),
+        ),
       ),
     },
 

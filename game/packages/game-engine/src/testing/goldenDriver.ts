@@ -33,7 +33,8 @@ const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
   skipDraw: [],
   playJokerGamble: [],
   playBlackSwanTour: ['distribution'],
-  playBlackHoleLevy: ['giverPicks'],
+  playBlackHoleLevy: [],
+  respondBlackHoleLevy: ['cardId'],
   useBlackHoleAbsorb: ['targetLayer'],
   useImperialCityWorldShoot: ['targetID'],
   playRevive: ['targetID', 'discardedCardIds'],
@@ -93,11 +94,12 @@ const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
   respondShootEvade: [],
   respondShootPass: [],
   respondTerroristDiscard: ['cardId'],
-  useAthenaWit: [],
+  respondAthenaWit: ['cardId'],
   respondTerroristAccept: [],
   respondVirgoPerfect: ['choice', 'params'],
   playGaiaShift: ['gaiaDirection'],
-  playDarwinEvolution: ['returnCards'],
+  playDarwinEvolution: [],
+  respondDarwinReturn: ['returnCards'],
   playShadeFollow: [],
   playForgerExchangeSingle: ['targetID', 'returnedCardId'],
   playLibraBalance: ['targetID'],
@@ -116,6 +118,17 @@ const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
   doDiscard: ['cardIds'],
   skipDiscard: [],
   useSpaceQueenStashTop: ['cardId'],
+};
+
+/**
+ * 已经不再是实参、但为了让伪随机序列的消耗与改动前逐位一致而继续「猜一次再丢掉」的形参名。
+ * 否则 move 一旦少了参数，之后每一局都会从第一次试探它的那一步起整体错位，守护就看不出真正的行为差异。
+ */
+const DISCARDED_PARAMS: Readonly<Record<string, readonly string[]>> = {
+  // 黑洞·吞噬：从发动者指明别人的牌，改为不带实参、由各交牌人应答
+  playBlackHoleLevy: ['giverPicks'],
+  // 达尔文·淘汰：从一步指明放回哪两张，改为发动不带实参、由第二步选牌
+  playDarwinEvolution: ['returnCards'],
 };
 
 // ---------------------------------------------------------------------------
@@ -268,6 +281,14 @@ function guessArg(name: string, G: SetupState, actor: string, rnd: Seq): unknown
     const cut = Math.ceil(targetHand.length / 2);
     return n === 'pile1' ? targetHand.slice(0, cut) : targetHand.slice(cut);
   }
+  // 黑洞·吞噬的应答：名单里的人从自己手里挑一张
+  if (n === 'cardid' && G.pendingBlackHoleLevy?.waiting.includes(actor)) return pick(rnd, hand);
+  // 雅典娜·急智的应答：从弃牌堆里选一张，或放弃
+  if (n === 'cardid' && G.pendingAthenaWit?.athenaID === actor) {
+    return rnd() < 0.3 ? null : pick(rnd, G.deck.discardPile);
+  }
+  // 达尔文·淘汰的选牌：从抽牌后的手牌里挑刚好 2 张
+  if (n === 'returncards' && G.pendingDarwinReturn?.playerID === actor) return sample(rnd, hand, 2);
   if (n === 'cardstoreturn' && rnd() < 0.7) return sample(rnd, hand, 2);
   const forcedAt = G.players[actor]?.forcedDiscardArmedAtTurn;
   if (n === 'cardids' && typeof forcedAt === 'number' && forcedAt === G.turnNumber) {
@@ -349,6 +370,7 @@ function candidateFor(
 ): MoveRequest {
   const names = Object.hasOwn(MOVE_PARAMS, move) ? MOVE_PARAMS[move]! : [];
   const args = names.map((name) => guessArg(name, state.G, playerID, rnd));
+  for (const name of DISCARDED_PARAMS[move] ?? []) guessArg(name, state.G, playerID, rnd);
   while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
   return { playerID, move, args };
 }
@@ -424,9 +446,30 @@ function choose(accepted: MoveRequest[], rnd: Seq): MoveRequest | null {
   return pick(rnd, progress.length > 0 ? progress : accepted)!;
 }
 
+/**
+ * 噪声请求挑 move 的名单里要排除的名字：只在有待应答状态时才有行动权的新应答 move。
+ * 噪声按「名单下标」选 move，名单里多一个名字，同一个随机数就会指到另一个 move，每一局都从第一次噪声起整体错位。
+ * 所以名单冻结在这些新 move 出现之前的样子；它们的覆盖由正常策略（结算类优先）负责。
+ */
+const NOISE_EXCLUDED: ReadonlySet<string> = new Set([
+  'respondBlackHoleLevy',
+  'respondDarwinReturn',
+  'respondAthenaWit',
+]);
+
+/**
+ * 已经从对局定义里删掉、但仍留在噪声名单里的 move 名（同样为了让名单下标不错位）。
+ * 它们现在会被当作未知 move 拒绝，这是行为变化，会在轨迹里体现。
+ */
+const NOISE_REMOVED: readonly string[] = ['useAthenaWit'];
+
 /** 噪声请求：随机座位、随机 move、随机参数，绝大多数会被拒绝；用来把「拒绝」也钉进轨迹 */
 function noiseMove(state: MatchState<SetupState>, rnd: Seq): MoveRequest {
-  const all = [...new Set(Object.keys(game.phases).flatMap((p) => phaseMoveNames(p)))].sort();
+  const all = [
+    ...new Set([...Object.keys(game.phases).flatMap((p) => phaseMoveNames(p)), ...NOISE_REMOVED]),
+  ]
+    .filter((name) => !NOISE_EXCLUDED.has(name))
+    .sort();
   const move = rnd() < 0.05 ? 'noSuchMove' : (pick(rnd, all) ?? 'noSuchMove');
   const playerID = rnd() < 0.5 ? state.ctx.currentPlayer : (pick(rnd, state.ctx.playOrder) ?? '0');
   return candidateFor(state, move, playerID, rnd);

@@ -3,9 +3,11 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import type { MatchView } from '@icgame/game-engine';
+import { toggleHandPick } from '../../../lib/handPick';
 import { logger } from '../../../lib/logger';
 import type { MatchMakeMove, ResponseModel } from '../controllerTypes';
 import {
+  DARWIN_RETURN_COUNT,
   EMPTY_DRAFT,
   awaitedActions,
   awaitedKey,
@@ -135,6 +137,18 @@ export function useAwaitedResponse({
       setNightmareDraft: (next) =>
         patchDraft({ echoLayer: next.echoLayer, echoAction: next.echoAction, bribed: next.bribed }),
       pickPile: (pile) => void pickPile(pile),
+      pickGive: (index) => patchDraft({ giveIndex: index }),
+      toggleReturn: (index) =>
+        update((prev) => ({
+          draft: {
+            ...prev.draft,
+            returnPicks: [...toggleHandPick(prev.draft.returnPicks, index, DARWIN_RETURN_COUNT)],
+          },
+        })),
+      pickAthenaCard: (card) =>
+        update((prev) => ({
+          draft: { ...prev.draft, athenaCard: prev.draft.athenaCard === card ? null : card },
+        })),
     },
   };
 }

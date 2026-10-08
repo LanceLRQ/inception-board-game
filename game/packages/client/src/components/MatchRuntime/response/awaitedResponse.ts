@@ -1,15 +1,18 @@
 // 轮到本人应答的待决情形：从按座位裁剪的视图推导「现在要应答什么、有哪些合法选项、点下去发哪个 move」。
 //
-// 覆盖六种需要本人做选择的待决状态：
+// 覆盖九种需要本人做选择的待决状态：
 //   被 SHOOT 时的响应（双鱼·游离 / 恐怖分子·狂热）、天秤·平衡（分牌 / 挑一份）、
-//   意念判官·定罪（二选一骰值）、处女·完美（三选一）、白羊·星尘（发动或弃掉梦魇）。
+//   意念判官·定罪（二选一骰值）、处女·完美（三选一）、白羊·星尘（发动或弃掉梦魇）、
+//   黑洞·吞噬（同层有手牌的人各交 1 张）、达尔文·淘汰（选 2 张放回牌库顶）、雅典娜·急智（从弃牌堆选 1 张或放弃）。
 // 只读视图里对本人可见的字段；点名对本人不可见（视图里为 null）时一律视为不是本人。
 // 引擎不支持的选项不给：可复活的目标、可传送的层、双鱼能否闪避等都按引擎守卫的同一口径推导。
 //
 // 对照：docs/manual/05-dream-thieves.md 双鱼（52-60 行）、白羊（62-70 行）、处女（100-111 行）、
-//       天秤（113-120 行）、恐怖分子（239-248 行）、意念判官（258-265 行）；梦魇效果见 docs/manual/07-nightmare-cards.md
+//       天秤（113-120 行）、黑洞（150-158 行）、雅典娜（160-170 行）、恐怖分子（239-248 行）、意念判官（258-265 行）；
+//       梦魇效果见 docs/manual/07-nightmare-cards.md；达尔文是扩展角色，说明书没有收录，以卡面「淘汰」为准
 
 import type { MatchView } from '@icgame/game-engine';
+import { handCardsAt, validHandPicks } from '../../../lib/handPick';
 import { nightmareParamKind, plagueCandidates } from '../../../lib/nightmareParams';
 
 export type AwaitedKind =
@@ -19,7 +22,10 @@ export type AwaitedKind =
   | 'libra-pick'
   | 'sudger'
   | 'virgo'
-  | 'aries';
+  | 'aries'
+  | 'levy'
+  | 'darwin'
+  | 'athena';
 
 /** SHOOT 一次结算的结果 */
 export type ShootResult = 'kill' | 'move' | 'miss';
@@ -110,6 +116,34 @@ export interface AriesAwaited {
   readonly bribePoolCount: number;
 }
 
+/** 黑洞·吞噬：同层有手牌的每个人各选 1 张手牌交给黑洞（不挡先后，各自应答） */
+export interface LevyAwaited {
+  readonly mine: true;
+  readonly kind: 'levy';
+  readonly blackHoleID: string;
+  /** 本人手牌，每张都可以交 */
+  readonly hand: readonly string[];
+}
+
+/** 达尔文·淘汰：已抽到牌库顶 2 张，从现在的手牌里选刚好 2 张按顺序放回牌库顶 */
+export interface DarwinAwaited {
+  readonly mine: true;
+  readonly kind: 'darwin';
+  /** 抽牌之后的手牌 */
+  readonly hand: readonly string[];
+}
+
+/** 雅典娜·急智：另一同层盗梦者对本人用行动牌，结算前可以从弃牌堆选 1 张收入手牌，也可以放弃 */
+export interface AthenaAwaited {
+  readonly mine: true;
+  readonly kind: 'athena';
+  readonly userID: string;
+  /** 对方打出的牌 */
+  readonly cardId: string;
+  /** 弃牌堆（公开），每张都可以选 */
+  readonly discard: readonly string[];
+}
+
 export type MineAwaited =
   | ShootEvadeAwaited
   | ShootZealotAwaited
@@ -117,7 +151,10 @@ export type MineAwaited =
   | LibraPickAwaited
   | SudgerAwaited
   | VirgoAwaited
-  | AriesAwaited;
+  | AriesAwaited
+  | LevyAwaited
+  | DarwinAwaited
+  | AthenaAwaited;
 
 /** 别人在应答：本人只需要等 */
 export interface OtherAwaited {
@@ -126,6 +163,8 @@ export interface OtherAwaited {
 
 export type AwaitedResponse = MineAwaited | OtherAwaited;
 
+/** 达尔文·淘汰要放回牌库顶的张数 */
+export const DARWIN_RETURN_COUNT = 2;
 /** 回音萦绕·发动时的层数范围 */
 export const ECHO_LAYERS: readonly number[] = [1, 2, 3, 4];
 /** 传送可选的层 */
@@ -243,6 +282,36 @@ export function awaitedResponse(view: MatchView, seat: string | null): AwaitedRe
     };
   }
 
+  // 黑洞·吞噬：名单里的每个人都可以交，不限先后；不在名单里（含黑洞自己）的只需要等
+  const levy = view.pendingBlackHoleLevy;
+  if (levy) {
+    if (seat === null || !levy.waiting.includes(seat)) return other;
+    const hand = handOf(view, seat);
+    if (hand === null) return other;
+    return { mine: true, kind: 'levy', blackHoleID: levy.blackHoleID, hand };
+  }
+
+  // 雅典娜·急智：雅典娜是谁只有她本人看得到
+  const athena = view.pendingAthenaWit;
+  if (athena) {
+    if (seat === null || athena.athenaID === null || athena.athenaID !== seat) return other;
+    return {
+      mine: true,
+      kind: 'athena',
+      userID: athena.userID,
+      cardId: athena.cardId,
+      discard: view.deck.discardPile,
+    };
+  }
+
+  const darwin = view.pendingDarwinReturn;
+  if (darwin) {
+    if (seat === null || darwin.playerID !== seat) return other;
+    const hand = handOf(view, seat);
+    if (hand === null) return other;
+    return { mine: true, kind: 'darwin', hand };
+  }
+
   const aries = view.pendingAriesChoice;
   if (aries) {
     if (seat === null || aries.ariesID === null || aries.ariesID !== seat) return other;
@@ -275,7 +344,10 @@ export type AwaitedSheet =
   | 'virgo-revive'
   | 'virgo-teleport'
   | 'aries-echo'
-  | 'aries-plague';
+  | 'aries-plague'
+  | 'levy-give'
+  | 'darwin-return'
+  | 'athena-pick';
 
 /** 点击一个操作按钮的效果：直接发 move，或打开弹窗 */
 export type AwaitedEffect =
@@ -415,6 +487,47 @@ export function awaitedActions(awaited: MineAwaited): AwaitedAction[] {
           effect: move('respondVirgoPerfect', 'skip'),
         },
       ];
+    case 'levy':
+      return [
+        {
+          id: 'give',
+          labelKey: 'awaited.levy.give',
+          tone: 'primary',
+          disabled: awaited.hand.length === 0,
+          decline: false,
+          effect: sheet('levy-give'),
+        },
+      ];
+    case 'darwin':
+      return [
+        {
+          id: 'return',
+          labelKey: 'awaited.darwin.open',
+          tone: 'primary',
+          disabled: awaited.hand.length < DARWIN_RETURN_COUNT,
+          decline: false,
+          effect: sheet('darwin-return'),
+        },
+      ];
+    case 'athena':
+      return [
+        {
+          id: 'take',
+          labelKey: 'awaited.athena.take',
+          tone: 'primary',
+          disabled: awaited.discard.length === 0,
+          decline: false,
+          effect: sheet('athena-pick'),
+        },
+        {
+          id: 'pass',
+          labelKey: 'awaited.athena.pass',
+          tone: 'plain',
+          disabled: false,
+          decline: true,
+          effect: move('respondAthenaWit', null),
+        },
+      ];
     case 'aries': {
       const activateSheet: AwaitedSheet | null =
         awaited.params === 'echo'
@@ -463,6 +576,12 @@ export interface AwaitedDraft {
   readonly echoAction: 'restore' | 'add' | null;
   /** 邪念瘟疫点名要派发贿赂牌的盗梦者 */
   readonly bribed: readonly string[];
+  /** 黑洞·吞噬：选中要交出的手牌位置 */
+  readonly giveIndex: number | null;
+  /** 达尔文·淘汰：选中要放回的手牌位置，按选择顺序（第 1 张放在牌库最顶） */
+  readonly returnPicks: readonly number[];
+  /** 雅典娜·急智：选中的弃牌堆里的牌 */
+  readonly athenaCard: string | null;
 }
 
 export const EMPTY_DRAFT: AwaitedDraft = {
@@ -473,6 +592,9 @@ export const EMPTY_DRAFT: AwaitedDraft = {
   echoLayer: null,
   echoAction: null,
   bribed: [],
+  giveIndex: null,
+  returnPicks: [],
+  athenaCard: null,
 };
 
 /** 切换一个位置是否在列表里（保持升序、不重复） */
@@ -492,6 +614,15 @@ export function splitPiles(
   const pile2: string[] = [];
   hand.forEach((card, i) => (second.has(i) ? pile2 : pile1).push(card));
   return { pile1, pile2 };
+}
+
+/** 弃牌堆按牌种归并：保持首次出现的顺序，带张数 */
+export function groupDiscard(
+  discard: readonly string[],
+): readonly { readonly card: string; readonly count: number }[] {
+  const counts = new Map<string, number>();
+  for (const card of discard) counts.set(card, (counts.get(card) ?? 0) + 1);
+  return [...counts].map(([card, count]) => ({ card, count }));
 }
 
 export interface AwaitedCommand {
@@ -544,6 +675,24 @@ export function sheetCommand(
         args: [{ bribedTargets: [...draft.bribed] }],
       };
     }
+    case 'levy-give': {
+      if (awaited.kind !== 'levy' || draft.giveIndex === null) return null;
+      const card = awaited.hand[draft.giveIndex];
+      return card === undefined ? null : { move: 'respondBlackHoleLevy', args: [card] };
+    }
+    case 'darwin-return': {
+      if (awaited.kind !== 'darwin') return null;
+      const picks = validHandPicks(draft.returnPicks, awaited.hand.length);
+      if (picks.length !== DARWIN_RETURN_COUNT || picks.length !== draft.returnPicks.length) {
+        return null;
+      }
+      return { move: 'respondDarwinReturn', args: [handCardsAt(awaited.hand, picks)] };
+    }
+    case 'athena-pick': {
+      if (awaited.kind !== 'athena' || draft.athenaCard === null) return null;
+      if (!awaited.discard.includes(draft.athenaCard)) return null;
+      return { move: 'respondAthenaWit', args: [draft.athenaCard] };
+    }
     case 'libra-pick':
       return null;
   }
@@ -571,6 +720,12 @@ export function awaitedKey(awaited: MineAwaited | null, turnNumber: number): str
       return `${awaited.kind}|${turnNumber}|${awaited.shooterID}|${awaited.triggerRoll}`;
     case 'aries':
       return `${awaited.kind}|${turnNumber}|${awaited.victimID}|${awaited.victimLayer}`;
+    case 'levy':
+      return `${awaited.kind}|${turnNumber}|${awaited.blackHoleID}|${awaited.hand.join(',')}`;
+    case 'darwin':
+      return `${awaited.kind}|${turnNumber}|${awaited.hand.join(',')}`;
+    case 'athena':
+      return `${awaited.kind}|${turnNumber}|${awaited.userID}|${awaited.cardId}`;
   }
 }
 

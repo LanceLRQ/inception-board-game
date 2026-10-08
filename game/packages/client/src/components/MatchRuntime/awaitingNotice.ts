@@ -20,8 +20,8 @@ interface Awaited {
   hasOwnUi?: true;
 }
 
-/** 当前正在等待应答的座位；没有待决状态返回 undefined */
-function awaitedSeat(view: MatchView): Awaited | undefined {
+/** 当前正在等待应答的座位；没有待决状态返回 undefined。可以由多人同时应答的待决（黑洞·吞噬）按本人是否在名单里判断 */
+function awaitedSeat(view: MatchView, mySeat: string | null): Awaited | undefined {
   // 阻塞类先判断，白羊选择不挡住回合主人，放最后
   if (view.pendingShootResponse) return { seat: view.pendingShootResponse.targetPlayerID };
   if (view.pendingLibra) {
@@ -34,6 +34,14 @@ function awaitedSeat(view: MatchView): Awaited | undefined {
   }
   if (view.pendingSudgerRolls) return { seat: view.currentPlayerID };
   if (view.pendingVirgoChoice) return { seat: view.pendingVirgoChoice.virgoID };
+  // 黑洞·吞噬：名单里的人各自交牌；本人在名单里就是本人，否则点名名单里的第一个人
+  if (view.pendingBlackHoleLevy) {
+    const { waiting } = view.pendingBlackHoleLevy;
+    return { seat: mySeat !== null && waiting.includes(mySeat) ? mySeat : (waiting[0] ?? null) };
+  }
+  // 雅典娜是谁只有她本人看得到（视图里为 null）
+  if (view.pendingAthenaWit) return { seat: view.pendingAthenaWit.athenaID };
+  if (view.pendingDarwinReturn) return { seat: view.pendingDarwinReturn.playerID };
   // 金币金库三选一、梦境窥视是否派贿赂：都等梦主，梦主各有自己的弹窗
   if (view.pendingVaultDecision) return { seat: view.dreamMasterID, hasOwnUi: true };
   if (view.pendingPeekDecision) return { seat: view.dreamMasterID, hasOwnUi: true };
@@ -42,7 +50,7 @@ function awaitedSeat(view: MatchView): Awaited | undefined {
 }
 
 export function awaitingNotice(view: MatchView, seat: string | null): AwaitingNotice | null {
-  const awaited = awaitedSeat(view);
+  const awaited = awaitedSeat(view, seat);
   if (awaited === undefined) return null;
   const mine = seat !== null && awaited.seat !== null && awaited.seat === seat;
   return mine && awaited.hasOwnUi ? { mine, hasOwnUi: true } : { mine };

@@ -131,6 +131,20 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
     const cut = Math.ceil(targetHand.length / 2);
     return n === 'pile1' ? targetHand.slice(0, cut) : targetHand.slice(cut);
   }
+  // SHOOT 判定为移动时发动方选层：层必须在待选的相邻层里，随机猜 0-5 有一定概率连续猜不中
+  if (n === 'layer' && G.pendingShootMove && G.pendingShootMove.shooterID === actor) {
+    return pick(rnd, G.pendingShootMove.choices);
+  }
+  // 黑洞·吞噬的交牌：名单里的人从自己手里交一张
+  if (n === 'cardid' && G.pendingBlackHoleLevy?.waiting.includes(actor)) return pick(rnd, hand);
+  // 雅典娜·急智的应答：从弃牌堆里选一张，或放弃
+  if (n === 'cardid' && G.pendingAthenaWit?.athenaID === actor) {
+    return rnd() < 0.3 ? null : pick(rnd, G.deck.discardPile);
+  }
+  // 达尔文·淘汰的选牌：从抽牌后的手牌里选刚好 2 张
+  if (n === 'returncards' && G.pendingDarwinReturn?.playerID === actor) {
+    return sample(rnd, hand, 2);
+  }
   // 嫁接结算要求恰好退回 2 张
   if (n === 'cardstoreturn' && rnd() < 0.7) return sample(rnd, hand, 2);
   // 小丑赌博的罚则生效后，弃牌阶段必须一次弃掉全部手牌；随机子集几乎碰不到这一种

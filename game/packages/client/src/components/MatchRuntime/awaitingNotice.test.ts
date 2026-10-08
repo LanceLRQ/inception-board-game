@@ -139,4 +139,33 @@ describe('awaitingNotice', () => {
     expect(awaitingNotice(view, '9')).toEqual({ mine: true, hasOwnUi: true });
     expect(awaitingNotice(view, '1')).toEqual({ mine: false });
   });
+
+  it('黑洞·吞噬：名单里的人各自轮到本人，名单外的人（含黑洞）在等', () => {
+    const view = viewWith({
+      pendingBlackHoleLevy: { blackHoleID: '0', waiting: ['1', '2'] },
+    } as Partial<MatchView>);
+    expect(awaitingNotice(view, '1')).toEqual({ mine: true });
+    expect(awaitingNotice(view, '2')).toEqual({ mine: true });
+    expect(awaitingNotice(view, '0')).toEqual({ mine: false });
+    expect(awaitingNotice(view, '9')).toEqual({ mine: false });
+    expect(awaitingNotice(view, null)).toEqual({ mine: false });
+  });
+
+  it('达尔文·淘汰：轮到达尔文本人', () => {
+    const view = viewWith({ pendingDarwinReturn: { playerID: '4' } } as Partial<MatchView>);
+    expect(awaitingNotice(view, '4')).toEqual({ mine: true });
+    expect(awaitingNotice(view, '1')).toEqual({ mine: false });
+  });
+
+  it('雅典娜·急智：只有雅典娜本人的视图里带座位号，别人只是在等', () => {
+    const own = viewWith({
+      pendingAthenaWit: { athenaID: '2', userID: '0', cardId: 'action_kick' },
+    } as Partial<MatchView>);
+    expect(awaitingNotice(own, '2')).toEqual({ mine: true });
+    const hidden = viewWith({
+      pendingAthenaWit: { athenaID: null, userID: '0', cardId: 'action_kick' },
+    } as Partial<MatchView>);
+    expect(awaitingNotice(hidden, '2')).toEqual({ mine: false });
+    expect(awaitingNotice(hidden, null)).toEqual({ mine: false });
+  });
 });

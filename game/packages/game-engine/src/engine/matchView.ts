@@ -220,6 +220,30 @@ export interface PendingShootResponseView {
   skill: ShootSkillSource | null;
 }
 
+/**
+ * 黑洞·吞噬的交牌等待：黑洞是回合主人（发动本身公开），名单是同层有手牌的人（手牌张数本来公开）。
+ * 交出的是哪张牌不在状态里，牌一交就转进黑洞的手牌，只有黑洞本人与（自己交出的）交牌人看得到。
+ */
+export interface PendingBlackHoleLevyView {
+  blackHoleID: string;
+  waiting: string[];
+}
+
+/** 达尔文·淘汰的选牌等待：达尔文是回合主人（发动本身公开），抽到哪些牌、放回哪些牌都不在视图里 */
+export interface PendingDarwinReturnView {
+  playerID: string;
+}
+
+/**
+ * 雅典娜·急智的应答等待：出牌者与被打出的牌是公开的（出牌本来就公开），
+ * 雅典娜是谁会暴露角色，只有雅典娜本人（和对局结束后）可见；重放用的 move 名与实参不进视图。
+ */
+export interface PendingAthenaWitView {
+  athenaID: string | null;
+  userID: string;
+  cardId: CardID;
+}
+
 /** 某个观察者能看到的对局状态。字段是白名单：这里没有的，观察者就看不到 */
 export interface MatchView {
   /** 对局是否已结束（此时 null 只表示「本来就没有」，不再表示「看不到」） */
@@ -275,6 +299,9 @@ export interface MatchView {
   pendingAriesChoice: PendingAriesChoiceView | null;
   pendingVirgoChoice: PendingVirgoChoiceView | null;
   pendingShootResponse: PendingShootResponseView | null;
+  pendingBlackHoleLevy: PendingBlackHoleLevyView | null;
+  pendingDarwinReturn: PendingDarwinReturnView | null;
+  pendingAthenaWit: PendingAthenaWitView | null;
 
   winner: Faction | null;
   winReason: string | null;
@@ -334,6 +361,9 @@ export const FIELD_DISPOSITION: Record<keyof SetupState, Disposition> = {
   pendingAriesChoice: 'conditional',
   pendingVirgoChoice: 'conditional',
   pendingShootResponse: 'conditional',
+  pendingBlackHoleLevy: 'public',
+  pendingDarwinReturn: 'public',
+  pendingAthenaWit: 'conditional',
   winner: 'public',
   winReason: 'public',
   endTurn: 'public',
@@ -727,6 +757,26 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
         }
       : null,
     pendingShootResponse: shootResponse ? viewShootResponse(shootResponse, who) : null,
+    pendingBlackHoleLevy: G.pendingBlackHoleLevy
+      ? {
+          blackHoleID: G.pendingBlackHoleLevy.blackHoleID,
+          waiting: G.pendingBlackHoleLevy.waiting.slice(),
+        }
+      : null,
+    pendingDarwinReturn: G.pendingDarwinReturn
+      ? { playerID: G.pendingDarwinReturn.playerID }
+      : null,
+    // 这里遮住的行动者，必须与 matchEvents.ts 的 MASKED_ACTOR_FIELDS 保持一致
+    pendingAthenaWit: G.pendingAthenaWit
+      ? {
+          athenaID:
+            who.open || who.who === G.pendingAthenaWit.athenaID
+              ? G.pendingAthenaWit.athenaID
+              : null,
+          userID: G.pendingAthenaWit.userID,
+          cardId: G.pendingAthenaWit.cardId,
+        }
+      : null,
 
     winner: options.outcome ? options.outcome.winner : G.winner,
     winReason: options.outcome ? options.outcome.reason : G.winReason,

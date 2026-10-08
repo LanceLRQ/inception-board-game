@@ -76,6 +76,14 @@ export function defaultArgsFor(move: string, G: SetupState, botID: string): unkn
       const hand = self?.hand ?? [];
       return [hand.slice(0, 2)];
     }
+    case 'respondBlackHoleLevy': {
+      // 代交牌：交出手牌里的第 1 张
+      return [self?.hand[0]];
+    }
+    case 'respondDarwinReturn': {
+      // 与嫁接一致：取手牌前 2 张放回牌库顶
+      return [(self?.hand ?? []).slice(0, 2)];
+    }
     case 'resolveGravityPick': {
       // 简单策略：从牌池挑第 1 张
       const pool = G.pendingGravity?.pool ?? [];

@@ -229,6 +229,90 @@ test.describe('固定场景 · 应答窗口', () => {
     });
   });
 
+  test('黑洞·吞噬：必须交一张手牌，没有放弃按钮；选定后才能确认，发 respondBlackHoleLevy', async ({
+    page,
+  }) => {
+    const sent = await openScene(page, '/game/debug?pending=levy');
+    await expect(panelOf(page)).toHaveAttribute('data-kind', 'levy', { timeout: 10_000 });
+    await expect(panelOf(page)).toContainText('黑洞');
+    await expect(action(page, 'give')).toBeEnabled();
+    await expect(page.getByTestId(/^awaited-action-/)).toHaveCount(1);
+
+    await action(page, 'give').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    await expect(page.getByTestId('awaited-sheet-confirm')).toBeDisabled();
+    await page.getByTestId('awaited-card-2').click();
+    await expect(page.getByTestId('awaited-sheet-confirm')).toBeEnabled();
+    await page.getByTestId('awaited-sheet-confirm').click();
+    const move = await lastMove(sent, 1);
+    expect(move.move).toBe('respondBlackHoleLevy');
+    expect(move.args).toHaveLength(1);
+    expect(typeof move.args[0]).toBe('string');
+  });
+
+  test('达尔文·淘汰：手牌里含新抽的牌；刚好选 2 张才能确认，选的先后就是放回的顺序', async ({
+    page,
+  }) => {
+    const sent = await openScene(page, '/game/debug?pending=darwin');
+    await expect(panelOf(page)).toHaveAttribute('data-kind', 'darwin', { timeout: 10_000 });
+    await action(page, 'return').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    const confirm = page.getByTestId('awaited-sheet-confirm');
+    const total = await page.getByTestId('awaited-sheet-hand').locator('button').count();
+    expect(total).toBe(6);
+    await expect(confirm).toBeDisabled();
+
+    // 先选刚抽到的最后一张，再选第一张
+    await page.getByTestId(`awaited-card-${total - 1}`).click();
+    await expect(confirm).toBeDisabled();
+    await page.getByTestId('awaited-card-0').click();
+    await expect(confirm).toBeEnabled();
+    await expect(page.getByTestId(`awaited-order-${total - 1}`)).toHaveText('1');
+    await expect(page.getByTestId('awaited-order-0')).toHaveText('2');
+    await expect(page.getByTestId('awaited-return-progress')).toContainText('2 / 2');
+    // 已经选满 2 张：再点第三张不生效
+    await page.getByTestId('awaited-card-1').click();
+    await expect(page.getByTestId('awaited-order-1')).toHaveCount(0);
+    await confirm.click();
+    const forward = await lastMove(sent, 1);
+    expect(forward.move).toBe('respondDarwinReturn');
+    const [firstPick] = forward.args as [string[]];
+    expect(firstPick).toHaveLength(2);
+
+    // 固定场景不推进状态：弹窗再打开时草稿还在。再点已选的牌是取消，不是顶掉
+    await action(page, 'return').click();
+    await expect(page.getByTestId('awaited-order-0')).toHaveText('2');
+    await page.getByTestId('awaited-card-0').click();
+    await expect(page.getByTestId('awaited-order-0')).toHaveCount(0);
+    await expect(confirm).toBeDisabled();
+    await page.getByTestId('awaited-card-3').click();
+    await expect(confirm).toBeEnabled();
+    await expect(page.getByTestId('awaited-order-3')).toHaveText('2');
+  });
+
+  test('雅典娜·急智：可以放弃直接发 null；或在弹窗里从弃牌堆选一张再确认', async ({ page }) => {
+    const sent = await openScene(page, '/game/debug?pending=athena');
+    await expect(panelOf(page)).toHaveAttribute('data-kind', 'athena', { timeout: 10_000 });
+    await expect(panelOf(page)).toContainText('雅典娜');
+
+    await action(page, 'pass').click();
+    expect(await lastMove(sent, 1)).toEqual({ move: 'respondAthenaWit', args: [null] });
+
+    await action(page, 'take').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    const confirm = page.getByTestId('awaited-sheet-confirm');
+    await expect(confirm).toBeDisabled();
+    const options = page.getByTestId('awaited-sheet-discard').locator('button');
+    expect(await options.count()).toBeGreaterThanOrEqual(3);
+    await options.nth(1).click();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    const move = await lastMove(sent, 2);
+    expect(move.move).toBe('respondAthenaWit');
+    expect(move.args).toHaveLength(1);
+    expect(typeof move.args[0]).toBe('string');
+  });
+
   test('应答窗口不挡住别的界面：舞台仍在，页面没有报错', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
