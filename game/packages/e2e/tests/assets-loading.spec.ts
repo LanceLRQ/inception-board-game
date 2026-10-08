@@ -87,11 +87,17 @@ test.describe('素材预加载', () => {
       timeout: 10_000,
     });
     await expect(hand.locator('[data-testid="card-art-fallback"]').first()).not.toBeEmpty();
-    // 页面里没有留下加载失败的 <img>
-    const broken = await page.evaluate(
-      () => [...document.images].filter((img) => img.complete && img.naturalWidth === 0).length,
-    );
-    expect(broken).toBe(0);
+    // 页面里没有留下加载失败的 <img>：图片报错到换成占位之间隔着一次渲染，等它收敛而不是只取一次快照
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              [...document.images].filter((img) => img.complete && img.naturalWidth === 0).length,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(0);
     // 类别色块带分类标记，换主题也只用令牌
     await expect(
       hand.locator('[data-testid="card-art-fallback"][data-category="action"]').first(),
