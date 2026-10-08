@@ -491,7 +491,7 @@ describe('migrations', () => {
     });
   });
 
-  describe('v13 → v16 · 黑洞吞噬 / 达尔文淘汰 / 雅典娜急智的等待态', () => {
+  describe('v13 → v17 · 黑洞吞噬 / 达尔文淘汰 / 雅典娜急智 / 土星律令的等待态', () => {
     function stateAt(version: number): Record<string, unknown> {
       const fresh = createInitialState({
         playerCount: 5,
@@ -503,21 +503,24 @@ describe('migrations', () => {
         pendingBlackHoleLevy: _a,
         pendingDarwinReturn: _b,
         pendingAthenaWit: _c,
+        pendingSaturnDecree: _d,
         ...older
       } = fresh;
       void _a;
       void _b;
       void _c;
+      void _d;
       return { ...older, schemaVersion: version };
     }
 
-    it('版本号升到 16', () => {
-      expect(CURRENT_SCHEMA_VERSION).toBe(16);
+    it('版本号升到 17', () => {
+      expect(CURRENT_SCHEMA_VERSION).toBe(17);
     });
 
-    it('旧存档补齐三个等待字段为 null，并升到当前版本', () => {
+    it('旧存档补齐四个等待字段为 null，并升到当前版本', () => {
       const migrated = migrateGameState(stateAt(13));
-      expect(migrated.schemaVersion).toBe(16);
+      expect(migrated.schemaVersion).toBe(17);
+      expect(migrated.pendingSaturnDecree).toBeNull();
       expect(migrated.pendingBlackHoleLevy).toBeNull();
       expect(migrated.pendingDarwinReturn).toBeNull();
       expect(migrated.pendingAthenaWit).toBeNull();
@@ -533,6 +536,21 @@ describe('migrations', () => {
       const fromFifteen = migrateGameState({ ...stateAt(15), pendingDarwinReturn: darwin });
       expect(fromFifteen.pendingDarwinReturn).toEqual(darwin);
       expect(fromFifteen.pendingAthenaWit).toBeNull();
+      expect(fromFifteen.pendingSaturnDecree).toBeNull();
+    });
+
+    it('从 16 版出发只补律令的等待字段，雅典娜的等待态原样保留', () => {
+      const wit = {
+        athenaID: '1',
+        userID: '0',
+        cardId: 'action_kick',
+        move: 'playKick',
+        args: ['action_kick', '1'],
+      };
+      const migrated = migrateGameState({ ...stateAt(16), pendingAthenaWit: wit });
+      expect(migrated.schemaVersion).toBe(17);
+      expect(migrated.pendingAthenaWit).toEqual(wit);
+      expect(migrated.pendingSaturnDecree).toBeNull();
     });
 
     it('当前版本的状态原样通过', () => {

@@ -154,4 +154,23 @@ describe('awaitedCopy', () => {
       notes: [],
     });
   });
+
+  it('土星·律令：说明里带出牌者与牌名；没有同名牌时给出原因', () => {
+    const base: MineAwaited = {
+      mine: true,
+      kind: 'saturn',
+      userID: '2',
+      cardId: 'action_kick',
+      hand: ['action_kick', 'action_shoot'],
+      matches: [0],
+    };
+    expect(awaitedCopy(base, deps)).toEqual({
+      titleKey: 'awaited.saturn.title',
+      bodyKey: 'awaited.saturn.body',
+      bodyParams: { name: '玩家2', card: '牌:action_kick' },
+      notes: [],
+    });
+    const none = awaitedCopy({ ...base, matches: [] }, deps);
+    expect(none.notes).toEqual([{ key: 'awaited.saturn.noMatch' }]);
+  });
 });

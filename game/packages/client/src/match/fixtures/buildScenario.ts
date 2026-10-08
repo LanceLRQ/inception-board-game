@@ -391,10 +391,19 @@ const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
   },
 };
 
+/** 梦主是土星·领地、盗梦者打出 KICK 后等梦主应答律令的场景（手里有 / 没有同名牌） */
+const isSaturnScenario = (id: FixtureScenarioId): boolean =>
+  id === 'master-pending-saturn' ||
+  id === 'master-pending-saturn-nomatch' ||
+  id === 'thief-pending-saturn';
+const SATURN_MASTER = 'dm_saturn_territory' as CardID;
+
 const isMasterScenario = (id: FixtureScenarioId): boolean =>
   SKILL_SCENES[id]?.viewer === 'master' ||
   id === 'master' ||
   id === 'master-pending' ||
+  id === 'master-pending-saturn' ||
+  id === 'master-pending-saturn-nomatch' ||
   id === 'master-chess' ||
   id === 'master-mate-dead' ||
   id === 'master-bribe' ||
@@ -531,7 +540,10 @@ export function buildFixtureMatch(
   const skillScene = SKILL_SCENES[id];
   // 待应答场景里由第二名盗梦者当回合主人；其余场景轮到本人
   const actor =
-    isPendingScenario(id) || response?.turnOwner === 'other' || skillScene?.turnOwner === 'other'
+    isPendingScenario(id) ||
+    isSaturnScenario(id) ||
+    response?.turnOwner === 'other' ||
+    skillScene?.turnOwner === 'other'
       ? thieves[1]!
       : viewer;
 
@@ -540,9 +552,12 @@ export function buildFixtureMatch(
   G = dealSpecific(
     G,
     viewer,
-    isMasterScenario(id)
-      ? cards('action_kick', 'action_dream_peek', UNLOCK_CARD)
-      : cards('action_shoot', UNLOCK_CARD, 'action_dream_transit', 'action_kick'),
+    id === 'master-pending-saturn-nomatch'
+      ? // 没有与出牌者的 KICK 同名的牌：律令窗口照样出现，但只能不抵消
+        cards('action_dream_peek', UNLOCK_CARD, 'action_dream_transit')
+      : isMasterScenario(id)
+        ? cards('action_kick', 'action_dream_peek', UNLOCK_CARD)
+        : cards('action_shoot', UNLOCK_CARD, 'action_dream_transit', 'action_kick'),
   );
   if (isDiscardScenario(id)) G = dealTop(G, viewer, DISCARD_EXTRA_CARDS);
   if (actor !== viewer) G = dealSpecific(G, actor, cards(UNLOCK_CARD, 'action_kick'));
@@ -573,7 +588,11 @@ export function buildFixtureMatch(
         characterId: (skillScene?.viewer === 'master'
           ? skillScene.character
           : (skillScene?.masterCharacter ??
-            (id === 'master-chess' ? CHESS_MASTER : PLAIN_MASTER))) as CardID,
+            (id === 'master-chess'
+              ? CHESS_MASTER
+              : isSaturnScenario(id)
+                ? SATURN_MASTER
+                : PLAIN_MASTER))) as CardID,
       },
     },
   };
@@ -649,6 +668,12 @@ export function buildFixtureMatch(
     case 'thief-pending-athena':
       // 对方真的对本人打出 KICK：引擎在结算前挂起雅典娜的应答
       state = mustApply(state, actor, 'playKick', ['action_kick', viewer]);
+      break;
+    case 'master-pending-saturn':
+    case 'master-pending-saturn-nomatch':
+    case 'thief-pending-saturn':
+      // 盗梦者真的打出 KICK：引擎在结算前挂起梦主的律令应答
+      state = mustApply(state, actor, 'playKick', ['action_kick', thieves[0]!]);
       break;
     case 'thief-pending-sudger': {
       state = mustApply(state, viewer, 'playShootSudger', [other, 'action_shoot']);

@@ -333,44 +333,53 @@ describe('M4 卡宾枪 · dice modifier', () => {
 
 describe('土星·领地（dm_saturn_territory）', () => {
   describe('律令 applySaturnDecree', () => {
-    it('弃 1 手牌 + 抽 1', () => {
-      let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
+    /** p1 手里有被打出的 KICK；梦主手牌 [UNLOCK, KICK] */
+    function decreeScene(masterChar: CardID = 'dm_saturn_territory' as CardID): SetupState {
+      let s = setMasterCharacter(scenarioStartOfGame3p(), masterChar);
       s = setHand(s, 'pM', ['action_unlock' as CardID, 'action_kick' as CardID]);
-      s = {
+      s = setHand(s, 'p1', ['action_kick' as CardID]);
+      return {
         ...s,
         deck: { cards: ['action_shoot' as CardID, 'action_graft' as CardID], discardPile: [] },
       };
-      const next = applySaturnDecree(s, 'pM', 'action_kick');
+    }
+    const countered = { userID: 'p1', cardId: 'action_kick' as CardID };
+
+    it('弃 1 同名手牌 + 被抵消的牌作废进弃牌堆 + 抽 1', () => {
+      const next = applySaturnDecree(decreeScene(), 'pM', 'action_kick', countered);
       expect(next).not.toBeNull();
       expect(next!.players.pM!.hand).toEqual(['action_unlock', 'action_shoot']);
-      expect(next!.deck.discardPile).toContain('action_kick');
+      expect(next!.players.p1!.hand).toEqual([]);
+      expect(next!.deck.discardPile).toEqual(['action_kick', 'action_kick']);
+      expect(next!.playedCardsThisTurn).toEqual(['action_kick']);
+    });
+
+    it('弃的牌与被抵消的牌不同名 → null', () => {
+      expect(applySaturnDecree(decreeScene(), 'pM', 'action_unlock', countered)).toBeNull();
     });
 
     it('手牌不含目标 → null', () => {
-      let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-      s = setHand(s, 'pM', ['action_unlock' as CardID]);
-      const next = applySaturnDecree(s, 'pM', 'action_kick');
-      expect(next).toBeNull();
+      const s = setHand(decreeScene(), 'pM', ['action_unlock' as CardID]);
+      expect(applySaturnDecree(s, 'pM', 'action_kick', countered)).toBeNull();
+    });
+
+    it('被抵消的牌不在出牌者手里 → null', () => {
+      const s = setHand(decreeScene(), 'p1', []);
+      expect(applySaturnDecree(s, 'pM', 'action_kick', countered)).toBeNull();
     });
 
     it('梦主非土星 → null', () => {
-      let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_fortress');
-      s = setHand(s, 'pM', ['action_unlock' as CardID]);
-      const next = applySaturnDecree(s, 'pM', 'action_unlock');
-      expect(next).toBeNull();
+      const s = decreeScene('dm_fortress' as CardID);
+      expect(applySaturnDecree(s, 'pM', 'action_kick', countered)).toBeNull();
     });
 
     it('梦主已死 → null', () => {
-      let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-      s = {
+      const s = decreeScene();
+      const dead = {
         ...s,
-        players: {
-          ...s.players,
-          pM: { ...s.players.pM!, isAlive: false, deathTurn: 1, hand: ['action_unlock' as CardID] },
-        },
+        players: { ...s.players, pM: { ...s.players.pM!, isAlive: false, deathTurn: 1 } },
       };
-      const next = applySaturnDecree(s, 'pM', 'action_unlock');
-      expect(next).toBeNull();
+      expect(applySaturnDecree(dead, 'pM', 'action_kick', countered)).toBeNull();
     });
   });
 

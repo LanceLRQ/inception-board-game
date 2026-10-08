@@ -285,6 +285,29 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
+  // ---------- 17. 土星·律令的应答等待 ----------
+  // 出牌者是回合主人、在出牌阶段、不是梦主；等的是存活的土星梦主；被打出的牌还在出牌者手里（尚未离手）
+  const decree = state.pendingSaturnDecree;
+  if (decree) {
+    const master = state.players[decree.masterID];
+    const user = state.players[decree.userID];
+    if (decree.userID !== state.currentPlayerID || state.turnPhase !== 'action') {
+      push('pending_decree_turn', `律令的应答只能挂在出牌者 ${decree.userID} 的出牌阶段`);
+    }
+    if (decree.masterID !== state.dreamMasterID) {
+      push('pending_decree_master', `pendingSaturnDecree.masterID=${decree.masterID} 不是梦主`);
+    }
+    if (!master || !master.isAlive || master.characterId !== 'dm_saturn_territory') {
+      push('pending_decree_saturn', `梦主 ${decree.masterID} 不是存活的土星·领地`);
+    }
+    if (decree.userID === state.dreamMasterID) {
+      push('pending_decree_user', '律令只针对其他玩家打出的牌，出牌者不应是梦主');
+    }
+    if (user && !user.hand.includes(decree.cardId)) {
+      push('pending_decree_card', `被打出的 ${decree.cardId} 应当还在出牌者 ${decree.userID} 手里`);
+    }
+  }
+
   return out;
 }
 

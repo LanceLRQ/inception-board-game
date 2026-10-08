@@ -451,6 +451,39 @@ describe('LocalMatchSession · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·�
   });
 });
 
+describe('LocalMatchSession · 土星·律令', () => {
+  const pending = (masterID: string, userID: string) => ({
+    turnPhase: 'action' as const,
+    pendingSaturnDecree: {
+      masterID,
+      userID,
+      cardId: 'action_kick' as never,
+      move: 'playKick',
+      args: ['action_kick', masterID],
+    },
+  });
+
+  it('真人是梦主时停下等真人（可以不抵消）；Bot 梦主缺省不抵消，由 Bot 代为放过', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    // 把本地真人座位当作梦主：停下等真人
+    patchState(session, { dreamMasterID: HUMAN, ...pending(HUMAN, '1') });
+    expect(session.step().action).toBeNull();
+
+    const bot = makeSession();
+    runUntilIdle(bot);
+    const botMaster = bot.snapshot().G.dreamMasterID;
+    const other = bot.snapshot().G.playerOrder.find((id) => id !== botMaster && id !== HUMAN)!;
+    patchState(bot, pending(botMaster, other));
+    expect(botMaster).not.toBe(HUMAN);
+    expect(bot.step().action).toMatchObject({
+      playerID: botMaster,
+      move: 'respondSaturnDecree',
+      args: [null],
+    });
+  });
+});
+
 describe('LocalMatchSession · 真人白羊的宽限期', () => {
   it('Bot 的回合里真人白羊有选择：宽限期内先等，到点后继续；真人处理后立即解除', () => {
     let clock = 1_000;

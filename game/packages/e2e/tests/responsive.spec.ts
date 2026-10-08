@@ -50,6 +50,7 @@ const SCENES = [
   { name: '缺省', url: '/game/debug', players: 6 },
   { name: '响应窗口', url: '/game/debug?pending=1', players: 6 },
   { name: '10 人', url: '/game/debug?players=10', players: 10 },
+  { name: '梦主应答土星·律令', url: '/game/debug?as=master&pending=saturn', players: 6 },
   { name: '弃牌阶段', url: '/game/debug?discard=1', players: 6 },
   { name: '本人在迷失层（复活入口）', url: '/game/debug?dead=1', players: 6 },
   { name: '同伴在迷失层（复活同伴入口）', url: '/game/debug?dead=mate', players: 6 },
@@ -233,7 +234,7 @@ for (const vp of VIEWPORTS) {
         }
         await expectNoPageScroll(page);
 
-        if (ENTRY_SCENE.test(scene.url) && !scene.url.includes('pending=1')) {
+        if (ENTRY_SCENE.test(scene.url) && !scene.url.includes('pending=')) {
           await expectEntriesClean(page);
         }
 

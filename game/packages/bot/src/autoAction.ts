@@ -172,6 +172,18 @@ export function nextAutoAction(
     };
   }
 
+  // 土星·律令：Bot 一律放过（缺省不抵消），以梦主本人的名义应答；梦主是真人就等他选择。
+  const decree = G.pendingSaturnDecree;
+  if (decree) {
+    if (isHuman(decree.masterID)) return null;
+    return {
+      playerID: decree.masterID,
+      move: 'respondSaturnDecree',
+      args: [null],
+      why: `${decree.masterID} 不发动律令`,
+    };
+  }
+
   // 回合主人是真人：等他操作
   if (isHuman(owner)) return null;
 

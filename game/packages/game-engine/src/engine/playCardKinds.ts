@@ -35,3 +35,17 @@ export const PLAY_MOVE_CARD_IDS: Readonly<Record<string, readonly string[]>> = {
 export function isCardForPlayMove(move: string, cardId: CardID): boolean {
   return PLAY_MOVE_CARD_IDS[move]?.includes(cardId) ?? false;
 }
+
+/**
+ * 一次出牌 move 的实参里，被打出的那张牌：取第一个属于该 move 对应牌的字符串实参。
+ * 出牌记录与「针对出牌的应答窗口」（土星·律令）共用，保证两处认定的是同一张牌；表里没有的 move 返回 undefined。
+ */
+export function playedCardOf(
+  move: string,
+  args: readonly unknown[],
+  table: Readonly<Record<string, readonly string[]>> = PLAY_MOVE_CARD_IDS,
+): CardID | undefined {
+  const allowed = table[move];
+  if (!allowed) return undefined;
+  return args.find((arg): arg is CardID => typeof arg === 'string' && allowed.includes(arg));
+}

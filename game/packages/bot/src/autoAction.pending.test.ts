@@ -1,4 +1,4 @@
-// 自动行动判定 · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智 的待应答状态
+// 自动行动判定 · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智 / 土星·律令 的待应答状态
 // 状态在真实对局建出的局面上改写；Bot 座位以应答者本人的名义代答，真人座位等真人，代答的 move 必须被引擎接受。
 
 import { describe, it, expect } from 'vitest';
@@ -171,5 +171,46 @@ describe('自动行动 · 雅典娜·急智', () => {
     const { s, owner, athena } = witState();
     expect(nextAutoAction(s, { humanPlayerIDs: [athena] })).toBeNull();
     expect(nextAutoAction(s, { humanPlayerIDs: [owner] })).toMatchObject({ playerID: athena });
+  });
+});
+
+describe('自动行动 · 土星·律令', () => {
+  /** 梦主是土星、手里有一张 KICK；回合主人打出 KICK，挂起梦主的应答 */
+  function decreeState(masterHand: string[] = [KICK]) {
+    const base = thiefTurn('auto-decree');
+    const owner = base.ctx.currentPlayer;
+    const master = base.G.dreamMasterID;
+    const target = base.G.playerOrder.find((id) => id !== owner && id !== master)!;
+    let s = patchPlayers(base, {
+      [owner]: { hand: [KICK] as never },
+      [master]: { characterId: 'dm_saturn_territory' as never, hand: masterHand as never },
+    });
+    s = must(s, { playerID: owner, move: 'doDraw', args: [] });
+    s = must(s, { playerID: owner, move: 'playKick', args: [KICK, target] });
+    return { s, owner, master };
+  }
+
+  it('梦主是 Bot / 超时：缺省放过，以梦主本人的名义发，引擎接受并继续结算那张牌', () => {
+    const { s, master } = decreeState();
+    expect(s.G.pendingSaturnDecree).toMatchObject({ masterID: master, cardId: KICK });
+    const action = nextAutoAction(s, NO_HUMAN)!;
+    expect(action).toMatchObject({ playerID: master, move: 'respondSaturnDecree', args: [null] });
+    const next = must(s, action);
+    expect(next.G.pendingSaturnDecree ?? null).toBeNull();
+    expect(next.G.players[master]!.hand).toEqual([KICK]);
+    expect(next.G.deck.discardPile).toContain(KICK);
+  });
+
+  it('梦主手里没有同名牌时同样放过', () => {
+    const { s, master } = decreeState([UNLOCK]);
+    const action = nextAutoAction(s, NO_HUMAN)!;
+    expect(action).toMatchObject({ playerID: master, move: 'respondSaturnDecree', args: [null] });
+    expect(must(s, action).G.pendingSaturnDecree ?? null).toBeNull();
+  });
+
+  it('梦主是真人：等他选，返回 null；出牌者是真人、梦主是 Bot 时 Bot 代答', () => {
+    const { s, owner, master } = decreeState();
+    expect(nextAutoAction(s, { humanPlayerIDs: [master] })).toBeNull();
+    expect(nextAutoAction(s, { humanPlayerIDs: [owner] })).toMatchObject({ playerID: master });
   });
 });

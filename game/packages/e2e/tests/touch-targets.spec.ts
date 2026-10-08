@@ -83,6 +83,9 @@ const SCENES = [
   ['应答：黑洞·吞噬', '/game/debug?pending=levy'],
   ['应答：达尔文·淘汰', '/game/debug?pending=darwin'],
   ['应答：雅典娜·急智', '/game/debug?pending=athena'],
+  ['应答：土星·律令（有同名牌）', '/game/debug?as=master&pending=saturn'],
+  ['应答：土星·律令（没有同名牌）', '/game/debug?as=master&pending=saturn-nomatch'],
+  ['等待梦主应答（土星·律令，盗梦者视角）', '/game/debug?pending=saturn'],
   ['抽牌阶段（黑洞·吞噬）', '/game/debug?skill=black-hole-draw'],
   ['金库三选一（回音萦绕）', '/game/debug?as=master&vault=echo'],
 ] as const;

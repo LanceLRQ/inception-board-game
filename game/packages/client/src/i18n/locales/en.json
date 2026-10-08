@@ -269,6 +269,7 @@
       "network": "Network unstable, action not delivered"
     },
     "waiting_others": "Waiting for other players to respond",
+    "waiting_master": "Waiting for the Dream Master to respond",
     "waiting_auto": "This step can't be handled right now, please wait",
     "deadline": "{{seconds}}s left",
     "connecting": "Connecting",
@@ -896,6 +897,13 @@
       "take": "Take 1 from the discard pile…",
       "pass": "Decline"
     },
+    "saturn": {
+      "title": "Saturn · Decree",
+      "body": "{{name}} played [{{card}}]. Before it resolves, you may discard 1 card of the same name to cancel it and draw 1 card from the top of the deck.",
+      "counter": "Discard a same-name card to cancel…",
+      "pass": "Don't cancel",
+      "noMatch": "You have no card with the same name in hand, so you can only let it resolve."
+    },
     "sheet": {
       "back": "Back",
       "zealotDiscard": {
@@ -956,6 +964,11 @@
         "title": "Take 1 card from the discard pile",
         "desc": "The chosen card goes into your hand first, then {{name}}'s [{{card}}] resolves.",
         "confirm": "Take card"
+      },
+      "saturnPick": {
+        "title": "Choose the same-name card to discard",
+        "desc": "Discard the chosen card to cancel {{name}}'s [{{card}}] (it is voided and does not resolve), then draw 1 card from the top of the deck.",
+        "confirm": "Cancel it"
       }
     }
   },

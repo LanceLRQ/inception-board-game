@@ -20,7 +20,9 @@ export function AwaitingNotice({ awaiting, hasResponseUi, className }: AwaitingN
         ? t('match.waiting_auto', {
             defaultValue: '这一步暂时无法操作，请稍候',
           })
-        : t('match.waiting_others', { defaultValue: '等待其他玩家应答' })}
+        : awaiting.master
+          ? t('match.waiting_master', { defaultValue: '等待梦主应答' })
+          : t('match.waiting_others', { defaultValue: '等待其他玩家应答' })}
     </div>
   );
 }

@@ -9,6 +9,7 @@
 // 因此同一份引擎行为下，轨迹逐字节相同；引擎行为变了，轨迹就会分叉。
 
 import { createHash } from 'node:crypto';
+import { isSameNameCard } from '@icgame/shared';
 import { InceptionCityGame } from '../game.js';
 import type { SetupState } from '../setup.js';
 import {
@@ -95,6 +96,7 @@ const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
   respondShootPass: [],
   respondTerroristDiscard: ['cardId'],
   respondAthenaWit: ['cardId'],
+  respondSaturnDecree: ['cardId'],
   respondTerroristAccept: [],
   respondVirgoPerfect: ['choice', 'params'],
   playGaiaShift: ['gaiaDirection'],
@@ -287,6 +289,12 @@ function guessArg(name: string, G: SetupState, actor: string, rnd: Seq): unknown
   if (n === 'cardid' && G.pendingAthenaWit?.athenaID === actor) {
     return rnd() < 0.3 ? null : pick(rnd, G.deck.discardPile);
   }
+  // 土星·律令的应答：手里有同名牌时多数情况弃一张抵消，其余放过；没有同名牌只能放过
+  const decree = G.pendingSaturnDecree;
+  if (n === 'cardid' && decree?.masterID === actor) {
+    const same = hand.filter((h) => isSameNameCard(h, decree.cardId));
+    return same.length === 0 || rnd() < 0.4 ? null : pick(rnd, same);
+  }
   // 达尔文·淘汰的选牌：从抽牌后的手牌里挑刚好 2 张
   if (n === 'returncards' && G.pendingDarwinReturn?.playerID === actor) return sample(rnd, hand, 2);
   if (n === 'cardstoreturn' && rnd() < 0.7) return sample(rnd, hand, 2);
@@ -455,6 +463,7 @@ const NOISE_EXCLUDED: ReadonlySet<string> = new Set([
   'respondBlackHoleLevy',
   'respondDarwinReturn',
   'respondAthenaWit',
+  'respondSaturnDecree',
 ]);
 
 /**
@@ -503,6 +512,8 @@ export interface GoldenStepRecord {
   stateHash: string | null;
   /** 到这一步为止的滚动哈希 */
   rolling: string;
+  /** 这一步发出的实参（没有请求时为空数组），供排查与统计用，不进哈希之外的任何基线 */
+  args: readonly unknown[];
 }
 
 export type GoldenEnd = 'gameover' | 'stalled' | 'step_limit';
@@ -595,7 +606,16 @@ export function runGoldenMatch(config: GoldenMatchConfig): GoldenResult {
     );
     steps++;
     if (steps % checkpointEvery === 0) checkpoints.push(rolling.slice(0, 16));
-    onStep?.({ index: steps, seat, move, accepted: ok, reason, stateHash, rolling });
+    onStep?.({
+      index: steps,
+      seat,
+      move,
+      accepted: ok,
+      reason,
+      stateHash,
+      rolling,
+      args: req?.args ?? [],
+    });
   };
 
   const attempt = (req: MoveRequest): void => {

@@ -11,6 +11,7 @@ import {
   incrementMoveCounter,
   discardCard,
   discardCards,
+  recordCardPlayed,
   setLayerHeartLock,
   setTurnPhase,
   FORTRESS_COLDNESS_CHANCES_KEY,
@@ -19,7 +20,7 @@ import {
 import { killPlayer, sendToLimbo, SAGITTARIUS_KILLS_THIS_TURN_KEY } from './death.js';
 import { resolveShootCustom } from '../dice.js';
 import { flipCharacter, isCharacterFace } from './abilities/dual-faced.js';
-import type { CardID, Layer } from '@icgame/shared';
+import { isSameNameCard, type CardID, type Layer } from '@icgame/shared';
 
 // === 技能使用前检查 ===
 
@@ -2181,28 +2182,46 @@ export function shouldJupiterThunderKill(
   return finalRoll < shooterLayer;
 }
 
-// === 土星·领地 · 律令（纯函数） ===
-// 技能 律令：弃 1 手牌抵消 1 张同名牌效果，并从牌库顶抽 1
+// === 土星·领地 · 律令 ===
+// 技能 律令：弃 1 手牌抵消 1 张同名牌效果，并从牌库顶抽 1。接入对局的应答流程见 engine/saturnDecree.ts
 // 世界观 领地：拥有贿赂的盗梦者，自己回合出牌阶段可不用行动牌移动 1 次到相邻层
-// 集成留后续（需 pending state + UI）；本批仅纯函数
-// 对照：docs/manual/06-dream-master.md 土星·领地
+// 对照：docs/manual/06-dream-master.md:168-173 土星·领地
 
 export const SATURN_DECREE_SKILL_ID = 'dm_saturn_territory.skill_0';
 
-/** 律令：弃 1 张手牌（抵消同名后）+ 抽 1 */
+/**
+ * 律令：梦主弃 1 张手牌抵消 1 张同名牌（纯函数）。
+ * 顺序按「先抵消同名牌效果，然后再抽牌」：梦主弃牌（弃出的是时间风暴则按从手牌弃掉的规则触发）→
+ * 被抵消的牌作废进弃牌堆（效果不结算，但算本回合打出过）→ 梦主从牌库顶抽 1 张（牌库空了就抽不到）。
+ * 不满足条件（梦主不是存活的土星、手牌里没有这张牌、弃的牌与被抵消的牌不同名、被抵消的牌不在出牌者手里）返回 null。
+ * 对照：docs/manual/06-dream-master.md:168-173 土星·领地；docs/manual/04-action-cards.md:165 同名牌
+ */
 export function applySaturnDecree(
   state: SetupState,
   masterID: string,
   discardCardId: CardID,
+  countered: { userID: string; cardId: CardID },
 ): SetupState | null {
   const master = state.players[masterID];
   if (!master || master.characterId !== 'dm_saturn_territory') return null;
   if (!master.isAlive) return null;
   if (!master.hand.includes(discardCardId)) return null;
+  if (!isSameNameCard(discardCardId, countered.cardId)) return null;
+  const user = state.players[countered.userID];
+  const at = user?.hand.indexOf(countered.cardId) ?? -1;
+  if (!user || at === -1) return null;
 
   let s = discardCard(state, masterID, discardCardId);
-  s = drawCards(s, masterID, 1);
-  return s;
+  // 被抵消的牌离开出牌者的手牌，进弃牌堆；不走「从手牌弃掉」（它是被打出后作废，不是被弃掉）
+  const hand = [...user.hand];
+  hand.splice(at, 1);
+  s = {
+    ...s,
+    players: { ...s.players, [countered.userID]: { ...user, hand } },
+    deck: { ...s.deck, discardPile: [...s.deck.discardPile, countered.cardId] },
+  };
+  s = recordCardPlayed(s, countered.cardId);
+  return drawCards(s, masterID, 1);
 }
 
 /** 土星领地世界观：盗梦者持有贿赂时获得 1 次免费移动（消耗后置 false） */

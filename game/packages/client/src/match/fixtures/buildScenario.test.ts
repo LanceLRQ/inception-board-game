@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame, checkInvariants, viewMatch, type MatchView } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { HAND_LIMIT } from '@icgame/game-engine/config';
+import { awaitingNotice } from '../../components/MatchRuntime/awaitingNotice';
 import { computeUnlockResponseState } from '../../components/UnlockResponse/logic';
 import {
   awaitedActions,
@@ -467,6 +468,54 @@ describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () =
       cardId: 'action_kick',
     });
     expect(awaitedResponse(seen, other)).toEqual({ mine: false });
+  });
+
+  it('土星·律令（有同名牌）：梦主本人手里有 KICK，窗口由盗梦者真的打出 KICK 打开；别人看到的视图里没有手牌', () => {
+    const a = mineOf('master-pending-saturn');
+    expect(a.kind).toBe('saturn');
+    const { state, viewer } = buildFixtureMatch('master-pending-saturn');
+    const decree = state.G.pendingSaturnDecree!;
+    expect(decree).toMatchObject({ masterID: viewer, move: 'playKick', cardId: 'action_kick' });
+    expect(state.G.players[viewer]!.characterId).toBe('dm_saturn_territory');
+    // 该牌还没有结算：仍在出牌者手里
+    expect(state.G.players[decree.userID]!.hand).toContain('action_kick');
+    if (a.kind !== 'saturn') return;
+    expect(a.userID).toBe(decree.userID);
+    expect(a.matches.length).toBeGreaterThan(0);
+    expect(awaitedActions(a).map((x) => [x.id, x.disabled])).toEqual([
+      ['counter', false],
+      ['pass', false],
+    ]);
+    const other = state.G.playerOrder.find((id) => id !== viewer && id !== decree.userID)!;
+    const seen = viewFrom('master-pending-saturn', other);
+    expect(seen.pendingSaturnDecree).toEqual({
+      masterID: viewer,
+      userID: decree.userID,
+      cardId: 'action_kick',
+    });
+    expect(seen.players[viewer]!.hand).toBeNull();
+    expect(awaitedResponse(seen, other)).toEqual({ mine: false });
+  });
+
+  it('土星·律令（盗梦者视角）：同一局面，旁观的盗梦者没有应答界面，只看到在等梦主', () => {
+    const sc = buildFixtureScenario('thief-pending-saturn');
+    const G = sc.view.G as MatchView;
+    expect(G.pendingSaturnDecree).toMatchObject({
+      masterID: G.dreamMasterID,
+      cardId: 'action_kick',
+    });
+    expect(G.players[G.dreamMasterID]!.characterId).toBe('dm_saturn_territory');
+    expect(awaitedResponse(G, sc.seat)).toEqual({ mine: false });
+    expect(awaitingNotice(G, sc.seat)).toEqual({ mine: false, master: true });
+  });
+
+  it('土星·律令（没有同名牌）：窗口照样出现，只能不抵消', () => {
+    const a = mineOf('master-pending-saturn-nomatch');
+    expect(a.kind === 'saturn' && a.matches).toEqual([]);
+    expect(awaitedActions(a).map((x) => [x.id, x.disabled])).toEqual([
+      ['counter', true],
+      ['pass', false],
+    ]);
   });
 
   it('skill-black-hole-draw：抽牌阶段的黑洞，同层有人有手牌，「吞噬」入口可用', () => {

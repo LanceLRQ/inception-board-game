@@ -155,6 +155,7 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     pendingBlackHoleLevy: null,
     pendingDarwinReturn: null,
     pendingAthenaWit: null,
+    pendingSaturnDecree: null,
     winner: null,
     winReason: null,
     endTurn: null,

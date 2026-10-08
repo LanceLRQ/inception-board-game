@@ -149,6 +149,10 @@ export function useAwaitedResponse({
         update((prev) => ({
           draft: { ...prev.draft, athenaCard: prev.draft.athenaCard === card ? null : card },
         })),
+      pickSaturn: (index) =>
+        update((prev) => ({
+          draft: { ...prev.draft, saturnIndex: prev.draft.saturnIndex === index ? null : index },
+        })),
     },
   };
 }

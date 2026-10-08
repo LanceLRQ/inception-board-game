@@ -118,6 +118,14 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('pending=athena')).toBe('thief-pending-athena');
   });
 
+  it('as=master&pending=saturn|saturn-nomatch：梦主等待应答律令（有 / 没有同名牌）', () => {
+    expect(idOf('as=master&pending=saturn')).toBe('master-pending-saturn');
+    expect(idOf('as=master&pending=saturn-nomatch')).toBe('master-pending-saturn-nomatch');
+    // 角色走查参数不盖过它；不带 as=master 是同一局面的盗梦者视角（旁观者）
+    expect(idOf('as=master&pending=saturn&skill=venus')).toBe('master-pending-saturn');
+    expect(idOf('pending=saturn')).toBe('thief-pending-saturn');
+  });
+
   it('skill=black-hole-draw 进入抽牌阶段的黑洞场景', () => {
     expect(idOf('skill=black-hole-draw')).toBe('skill-black-hole-draw');
     expect(idOf('skill=black-hole-draw&pending=levy')).toBe('thief-pending-levy');

@@ -37,6 +37,12 @@ export const LAYER_COUNT = 4; // 1-4
 // 响应窗口超时（秒）
 export const RESPONSE_WINDOW_TIMEOUT = 30;
 
+/**
+ * 响应窗口超时（毫秒）：【解封】响应窗口的时限，土星·律令的应答窗口也用这一档。
+ * 比 45 秒的阻塞型待结算短：律令窗口在土星局里每张牌都要等一次，时限不能太长。
+ */
+export const RESPONSE_WINDOW_TIMEOUT_MS = RESPONSE_WINDOW_TIMEOUT * 1000;
+
 // 断线分级（秒）
 export const DISCONNECT_SILENT = 10;
 export const DISCONNECT_OFFLINE = 60;

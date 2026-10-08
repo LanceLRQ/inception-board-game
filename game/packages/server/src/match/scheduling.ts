@@ -4,7 +4,7 @@
 
 import type { SetupState } from '@icgame/game-engine/setup';
 import type { MatchState } from '@icgame/game-engine/runner';
-import { listAwaiting } from '@icgame/game-engine';
+import { RESPONSE_WINDOW_TIMEOUT_MS, listAwaiting } from '@icgame/game-engine';
 import { nextAutoAction, type AutoAction } from '@icgame/bot';
 
 export interface TimingConfig {
@@ -35,10 +35,16 @@ function hasBlockingPending(G: SetupState): boolean {
   return listAwaiting(G).some((item) => item.blocking && item.field !== 'pendingResponseWindow');
 }
 
-/** 截止时长：响应窗口用窗口自己的，其次待结算事项，否则回合主人的正常行动 */
+/**
+ * 截止时长：响应窗口用窗口自己的，土星·律令的应答窗口用与解封响应窗口同一档（受同一个上限约束；
+ * 土星局里每张牌都要等一次，不能用 45 秒的待结算时限），其次待结算事项，否则回合主人的正常行动
+ */
 function deadlineMs(state: MatchState<SetupState>, timing: TimingConfig): number {
   const window = state.G.pendingResponseWindow;
   if (window) return Math.min(window.timeoutMs, timing.responseTimeoutCapMs ?? Infinity);
+  if (state.G.pendingSaturnDecree) {
+    return Math.min(RESPONSE_WINDOW_TIMEOUT_MS, timing.responseTimeoutCapMs ?? Infinity);
+  }
   if (hasBlockingPending(state.G)) return timing.pendingTimeoutMs;
   return timing.turnTimeoutMs;
 }

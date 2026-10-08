@@ -1,17 +1,20 @@
 // 轮到本人应答的待决情形：从按座位裁剪的视图推导「现在要应答什么、有哪些合法选项、点下去发哪个 move」。
 //
-// 覆盖九种需要本人做选择的待决状态：
+// 覆盖十种需要本人做选择的待决状态：
 //   被 SHOOT 时的响应（双鱼·游离 / 恐怖分子·狂热）、天秤·平衡（分牌 / 挑一份）、
 //   意念判官·定罪（二选一骰值）、处女·完美（三选一）、白羊·星尘（发动或弃掉梦魇）、
-//   黑洞·吞噬（同层有手牌的人各交 1 张）、达尔文·淘汰（选 2 张放回牌库顶）、雅典娜·急智（从弃牌堆选 1 张或放弃）。
+//   黑洞·吞噬（同层有手牌的人各交 1 张）、达尔文·淘汰（选 2 张放回牌库顶）、雅典娜·急智（从弃牌堆选 1 张或放弃）、
+//   土星·律令（别人打出行动牌后，梦主弃 1 张同名手牌抵消它，或不抵消）。
 // 只读视图里对本人可见的字段；点名对本人不可见（视图里为 null）时一律视为不是本人。
 // 引擎不支持的选项不给：可复活的目标、可传送的层、双鱼能否闪避等都按引擎守卫的同一口径推导。
 //
 // 对照：docs/manual/05-dream-thieves.md 双鱼（52-60 行）、白羊（62-70 行）、处女（100-111 行）、
 //       天秤（113-120 行）、黑洞（150-158 行）、雅典娜（160-170 行）、恐怖分子（239-248 行）、意念判官（258-265 行）；
+//       docs/manual/06-dream-master.md:168-173 土星·领地；同名牌见 docs/manual/04-action-cards.md:165；
 //       梦魇效果见 docs/manual/07-nightmare-cards.md；达尔文是扩展角色，说明书没有收录，以卡面「淘汰」为准
 
 import type { MatchView } from '@icgame/game-engine';
+import { isSameNameCard, type CardID } from '@icgame/shared';
 import { handCardsAt, validHandPicks } from '../../../lib/handPick';
 import { nightmareParamKind, plagueCandidates } from '../../../lib/nightmareParams';
 
@@ -25,7 +28,8 @@ export type AwaitedKind =
   | 'aries'
   | 'levy'
   | 'darwin'
-  | 'athena';
+  | 'athena'
+  | 'saturn';
 
 /** SHOOT 一次结算的结果 */
 export type ShootResult = 'kill' | 'move' | 'miss';
@@ -144,6 +148,22 @@ export interface AthenaAwaited {
   readonly discard: readonly string[];
 }
 
+/**
+ * 土星·律令：别人打出了一张行动牌，结算前梦主可以弃 1 张同名手牌抵消它（并抽 1 张牌），也可以不抵消。
+ * 窗口不论梦主手里有没有同名牌都会出现（窗口的有无不泄露手牌）；没有同名牌时只能不抵消。
+ */
+export interface SaturnAwaited {
+  readonly mine: true;
+  readonly kind: 'saturn';
+  readonly userID: string;
+  /** 对方打出的牌 */
+  readonly cardId: string;
+  /** 本人手牌 */
+  readonly hand: readonly string[];
+  /** 手牌里与被打出的牌同名的位置（同名牌各算一张）；为空时只能不抵消 */
+  readonly matches: readonly number[];
+}
+
 export type MineAwaited =
   | ShootEvadeAwaited
   | ShootZealotAwaited
@@ -154,7 +174,8 @@ export type MineAwaited =
   | AriesAwaited
   | LevyAwaited
   | DarwinAwaited
-  | AthenaAwaited;
+  | AthenaAwaited
+  | SaturnAwaited;
 
 /** 别人在应答：本人只需要等 */
 export interface OtherAwaited {
@@ -304,6 +325,26 @@ export function awaitedResponse(view: MatchView, seat: string | null): AwaitedRe
     };
   }
 
+  // 土星·律令：梦主是谁本来就公开，被问的就是梦主
+  const saturn = view.pendingSaturnDecree;
+  if (saturn) {
+    if (seat === null || saturn.masterID !== seat) return other;
+    const hand = handOf(view, seat);
+    if (hand === null) return other;
+    const matches: number[] = [];
+    hand.forEach((card, i) => {
+      if (isSameNameCard(card as CardID, saturn.cardId)) matches.push(i);
+    });
+    return {
+      mine: true,
+      kind: 'saturn',
+      userID: saturn.userID,
+      cardId: saturn.cardId,
+      hand,
+      matches,
+    };
+  }
+
   const darwin = view.pendingDarwinReturn;
   if (darwin) {
     if (seat === null || darwin.playerID !== seat) return other;
@@ -347,7 +388,8 @@ export type AwaitedSheet =
   | 'aries-plague'
   | 'levy-give'
   | 'darwin-return'
-  | 'athena-pick';
+  | 'athena-pick'
+  | 'saturn-pick';
 
 /** 点击一个操作按钮的效果：直接发 move，或打开弹窗 */
 export type AwaitedEffect =
@@ -528,6 +570,26 @@ export function awaitedActions(awaited: MineAwaited): AwaitedAction[] {
           effect: move('respondAthenaWit', null),
         },
       ];
+    case 'saturn':
+      return [
+        {
+          id: 'counter',
+          labelKey: 'awaited.saturn.counter',
+          tone: 'primary',
+          // 没有同名牌时只能不抵消
+          disabled: awaited.matches.length === 0,
+          decline: false,
+          effect: sheet('saturn-pick'),
+        },
+        {
+          id: 'pass',
+          labelKey: 'awaited.saturn.pass',
+          tone: 'plain',
+          disabled: false,
+          decline: true,
+          effect: move('respondSaturnDecree', null),
+        },
+      ];
     case 'aries': {
       const activateSheet: AwaitedSheet | null =
         awaited.params === 'echo'
@@ -582,6 +644,8 @@ export interface AwaitedDraft {
   readonly returnPicks: readonly number[];
   /** 雅典娜·急智：选中的弃牌堆里的牌 */
   readonly athenaCard: string | null;
+  /** 土星·律令：选中的同名手牌位置 */
+  readonly saturnIndex: number | null;
 }
 
 export const EMPTY_DRAFT: AwaitedDraft = {
@@ -595,6 +659,7 @@ export const EMPTY_DRAFT: AwaitedDraft = {
   giveIndex: null,
   returnPicks: [],
   athenaCard: null,
+  saturnIndex: null,
 };
 
 /** 切换一个位置是否在列表里（保持升序、不重复） */
@@ -693,6 +758,12 @@ export function sheetCommand(
       if (!awaited.discard.includes(draft.athenaCard)) return null;
       return { move: 'respondAthenaWit', args: [draft.athenaCard] };
     }
+    case 'saturn-pick': {
+      if (awaited.kind !== 'saturn' || draft.saturnIndex === null) return null;
+      if (!awaited.matches.includes(draft.saturnIndex)) return null;
+      const card = awaited.hand[draft.saturnIndex];
+      return card === undefined ? null : { move: 'respondSaturnDecree', args: [card] };
+    }
     case 'libra-pick':
       return null;
   }
@@ -726,6 +797,8 @@ export function awaitedKey(awaited: MineAwaited | null, turnNumber: number): str
       return `${awaited.kind}|${turnNumber}|${awaited.hand.join(',')}`;
     case 'athena':
       return `${awaited.kind}|${turnNumber}|${awaited.userID}|${awaited.cardId}`;
+    case 'saturn':
+      return `${awaited.kind}|${turnNumber}|${awaited.userID}|${awaited.cardId}|${awaited.hand.join(',')}`;
   }
 }
 

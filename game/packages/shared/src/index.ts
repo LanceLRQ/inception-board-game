@@ -70,6 +70,9 @@ export {
   CARD_COPY_COUNT,
 } from './cards/generated/cards.js';
 
+// 同名牌判定（土星·律令据此判断手牌能否抵消被打出的牌）
+export { isSameNameCard } from './cards/sameName.js';
+
 // 聊天预设短语
 export {
   CHAT_BUBBLE_VISIBLE_MS,

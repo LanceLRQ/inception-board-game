@@ -236,9 +236,11 @@ export interface ResponseSheetModel {
   readonly toggleReturn: (index: number) => void;
   /** 雅典娜·急智：选弃牌堆里的一张牌（再点同一张取消） */
   readonly pickAthenaCard: (card: string) => void;
+  /** 土星·律令：选一张同名手牌（按手牌位置；再点同一张取消） */
+  readonly pickSaturn: (index: number) => void;
 }
 
-/** 被 SHOOT 时的响应、天秤、意念判官、处女、白羊、黑洞·吞噬、达尔文·淘汰、雅典娜·急智：轮到本人时的操作界面 */
+/** 被 SHOOT 时的响应、天秤、意念判官、处女、白羊、黑洞·吞噬、达尔文·淘汰、雅典娜·急智、土星·律令：轮到本人时的操作界面 */
 export interface ResponseModel {
   /** 轮到本人应答的情形；没有待决状态或轮到别人为 null */
   readonly awaited: MineAwaited | null;

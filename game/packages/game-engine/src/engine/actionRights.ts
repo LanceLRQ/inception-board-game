@@ -153,6 +153,13 @@ const RIGHTS_RULES: readonly RightsRule[] = [
     actors: (G) => (G.pendingAthenaWit ? [G.pendingAthenaWit.athenaID] : null),
   },
   {
+    // 土星·律令：行动牌打出后、结算之前，由梦主弃同名牌抵消或放过
+    field: 'pendingSaturnDecree',
+    blocking: true,
+    moves: ['respondSaturnDecree'],
+    actors: (G) => (G.pendingSaturnDecree ? [G.pendingSaturnDecree.masterID] : null),
+  },
+  {
     // 达尔文·淘汰：只有达尔文本人选放回的牌
     field: 'pendingDarwinReturn',
     blocking: true,

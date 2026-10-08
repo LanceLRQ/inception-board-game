@@ -1796,42 +1796,50 @@ describe('火星·战场世界观交换', () => {
 });
 
 describe('土星·领地律令', () => {
-  it('非土星梦主 → null', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_harbor');
+  const countered = { userID: 'p1', cardId: 'action_unlock' as CardID };
+
+  /** 梦主手牌 [UNLOCK]，p1 手里有被打出的 UNLOCK，牌库顶是 SHOOT */
+  function decreeScene(character: string): { s: SetupState; mid: string } {
+    let s = setMasterCharacter(scenarioStartOfGame3p(), character as CardID);
     const mid = findMasterID(s)!;
     s = setHand(s, mid, ['action_unlock' as CardID]);
-    s = { ...s, deck: { cards: ['a' as CardID], discardPile: [] } };
-    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
-    expect(r).toBeNull();
+    s = setHand(s, 'p1', ['action_unlock' as CardID]);
+    s = { ...s, deck: { cards: ['action_shoot' as CardID], discardPile: [] } };
+    return { s, mid };
+  }
+
+  it('非土星梦主 → null', () => {
+    const { s, mid } = decreeScene('dm_harbor');
+    expect(applySaturnDecree(s, mid, 'action_unlock' as CardID, countered)).toBeNull();
   });
 
   it('土星 + 手牌有指定弃牌 → 弃 1 抽 1', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    const mid = findMasterID(s)!;
-    s = setHand(s, mid, ['action_unlock' as CardID]);
-    s = { ...s, deck: { cards: ['action_shoot' as CardID], discardPile: [] } };
-    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
+    const { s, mid } = decreeScene('dm_saturn_territory');
+    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID, countered);
     expect(r).not.toBeNull();
-    // 弃 unlock + 抽 shoot
+    // 弃 unlock + 抽 shoot；被抵消的 unlock 也进弃牌堆
     expect(r!.players[mid]!.hand).toEqual(['action_shoot']);
-    expect(r!.deck.discardPile).toEqual(['action_unlock']);
+    expect(r!.deck.discardPile).toEqual(['action_unlock', 'action_unlock']);
   });
 
   it('土星 + 手牌无指定弃牌 → null', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    const mid = findMasterID(s)!;
-    s = setHand(s, mid, ['action_shoot' as CardID]);
-    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
+    const { s, mid } = decreeScene('dm_saturn_territory');
+    const r = applySaturnDecree(
+      setHand(s, mid, ['action_shoot' as CardID]),
+      mid,
+      'action_unlock' as CardID,
+      countered,
+    );
     expect(r).toBeNull();
   });
 
   it('土星梦主 + 死亡 → null', () => {
-    let s = setMasterCharacter(scenarioStartOfGame3p(), 'dm_saturn_territory');
-    const mid = findMasterID(s)!;
-    s = setHand(s, mid, ['action_unlock' as CardID]);
-    s = { ...s, players: { ...s.players, [mid]: { ...s.players[mid]!, isAlive: false } } };
-    const r = applySaturnDecree(s, mid, 'action_unlock' as CardID);
-    expect(r).toBeNull();
+    const { s, mid } = decreeScene('dm_saturn_territory');
+    const dead = {
+      ...s,
+      players: { ...s.players, [mid]: { ...s.players[mid]!, isAlive: false, deathTurn: 1 } },
+    };
+    expect(applySaturnDecree(dead, mid, 'action_unlock' as CardID, countered)).toBeNull();
   });
 });
 

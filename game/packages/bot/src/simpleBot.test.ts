@@ -89,6 +89,10 @@ describe('SimpleBot L0', () => {
       const choice = bot.play(null, ['endActionPhase', 'respondAthenaWit']);
       expect(choice).toBe('endActionPhase');
     });
+    // 土星·律令
+    it('endActionPhase 优先于 respondSaturnDecree', () => {
+      expect(bot.play(null, ['endActionPhase', 'respondSaturnDecree'])).toBe('endActionPhase');
+    });
     // 黑洞·吞噬 / 达尔文·淘汰
     it('endActionPhase 优先于 respondBlackHoleLevy / respondDarwinReturn', () => {
       expect(bot.play(null, ['endActionPhase', 'respondBlackHoleLevy'])).toBe('endActionPhase');

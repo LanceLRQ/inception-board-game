@@ -3,6 +3,7 @@
 // 做法：从 move 函数源码里读出形参名，按名字猜参数类型；再在运行器上逐个试跑，
 //       留下被接受的候选。试跑用独立的随机源，不影响正式对局的随机序列。
 
+import { isSameNameCard } from '@icgame/shared';
 import type { SetupState } from '../setup.js';
 import { listAwaiting, OFF_TURN_MOVES } from '../engine/actionRights.js';
 import { applyMove, type GameDef, type MatchState, type RandomSource } from './matchRunner.js';
@@ -140,6 +141,12 @@ function fuzzArg(name: string, G: SetupState, actor: string, rnd: () => number):
   // 雅典娜·急智的应答：从弃牌堆里选一张，或放弃
   if (n === 'cardid' && G.pendingAthenaWit?.athenaID === actor) {
     return rnd() < 0.3 ? null : pick(rnd, G.deck.discardPile);
+  }
+  // 土星·律令的应答：有同名牌时多数情况弃一张抵消，其余放过
+  const decree = G.pendingSaturnDecree;
+  if (n === 'cardid' && decree?.masterID === actor) {
+    const same = hand.filter((h) => isSameNameCard(h, decree.cardId));
+    return same.length === 0 || rnd() < 0.4 ? null : pick(rnd, same);
   }
   // 达尔文·淘汰的选牌：从抽牌后的手牌里选刚好 2 张
   if (n === 'returncards' && G.pendingDarwinReturn?.playerID === actor) {

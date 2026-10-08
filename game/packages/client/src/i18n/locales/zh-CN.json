@@ -269,6 +269,7 @@
       "network": "网络不稳，操作未送达"
     },
     "waiting_others": "等待其他玩家应答",
+    "waiting_master": "等待梦主应答",
     "waiting_auto": "这一步暂时无法操作，请稍候",
     "deadline": "剩余 {{seconds}} 秒",
     "connecting": "正在连接",
@@ -896,6 +897,13 @@
       "take": "从弃牌堆选 1 张…",
       "pass": "不发动"
     },
+    "saturn": {
+      "title": "土星 · 律令",
+      "body": "{{name}} 打出了【{{card}}】。该牌结算前，你可以弃 1 张同名手牌抵消它，并从牌库顶抽 1 张牌。",
+      "counter": "弃同名牌抵消…",
+      "pass": "不抵消",
+      "noMatch": "你的手牌里没有与之同名的牌，只能不抵消。"
+    },
     "sheet": {
       "back": "返回",
       "zealotDiscard": {
@@ -956,6 +964,11 @@
         "title": "从弃牌堆选取 1 张牌",
         "desc": "选中的牌先收入手牌，再结算 {{name}} 的【{{card}}】。",
         "confirm": "确认选取"
+      },
+      "saturnPick": {
+        "title": "选择弃掉的同名牌",
+        "desc": "弃掉选中的牌，抵消 {{name}} 的【{{card}}】（该牌作废、不结算），然后你从牌库顶抽 1 张牌。",
+        "confirm": "确认抵消"
       }
     }
   },

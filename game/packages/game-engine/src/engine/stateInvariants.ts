@@ -460,6 +460,13 @@ function checkPending(c: Collector, G: Rec): void {
     c.card('pendingAthenaWit.move', o.move);
     if (!Array.isArray(o.args)) c.add('pendingAthenaWit.args', '必须是数组');
   });
+  c.optional('pendingSaturnDecree', G.pendingSaturnDecree, (o) => {
+    c.player('pendingSaturnDecree.masterID', o.masterID);
+    c.player('pendingSaturnDecree.userID', o.userID);
+    c.card('pendingSaturnDecree.cardId', o.cardId);
+    c.card('pendingSaturnDecree.move', o.move);
+    if (!Array.isArray(o.args)) c.add('pendingSaturnDecree.args', '必须是数组');
+  });
 }
 
 function checkExtraOnMove(c: Collector, path: string, value: unknown): void {

@@ -1,5 +1,5 @@
 // 应答弹窗：需要选牌、分牌、选层的应答（狂热弃牌、天秤分牌 / 挑一份、处女复活 / 传送、白羊·回音萦绕、
-// 黑洞·吞噬交牌、达尔文·淘汰放回牌库顶、雅典娜·急智选弃牌堆里的牌）。
+// 黑洞·吞噬交牌、达尔文·淘汰放回牌库顶、雅典娜·急智选弃牌堆里的牌、土星·律令选同名手牌抵消）。
 // 窗口 / 响应条上的按钮打开它；选择只存在控制层的草稿里，确认后才发 move。样式钩子类名：ms-btn。
 
 import type { ReactNode } from 'react';
@@ -315,6 +315,27 @@ export function AwaitedResponseSheet({ controller }: AwaitedResponseSheetProps) 
           >
             {getCardName(card)}
             {count > 1 && <span className="font-mono text-[11px]">×{count}</span>}
+          </Choice>
+        ))}
+      </div>
+    );
+  } else if (awaited !== null && mode === 'saturn-pick' && awaited.kind === 'saturn') {
+    title = t('awaited.sheet.saturnPick.title');
+    description = t('awaited.sheet.saturnPick.desc', {
+      name: controller.nicknameOf(awaited.userID),
+      card: getCardName(awaited.cardId),
+    });
+    confirmLabel = t('awaited.sheet.saturnPick.confirm');
+    body = (
+      <div className="flex flex-wrap gap-2" data-testid="awaited-sheet-hand">
+        {awaited.matches.map((i) => (
+          <Choice
+            key={`saturn-${i}-${awaited.hand[i]}`}
+            selected={draft.saturnIndex === i}
+            onPress={() => sheet.pickSaturn(i)}
+            testId={`awaited-card-${i}`}
+          >
+            {getCardName(awaited.hand[i]!)}
           </Choice>
         ))}
       </div>

@@ -1303,4 +1303,76 @@ describe('MatchRoom 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智的截
     expect(after.pendingAthenaWit ?? null).toBeNull();
     expect(after.deck.discardPile).toContain(KICK);
   });
+
+  /** 梦主是土星、手里有一张 KICK；回合主人打出 KICK，挂起梦主的律令应答 */
+  function saturnWindow(masterHand: string[] = [KICK]) {
+    const { state, owner } = thiefTurn((o) => ({ [o]: { hand: [KICK] as never } }));
+    const master = state.G.dreamMasterID;
+    const target = state.G.playerOrder.find((id) => id !== owner && id !== master)!;
+    let s: MatchState<SetupState> = {
+      ...state,
+      G: {
+        ...state.G,
+        turnPhase: 'action',
+        players: {
+          ...state.G.players,
+          [master]: {
+            ...state.G.players[master]!,
+            characterId: 'dm_saturn_territory' as never,
+            hand: masterHand as never,
+          },
+        },
+      },
+    };
+    s = must(s, owner, 'playKick', [KICK, target]);
+    expect(s.G.pendingSaturnDecree).toMatchObject({ masterID: master, userID: owner });
+    return { s, owner, master };
+  }
+
+  it('土星·律令：真人梦主超时视为放过（响应窗口同一档的时限），被挂起的出牌随后照常结算', async () => {
+    const { s } = saturnWindow();
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, s);
+    h.room.start();
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + 30_000);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+    const after = h.room.current().G;
+    expect(after.pendingSaturnDecree ?? null).toBeNull();
+    expect(after.deck.discardPile).toContain(KICK);
+    expect(after.playedCardsThisTurn).toEqual([KICK]);
+  });
+
+  it('土星·律令：梦主是 Bot 座位，短延迟内放过，不等待时限', async () => {
+    const { s, owner } = saturnWindow();
+    const h = makeHarness(5, [owner], {}, s);
+    h.room.start();
+    expect(h.timers.pending()[0]!.at).toBe(h.timers.now() + timing.botStepDelayMs);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('bot');
+    expect(h.room.current().G.pendingSaturnDecree ?? null).toBeNull();
+  });
+
+  it('土星·律令：真人梦主在时限内弃同名牌抵消，出牌作废；其他座位的应答被拒', async () => {
+    const { s, owner, master } = saturnWindow();
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, s);
+    h.room.start();
+    const other = await h.room.submit(owner, {
+      move: 'respondSaturnDecree',
+      args: [KICK],
+      intentId: 'o',
+    });
+    expect(other.ok).toBe(false);
+    const ok = await h.room.submit(master, {
+      move: 'respondSaturnDecree',
+      args: [KICK],
+      intentId: 'm',
+    });
+    expect(ok.ok).toBe(true);
+    const after = h.room.current().G;
+    expect(after.pendingSaturnDecree ?? null).toBeNull();
+    expect(after.players[master]!.hand).not.toContain(KICK);
+    expect(after.deck.discardPile.filter((c) => c === KICK)).toHaveLength(2);
+  });
 });

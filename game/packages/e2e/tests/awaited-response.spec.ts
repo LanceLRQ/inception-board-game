@@ -313,6 +313,52 @@ test.describe('固定场景 · 应答窗口', () => {
     expect(typeof move.args[0]).toBe('string');
   });
 
+  test('土星·律令（有同名牌）：不抵消直接发 null；抵消要在弹窗里选一张同名手牌再确认', async ({
+    page,
+  }) => {
+    const sent = await openScene(page, '/game/debug?as=master&pending=saturn');
+    await expect(panelOf(page)).toHaveAttribute('data-kind', 'saturn', { timeout: 10_000 });
+    await expect(panelOf(page)).toContainText('律令');
+    await expect(action(page, 'counter')).toBeEnabled();
+    await expect(action(page, 'pass')).toBeEnabled();
+
+    await action(page, 'pass').click();
+    expect(await lastMove(sent, 1)).toEqual({ move: 'respondSaturnDecree', args: [null] });
+
+    await action(page, 'counter').click();
+    await expect(page.getByTestId('awaited-sheet')).toBeVisible();
+    const confirm = page.getByTestId('awaited-sheet-confirm');
+    await expect(confirm).toBeDisabled();
+    // 弹窗里只列同名的牌（场景里梦主只有一张 KICK）
+    const options = page.getByTestId('awaited-sheet-hand').locator('button');
+    await expect(options).toHaveCount(1);
+    await options.first().click();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    expect(await lastMove(sent, 2)).toEqual({
+      move: 'respondSaturnDecree',
+      args: ['action_kick'],
+    });
+  });
+
+  test('土星·律令（没有同名牌）：窗口照样出现，抵消置灰并说明原因，只能不抵消', async ({
+    page,
+  }) => {
+    const sent = await openScene(page, '/game/debug?as=master&pending=saturn-nomatch');
+    await expect(panelOf(page)).toHaveAttribute('data-kind', 'saturn', { timeout: 10_000 });
+    await expect(action(page, 'counter')).toBeDisabled();
+    await expect(panelOf(page)).toContainText('没有与之同名');
+    await action(page, 'pass').click();
+    expect(await lastMove(sent, 1)).toEqual({ move: 'respondSaturnDecree', args: [null] });
+  });
+
+  test('土星·律令（旁观的盗梦者）：没有应答界面，只提示在等梦主', async ({ page }) => {
+    await openScene(page, '/game/debug?pending=saturn');
+    await expect(page.getByTestId('awaited-window')).toHaveCount(0);
+    await expect(page.getByTestId('awaited-bar')).toHaveCount(0);
+    await expect(page.getByTestId('awaiting-notice').first()).toContainText('等待梦主应答');
+  });
+
   test('应答窗口不挡住别的界面：舞台仍在，页面没有报错', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));

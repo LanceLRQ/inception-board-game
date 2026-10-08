@@ -113,6 +113,15 @@ const athenaWit: Partial<SetupState> = {
     args: ['action_kick', 'p3'],
   },
 };
+const saturnDecree: Partial<SetupState> = {
+  pendingSaturnDecree: {
+    masterID: 'pM',
+    userID: 'p1',
+    cardId: 'action_kick',
+    move: 'playKick',
+    args: ['action_kick', 'p3'],
+  },
+};
 const darwinReturn: Partial<SetupState> = {
   pendingDarwinReturn: { playerID: 'p1' },
 };
@@ -226,6 +235,13 @@ const blockingRows: BlockingRow[] = [
     patch: athenaWit,
     actor: 'p3',
     moves: ['respondAthenaWit'],
+    other: 'p2',
+  },
+  {
+    name: 'pendingSaturnDecree（只有梦主可以应答）',
+    patch: saturnDecree,
+    actor: 'pM',
+    moves: ['respondSaturnDecree'],
     other: 'p2',
   },
   {
@@ -345,6 +361,11 @@ describe('行动权表 · 没有待结算', () => {
     expect(denyAction(s, OWNER, 'respondAthenaWit')).toBe('nothing_to_settle');
   });
 
+  it('土星·律令的应答只在挂起时才有人能发：没有挂起时梦主与回合主人发都被拒', () => {
+    expect(denyAction(s, 'pM', 'respondSaturnDecree')).toBe('not_turn_owner');
+    expect(denyAction(s, OWNER, 'respondSaturnDecree')).toBe('nothing_to_settle');
+  });
+
   it('回合外只有空间女王·造物可以不经待结算而发', () => {
     expect(denyAction(s, 'p2', 'useSpaceQueenStashTop')).toBeNull();
     expect(OFF_TURN_MOVES).toEqual(['useSpaceQueenStashTop']);
@@ -453,6 +474,7 @@ describe('行动权表 · 一致性', () => {
           ...blackHoleLevy,
           ...darwinReturn,
           ...athenaWit,
+          ...saturnDecree,
           ...responseWindow,
         }),
         base(unlockOnly),

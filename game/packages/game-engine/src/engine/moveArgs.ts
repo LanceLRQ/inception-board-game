@@ -184,6 +184,7 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   playDarwinEvolution: [],
   respondDarwinReturn: [cardList],
   respondAthenaWit: [nullable(card)],
+  respondSaturnDecree: [nullable(card)],
   playForgerExchangeSingle: [player, card],
   playLibraBalance: [player],
   resolveLibraSplit: [cardList, cardList],

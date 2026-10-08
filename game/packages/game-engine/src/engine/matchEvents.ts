@@ -66,15 +66,31 @@ export const MASKED_ACTOR_FIELDS: ReadonlySet<string> = new Set([
 
 export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   const { before, after, ctxBefore, ctxAfter, request } = args;
-  // 雅典娜应答之后，被挂起的出牌在同一步里重放：这一步的动作者是出牌者，不是应答的雅典娜
+  // 雅典娜 / 土星梦主放过之后，被挂起的出牌在同一步里重放：这一步的动作者是出牌者，不是应答的人
+  const played = after.playedCardsThisTurn.length > before.playedCardsThisTurn.length;
   const replayed =
+    played &&
     request.move === 'respondAthenaWit' &&
     before.pendingAthenaWit &&
-    !after.pendingAthenaWit &&
-    before.playedCardsThisTurn.length < after.playedCardsThisTurn.length
+    !after.pendingAthenaWit
       ? before.pendingAthenaWit.userID
+      : played &&
+          request.move === 'respondSaturnDecree' &&
+          before.pendingSaturnDecree &&
+          !after.pendingSaturnDecree &&
+          request.args[0] === null
+        ? before.pendingSaturnDecree.userID
+        : null;
+  // 土星梦主弃牌抵消：这一步的动作者是梦主（弃牌、抽牌），被作废的那张牌仍记在出牌者名下
+  const countered =
+    request.move === 'respondSaturnDecree' &&
+    before.pendingSaturnDecree &&
+    !after.pendingSaturnDecree &&
+    request.args[0] !== null
+      ? before.pendingSaturnDecree
       : null;
   const mover = replayed ?? request.playerID;
+  const playedBy = countered ? countered.userID : mover;
   const events: DescribedEvent[] = [];
   const order = after.playerOrder;
 
@@ -122,11 +138,20 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     const now = after.players[id];
     if (!was || !now || pool.length === 0) continue;
     const baseline = [...was.hand];
-    if (id === mover) {
-      for (const card of [...playedNow, ...discarded]) {
-        const at = baseline.indexOf(card);
-        if (at >= 0) baseline.splice(at, 1);
-      }
+    // 本步从这名玩家手里离开的牌：一般是动作者打出、弃掉的牌；
+    // 律令抵消时打出的牌来自出牌者、弃掉的牌（含触发后移出游戏的时间风暴）来自梦主，各扣各的
+    const spent = countered
+      ? id === countered.masterID
+        ? [...discarded, ...removedNow]
+        : id === countered.userID
+          ? playedNow
+          : []
+      : id === mover
+        ? [...playedNow, ...discarded]
+        : [];
+    for (const card of spent) {
+      const at = baseline.indexOf(card);
+      if (at >= 0) baseline.splice(at, 1);
     }
     const gained = addedCards(baseline, now.hand);
     const drawn: CardID[] = [];
@@ -149,9 +174,9 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   }
 
   // card_played
-  const played = playedNow;
-  for (const card of played) {
-    events.push({ kind: 'card_played', actor: mover, data: { player: mover, card } });
+  const playedCards = playedNow;
+  for (const card of playedCards) {
+    events.push({ kind: 'card_played', actor: playedBy, data: { player: playedBy, card } });
   }
 
   // cards_discarded：见上，弃牌堆里新增的牌去掉本步打出的牌（打出的牌由 card_played 表达）
@@ -166,7 +191,7 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   // shoot_rolled：骰值被写入。字段不会被清空，所以同一个值再次出现时，以本步打出了 SHOOT 类牌为准
   if (after.lastShootRoll !== null) {
     const changed = after.lastShootRoll !== before.lastShootRoll;
-    const repeated = played.some((c) => c.startsWith('action_shoot'));
+    const repeated = playedCards.some((c) => c.startsWith('action_shoot'));
     if (changed || repeated) {
       events.push({
         kind: 'shoot_rolled',

@@ -13,7 +13,7 @@
 import { recordCardPlayed } from '../stateOps.js';
 import type { SetupState } from '../setup.js';
 import { INVALID_MOVE } from './invalidMove.js';
-import { PLAY_MOVE_CARD_IDS } from './playCardKinds.js';
+import { PLAY_MOVE_CARD_IDS, playedCardOf } from './playCardKinds.js';
 
 interface RecordableMove {
   move: (...args: never[]) => unknown;
@@ -40,9 +40,7 @@ export function recordPlayedCards<M extends Record<string, RecordableMove>>(
     const recorded = (context: unknown, ...rest: unknown[]): unknown => {
       const result = original(context, ...rest);
       if (result === INVALID_MOVE || typeof result !== 'object' || result === null) return result;
-      const cardId = rest.find(
-        (arg): arg is string => typeof arg === 'string' && allowed.includes(arg),
-      );
+      const cardId = playedCardOf(name, rest, cardTable);
       if (cardId === undefined) return result;
       return recordCardPlayed(result as SetupState, cardId);
     };

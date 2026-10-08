@@ -483,6 +483,36 @@ describe('checkInvariants - 待应答状态的规则', () => {
     ).toContain('pending_wit_layer');
     expect(rules({ ...G, dreamMasterID: 'p1' })).toContain('pending_wit_master');
   });
+
+  it('土星·律令：合法的应答等待没有违规；不在出牌阶段、等的不是土星梦主、出牌者是梦主、牌已离手都要点名', () => {
+    const decree = {
+      masterID: 'pM',
+      userID: 'p1',
+      cardId: 'action_kick' as never,
+      move: 'playKick',
+      args: ['action_kick', 'p2'],
+    };
+    const G = asChar(
+      withHand(
+        playing({ pendingSaturnDecree: decree, currentPlayerID: 'p1', dreamMasterID: 'pM' }),
+        'p1',
+        ['action_kick'],
+      ),
+      'pM',
+      'dm_saturn_territory',
+    );
+    expect(rules(G)).toEqual([]);
+    expect(rules({ ...G, turnPhase: 'draw' })).toContain('pending_decree_turn');
+    expect(rules({ ...G, currentPlayerID: 'p2' })).toContain('pending_decree_turn');
+    expect(rules(asChar(G, 'pM', 'dm_fortress'))).toContain('pending_decree_saturn');
+    expect(rules({ ...G, pendingSaturnDecree: { ...decree, masterID: 'p2' } })).toContain(
+      'pending_decree_master',
+    );
+    expect(
+      rules({ ...G, pendingSaturnDecree: { ...decree, userID: 'pM' }, currentPlayerID: 'pM' }),
+    ).toContain('pending_decree_user');
+    expect(rules(withHand(G, 'p1', []))).toContain('pending_decree_card');
+  });
 });
 
 describe('assertInvariants', () => {

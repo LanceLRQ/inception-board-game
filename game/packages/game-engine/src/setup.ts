@@ -289,6 +289,20 @@ export interface SetupState {
     move: string;
     args: unknown[];
   } | null;
+  /**
+   * 土星·律令：梦主是土星时，别的玩家在出牌阶段打出一张行动牌后、结算之前，该牌挂起，等梦主选择
+   * 弃 1 张同名手牌抵消它（并抽 1 张牌），或放过。不论梦主手里有没有同名牌都会挂起，窗口的有无不泄露手牌。
+   * 应答之后：放过则用同样的 move 与实参重放这次出牌；抵消则这张牌作废。
+   * move / args 是出牌者原样发来的出牌 move 名与实参，只存在状态里，不进视图；cardId 是被打出的那张行动牌（出牌本来就公开）。
+   * 对照：docs/manual/06-dream-master.md:168-173 土星·领地
+   */
+  pendingSaturnDecree?: {
+    masterID: string;
+    userID: string;
+    cardId: CardID;
+    move: string;
+    args: unknown[];
+  } | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -518,6 +532,7 @@ export function createInitialState(options: {
     pendingBlackHoleLevy: null,
     pendingDarwinReturn: null,
     pendingAthenaWit: null,
+    pendingSaturnDecree: null,
     winner: null,
     winReason: null,
     endTurn: null,

@@ -168,4 +168,15 @@ describe('awaitingNotice', () => {
     expect(awaitingNotice(hidden, '2')).toEqual({ mine: false });
     expect(awaitingNotice(hidden, null)).toEqual({ mine: false });
   });
+
+  it('土星·律令：轮到梦主本人；别人看到的是在等梦主（带 master 标记）', () => {
+    const view = viewWith({
+      dreamMasterID: '9',
+      pendingSaturnDecree: { masterID: '9', userID: '0', cardId: 'action_kick' },
+    } as Partial<MatchView>);
+    expect(awaitingNotice(view, '9')).toEqual({ mine: true, master: true });
+    expect(awaitingNotice(view, '0')).toEqual({ mine: false, master: true });
+    expect(awaitingNotice(view, '2')).toEqual({ mine: false, master: true });
+    expect(awaitingNotice(view, null)).toEqual({ mine: false, master: true });
+  });
 });

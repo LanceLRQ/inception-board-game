@@ -99,6 +99,13 @@ export function awaitedCopy(awaited: MineAwaited, deps: AwaitedCopyDeps): Awaite
         bodyParams: { name: nicknameOf(awaited.userID), card: cardNameOf(awaited.cardId) },
         notes: [],
       };
+    case 'saturn':
+      return {
+        titleKey: 'awaited.saturn.title',
+        bodyKey: 'awaited.saturn.body',
+        bodyParams: { name: nicknameOf(awaited.userID), card: cardNameOf(awaited.cardId) },
+        notes: awaited.matches.length === 0 ? [{ key: 'awaited.saturn.noMatch' }] : [],
+      };
     case 'aries': {
       const notes: { key: string; params?: Record<string, string> }[] = [];
       if (awaited.nightmareId === null) notes.push({ key: 'awaited.aries.unknown' });

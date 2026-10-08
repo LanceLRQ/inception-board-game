@@ -5,9 +5,10 @@
 //        「玩家使用【念力牵引】，若不在同一层，则无法触发【急智】技能」
 // 对照：docs/manual/05-dream-thieves.md:160-170 雅典娜
 //
-// 做法：给「以玩家为目标的出牌 move」套一层。出牌者的出牌 move 到达时，先照常试跑一遍确认它合法（不合法直接拒绝，
-// 不会先挂起再卡住），满足触发条件就不结算，只把 move 名与实参记进 pendingAthenaWit，等雅典娜应答；
-// 雅典娜选牌（或放弃）之后，用出牌者的名义、原来的实参重放这次出牌。这样「先」收入手牌发生在该牌的任何效果之前。
+// 做法：给「以玩家为目标的出牌 move」套一层挂起（机制见 deferredPlay.ts）：满足触发条件就不结算，
+// 只把 move 名与实参记进 pendingAthenaWit，等雅典娜应答；雅典娜选牌（或放弃）之后，用出牌者的名义、
+// 原来的实参重放这次出牌。这样「先」收入手牌发生在该牌的任何效果之前。
+// 与土星·律令同时在场时，律令窗口在前（土星·律令的包装层套在这一层之外）：梦主抵消了这张牌，就不再问雅典娜。
 //
 // 覆盖的出牌 move（都要打出一张真实的行动牌，并且目标是一名玩家）：
 //   SHOOT 类：playShoot、playShootKing、playShootArmor、playShootBurst、playShootDreamTransit（选 SHOOT 方式时）、
@@ -18,6 +19,12 @@
 
 import type { CardID } from '@icgame/shared';
 import type { SetupState } from '../setup.js';
+import {
+  replayDeferredPlay,
+  suspendPlays,
+  type DeferContext,
+  type DeferrableMove,
+} from './deferredPlay.js';
 import { INVALID_MOVE } from './invalidMove.js';
 import { applyAthenaWitPick, athenaWitUsedInTurn } from './skills.js';
 
@@ -89,70 +96,35 @@ export function findAthenaWitResponder(
   return null;
 }
 
-interface MoveDef {
-  move: (...args: never[]) => unknown;
-  client?: boolean;
-}
-
-export interface WitContext {
-  G: SetupState;
-  ctx: { currentPlayer: string };
-  playerID?: string;
-  random?: unknown;
-  events?: unknown;
-}
+export type WitContext = DeferContext;
 
 type AthenaWitRespond = (
   context: WitContext,
   cardId: CardID | null,
 ) => SetupState | typeof INVALID_MOVE;
 
-/** 试跑用的随机源：合法性不取决于骰值，试跑的结果只用来判断「会不会被拒绝」 */
-const PROBE_RANDOM = {
-  Die: () => 1,
-  D6: () => 1,
-  Shuffle: <T>(items: T[]): T[] => [...items],
-};
-
 /**
  * 给出牌 move 套上急智判定，并追加雅典娜的应答 move respondAthenaWit。
  * 应套在出牌记录包装层之外、行动权闸门之内：withSettleGate(withAthenaWit(recordPlayedCards({...})))，
  * 这样挂起时这张牌还没有被记录、没有离手，重放时才由里层的出牌记录统一记录。
  */
-export function withAthenaWit<M extends Record<string, MoveDef>>(
+export function withAthenaWit<M extends Record<string, DeferrableMove>>(
   moves: M,
 ): M & { respondAthenaWit: { move: AthenaWitRespond; client: false } } {
-  const out: Record<string, MoveDef> = {};
-  for (const [name, def] of Object.entries(moves)) {
-    if (!Object.hasOwn(TARGETED_PLAY_MOVES, name)) {
-      out[name] = def;
-      continue;
-    }
-    const inner = def.move as (context: WitContext, ...rest: unknown[]) => unknown;
-    const wrapped = (context: WitContext, ...rest: unknown[]): unknown => {
-      const found = findAthenaWitResponder(context.G, context.ctx.currentPlayer, name, rest);
-      if (found === null) return inner(context, ...rest);
-      // 试跑：出牌本身不合法就直接拒绝，不让雅典娜白白应答一次
-      const probe = inner({ ...context, random: PROBE_RANDOM }, ...rest);
-      if (probe === INVALID_MOVE) return INVALID_MOVE;
-      return {
-        ...context.G,
-        moveCounter: context.G.moveCounter + 1,
-        pendingAthenaWit: {
-          athenaID: found.athenaID,
-          userID: context.ctx.currentPlayer,
-          cardId: found.cardId,
-          move: name,
-          args: rest,
-        },
-      } satisfies SetupState;
-    };
-    Object.defineProperty(wrapped, 'length', { value: inner.length });
-    Object.defineProperty(wrapped, 'unwrapped', {
-      value: (inner as { unwrapped?: unknown }).unwrapped ?? inner,
-    });
-    out[name] = { ...def, move: wrapped as never };
-  }
+  const out = suspendPlays(moves, new Set(ATHENA_WIT_TRIGGER_MOVES), {
+    detect: (context, move, args) =>
+      findAthenaWitResponder(context.G, context.ctx.currentPlayer, move, args),
+    suspend: (found, play, G) => ({
+      ...G,
+      pendingAthenaWit: {
+        athenaID: found.athenaID,
+        userID: play.userID,
+        cardId: found.cardId,
+        move: play.move,
+        args: play.args,
+      },
+    }),
+  });
 
   // 雅典娜的应答：选弃牌堆里的 1 张收入手牌，或放弃（null）；随后以出牌者的名义重放被挂起的出牌。
   // 形参写成解构形式，测试工具按这个写法读取 cardId 这个形参名
@@ -170,24 +142,7 @@ export function withAthenaWit<M extends Record<string, MoveDef>>(
       state = picked;
     }
     // 重放走的是没有急智判定的里层 move，所以不会再次挂起
-    const raw = moves[pending.move]?.move as
-      | ((context: WitContext, ...rest: unknown[]) => unknown)
-      | undefined;
-    const result = raw
-      ? raw(
-          {
-            G: state,
-            ctx: { ...ctx, currentPlayer: pending.userID },
-            playerID: pending.userID,
-            random,
-            events,
-          },
-          ...pending.args,
-        )
-      : INVALID_MOVE;
-    // 重放不成立（例如出牌者的局面已经变了）：这次出牌作废，雅典娜的收获保留，对局继续，不会卡在挂起上
-    if (result === INVALID_MOVE) return { ...state, moveCounter: state.moveCounter + 1 };
-    return result as SetupState;
+    return replayDeferredPlay(moves, state, ctx, pending, { random, events });
   };
   return { ...out, respondAthenaWit: { move: respond, client: false } } as unknown as M & {
     respondAthenaWit: { move: AthenaWitRespond; client: false };

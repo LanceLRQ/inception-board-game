@@ -392,6 +392,30 @@ describe('checkStateInvariants', () => {
           args: 'x' as never,
         }),
     ],
+    [
+      '土星律令的梦主不存在',
+      'pendingSaturnDecree.masterID',
+      (G, _a, b) =>
+        (G.pendingSaturnDecree = {
+          masterID: 'x',
+          userID: b,
+          cardId: 'action_kick' as never,
+          move: 'playKick',
+          args: [],
+        }),
+    ],
+    [
+      '土星律令的重放实参不是数组',
+      'pendingSaturnDecree.args',
+      (G, a, b) =>
+        (G.pendingSaturnDecree = {
+          masterID: a,
+          userID: b,
+          cardId: 'action_kick' as never,
+          move: 'playKick',
+          args: 'x' as never,
+        }),
+    ],
     ['换位快照里有数字牌', 'shiftSnapshot', (G, a) => (G.shiftSnapshot = { [a]: 3 as never })],
   ];
 

@@ -6,6 +6,7 @@ import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
  * 盗梦者 / 梦主视角，各有一个「无待办」与「有待应答的解封响应窗口」的版本；
  * 另有盗梦者的「弃牌阶段」场景（手牌超出上限，必须选牌弃置）、
  * 盗梦者轮到本人应答的各种待决状态（被 SHOOT 时的响应、天秤、意念判官、处女、白羊、黑洞·吞噬、达尔文·淘汰、雅典娜·急智），
+ * 梦主是「土星·领地」、盗梦者打出 KICK 后等梦主应答律令的场景（梦主视角手里有 / 没有同名牌两种，另有旁观的盗梦者视角），
  * 以及梦主是「棋局」的场景
  */
 export const FIXTURE_SCENARIO_IDS = [
@@ -13,6 +14,9 @@ export const FIXTURE_SCENARIO_IDS = [
   'master',
   'thief-pending',
   'master-pending',
+  'master-pending-saturn',
+  'master-pending-saturn-nomatch',
+  'thief-pending-saturn',
   'thief-discard',
   'thief-sudger',
   'thief-sudger',
@@ -151,6 +155,11 @@ export function parseFixturePlayers(raw: string | null): number {
  *                天秤分牌 / 天秤挑一份、意念判官选骰、处女·完美、白羊·星尘（梦魇为回音萦绕；aries-plague 为邪念瘟疫）、
  *                黑洞·吞噬（levy，本人与另一名同层玩家各交 1 张手牌）、达尔文·淘汰（darwin，已抽到 2 张、选 2 张放回）、
  *                雅典娜·急智（athena，同层盗梦者对本人打出 KICK，结算前可从弃牌堆选 1 张）；不与 as=master 叠加
+ *   ?as=master&pending=saturn|saturn-nomatch
+ *                梦主视角，本人是土星·领地，一名盗梦者打出 KICK，结算前轮到本人应答【律令】：
+ *                saturn 手里有同名的 KICK（可弃牌抵消），saturn-nomatch 手里没有（只能不抵消）；不与其他梦主参数叠加
+ *   ?pending=saturn  盗梦者视角（不带 as=master）：同一局面，梦主是土星·领地、别的盗梦者对本人打出 KICK，
+ *                本人只看到「等待梦主应答」的提示
  *   ?character=sudger  盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的发动入口）；
  *                      梦主视角、响应窗口与待应答参数优先，忽略它
  *   ?skill=名    走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面（视角由场景决定，响应窗口与待应答参数优先）：
@@ -196,34 +205,47 @@ export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureSc
     skillParam !== null && Object.hasOwn(SKILL_SCENARIOS, skillParam)
       ? SKILL_SCENARIOS[skillParam as keyof typeof SKILL_SCENARIOS]
       : null;
+  const saturnId: FixtureScenarioId | null =
+    master && pendingParam === 'saturn'
+      ? 'master-pending-saturn'
+      : master && pendingParam === 'saturn-nomatch'
+        ? 'master-pending-saturn-nomatch'
+        : null;
   const baseId: FixtureScenarioId = master
-    ? pending
-      ? 'master-pending'
-      : chess
-        ? 'master-chess'
-        : deadMate
-          ? 'master-mate-dead'
-          : bribe
-            ? 'master-bribe'
-            : vaultParam === 'echo'
-              ? 'master-vault-echo'
-              : vaultParam === 'plague'
-                ? 'master-vault-plague'
-                : 'master'
+    ? saturnId !== null
+      ? saturnId
+      : pending
+        ? 'master-pending'
+        : chess
+          ? 'master-chess'
+          : deadMate
+            ? 'master-mate-dead'
+            : bribe
+              ? 'master-bribe'
+              : vaultParam === 'echo'
+                ? 'master-vault-echo'
+                : vaultParam === 'plague'
+                  ? 'master-vault-plague'
+                  : 'master'
     : pending
       ? 'thief-pending'
-      : (response ??
-        (discard
-          ? 'thief-discard'
-          : deadSelf
-            ? 'thief-dead'
-            : deadMate
-              ? 'thief-mate-dead'
-              : sudger
-                ? 'thief-sudger'
-                : 'thief'));
+      : pendingParam === 'saturn'
+        ? 'thief-pending-saturn'
+        : (response ??
+          (discard
+            ? 'thief-discard'
+            : deadSelf
+              ? 'thief-dead'
+              : deadMate
+                ? 'thief-mate-dead'
+                : sudger
+                  ? 'thief-sudger'
+                  : 'thief'));
   // 角色走查场景自带视角；只有响应窗口与待应答参数比它优先
-  const id: FixtureScenarioId = !pending && response === null && skillScene ? skillScene : baseId;
+  const id: FixtureScenarioId =
+    !pending && response === null && saturnId === null && pendingParam !== 'saturn' && skillScene
+      ? skillScene
+      : baseId;
   const extras = resolveFixtureExtras(searchParams);
   return {
     id,

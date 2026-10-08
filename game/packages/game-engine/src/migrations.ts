@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 16;
+export const CURRENT_SCHEMA_VERSION = 17;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -260,6 +260,16 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     (state) => ({
       ...state,
       pendingAthenaWit: state.pendingAthenaWit ?? null,
+    }),
+  ],
+  // v16 → v17：新增 pendingSaturnDecree（土星·律令的应答等待态），旧存档补 null。
+  //   旧版本里律令没有接进对局，不会留下进行中的应答，所以只需补字段
+  //   对照：docs/manual/06-dream-master.md:168-173 土星·领地
+  [
+    17,
+    (state) => ({
+      ...state,
+      pendingSaturnDecree: state.pendingSaturnDecree ?? null,
     }),
   ],
 ]);

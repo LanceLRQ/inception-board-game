@@ -6,6 +6,7 @@ import {
   passOnResponse,
   respondToWindow,
 } from '../engine/abilities/response-chain.js';
+import { RESPONSE_WINDOW_TIMEOUT_MS } from '../config.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import { isCardForPlayMove } from '../engine/playCardKinds.js';
 import {
@@ -63,7 +64,7 @@ export const unlockMoves = {
           sourceAbilityID: 'action_unlock_effect_1',
           sourceType: 'unlock',
           responders,
-          timeoutMs: 30_000,
+          timeoutMs: RESPONSE_WINDOW_TIMEOUT_MS,
           validResponseAbilityIDs: ['action_unlock_effect_2'],
           onTimeout: 'resolve',
         });

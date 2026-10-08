@@ -645,3 +645,91 @@ describe('awaitedResponse · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急
     expect(awaitedKey(athena, 5)).toBe('athena|5|1|action_kick');
   });
 });
+
+describe('土星·律令的应答', () => {
+  /** 本人 0 是土星梦主（dreamMasterID = 0），手牌 [KICK, SHOOT, KICK, 梦境穿梭剂]；出牌者 1 打出了 KICK */
+  function saturnView(hand: string[], cardId = 'action_kick'): MatchView {
+    return viewWith({
+      dreamMasterID: '0',
+      players: {
+        ...viewWith().players,
+        '0': player('0', { hand, faction: 'master', isRevealed: true }),
+      },
+      pendingSaturnDecree: { masterID: '0', userID: '1', cardId },
+    } as Partial<MatchView>);
+  }
+  const HAND = ['action_kick', 'action_shoot', 'action_kick', 'action_dream_transit'];
+
+  it('梦主本人：列出手牌里同名的位置（同名牌各算一张）；别人只需要等', () => {
+    const view = saturnView(HAND);
+    expect(awaitedResponse(view, '0')).toEqual({
+      mine: true,
+      kind: 'saturn',
+      userID: '1',
+      cardId: 'action_kick',
+      hand: HAND,
+      matches: [0, 2],
+    });
+    for (const seat of ['1', '2', '9', null]) {
+      expect(awaitedResponse(view, seat)).toEqual({ mine: false });
+    }
+  });
+
+  it('同名口径：SHOOT 与 SHOOT·梦境穿梭剂互为同名，梦境穿梭剂与 SHOOT 本身不同名', () => {
+    const hybrid = 'action_shoot_dream_transit';
+    const a = awaitedResponse(
+      saturnView(['action_shoot', hybrid, 'action_dream_transit'], 'action_shoot'),
+      '0',
+    ) as MineAwaited;
+    expect(a.kind === 'saturn' && a.matches).toEqual([0, 1]);
+    const b = awaitedResponse(
+      saturnView(['action_shoot', hybrid, 'action_dream_transit'], 'action_dream_transit'),
+      '0',
+    ) as MineAwaited;
+    expect(b.kind === 'saturn' && b.matches).toEqual([1, 2]);
+  });
+
+  it('有同名牌：可以打开选牌弹窗抵消，也可以不抵消（respondSaturnDecree null）', () => {
+    const a = awaitedResponse(saturnView(HAND), '0') as MineAwaited;
+    const actions = awaitedActions(a);
+    expect(actions.map((x) => [x.id, x.decline, x.disabled])).toEqual([
+      ['counter', false, false],
+      ['pass', true, false],
+    ]);
+    expect(actions[0]!.effect).toEqual({ type: 'sheet', sheet: 'saturn-pick' });
+    expect(actions[1]!.effect).toEqual({ type: 'move', move: 'respondSaturnDecree', args: [null] });
+  });
+
+  it('没有同名牌：抵消按钮置灰，只能不抵消', () => {
+    const a = awaitedResponse(
+      saturnView(['action_shoot', 'action_dream_transit']),
+      '0',
+    ) as MineAwaited;
+    const actions = awaitedActions(a);
+    expect(actions[0]!.disabled).toBe(true);
+    expect(actions[1]!.disabled).toBe(false);
+    expect(a.kind === 'saturn' && a.matches).toEqual([]);
+  });
+
+  it('没有手牌也照样有窗口：只能不抵消', () => {
+    const a = awaitedResponse(saturnView([]), '0') as MineAwaited;
+    expect(awaitedActions(a)[0]!.disabled).toBe(true);
+  });
+
+  it('确认命令按手牌位置取牌 id；位置不在同名名单里不能确认', () => {
+    const a = awaitedResponse(saturnView(HAND), '0') as MineAwaited;
+    expect(sheetCommand(a, 'saturn-pick', EMPTY_DRAFT)).toBeNull();
+    expect(sheetCommand(a, 'saturn-pick', { ...EMPTY_DRAFT, saturnIndex: 2 })).toEqual({
+      move: 'respondSaturnDecree',
+      args: ['action_kick'],
+    });
+    expect(sheetCommand(a, 'saturn-pick', { ...EMPTY_DRAFT, saturnIndex: 1 })).toBeNull();
+    expect(sheetCommand(a, 'saturn-pick', { ...EMPTY_DRAFT, saturnIndex: 9 })).toBeNull();
+  });
+
+  it('awaitedKey 随出牌者与被打出的牌、手牌而变；窗口有自己的截止时间', () => {
+    const a = awaitedResponse(saturnView(HAND), '0') as MineAwaited;
+    expect(awaitedKey(a, 5)).toBe(`saturn|5|1|action_kick|${HAND.join(',')}`);
+    expect(hasOwnDeadline(a)).toBe(true);
+  });
+});

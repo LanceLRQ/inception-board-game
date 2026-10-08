@@ -77,6 +77,8 @@ const MOVE_PRIORITY: Record<string, number> = {
   respondAthenaWit: 999,
   respondBlackHoleLevy: 999,
   respondDarwinReturn: 999,
+  // 土星·律令的应答同上：由自动行动判定以梦主本人的名义发
+  respondSaturnDecree: 999,
 };
 
 /**

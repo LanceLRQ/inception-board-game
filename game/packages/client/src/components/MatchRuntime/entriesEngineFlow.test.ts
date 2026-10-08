@@ -433,6 +433,58 @@ describe('雅典娜·急智：界面构造的应答经真实引擎', () => {
   });
 });
 
+describe('土星·律令：界面构造的应答经真实引擎', () => {
+  it('选同名手牌抵消：引擎接受，被打出的 KICK 作废、梦主弃 1 抽 1', () => {
+    const { state, viewer } = sceneOf('master-pending-saturn');
+    const view = viewMatch(game, state, viewer).G as MatchView;
+    const awaited = awaitedResponse(view, viewer) as MineAwaited;
+    expect(awaited.kind).toBe('saturn');
+    const index = awaited.kind === 'saturn' ? awaited.matches[0]! : -1;
+    const cmd = sheetCommand(awaited, 'saturn-pick', { ...EMPTY_DRAFT, saturnIndex: index })!;
+    const decree = state.G.pendingSaturnDecree!;
+    const handBefore = state.G.players[viewer]!.hand.length;
+    const next = apply(state, viewer, cmd.move, [...cmd.args])!;
+    expect(next).not.toBeNull();
+    expect(next.G.pendingSaturnDecree ?? null).toBeNull();
+    // 弃 1 张、抽 1 张：张数不变，且 KICK 少了一张
+    expect(next.G.players[viewer]!.hand.length).toBe(handBefore);
+    expect(next.G.players[viewer]!.hand.filter((c) => c === 'action_kick')).toHaveLength(
+      state.G.players[viewer]!.hand.filter((c) => c === 'action_kick').length - 1,
+    );
+    // 被抵消的 KICK 离开出牌者手牌、没有结算（出牌者层数不变）
+    expect(next.G.players[decree.userID]!.hand).not.toContain('action_kick');
+    expect(next.G.players[decree.userID]!.currentLayer).toBe(
+      state.G.players[decree.userID]!.currentLayer,
+    );
+  });
+
+  it('不抵消：界面按钮发 respondSaturnDecree null，引擎接受，那张 KICK 照常结算', () => {
+    const { state, viewer } = sceneOf('master-pending-saturn');
+    const view = viewMatch(game, state, viewer).G as MatchView;
+    const awaited = awaitedResponse(view, viewer) as MineAwaited;
+    const pass = awaitedActions(awaited).find((a) => a.id === 'pass')!;
+    expect(pass.effect.type).toBe('move');
+    if (pass.effect.type !== 'move') return;
+    const decree = state.G.pendingSaturnDecree!;
+    const next = apply(state, viewer, pass.effect.move, [...pass.effect.args])!;
+    expect(next).not.toBeNull();
+    expect(next.G.pendingSaturnDecree ?? null).toBeNull();
+    expect(next.G.deck.discardPile).toContain('action_kick');
+    expect(next.G.players[decree.userID]!.hand).not.toContain('action_kick');
+  });
+
+  it('没有同名牌：界面不给抵消，引擎也拒绝用别的牌抵消；只能不抵消', () => {
+    const { state, viewer } = sceneOf('master-pending-saturn-nomatch');
+    const view = viewMatch(game, state, viewer).G as MatchView;
+    const awaited = awaitedResponse(view, viewer) as MineAwaited;
+    expect(awaitedActions(awaited)[0]!.disabled).toBe(true);
+    for (const card of state.G.players[viewer]!.hand) {
+      expect(apply(state, viewer, 'respondSaturnDecree', [card]), card).toBeNull();
+    }
+    expect(apply(state, viewer, 'respondSaturnDecree', [null])).not.toBeNull();
+  });
+});
+
 describe('达尔文·淘汰：界面构造的放回命令经真实引擎', () => {
   it('选刚好 2 张（可含新抽的）按顺序放回：引擎接受，牌库顶就是选的顺序', () => {
     const { state, viewer } = sceneOf('thief-pending-darwin');

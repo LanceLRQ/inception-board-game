@@ -244,6 +244,16 @@ export interface PendingAthenaWitView {
   cardId: CardID;
 }
 
+/**
+ * 土星·律令的应答等待：梦主是谁本来就公开，出牌者与被打出的牌也是公开的（出牌本来就公开）。
+ * 窗口不论梦主手里有没有同名牌都会开，所以它本身不透露手牌；重放用的 move 名与实参不进视图。
+ */
+export interface PendingSaturnDecreeView {
+  masterID: string;
+  userID: string;
+  cardId: CardID;
+}
+
 /** 某个观察者能看到的对局状态。字段是白名单：这里没有的，观察者就看不到 */
 export interface MatchView {
   /** 对局是否已结束（此时 null 只表示「本来就没有」，不再表示「看不到」） */
@@ -302,6 +312,7 @@ export interface MatchView {
   pendingBlackHoleLevy: PendingBlackHoleLevyView | null;
   pendingDarwinReturn: PendingDarwinReturnView | null;
   pendingAthenaWit: PendingAthenaWitView | null;
+  pendingSaturnDecree: PendingSaturnDecreeView | null;
 
   winner: Faction | null;
   winReason: string | null;
@@ -364,6 +375,7 @@ export const FIELD_DISPOSITION: Record<keyof SetupState, Disposition> = {
   pendingBlackHoleLevy: 'public',
   pendingDarwinReturn: 'public',
   pendingAthenaWit: 'conditional',
+  pendingSaturnDecree: 'public',
   winner: 'public',
   winReason: 'public',
   endTurn: 'public',
@@ -775,6 +787,13 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
               : null,
           userID: G.pendingAthenaWit.userID,
           cardId: G.pendingAthenaWit.cardId,
+        }
+      : null,
+    pendingSaturnDecree: G.pendingSaturnDecree
+      ? {
+          masterID: G.pendingSaturnDecree.masterID,
+          userID: G.pendingSaturnDecree.userID,
+          cardId: G.pendingSaturnDecree.cardId,
         }
       : null,
 

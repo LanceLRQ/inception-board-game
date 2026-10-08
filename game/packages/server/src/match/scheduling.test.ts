@@ -169,6 +169,41 @@ describe('planNext', () => {
     }
   });
 
+  it('土星·律令的应答窗口：真人梦主用与解封响应窗口同一档的时限（30 秒），不用 45 秒的待结算时限；受响应上限约束', () => {
+    const s = afterSetup();
+    const master = s.G.dreamMasterID;
+    const owner = s.G.playerOrder.find((id) => id !== master)!;
+    const pending = {
+      ...s,
+      G: {
+        ...s.G,
+        turnPhase: 'action',
+        pendingSaturnDecree: {
+          masterID: master,
+          userID: owner,
+          cardId: 'action_kick',
+          move: 'playKick',
+          args: ['action_kick', master],
+        },
+      },
+    } as unknown as MatchState<SetupState>;
+    expect(planNext(pending, [master], { ...timing, pendingTimeoutMs: 45_000 })).toEqual({
+      kind: 'deadline',
+      delayMs: 30_000,
+    });
+    expect(planNext(pending, [master], { ...timing, responseTimeoutCapMs: 40 })).toEqual({
+      kind: 'deadline',
+      delayMs: 40,
+    });
+    // 梦主是 Bot：短延迟内以梦主本人的名义放过；到时限同样放过
+    expect(planNext(pending, [owner], timing).kind).toBe('auto');
+    expect(timeoutAction(pending)).toMatchObject({
+      playerID: master,
+      move: 'respondSaturnDecree',
+      args: [null],
+    });
+  });
+
   it('对局已结束返回 none', () => {
     const s = afterSetup();
     const over = {
