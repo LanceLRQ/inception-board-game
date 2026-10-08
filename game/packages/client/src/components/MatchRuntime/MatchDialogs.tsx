@@ -3,6 +3,7 @@
 // 只依赖控制层 MatchController；不关心页面布局，任何布局都可以直接挂载。
 
 import { useTranslation } from 'react-i18next';
+import { Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getCardName } from '../../lib/cards';
 import { CardDetailModal } from '../CardDetailModal';
@@ -76,45 +77,67 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         dreamMasterID={view?.dreamMasterID}
         viewerIsMaster={controller.playRole === 'master'}
         bribeHolderIds={controller.bribeHolderIds}
+        viewerCharacterId={controller.self?.characterId ?? null}
+        viewerHandCount={controller.hand.cards.length}
+        masterCharacterId={view ? (view.players[view.dreamMasterID]?.characterId ?? null) : null}
         cardNameOf={(cardId) => getCardName(cardId)}
         onPick={(id) => void play.confirmTargetPlayer(id)}
         onCancel={() => play.cancelTargetPlayer()}
         decreeSlot={
-          decree.applicable ? (
-            <div
-              className="mb-2 flex flex-wrap items-center gap-2 text-[11px]"
-              data-testid="decree-picker"
-            >
-              <span className="text-muted-foreground">
-                {t('localMatch.decreeLabel', { defaultValue: '附加死亡宣言：' })}
-              </span>
-              {decree.options.map((c) => (
-                <button
-                  key={`decree-${c}`}
-                  type="button"
-                  onClick={() => decree.toggle(c)}
-                  className={cn(
-                    'rounded-full border px-2 py-0.5',
-                    decree.selected === c
-                      ? 'border-acc bg-acc/30 text-acc-bright'
-                      : 'border-border bg-card hover:border-acc/60',
-                  )}
-                  data-testid={`decree-${c}`}
-                >
-                  {getCardName(c)}
-                </button>
-              ))}
-              {decree.selected && (
-                <button
-                  type="button"
-                  onClick={() => decree.clear()}
-                  className="rounded-full border border-muted px-2 py-0.5 text-muted-foreground"
-                >
-                  {t('localMatch.decreeClear', { defaultValue: '取消宣言' })}
-                </button>
-              )}
-            </div>
-          ) : null
+          <>
+            {play.preventMove.applicable && (
+              <button
+                type="button"
+                aria-pressed={play.preventMove.value}
+                onClick={play.preventMove.toggle}
+                data-testid="prevent-move-toggle"
+                className={cn(
+                  'mb-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] coarse:min-h-11',
+                  play.preventMove.value
+                    ? 'border-acc bg-acc/30 text-acc-bright'
+                    : 'border-border bg-card hover:border-acc/60',
+                )}
+              >
+                {play.preventMove.value ? <Check className="size-3" aria-hidden /> : null}
+                {t('play.preventMove.label')}
+              </button>
+            )}
+            {decree.applicable ? (
+              <div
+                className="mb-2 flex flex-wrap items-center gap-2 text-[11px]"
+                data-testid="decree-picker"
+              >
+                <span className="text-muted-foreground">
+                  {t('localMatch.decreeLabel', { defaultValue: '附加死亡宣言：' })}
+                </span>
+                {decree.options.map((c) => (
+                  <button
+                    key={`decree-${c}`}
+                    type="button"
+                    onClick={() => decree.toggle(c)}
+                    className={cn(
+                      'rounded-full border px-2 py-0.5',
+                      decree.selected === c
+                        ? 'border-acc bg-acc/30 text-acc-bright'
+                        : 'border-border bg-card hover:border-acc/60',
+                    )}
+                    data-testid={`decree-${c}`}
+                  >
+                    {getCardName(c)}
+                  </button>
+                ))}
+                {decree.selected && (
+                  <button
+                    type="button"
+                    onClick={() => decree.clear()}
+                    className="rounded-full border border-muted px-2 py-0.5 text-muted-foreground"
+                  >
+                    {t('localMatch.decreeClear', { defaultValue: '取消宣言' })}
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </>
         }
       />
 
@@ -122,6 +145,7 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
       <TargetLayerPickerDialog
         pending={play.targetLayerPending}
         viewerLayer={viewerLayer}
+        validLayers={play.targetLayerChoices ? [...play.targetLayerChoices] : null}
         cardNameOf={(cardId) => getCardName(cardId)}
         onPick={(layer) => void play.confirmTargetLayer(layer)}
         onCancel={play.cancel}

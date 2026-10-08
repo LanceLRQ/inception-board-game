@@ -369,10 +369,6 @@
         "name": "激活梦魇",
         "desc": "激活目标层的一张明置梦魇"
       },
-      "secret_passage_teleport": {
-        "name": "密道·传送",
-        "desc": "弃 1 张梦境穿梭剂 → 将 1 名盗梦者送入迷失层（限 2 次/回合）"
-      },
       "deal_bribe": {
         "name": "派发贿赂",
         "desc": "从贿赂池随机派 1 张贿赂给指定盗梦者"
@@ -406,12 +402,20 @@
       "skill_0": {
         "name": "药剂师·调剂",
         "desc": "指定 1 张手牌进行调剂"
+      },
+      "skill_1": {
+        "name": "药剂师·注射",
+        "desc": "弃 1 张梦境穿梭剂，令同层的一名玩家移动到相邻层"
       }
     },
     "thief_gemini": {
       "skill_0": {
         "name": "双子·命运",
         "desc": "弃牌阶段：若梦主所在层数字更大，可掷 1 颗骰子，4 / 5 / 6 则当层心锁 -2，之后翻面"
+      },
+      "skill_1": {
+        "name": "双子·抉择",
+        "desc": "梦主所在层数字更小时，掷 2 颗骰子，从牌库顶抽骰点之和的牌，之后翻面"
       }
     },
     "thief_paprik": {
@@ -518,6 +522,57 @@
       "skill_0": {
         "name": "皇城·重金",
         "desc": "指定目标 + 选贿赂池 1 张派发"
+      },
+      "worldview": {
+        "name": "皇城·视为 SHOOT",
+        "desc": "收到过贿赂牌的玩家，每收到 1 张得 1 次机会，选一名没收到贿赂牌的盗梦者视为使用 1 张 SHOOT，掷骰结果 -3"
+      }
+    },
+    "disabledAria": "{{name}}（不可用：{{reason}}）",
+    "reason": {
+      "usedUp": "本回合已用完（{{used}}/{{limit}}）",
+      "usedUpGame": "本局已用完（{{used}}/{{limit}}）",
+      "noTarget": "没有可选的目标",
+      "noTransitInDiscard": "弃牌堆里没有梦境穿梭剂",
+      "noTransitInHand": "手里没有梦境穿梭剂",
+      "unlockLimit": "本回合解封次数已用尽（减少心锁也算一次）",
+      "noShootCard": "手里没有 SHOOT 类牌",
+      "needTwoShoot": "需要手里有 2 张基础 SHOOT",
+      "needTwoNonShoot": "需要手里有 2 张非 SHOOT 牌",
+      "noShootInDiscard": "弃牌堆里没有 SHOOT 类牌",
+      "noUnlockCard": "手里没有【解封】",
+      "noRevealedNightmare": "没有已翻开的梦魇",
+      "echoNeedsParams": "已翻开的只有回音萦绕，它的效果要先选层与方式，这里暂不支持发动",
+      "noNightmare": "没有可发动的梦魇",
+      "deckShort": "牌库不足 2 张",
+      "deckEmpty": "牌库已空",
+      "discardEmpty": "弃牌堆是空的",
+      "noAdjacentPlayers": "相邻的层里都没有存活的玩家",
+      "noPlutoTarget": "没有手牌不足 2 张的存活盗梦者",
+      "noVaultPair": "未打开的金库不足 2 个"
+    },
+    "thief_space_queen": {
+      "skill_1": {
+        "name": "空间女王·造物",
+        "desc": "弃牌阶段，把 1 张手牌放到牌库顶"
+      }
+    },
+    "thief_black_hole": {
+      "skill_1": {
+        "name": "黑洞·吸纳",
+        "desc": "指定一个相邻层，该层所有存活玩家移动到你所在层（回合限 1 次）"
+      }
+    },
+    "dm_venus_mirror": {
+      "skill_0": {
+        "name": "金星·重影",
+        "desc": "展示牌库顶与任意手牌，同名的牌收入手牌，其余混洗放回牌库顶（回合限 1 次）"
+      }
+    },
+    "dm_secret_passage": {
+      "skill_0": {
+        "name": "密道·传送",
+        "desc": "弃 1 张梦境穿梭剂，把 1 名盗梦者送入迷失层（回合限 2 次）"
       }
     }
   },
@@ -676,7 +731,10 @@
       "dead": "现在不能打：你在迷失层，只能复活自己",
       "masterNoUnlock": "梦主不能用【解封】解锁，只能在响应窗口里用它抵消",
       "revivedNoUnlock": "本回合复活过自己，不能用【解封】解锁",
-      "noPeekTarget": "没有持有贿赂牌的盗梦者可以查看"
+      "noPeekTarget": "没有持有贿赂牌的盗梦者可以查看",
+      "noHeartLock": "这一层的心锁已经是 0，没有可解的锁",
+      "unlockLimit": "本回合解封次数已用尽，不能再用【解封】解锁",
+      "noNightmareTarget": "没有哪一层还盖着暗置的梦魇"
     },
     "wait": "等待"
   },
@@ -920,7 +978,9 @@
     "kind": {
       "reviveSelf": "复活",
       "reviveOther": "复活同伴",
-      "masterMove": "移动"
+      "masterMove": "移动",
+      "skipDraw": "跳过抽牌",
+      "jokerGamble": "小丑·失控"
     },
     "reason": {
       "handShort": "复活要弃 {{count}} 张手牌，你只有 {{have}} 张",
@@ -946,6 +1006,11 @@
       "costTransit": "密道世界观：只能弃 {{n}} 张梦境穿梭剂（已选 {{picked}}）",
       "notTransit": "密道世界观下只能弃梦境穿梭剂",
       "confirm": "确认复活"
+    }
+  },
+  "play": {
+    "preventMove": {
+      "label": "射手·禁足：令目标不移动"
     }
   }
 }

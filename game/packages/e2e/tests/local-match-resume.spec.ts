@@ -45,7 +45,7 @@ async function startAndDraw(page: Page): Promise<void> {
   await page.goto(LOCAL_MATCH_URL);
   await waitForAppReady(page);
   await page.getByRole('button', { name: /开始游戏|Start/ }).click();
-  const draw = page.getByRole('button', { name: /抽牌|Draw/ });
+  const draw = page.getByTestId('action-draw');
   await waitVisibleAnswering(page, draw, 20_000);
   await draw.click({ timeout: 5_000 });
   await expect(page.getByRole('button', { name: /结束行动|End Action/ })).toBeVisible({
@@ -124,11 +124,11 @@ test.describe('人机对局本地存档', () => {
     await page.getByTestId('local-resume-continue').click();
 
     // 开了新局：能走到自己的回合
-    await waitVisibleAnswering(page, page.getByRole('button', { name: /抽牌|Draw/ }), 20_000);
+    await waitVisibleAnswering(page, page.getByTestId('action-draw'), 20_000);
     expect(warnings.some((w) => w.includes('saved match could not be restored'))).toBe(true);
     expect(errors).toEqual([]);
     // 损坏的存档已被丢弃，随后被新局的进度覆盖
-    await page.getByRole('button', { name: /抽牌|Draw/ }).click({ timeout: 5_000 });
+    await page.getByTestId('action-draw').click({ timeout: 5_000 });
     const saved = await waitForSaveSettled(page);
     expect(saved.stateID).not.toBe(7);
   });

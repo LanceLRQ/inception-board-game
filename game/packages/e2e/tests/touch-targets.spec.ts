@@ -75,6 +75,9 @@ const SCENES = [
   ['同伴在迷失层（复活同伴入口）', '/game/debug?dead=mate'],
   ['梦主 + 同伴在迷失层（两个入口）', '/game/debug?as=master&dead=mate'],
   ['梦主的梦境窥视选目标', '/game/debug?as=master&bribe=1'],
+  ['抽牌阶段（略过抽牌）', '/game/debug?skill=draw'],
+  ['抽牌阶段（略过抽牌 + 小丑·失控）', '/game/debug?skill=joker'],
+  ['【解封】打不出（心锁为 0）', '/game/debug?skill=unlock-none'],
 ] as const;
 
 test.describe('触控目标 · 390×844', () => {
@@ -199,6 +202,39 @@ test.describe('触控目标 · 390×844', () => {
     await page.getByTestId('dock-entry-move').click();
     await expect(page.getByTestId('target-layer-picker-dialog')).toBeVisible();
     await expectTouchClean(page, '梦主移动弹层');
+  });
+
+  test('对局：技能面板（置灰项与原因、选目标、选层、选牌）', async ({ page }) => {
+    await openScene(page, '/game/debug?skill=chemist');
+    await page.getByTestId('dock-skill').click();
+    await expect(page.getByTestId('skill-sheet')).toBeVisible();
+    await expect(page.getByTestId('active-skill-reason-playChemistRefine')).toBeVisible();
+    await expectTouchClean(page, '技能面板（含置灰项）');
+    await page.getByTestId('active-skill-playChemistInject').click();
+    await expect(page.getByTestId('active-skill-player-layer-picker')).toBeVisible();
+    await expectTouchClean(page, '技能面板（选目标）');
+    await page
+      .getByTestId(/^active-skill-pl-target-\d+$/)
+      .first()
+      .click();
+    await expectTouchClean(page, '技能面板（选层）');
+
+    await openScene(page, '/game/debug?skill=passage');
+    await page.getByTestId('dock-skill').click();
+    await page.getByTestId('active-skill-playSecretPassageTeleport').click();
+    await page
+      .getByTestId(/^active-skill-pc-target-\d+$/)
+      .first()
+      .click();
+    await expectTouchClean(page, '技能面板（选牌）');
+  });
+
+  test('对局：射手的选目标弹窗（禁足开关）', async ({ page }) => {
+    await openScene(page, '/game/debug?skill=sagittarius');
+    await page.locator('[data-testid^="card-"][title="SHOOT"]').first().click();
+    await page.getByTestId('hand-commit-play').click();
+    await expect(page.getByTestId('prevent-move-toggle')).toBeVisible();
+    await expectTouchClean(page, '射手选目标弹窗');
   });
 
   test('对局：弃牌阶段选牌后', async ({ page }) => {

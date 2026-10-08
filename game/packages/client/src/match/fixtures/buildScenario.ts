@@ -157,7 +157,123 @@ function giveTurn(
   };
 }
 
+/** 角色走查场景：本人的视角与角色、梦主的角色、回合阶段，以及在这之上对局面的调整 */
+interface SkillScene {
+  readonly viewer: 'thief' | 'master';
+  /** 本人的角色 */
+  readonly character: string;
+  /** 盗梦者视角下梦主的角色；缺省是没有主动技能的梦主 */
+  readonly masterCharacter?: string;
+  /** 回合阶段；缺省是出牌阶段 */
+  readonly phase?: 'draw' | 'discard';
+  readonly adjust?: (G: SetupState, who: { viewer: string; master: string }) => SetupState;
+}
+
+/** 弃牌堆里的梦境穿梭剂放回牌库底，使弃牌堆里没有这种牌（牌总数不变） */
+function withoutTransitInDiscard(G: SetupState): SetupState {
+  const transit = 'action_dream_transit';
+  const gone = G.deck.discardPile.filter((c) => c === transit);
+  return {
+    ...G,
+    deck: {
+      cards: [...G.deck.cards, ...gone],
+      discardPile: G.deck.discardPile.filter((c) => c !== transit),
+    },
+  };
+}
+
+const SKILL_SCENES: Partial<Record<FixtureScenarioId, SkillScene>> = {
+  // 抽牌阶段：略过抽牌的入口
+  'skill-draw': { viewer: 'thief', character: 'thief_aries', phase: 'draw' },
+  'skill-joker': { viewer: 'thief', character: 'thief_joker', phase: 'draw' },
+  // 双子翻到背面，本人在第 4 层、梦主在第 3 层：梦主所在层数字更小
+  'skill-gemini-back': {
+    viewer: 'thief',
+    character: 'thief_gemini_back',
+    adjust: (G, { viewer }) => placePlayers(G, { [viewer]: { layer: 4, revealed: false } }),
+  },
+  // 药剂师：手里有梦境穿梭剂、同层有同伴，但弃牌堆里没有梦境穿梭剂：「调剂」置灰并说明，「注射」可用
+  'skill-chemist': {
+    viewer: 'thief',
+    character: 'thief_chemist',
+    adjust: (G) => withoutTransitInDiscard(G),
+  },
+  'skill-space-queen': { viewer: 'thief', character: 'thief_space_queen', phase: 'discard' },
+  'skill-black-hole': { viewer: 'thief', character: 'thief_black_hole' },
+  'skill-terrorist': { viewer: 'thief', character: 'thief_terrorist' },
+  'skill-sagittarius': { viewer: 'thief', character: 'thief_sagittarius' },
+  // 皇城世界观：本人收过贿赂牌，有一次 SHOOT 机会
+  'skill-imperial': {
+    viewer: 'thief',
+    character: 'thief_aries',
+    masterCharacter: 'dm_imperial_city',
+    adjust: (G, { viewer }) => {
+      const given = giveBribe(G, viewer);
+      return {
+        ...given,
+        players: {
+          ...given.players,
+          [viewer]: { ...given.players[viewer]!, imperialShootCharges: 1 },
+        },
+      };
+    },
+  },
+  // 土星世界观：本人持有贿赂牌，可以免费移动到相邻层
+  'skill-saturn': {
+    viewer: 'thief',
+    character: 'thief_aries',
+    masterCharacter: 'dm_saturn_territory',
+    adjust: (G, { viewer }) => giveBribe(G, viewer),
+  },
+  // 本人所在层的心锁已被解空
+  'skill-unlock-none': {
+    viewer: 'thief',
+    character: 'thief_aries',
+    adjust: (G, { viewer }) => {
+      const layer = G.players[viewer]!.currentLayer;
+      return {
+        ...G,
+        layers: { ...G.layers, [layer]: { ...G.layers[layer]!, heartLockValue: 0 } },
+      };
+    },
+  },
+  // 本回合已成功解封一次，解封次数用尽
+  'skill-unlock-spent': {
+    viewer: 'thief',
+    character: 'thief_aries',
+    adjust: (G, { viewer }) => ({
+      ...G,
+      players: { ...G.players, [viewer]: { ...G.players[viewer]!, successfulUnlocksThisTurn: 1 } },
+    }),
+  },
+  'skill-venus': { viewer: 'master', character: 'dm_venus_mirror' },
+  // 密道：手里有梦境穿梭剂
+  'skill-passage': {
+    viewer: 'master',
+    character: 'dm_secret_passage',
+    adjust: (G, { viewer }) => dealSpecific(G, viewer, cards('action_dream_transit')),
+  },
+  // 梦主：第 2 层的梦魇已翻开（致命漩涡），第 3 层的梦魇已翻开（回音萦绕，发动要附加参数）
+  'skill-nightmare': {
+    viewer: 'master',
+    character: PLAIN_MASTER,
+    adjust: (G) => {
+      let s = placeNightmare(G, 2, 'nightmare_vortex' as CardID);
+      s = placeNightmare(s, 3, 'nightmare_echo' as CardID);
+      return {
+        ...s,
+        layers: {
+          ...s.layers,
+          2: { ...s.layers[2]!, nightmareRevealed: true },
+          3: { ...s.layers[3]!, nightmareRevealed: true },
+        },
+      };
+    },
+  },
+};
+
 const isMasterScenario = (id: FixtureScenarioId): boolean =>
+  SKILL_SCENES[id]?.viewer === 'master' ||
   id === 'master' ||
   id === 'master-pending' ||
   id === 'master-chess' ||
@@ -282,6 +398,7 @@ export function buildFixtureMatch(
   const thieves = base.G.playerOrder.filter((seat) => seat !== master);
   const viewer = isMasterScenario(id) ? master : thieves[0]!;
   const response = RESPONSE_SPECS[id];
+  const skillScene = SKILL_SCENES[id];
   // 待应答场景里由第二名盗梦者当回合主人；其余场景轮到本人
   const actor = isPendingScenario(id) || response?.turnOwner === 'other' ? thieves[1]! : viewer;
 
@@ -320,11 +437,18 @@ export function buildFixtureMatch(
       ...G.players,
       [master]: {
         ...G.players[master]!,
-        characterId: id === 'master-chess' ? CHESS_MASTER : PLAIN_MASTER,
+        characterId: (skillScene?.viewer === 'master'
+          ? skillScene.character
+          : (skillScene?.masterCharacter ??
+            (id === 'master-chess' ? CHESS_MASTER : PLAIN_MASTER))) as CardID,
       },
     },
   };
   if (response) G = assignCharacter(G, viewer, response.viewerCharacter);
+  if (skillScene) {
+    if (skillScene.viewer === 'thief') G = assignCharacter(G, viewer, skillScene.character);
+    if (skillScene.adjust) G = skillScene.adjust(G, { viewer, master });
+  }
   // 复活走查：本人在迷失层（手牌保留），或一名盗梦者同伴在迷失层
   if (id === 'thief-dead') G = sendToLimbo(G, viewer);
   if (id === 'thief-mate-dead' || id === 'master-mate-dead') {
@@ -337,6 +461,7 @@ export function buildFixtureMatch(
 
   let state = giveTurn(base, G, actor);
   if (isDiscardScenario(id)) state = { ...state, G: { ...state.G, turnPhase: 'discard' } };
+  if (skillScene?.phase) state = { ...state, G: { ...state.G, turnPhase: skillScene.phase } };
 
   if (isPendingScenario(id)) {
     const played = applyMove(game, state, {

@@ -10,6 +10,44 @@ const q = (s: string) => new URLSearchParams(s);
 
 const idOf = (s: string) => resolveFixtureScenario(q(s)).id;
 
+describe('resolveFixtureScenario · skill=', () => {
+  it.each([
+    ['draw', 'skill-draw'],
+    ['joker', 'skill-joker'],
+    ['gemini-back', 'skill-gemini-back'],
+    ['chemist', 'skill-chemist'],
+    ['space-queen', 'skill-space-queen'],
+    ['black-hole', 'skill-black-hole'],
+    ['terrorist', 'skill-terrorist'],
+    ['sagittarius', 'skill-sagittarius'],
+    ['venus', 'skill-venus'],
+    ['passage', 'skill-passage'],
+    ['imperial', 'skill-imperial'],
+    ['saturn', 'skill-saturn'],
+    ['nightmare', 'skill-nightmare'],
+    ['unlock-none', 'skill-unlock-none'],
+    ['unlock-spent', 'skill-unlock-spent'],
+  ])('skill=%s 进入 %s', (name, id) => {
+    expect(idOf(`skill=${name}`)).toBe(id);
+  });
+
+  it('skill 场景自带视角，盖过 as=master / discard / dead 等；响应窗口与待应答参数优先', () => {
+    expect(idOf('skill=chemist&as=master')).toBe('skill-chemist');
+    expect(idOf('skill=chemist&discard=1')).toBe('skill-chemist');
+    expect(idOf('skill=chemist&pending=1')).toBe('thief-pending');
+    expect(idOf('skill=chemist&pending=shoot')).toBe('thief-pending-shoot');
+  });
+
+  it('不认识的 skill 值被忽略；可与 players、chat 叠加', () => {
+    expect(idOf('skill=nope')).toBe('thief');
+    expect(resolveFixtureScenario(q('skill=draw&players=8&chat=1'))).toEqual({
+      id: 'skill-draw',
+      players: 8,
+      extras: { chat: true },
+    });
+  });
+});
+
 describe('resolveFixtureScenario', () => {
   it('无参数时是盗梦者视角的缺省场景，缺省人数', () => {
     expect(resolveFixtureScenario(q(''))).toEqual({

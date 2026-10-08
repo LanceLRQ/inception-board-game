@@ -38,7 +38,19 @@ import {
   SHADE_FOLLOW,
   TOURIST_ASSIST,
   type ActiveSkillContext,
+  type SkillLayerInfo,
 } from './activeSkills.js';
+
+function layerInfo(overrides: Partial<SkillLayerInfo> = {}): SkillLayerInfo {
+  return {
+    heartLockValue: 3,
+    nightmareRevealed: false,
+    nightmareTriggered: false,
+    nightmareId: null,
+    playersInLayer: [],
+    ...overrides,
+  };
+}
 
 function baseCtx(overrides: Partial<ActiveSkillContext> = {}): ActiveSkillContext {
   return {
@@ -172,7 +184,11 @@ describe('getAvailableActiveSkills · 殉道者·牺牲', () => {
 describe('getAvailableActiveSkills · 药剂师·调剂（handCard）', () => {
   it('药剂师 + 有手牌 → 含', () => {
     const list = getAvailableActiveSkills(
-      baseCtx({ characterId: 'thief_chemist', hand: ['action_unlock'] }),
+      baseCtx({
+        characterId: 'thief_chemist',
+        hand: ['action_unlock'],
+        discardPile: ['action_dream_transit'],
+      }),
     );
     expect(list).toContain(CHEMIST_REFINE);
   });
@@ -190,7 +206,7 @@ describe('getAvailableActiveSkills · 药剂师·调剂（handCard）', () => {
 describe('getAvailableActiveSkills · 筑梦师·迷宫（cardAndPlayer）', () => {
   it('筑梦师 + 有手牌 → 含', () => {
     const list = getAvailableActiveSkills(
-      baseCtx({ characterId: 'thief_architect', hand: ['action_unlock'] }),
+      baseCtx({ characterId: 'thief_architect', hand: ['action_shoot'] }),
     );
     expect(list).toContain(ARCHITECT_MAZE);
   });
@@ -208,7 +224,12 @@ describe('getAvailableActiveSkills · 筑梦师·迷宫（cardAndPlayer）', () 
 describe('getAvailableActiveSkills · 火星·杀戮（梦主·targetLayer）', () => {
   it('梦主 + 火星·战场 → 含', () => {
     const list = getAvailableActiveSkills(
-      baseCtx({ characterId: 'dm_mars_battlefield', faction: 'master' }),
+      baseCtx({
+        characterId: 'dm_mars_battlefield',
+        faction: 'master',
+        hand: ['action_unlock'],
+        layers: { 2: layerInfo({ nightmareId: 'nightmare_vortex' }) },
+      }),
     );
     expect(list).toContain(MARS_KILL);
   });
@@ -233,7 +254,12 @@ describe('getAvailableActiveSkills · 火星·杀戮（梦主·targetLayer）', 
 describe('getAvailableActiveSkills · 土星·自由移动（贿赂持有者）', () => {
   it('盗梦者 + 持贿赂 → 含', () => {
     const list = getAvailableActiveSkills(
-      baseCtx({ faction: 'thief', hasBribe: true, characterId: 'thief_any' }),
+      baseCtx({
+        faction: 'thief',
+        hasBribe: true,
+        characterId: 'thief_any',
+        masterCharacterId: 'dm_saturn_territory',
+      }),
     );
     expect(list).toContain(SATURN_FREE_MOVE);
   });
@@ -257,7 +283,11 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
   it('梦主 → 含 2 个通用梦魇操作（DISCARD/ACTIVATE，处理已被翻开的梦魇）', async () => {
     const mod = await import('./activeSkills.js');
     const list = getAvailableActiveSkills(
-      baseCtx({ faction: 'master', characterId: 'dm_fortress' }),
+      baseCtx({
+        faction: 'master',
+        characterId: 'dm_fortress',
+        layers: { 2: layerInfo({ nightmareRevealed: true, nightmareId: 'nightmare_vortex' }) },
+      }),
     );
     expect(list).toContain(MASTER_DISCARD_NIGHTMARE);
     expect(list).toContain(mod.MASTER_ACTIVATE_NIGHTMARE);
@@ -314,7 +344,11 @@ describe('getAvailableActiveSkills · 密道·传送（playerAndCard）', () => 
   it('梦主 + 手牌 + 未用满 → 含', async () => {
     const { SECRET_PASSAGE_TELEPORT } = await import('./activeSkills.js');
     const list = getAvailableActiveSkills(
-      baseCtx({ faction: 'master', characterId: 'dm_x', hand: ['action_unlock'] }),
+      baseCtx({
+        faction: 'master',
+        characterId: 'dm_secret_passage',
+        hand: ['action_dream_transit'],
+      }),
     );
     expect(list).toContain(SECRET_PASSAGE_TELEPORT);
   });
@@ -324,9 +358,9 @@ describe('getAvailableActiveSkills · 密道·传送（playerAndCard）', () => 
     const list = getAvailableActiveSkills(
       baseCtx({
         faction: 'master',
-        characterId: 'dm_x',
-        hand: ['action_unlock'],
-        skillUsedThisTurn: { secret_passage_teleport: 2 },
+        characterId: 'dm_secret_passage',
+        hand: ['action_dream_transit'],
+        skillUsedThisTurn: { 'dm_secret_passage.skill_0': 2 },
       }),
     );
     expect(list).not.toContain(SECRET_PASSAGE_TELEPORT);
@@ -364,7 +398,11 @@ describe('getAvailableActiveSkills · 灵魂牧师·拯救 & 天王星·权力',
   it('天王星·权力（梦主）→ 含 URANUS_POWER · argKind=playerAndLayer', async () => {
     const { URANUS_POWER } = await import('./activeSkills.js');
     const list = getAvailableActiveSkills(
-      baseCtx({ characterId: 'dm_uranus_firmament', faction: 'master' }),
+      baseCtx({
+        characterId: 'dm_uranus_firmament',
+        faction: 'master',
+        bribePoolItems: [{ index: 0, id: 'bribe-0' }],
+      }),
     );
     expect(list).toContain(URANUS_POWER);
     expect(URANUS_POWER.argKind).toBe('playerAndLayer');

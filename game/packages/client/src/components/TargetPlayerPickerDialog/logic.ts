@@ -14,6 +14,8 @@ export interface TargetPlayerOption {
   reason: TargetDisabledReason | null;
   /** 跨层时展示的层号（用于按钮后缀） */
   crossLayerNumber: number | null;
+  /** 要求同层的 SHOOT 打向别的层，但射手有豁免（摩羯·节奏、恐怖分子·远程、木星·巅峰世界观），可以选 */
+  crossLayerAllowed: boolean;
   /** target 当前层（信息性） */
   currentLayer: number;
 }
@@ -36,6 +38,41 @@ export interface TargetPickerInputs {
   viewerIsMaster?: boolean;
   /** 持有贿赂牌的座位（视图里贿赂池的 heldBy 是公开的）；梦境窥视效果②只能选他们 */
   bribeHolderIds?: readonly string[];
+  /** 本人的角色与手牌张数、梦主的角色（都在本人视图里）：SHOOT 跨层的豁免要用 */
+  viewerCharacterId?: string | null;
+  viewerHandCount?: number;
+  masterCharacterId?: string | null;
+}
+
+/**
+ * 要求同层的 SHOOT 能不能打向别的层：与引擎的 violatesShootLayerLimit 同口径，所需信息都在本人视图里。
+ *   摩羯·节奏：手牌数不小于所在层数字（手牌数含这张 SHOOT，出牌时它还在手里）
+ *   恐怖分子·远程：无条件
+ *   木星·巅峰世界观：梦主是木星时，相邻的梦境层也可以（迷失层不算）
+ * 对照：docs/manual/05-dream-thieves.md 摩羯、恐怖分子；docs/manual/06-dream-master.md 木星·巅峰
+ */
+export function shootCrossLayerAllowed(input: {
+  readonly viewerCharacterId?: string | null | undefined;
+  readonly viewerLayer: number;
+  readonly viewerHandCount?: number | undefined;
+  readonly masterCharacterId?: string | null | undefined;
+  readonly targetLayer: number;
+}): boolean {
+  const { viewerCharacterId, viewerLayer, viewerHandCount, masterCharacterId, targetLayer } = input;
+  if (viewerCharacterId === 'thief_terrorist') return true;
+  if (
+    viewerCharacterId === 'thief_capricornus' &&
+    viewerLayer >= 1 &&
+    (viewerHandCount ?? 0) >= viewerLayer
+  ) {
+    return true;
+  }
+  return (
+    masterCharacterId === 'dm_jupiter_peak' &&
+    viewerLayer >= 1 &&
+    targetLayer >= 1 &&
+    Math.abs(viewerLayer - targetLayer) === 1
+  );
 }
 
 /**
@@ -98,10 +135,20 @@ export function computeTargetOptions(inputs: TargetPickerInputs): TargetPlayerOp
     if (id === inputs.viewerPlayerID) continue;
     if (peekIds && !peekIds.has(id)) continue;
     const crossLayer = p.currentLayer !== inputs.viewerLayer;
+    const crossLayerAllowed =
+      sameLayerRequired &&
+      crossLayer &&
+      shootCrossLayerAllowed({
+        viewerCharacterId: inputs.viewerCharacterId,
+        viewerLayer: inputs.viewerLayer,
+        viewerHandCount: inputs.viewerHandCount,
+        masterCharacterId: inputs.masterCharacterId,
+        targetLayer: p.currentLayer,
+      });
     const reason: TargetDisabledReason | null =
       masterForbidden && id === inputs.dreamMasterID
         ? 'masterTarget'
-        : sameLayerRequired && crossLayer
+        : sameLayerRequired && crossLayer && !crossLayerAllowed
           ? 'sameLayer'
           : null;
     out.push({
@@ -110,6 +157,7 @@ export function computeTargetOptions(inputs: TargetPickerInputs): TargetPlayerOp
       disabled: reason !== null,
       reason,
       crossLayerNumber: crossLayer ? p.currentLayer : null,
+      crossLayerAllowed,
       currentLayer: p.currentLayer,
     });
   }

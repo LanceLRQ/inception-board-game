@@ -16,6 +16,25 @@ import {
   derivePlayRules,
 } from '../../components/MatchRuntime/controllerDerive';
 import { deriveDockEntries } from '../../components/MatchRuntime/model/dockEntries';
+import {
+  getSkillEntries,
+  GEMINI_CHOICE,
+  CHEMIST_INJECT,
+  CHEMIST_REFINE,
+  SPACE_QUEEN_STASH,
+  BLACK_HOLE_ABSORB,
+  IMPERIAL_WORLD_SHOOT,
+  SATURN_FREE_MOVE,
+  VENUS_DOUBLE,
+  SECRET_PASSAGE_TELEPORT,
+  MASTER_ACTIVATE_NIGHTMARE,
+  MASTER_DISCARD_NIGHTMARE,
+} from '../../lib/activeSkills';
+import {
+  buildActiveSkillContext,
+  nightmareUnlockLayers,
+} from '../../components/MatchRuntime/controllerDerive';
+import { playBlockReason } from '../../components/MatchRuntime/model/handDerive';
 import { peekMasterTargetIds } from '../../components/TargetPlayerPickerDialog/logic';
 import {
   FIXTURE_DEFAULT_PLAYERS,
@@ -63,9 +82,10 @@ describe('buildFixtureScenario · 通用', () => {
     (id) => {
       const G = viewG(id);
       // 迷失层（0）不是梦境，没有心锁；有人在迷失层时引擎会为它建一条层记录
-      for (const layer of Object.values(G.layers).filter((l) => l.layer !== 0)) {
-        expect(layer.heartLockValue).toBeGreaterThan(0);
-      }
+      // 「所在层心锁为 0」的走查场景本来就有一层被解空
+      const layers = Object.values(G.layers).filter((l) => l.layer !== 0);
+      const empty = layers.filter((l) => l.heartLockValue === 0);
+      expect(empty).toHaveLength(id === 'skill-unlock-none' ? 1 : 0);
       const revealedThieves = Object.values(G.players).filter(
         (p) => p.isRevealed && p.faction === 'thief',
       );
@@ -548,5 +568,139 @@ describe('buildFixtureScenario · 梦主的出牌限制', () => {
     // 引擎过滤后的视图：持有者公开，成败为 null
     expect(G.bribePool.find((b) => b.heldBy !== null)!.kind).toBeNull();
     expect(checkInvariants(buildFixtureMatch('master-bribe').state.G)).toEqual([]);
+  });
+});
+
+describe('buildFixtureScenario · 角色技能走查场景', () => {
+  /** 本人视图里此刻的技能项 */
+  function skillEntriesOf(id: FixtureScenarioId) {
+    const sc = buildFixtureScenario(id);
+    const G = sc.view.G as MatchView;
+    const hand = G.players[sc.seat]!.hand ?? [];
+    return {
+      sc,
+      G,
+      entries: getSkillEntries(
+        buildActiveSkillContext({
+          G,
+          seat: sc.seat,
+          isMyTurn: G.currentPlayerID === sc.seat,
+          hand,
+        }),
+      ),
+    };
+  }
+  const enabledSkills = (id: FixtureScenarioId) =>
+    skillEntriesOf(id)
+      .entries.filter((e) => e.enabled)
+      .map((e) => e.skill);
+
+  it('抽牌阶段的场景：轮到本人，阶段是抽牌；小丑场景的本人是小丑', () => {
+    for (const id of ['skill-draw', 'skill-joker'] as const) {
+      const sc = buildFixtureScenario(id);
+      const G = sc.view.G as MatchView;
+      expect(G.turnPhase).toBe('draw');
+      expect(G.currentPlayerID).toBe(sc.seat);
+      const kinds = deriveDockEntries({
+        seat: sc.seat,
+        dreamMasterID: G.dreamMasterID,
+        players: G.players,
+        hand: G.players[sc.seat]!.hand ?? [],
+        isMyTurn: true,
+        turnPhase: G.turnPhase,
+        winner: null,
+        busy: false,
+      }).map((e) => e.kind);
+      expect(kinds).toEqual(id === 'skill-joker' ? ['skipDraw', 'jokerGamble'] : ['skipDraw']);
+    }
+    const joker = buildFixtureScenario('skill-joker');
+    expect((joker.view.G as MatchView).players[joker.seat]!.characterId).toBe('thief_joker');
+  });
+
+  it('双子背面：翻到背面的角色 id，梦主所在层数字更小，「双子·抉择」可用', () => {
+    const { sc, G } = skillEntriesOf('skill-gemini-back');
+    expect(G.players[sc.seat]!.characterId).toBe('thief_gemini_back');
+    expect(G.players[sc.seat]!.currentLayer).toBe(4);
+    expect(enabledSkills('skill-gemini-back')).toContain(GEMINI_CHOICE);
+  });
+
+  it('药剂师：弃牌堆里没有梦境穿梭剂，「调剂」置灰并说明；手里有梦境穿梭剂、同层有同伴，「注射」可用', () => {
+    const { entries } = skillEntriesOf('skill-chemist');
+    expect(entries.find((e) => e.skill === CHEMIST_REFINE)).toMatchObject({
+      enabled: false,
+      reason: { key: 'skill.reason.noTransitInDiscard' },
+    });
+    expect(entries.find((e) => e.skill === CHEMIST_INJECT)?.enabled).toBe(true);
+  });
+
+  it('空间女王：弃牌阶段，「造物」可用', () => {
+    const { G } = skillEntriesOf('skill-space-queen');
+    expect(G.turnPhase).toBe('discard');
+    expect(enabledSkills('skill-space-queen')).toContain(SPACE_QUEEN_STASH);
+  });
+
+  it('黑洞：「吸纳」可用', () => {
+    expect(enabledSkills('skill-black-hole')).toContain(BLACK_HOLE_ABSORB);
+  });
+
+  it('皇城：本人有一次 SHOOT 机会，梦主是皇城；土星：本人持贿赂，梦主是土星', () => {
+    expect(enabledSkills('skill-imperial')).toContain(IMPERIAL_WORLD_SHOOT);
+    expect(enabledSkills('skill-saturn')).toContain(SATURN_FREE_MOVE);
+    const { G } = skillEntriesOf('skill-saturn');
+    expect(G.players[G.dreamMasterID]!.characterId).toBe('dm_saturn_territory');
+  });
+
+  it('梦主走查：金星、密道各有自己的技能，梦魇场景有两层已翻开的梦魇', () => {
+    expect(enabledSkills('skill-venus')).toContain(VENUS_DOUBLE);
+    expect(enabledSkills('skill-passage')).toContain(SECRET_PASSAGE_TELEPORT);
+    const night = skillEntriesOf('skill-nightmare');
+    const skills = night.entries.filter((e) => e.enabled).map((e) => e.skill);
+    expect(skills).toContain(MASTER_DISCARD_NIGHTMARE);
+    expect(skills).toContain(MASTER_ACTIVATE_NIGHTMARE);
+    expect(night.G.layers[2]!.nightmareRevealed).toBe(true);
+    expect(night.G.layers[3]!.nightmareRevealed).toBe(true);
+  });
+
+  it('射手 / 恐怖分子：本人角色正确，手里有 SHOOT', () => {
+    for (const [id, character] of [
+      ['skill-sagittarius', 'thief_sagittarius'],
+      ['skill-terrorist', 'thief_terrorist'],
+    ] as const) {
+      const sc = buildFixtureScenario(id);
+      const p = (sc.view.G as MatchView).players[sc.seat]!;
+      expect(p.characterId).toBe(character);
+      expect(p.hand).toContain('action_shoot');
+    }
+  });
+
+  it('解封预判场景：心锁为 0 / 解封次数用尽时，【解封】打不出', () => {
+    const none = buildFixtureScenario('skill-unlock-none');
+    expect(
+      playBlockReason('action_unlock', derivePlayRules(none.view.G as MatchView, none.seat)),
+    ).toBe('noHeartLock');
+    const spent = buildFixtureScenario('skill-unlock-spent');
+    expect(
+      playBlockReason('action_unlock', derivePlayRules(spent.view.G as MatchView, spent.seat)),
+    ).toBe('unlockLimit');
+  });
+
+  it('梦魇场景：梦主视角列出的暗置梦魇层不含已翻开的两层', () => {
+    const sc = buildFixtureScenario('skill-nightmare');
+    expect(nightmareUnlockLayers((sc.view.G as MatchView).layers)).toEqual([1, 4]);
+  });
+
+  it('盗梦者视角的角色走查场景里，视图看不到梦魇是什么、也看不到他人手牌', () => {
+    for (const id of ['skill-chemist', 'skill-imperial', 'skill-saturn'] as const) {
+      const { state, viewer } = buildFixtureMatch(id);
+      const G = viewG(id);
+      expect(
+        Object.values(G.layers).every((l) => l.nightmareId === null || l.nightmareRevealed),
+      ).toBe(true);
+      for (const [seat, p] of Object.entries(G.players)) {
+        if (seat === viewer) continue;
+        expect(p.hand).toBeNull();
+        expect(p.handCount).toBe(state.G.players[seat]!.hand.length);
+      }
+    }
   });
 });

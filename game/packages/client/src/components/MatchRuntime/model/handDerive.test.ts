@@ -148,6 +148,22 @@ describe('playBlockReason · 界面上看着能打、引擎必拒的牌', () => 
     expect(playBlockReason('action_dream_peek', rules())).toBeNull();
   });
 
+  it('【解封】：所在层心锁为 0、本回合解封次数用尽都打不出；其他牌不受影响', () => {
+    expect(playBlockReason('action_unlock', rules({ layerHeartLock: 0 }))).toBe('noHeartLock');
+    expect(playBlockReason('action_unlock', rules({ layerHeartLock: 2 }))).toBeNull();
+    expect(playBlockReason('action_unlock', rules({ unlockExhausted: true }))).toBe('unlockLimit');
+    expect(
+      playBlockReason('action_shoot', rules({ layerHeartLock: 0, unlockExhausted: true })),
+    ).toBe(null);
+  });
+
+  it('【梦魇解封】要有一层还盖着暗置的梦魇', () => {
+    expect(
+      playBlockReason('action_nightmare_unlock', rules({ hasNightmareUnlockTarget: false })),
+    ).toBe('noNightmareTarget');
+    expect(playBlockReason('action_nightmare_unlock', rules())).toBeNull();
+  });
+
   it('已在迷失层：任何牌都不能打', () => {
     expect(playBlockReason('action_shoot', rules({ alive: false }))).toBe('dead');
     expect(playBlockReason('action_dream_transit', rules({ alive: false }))).toBe('dead');

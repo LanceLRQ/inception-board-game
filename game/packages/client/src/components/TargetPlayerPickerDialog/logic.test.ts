@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeTargetOptions, isSameLayerRequired, peekMasterTargetIds } from './logic';
+import {
+  computeTargetOptions,
+  isSameLayerRequired,
+  peekMasterTargetIds,
+  shootCrossLayerAllowed,
+} from './logic';
 
 describe('TargetPlayerPickerDialog · logic', () => {
   describe('isSameLayerRequired', () => {
@@ -174,6 +179,67 @@ describe('TargetPlayerPickerDialog · 引擎必拒的目标', () => {
 
     it('peekMasterTargetIds：不含梦主自己与已死亡者', () => {
       expect(peekMasterTargetIds(players, 'pM', 'pM', ['pM', 'p1', 'p4'])).toEqual(['p1']);
+    });
+  });
+});
+
+describe('SHOOT 跨层的豁免', () => {
+  const base = { viewerLayer: 2, targetLayer: 4 };
+
+  it('恐怖分子：无条件', () => {
+    expect(shootCrossLayerAllowed({ ...base, viewerCharacterId: 'thief_terrorist' })).toBe(true);
+  });
+
+  it('摩羯：手牌数不小于所在层数字', () => {
+    const cap = { ...base, viewerCharacterId: 'thief_capricornus' };
+    expect(shootCrossLayerAllowed({ ...cap, viewerHandCount: 2 })).toBe(true);
+    expect(shootCrossLayerAllowed({ ...cap, viewerHandCount: 1 })).toBe(false);
+    expect(shootCrossLayerAllowed({ ...cap })).toBe(false);
+  });
+
+  it('木星·巅峰：相邻层可以，隔层与迷失层不行', () => {
+    const jupiter = { viewerLayer: 2, masterCharacterId: 'dm_jupiter_peak' };
+    expect(shootCrossLayerAllowed({ ...jupiter, targetLayer: 3 })).toBe(true);
+    expect(shootCrossLayerAllowed({ ...jupiter, targetLayer: 1 })).toBe(true);
+    expect(shootCrossLayerAllowed({ ...jupiter, targetLayer: 4 })).toBe(false);
+    expect(shootCrossLayerAllowed({ ...jupiter, targetLayer: 0 })).toBe(false);
+    expect(shootCrossLayerAllowed({ ...jupiter, viewerLayer: 0, targetLayer: 1 })).toBe(false);
+  });
+
+  it('其他角色与其他世界观：不豁免', () => {
+    expect(
+      shootCrossLayerAllowed({
+        ...base,
+        viewerCharacterId: 'thief_aries',
+        masterCharacterId: 'dm_chess',
+        viewerHandCount: 9,
+      }),
+    ).toBe(false);
+  });
+
+  it('computeTargetOptions：豁免的跨层目标可选并标出，没有豁免时仍置灰', () => {
+    const players = {
+      '0': { isAlive: true, currentLayer: 2 },
+      '1': { isAlive: true, currentLayer: 4 },
+    };
+    const exempt = computeTargetOptions({
+      cardId: 'action_shoot',
+      viewerLayer: 2,
+      viewerPlayerID: '0',
+      players,
+      viewerCharacterId: 'thief_terrorist',
+    });
+    expect(exempt[0]).toMatchObject({ disabled: false, reason: null, crossLayerAllowed: true });
+    const plain = computeTargetOptions({
+      cardId: 'action_shoot',
+      viewerLayer: 2,
+      viewerPlayerID: '0',
+      players,
+    });
+    expect(plain[0]).toMatchObject({
+      disabled: true,
+      reason: 'sameLayer',
+      crossLayerAllowed: false,
     });
   });
 });

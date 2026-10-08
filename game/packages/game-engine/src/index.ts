@@ -17,6 +17,7 @@ export {
   isAdjacentLayer,
   recordCardPlayed,
   FORTRESS_COLDNESS_CHANCES_KEY,
+  HEART_LOCK_REDUCED_BY_SKILL_KEY,
   MASTER_FREE_MOVE_KEY,
 } from './stateOps.js';
 export * from './config.js';

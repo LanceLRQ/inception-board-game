@@ -55,7 +55,7 @@ test.describe('人机对战 LocalMatch', () => {
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
 
     // 等待轮到自己
-    const drawBtn = page.getByRole('button', { name: /抽牌|Draw/ });
+    const drawBtn = page.getByTestId('action-draw');
     await drawBtn.waitFor({ state: 'visible', timeout: 15_000 });
     await drawBtn.click();
 
@@ -84,7 +84,7 @@ test.describe('人机对战 LocalMatch', () => {
     await page.getByRole('button', { name: /开始游戏|Start/ }).click();
 
     // 轮到自己抽牌（等待期间若 Bot 的行动让真人要应答，就给出最简单的答复）
-    const draw = page.getByRole('button', { name: /抽牌|Draw/ });
+    const draw = page.getByTestId('action-draw');
     await waitVisibleAnswering(page, draw, 15_000);
     await draw.click({ timeout: 5_000 });
     // 结束行动
@@ -109,7 +109,7 @@ test.describe('人机对战 LocalMatch', () => {
     }
 
     // Bot 自动推进后再次回到自己回合
-    await waitVisibleAnswering(page, page.getByRole('button', { name: /抽牌|Draw/ }), 15_000);
+    await waitVisibleAnswering(page, page.getByTestId('action-draw'), 15_000);
 
     // 关键断言：整个流程无 move 被拒（Worker 记录被拒时的文字为 'move rejected'，error 与 warning 级都要查）
     const rejected = [...consoleErrors, ...consoleWarnings].filter((e) =>

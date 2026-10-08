@@ -44,8 +44,18 @@ export function cardTargetKind(cardId: string, role: PlayRole = 'thief'): CardTa
  *   masterNoUnlock  梦主不能使用【解封】效果①，只能在响应窗口里用效果②抵消（docs/manual/04-action-cards.md:97）
  *   revivedNoUnlock 本回合复活过自己：不能用【解封】效果①（docs/manual/04-action-cards.md:94）
  *   noPeekTarget    梦主的【梦境窥视】效果②必须有一名持有贿赂牌的盗梦者可看（docs/manual/04-action-cards.md:115、:119）
+ *   noHeartLock     所在层的心锁已经是 0，没有可解的锁（docs/manual/04-action-cards.md:93）
+ *   unlockLimit     本回合成功解锁的次数已用尽（docs/manual/03-game-flow.md:26-28；摩羯·节奏、水瓶·同流豁免）
+ *   noNightmareTarget 【梦魇解封】要有一层还盖着暗置的梦魇（docs/manual/04-action-cards.md 梦魇解封）
  */
-export type PlayBlockReason = 'dead' | 'masterNoUnlock' | 'revivedNoUnlock' | 'noPeekTarget';
+export type PlayBlockReason =
+  | 'dead'
+  | 'masterNoUnlock'
+  | 'revivedNoUnlock'
+  | 'noPeekTarget'
+  | 'noHeartLock'
+  | 'unlockLimit'
+  | 'noNightmareTarget';
 
 /** 判断一张牌能否打出所需的、从视图推导出来的信息 */
 export interface PlayRuleContext {
@@ -55,6 +65,12 @@ export interface PlayRuleContext {
   readonly revivedSelfThisTurn: boolean;
   /** 梦境窥视效果②有没有可选目标（存活、非梦主、持有贿赂牌的盗梦者） */
   readonly hasPeekMasterTarget: boolean;
+  /** 本人所在层的心锁数（公开）；不知道为 null */
+  readonly layerHeartLock: number | null;
+  /** 本回合的解封次数已用尽（含摩羯 / 水瓶的豁免，见 lib/unlockLimit.ts） */
+  readonly unlockExhausted: boolean;
+  /** 有没有一层还盖着暗置的梦魇（未翻开且没被发动 / 弃掉，这两个标记都是公开的） */
+  readonly hasNightmareUnlockTarget: boolean;
 }
 
 /** 没有额外信息时的缺省：存活的盗梦者、没复活过、没有窥视目标（盗梦者不走效果②，用不到） */
@@ -63,6 +79,9 @@ export const DEFAULT_PLAY_RULES: PlayRuleContext = {
   alive: true,
   revivedSelfThisTurn: false,
   hasPeekMasterTarget: false,
+  layerHeartLock: null,
+  unlockExhausted: false,
+  hasNightmareUnlockTarget: true,
 };
 
 /** 这张牌此刻被引擎拒绝的原因；没有原因返回 null（只判断本表里的几种，其余由引擎校验） */
@@ -71,6 +90,11 @@ export function playBlockReason(card: string, rules: PlayRuleContext): PlayBlock
   if (card === 'action_unlock') {
     if (rules.role === 'master') return 'masterNoUnlock';
     if (rules.revivedSelfThisTurn) return 'revivedNoUnlock';
+    if (rules.layerHeartLock !== null && rules.layerHeartLock <= 0) return 'noHeartLock';
+    if (rules.unlockExhausted) return 'unlockLimit';
+  }
+  if (card === 'action_nightmare_unlock' && !rules.hasNightmareUnlockTarget) {
+    return 'noNightmareTarget';
   }
   if (card === 'action_dream_peek' && rules.role === 'master' && !rules.hasPeekMasterTarget) {
     return 'noPeekTarget';

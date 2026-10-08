@@ -369,10 +369,6 @@
         "name": "Activate Nightmare",
         "desc": "Activate a face-up nightmare on the target layer"
       },
-      "secret_passage_teleport": {
-        "name": "Secret Passage Teleport",
-        "desc": "Discard 1 Dream Transit → send a thief to the Lost layer (up to 2/turn)"
-      },
       "deal_bribe": {
         "name": "Deal Bribe",
         "desc": "Randomly deal 1 bribe from the pool to a chosen thief"
@@ -406,12 +402,20 @@
       "skill_0": {
         "name": "Chemist · Refine",
         "desc": "Refine a chosen hand card"
+      },
+      "skill_1": {
+        "name": "Chemist · Inject",
+        "desc": "Discard 1 Dream Transit to move a same-layer player to an adjacent layer"
       }
     },
     "thief_gemini": {
       "skill_0": {
         "name": "Gemini · Fate",
         "desc": "Discard phase: if the master is on a higher-numbered layer, roll a die; on 4 / 5 / 6 remove 2 heart-locks here, then flip"
+      },
+      "skill_1": {
+        "name": "Gemini · Choice",
+        "desc": "When the dream master's layer number is lower, roll 2 dice and draw that many cards, then flip"
       }
     },
     "thief_paprik": {
@@ -518,6 +522,57 @@
       "skill_0": {
         "name": "Imperial City · Bounty",
         "desc": "Choose target + pick 1 bribe from the pool to deal"
+      },
+      "worldview": {
+        "name": "Imperial City · Counts as SHOOT",
+        "desc": "Each bribe a player receives grants 1 chance to pick a thief without a bribe and count as playing a SHOOT, roll -3"
+      }
+    },
+    "disabledAria": "{{name}} (unavailable: {{reason}})",
+    "reason": {
+      "usedUp": "Used up this turn ({{used}}/{{limit}})",
+      "usedUpGame": "Used up this match ({{used}}/{{limit}})",
+      "noTarget": "No valid target",
+      "noTransitInDiscard": "No Dream Transit in the discard pile",
+      "noTransitInHand": "You have no Dream Transit in hand",
+      "unlockLimit": "You have used all your unlocks this turn (reducing a heart lock counts as one)",
+      "noShootCard": "You have no SHOOT-type card in hand",
+      "needTwoShoot": "Needs 2 basic SHOOT cards in hand",
+      "needTwoNonShoot": "Needs 2 non-SHOOT cards in hand",
+      "noShootInDiscard": "No SHOOT-type card in the discard pile",
+      "noUnlockCard": "You have no Unlock in hand",
+      "noRevealedNightmare": "No nightmare is face up",
+      "echoNeedsParams": "The only face-up nightmare is Echo, which needs a layer and mode first; not supported here yet",
+      "noNightmare": "No nightmare to activate",
+      "deckShort": "The deck has fewer than 2 cards",
+      "deckEmpty": "The deck is empty",
+      "discardEmpty": "The discard pile is empty",
+      "noAdjacentPlayers": "No living player on the adjacent layers",
+      "noPlutoTarget": "No living thief with fewer than 2 cards",
+      "noVaultPair": "Fewer than 2 vaults are still unopened"
+    },
+    "thief_space_queen": {
+      "skill_1": {
+        "name": "Space Queen · Creation",
+        "desc": "In the discard phase, put 1 hand card on top of the deck"
+      }
+    },
+    "thief_black_hole": {
+      "skill_1": {
+        "name": "Black Hole · Absorb",
+        "desc": "Pick an adjacent layer; all living players there move to your layer (once per turn)"
+      }
+    },
+    "dm_venus_mirror": {
+      "skill_0": {
+        "name": "Venus · Double",
+        "desc": "Reveal the top of the deck and any hand cards; same-name cards go to your hand, the rest are shuffled back (once per turn)"
+      }
+    },
+    "dm_secret_passage": {
+      "skill_0": {
+        "name": "Secret Passage · Teleport",
+        "desc": "Discard 1 Dream Transit to send a thief to the Lost layer (up to 2/turn)"
       }
     }
   },
@@ -676,7 +731,10 @@
       "dead": "Can't play: you are in the lost layer and can only revive yourself",
       "masterNoUnlock": "The Dream Master cannot unlock with Unlock; use it in the response window to cancel",
       "revivedNoUnlock": "You revived yourself this turn and cannot unlock with Unlock",
-      "noPeekTarget": "No thief holds a bribe card to inspect"
+      "noPeekTarget": "No thief holds a bribe card to inspect",
+      "noHeartLock": "This layer has no heart locks left to unlock",
+      "unlockLimit": "You have used all your unlocks this turn and cannot unlock with Unlock",
+      "noNightmareTarget": "No layer still has a face-down nightmare"
     },
     "wait": "Waiting"
   },
@@ -920,7 +978,9 @@
     "kind": {
       "reviveSelf": "Revive",
       "reviveOther": "Revive ally",
-      "masterMove": "Move"
+      "masterMove": "Move",
+      "skipDraw": "Skip draw",
+      "jokerGamble": "Joker · Wild"
     },
     "reason": {
       "handShort": "Reviving costs {{count}} cards from your hand; you have {{have}}",
@@ -946,6 +1006,11 @@
       "costTransit": "Secret Passage world view: discard {{n}} Dream Transit ({{picked}} chosen)",
       "notTransit": "Only Dream Transit can be discarded under the Secret Passage world view",
       "confirm": "Confirm revive"
+    }
+  },
+  "play": {
+    "preventMove": {
+      "label": "Sagittarius · Hold: the target does not move"
     }
   }
 }

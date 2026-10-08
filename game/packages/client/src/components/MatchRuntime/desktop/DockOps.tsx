@@ -90,6 +90,7 @@ export function DockOps({ controller, commitName, onCommit, skillReady }: DockOp
             <ActiveSkillPanel
               context={skillPanel.context}
               availableTargetIds={skillPanel.targetIds}
+              lostTargetIds={skillPanel.lostTargetIds}
               playerNicknames={skillPanel.nicknames}
               onInvoke={(skill, args) => {
                 skillPanel.invoke(skill, args);

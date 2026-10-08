@@ -47,6 +47,7 @@ import {
   layersOfPlayers,
   nicknameMap,
   pendingPlayFor,
+  playLayerChoices,
   shootToastFor,
   toggleDiscardSelection,
   toggleGravityTargets,
@@ -189,6 +190,12 @@ export function useMatchController(source: MatchSource): MatchController {
     (cardId: string) => setDecreePick((prev) => (prev === cardId ? null : cardId)),
     [setDecreePick],
   );
+  // 射手·禁足：打出普通 SHOOT 时选择令目标不移动
+  const [preventMovePick, setPreventMovePick] = useState(false);
+  const togglePreventMove = useCallback(
+    () => setPreventMovePick((prev) => !prev),
+    [setPreventMovePick],
+  );
 
   // 万有引力：1-2 目标的选择中间态
   const [gravityPicker, setGravityPicker] = useState<{
@@ -293,6 +300,11 @@ export function useMatchController(source: MatchSource): MatchController {
     effectivePendingPlay(pendingPlay, turnPhase, isMyTurn, humanHand),
     humanCharacterId,
   );
+  // 射手·禁足只对普通 SHOOT（playShoot）生效，且要选了目标玩家的出牌意图
+  const preventMoveApplicable =
+    humanCharacterId === 'thief_sagittarius' &&
+    effectivePending?.move === 'playShoot' &&
+    effectivePending.needsTarget === 'player';
 
   const startPlay = useCallback(
     (card: string) => {
@@ -340,12 +352,26 @@ export function useMatchController(source: MatchSource): MatchController {
       if (!effectivePending || effectivePending.needsTarget !== 'player') return;
       await makeMove(
         effectivePending.move,
-        buildPlayArgs(effectivePending, targetPlayerID, decreePick),
+        buildPlayArgs(
+          effectivePending,
+          targetPlayerID,
+          decreePick,
+          preventMoveApplicable && preventMovePick,
+        ),
       );
       setPendingPlay(null);
       setDecreePick(null);
+      setPreventMovePick(false);
     },
-    [effectivePending, makeMove, decreePick, setDecreePick],
+    [
+      effectivePending,
+      makeMove,
+      decreePick,
+      setDecreePick,
+      preventMoveApplicable,
+      preventMovePick,
+      setPreventMovePick,
+    ],
   );
 
   const confirmPlayTargetLayer = useCallback(
@@ -492,6 +518,7 @@ export function useMatchController(source: MatchSource): MatchController {
           showChess();
           return;
         }
+        logger.flow('game/move', 'active skill', { skill: skill.id, move: skill.move });
         void makeMove(skill.move, args);
       },
     };
@@ -545,6 +572,13 @@ export function useMatchController(source: MatchSource): MatchController {
         setMoveOpenStamp(dockStamp);
         return;
       }
+      // 抽牌阶段的两个入口不需要选参数，直接发 move
+      if (kind === 'skipDraw' || kind === 'jokerGamble') {
+        const move = kind === 'skipDraw' ? 'skipDraw' : 'playJokerGamble';
+        logger.flow('game/move', 'draw phase entry', { move });
+        void makeMove(move);
+        return;
+      }
       const mode = kind === 'reviveSelf' ? 'self' : 'other';
       setReviveDraft({
         stamp: dockStamp,
@@ -553,7 +587,7 @@ export function useMatchController(source: MatchSource): MatchController {
         picked: [],
       });
     },
-    [cancelPlay, dockStamp, reviveTargets, setMoveOpenStamp, setReviveDraft],
+    [cancelPlay, dockStamp, makeMove, reviveTargets, setMoveOpenStamp, setReviveDraft],
   );
   const entries: DockEntry[] = entrySpecs.map((spec) => ({
     ...spec,
@@ -721,9 +755,13 @@ export function useMatchController(source: MatchSource): MatchController {
         isMyTurn && turnPhase === 'action' && effectivePending?.needsTarget === 'layer'
           ? { card: effectivePending.card, move: effectivePending.move }
           : null,
+      targetLayerChoices: effectivePending
+        ? playLayerChoices(effectivePending.card, G?.layers)
+        : null,
       cancelTargetPlayer: () => {
         cancelPlay();
         setDecreePick(null);
+        setPreventMovePick(false);
       },
       dreamTransit: {
         open: dreamTransitPicker != null,
@@ -736,6 +774,11 @@ export function useMatchController(source: MatchSource): MatchController {
         toggle: toggleDecree,
         clear: () => setDecreePick(null),
         applicable: decreeApplicable(effectivePending, humanHand),
+      },
+      preventMove: {
+        applicable: preventMoveApplicable,
+        value: preventMoveApplicable && preventMovePick,
+        toggle: togglePreventMove,
       },
     },
     actions: {

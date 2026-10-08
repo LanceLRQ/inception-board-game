@@ -9,6 +9,7 @@ import {
   adjacentLayers,
   canConfirmRevive,
   deriveDockEntries,
+  entryTestId,
   isSecretPassageActive,
   reviveArgs,
   reviveCardEligible,
@@ -127,11 +128,12 @@ describe('底部坞入口 · 复活（本人在迷失层）', () => {
     expect(e!.reason).toEqual({ key: 'entries.reason.busy' });
   });
 
-  it('不在自己的出牌阶段 / 对局已结束：没有入口', () => {
+  it('不在自己的回合 / 弃牌阶段 / 对局已结束：没有复活入口', () => {
     expect(deriveDockEntries(dead({ isMyTurn: false }))).toEqual([]);
-    expect(deriveDockEntries(dead({ turnPhase: 'draw' }))).toEqual([]);
     expect(deriveDockEntries(dead({ turnPhase: 'discard' }))).toEqual([]);
     expect(deriveDockEntries(dead({ winner: 'thief' }))).toEqual([]);
+    // 抽牌阶段不能复活，只有略过抽牌的入口
+    expect(deriveDockEntries(dead({ turnPhase: 'draw' })).map((e) => e.kind)).toEqual(['skipDraw']);
   });
 
   it('迷失层里不会同时出现「复活同伴」', () => {
@@ -260,5 +262,57 @@ describe('复活弹层的确认条件与参数', () => {
     expect(
       canConfirmRevive({ mode: 'self', target: null, hand: h, picked: [0], passage: true }),
     ).toBe(false);
+  });
+});
+
+describe('底部坞入口 · 抽牌阶段', () => {
+  const drawing = (over: Partial<DockEntriesInput> = {}) => input({ turnPhase: 'draw', ...over });
+
+  it('自己回合的抽牌阶段：出现「跳过抽牌」且可用', () => {
+    expect(deriveDockEntries(drawing())).toEqual([
+      { kind: 'skipDraw', enabled: true, reason: null },
+    ]);
+  });
+
+  it('小丑存活：多一个「小丑·失控」；其他角色没有', () => {
+    const joker = drawing({
+      players: {
+        p1: player({ characterId: 'thief_joker' }),
+        p2: player(),
+        pM: player({ characterId: 'dm_neptune_ocean' }),
+      },
+    });
+    expect(deriveDockEntries(joker).map((e) => [e.kind, e.enabled])).toEqual([
+      ['skipDraw', true],
+      ['jokerGamble', true],
+    ]);
+    expect(deriveDockEntries(drawing()).map((e) => e.kind)).toEqual(['skipDraw']);
+  });
+
+  it('小丑在迷失层：没有「小丑·失控」，仍可略过抽牌', () => {
+    const dead = drawing({
+      players: {
+        p1: player({ characterId: 'thief_joker', isAlive: false, currentLayer: 0 }),
+        p2: player(),
+        pM: player({ characterId: 'dm_neptune_ocean' }),
+      },
+    });
+    expect(deriveDockEntries(dead).map((e) => e.kind)).toEqual(['skipDraw']);
+  });
+
+  it('有别的待办占着界面：入口仍在，但禁用并说明', () => {
+    const [e] = deriveDockEntries(drawing({ busy: true }));
+    expect(e).toMatchObject({ kind: 'skipDraw', enabled: false });
+    expect(e!.reason).toEqual({ key: 'entries.reason.busy' });
+  });
+
+  it('不是自己的回合 / 对局已结束：没有入口', () => {
+    expect(deriveDockEntries(drawing({ isMyTurn: false }))).toEqual([]);
+    expect(deriveDockEntries(drawing({ winner: 'master' }))).toEqual([]);
+  });
+
+  it('入口的 data-testid', () => {
+    expect(entryTestId('skipDraw')).toBe('dock-entry-skip-draw');
+    expect(entryTestId('jokerGamble')).toBe('dock-entry-joker');
   });
 });

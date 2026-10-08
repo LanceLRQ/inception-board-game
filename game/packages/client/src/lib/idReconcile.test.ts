@@ -76,8 +76,10 @@ describe('主动技能表 · 与卡牌配置对账', () => {
     );
     for (const d of descriptors) {
       if (d.characterId === '__any__') continue;
-      expect(characterIds.has(d.characterId), d.characterId).toBe(true);
-      expect(d.id.startsWith(`${d.characterId}.`), d.id).toBe(true);
+      // 双面角色翻面后玩家的角色 id 是「牌 id + _back」，背面技能的标识仍以牌 id 开头
+      const baseId = d.characterId.replace(/_back$/, '');
+      expect(characterIds.has(baseId), d.characterId).toBe(true);
+      expect(d.id.startsWith(`${baseId}.`), d.id).toBe(true);
     }
   });
 
@@ -133,6 +135,7 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   action_unlock_effect_2: '【解封】两种效果之一，出牌 move 的参数值',
   'dm_fortress.skill_0.chances':
     '技能使用记录里的内部计数键：要塞·冷酷本回合的发动机会数，不是技能标识',
+  thief_gemini_back: '双子翻到背面后玩家的角色 id（牌 id + _back，运行时状态，不是另一张牌）',
   thief_char: '卡牌类别名',
   master_char: '卡牌类别名',
 };

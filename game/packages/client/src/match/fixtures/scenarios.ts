@@ -28,6 +28,21 @@ export const FIXTURE_SCENARIO_IDS = [
   'thief-mate-dead',
   'master-mate-dead',
   'master-bribe',
+  'skill-draw',
+  'skill-joker',
+  'skill-gemini-back',
+  'skill-chemist',
+  'skill-space-queen',
+  'skill-black-hole',
+  'skill-terrorist',
+  'skill-sagittarius',
+  'skill-venus',
+  'skill-passage',
+  'skill-imperial',
+  'skill-saturn',
+  'skill-nightmare',
+  'skill-unlock-none',
+  'skill-unlock-spent',
 ] as const;
 
 export type FixtureScenarioId = (typeof FIXTURE_SCENARIO_IDS)[number];
@@ -67,6 +82,25 @@ const PENDING_RESPONSE_SCENARIOS = {
   aries: 'thief-pending-aries',
 } as const satisfies Record<string, FixtureScenarioId>;
 
+/** ?skill= 的取值与场景的对应：走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面 */
+export const SKILL_SCENARIOS = {
+  draw: 'skill-draw',
+  joker: 'skill-joker',
+  'gemini-back': 'skill-gemini-back',
+  chemist: 'skill-chemist',
+  'space-queen': 'skill-space-queen',
+  'black-hole': 'skill-black-hole',
+  terrorist: 'skill-terrorist',
+  sagittarius: 'skill-sagittarius',
+  venus: 'skill-venus',
+  passage: 'skill-passage',
+  imperial: 'skill-imperial',
+  saturn: 'skill-saturn',
+  nightmare: 'skill-nightmare',
+  'unlock-none': 'skill-unlock-none',
+  'unlock-spent': 'skill-unlock-spent',
+} as const satisfies Record<string, FixtureScenarioId>;
+
 /** 解析人数参数：4–10 的整数；缺失或非法（含小数、超出范围）回落缺省 */
 export function parseFixturePlayers(raw: string | null): number {
   if (raw === null || !/^\d+$/.test(raw)) return FIXTURE_DEFAULT_PLAYERS;
@@ -83,6 +117,11 @@ export function parseFixturePlayers(raw: string | null): number {
  *                天秤分牌 / 天秤挑一份、意念判官选骰、处女·完美、白羊·星尘（梦魇为回音萦绕）；不与 as=master 叠加
  *   ?character=sudger  盗梦者视角，本人是意念判官、行动阶段手里有 SHOOT（走查【定罪】的发动入口）；
  *                      梦主视角、响应窗口与待应答参数优先，忽略它
+ *   ?skill=名    走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面（视角由场景决定，响应窗口与待应答参数优先）：
+ *                draw 抽牌阶段（略过抽牌）· joker 抽牌阶段的小丑 · gemini-back 翻到背面的双子 · chemist 药剂师
+ *                · space-queen 弃牌阶段的空间女王 · black-hole 黑洞 · terrorist 恐怖分子 · sagittarius 射手
+ *                · imperial 皇城世界观下有 SHOOT 机会 · saturn 土星世界观下持贿赂 · unlock-none 所在层心锁为 0
+ *                · unlock-spent 本回合已成功解封；梦主视角：venus 金星 · passage 密道 · nightmare 有已翻开的梦魇
  *   ?chess=1     与 as=master 叠加：梦主是「棋局」，行动阶段会自动弹出易位弹窗
  *   ?dead=1      盗梦者视角，本人已在迷失层、轮到自己的出牌阶段、手里有牌（走查「复活」入口）；
  *                ?dead=mate 本人存活，一名盗梦者同伴在迷失层（走查「复活同伴」，可与 as=master 叠加）；
@@ -109,7 +148,12 @@ export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureSc
   const deadMate = deadParam === 'mate';
   const bribe = searchParams.get('bribe') === '1';
   const sudger = searchParams.get('character') === 'sudger';
-  const id: FixtureScenarioId = master
+  const skillParam = searchParams.get('skill');
+  const skillScene =
+    skillParam !== null && Object.hasOwn(SKILL_SCENARIOS, skillParam)
+      ? SKILL_SCENARIOS[skillParam as keyof typeof SKILL_SCENARIOS]
+      : null;
+  const baseId: FixtureScenarioId = master
     ? pending
       ? 'master-pending'
       : chess
@@ -131,6 +175,8 @@ export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureSc
               : sudger
                 ? 'thief-sudger'
                 : 'thief'));
+  // 角色走查场景自带视角；只有响应窗口与待应答参数比它优先
+  const id: FixtureScenarioId = !pending && response === null && skillScene ? skillScene : baseId;
   const extras = resolveFixtureExtras(searchParams);
   return {
     id,

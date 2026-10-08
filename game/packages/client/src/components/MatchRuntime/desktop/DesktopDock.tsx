@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getAvailableActiveSkills } from '../../../lib/activeSkills';
+import { getSkillEntries } from '../../../lib/activeSkills';
 import { CopyrightNotice } from '../../CopyrightNotice';
 import type { MatchController } from '../controllerTypes';
 import {
@@ -45,8 +45,10 @@ export function DesktopDock({ controller }: DesktopDockProps) {
     verdict && !verdict.canPlay && verdict.reason !== 'discardPhase'
       ? t(`handInfo.verdict.${verdict.reason}`)
       : null;
-  const skills = skillPanel ? getAvailableActiveSkills(skillPanel.context) : [];
-  const skillName = skills[0] ? t(skills[0].nameKey) : null;
+  // 有技能项就让「技能」按钮可点（用不了的技能在面板里置灰并说明原因）；身份块的提示只认此刻能发动的第一个
+  const skillEntries = skillPanel ? getSkillEntries(skillPanel.context) : [];
+  const firstReady = skillEntries.find((e) => e.enabled)?.skill;
+  const skillName = firstReady ? t(firstReady.nameKey) : null;
   const selfMarkers = stage && self ? (markersBySeat(stage.seats)[self.seat] ?? []) : [];
 
   const handleTap = (index: number) => {
@@ -113,7 +115,7 @@ export function DesktopDock({ controller }: DesktopDockProps) {
           controller={controller}
           commitName={verdict?.canPlay && readingItem ? readingItem.name : null}
           onCommit={handleCommit}
-          skillReady={skills.length > 0}
+          skillReady={skillEntries.length > 0}
         />
       </div>
       <div className="flex h-5 shrink-0 items-center justify-center px-3">

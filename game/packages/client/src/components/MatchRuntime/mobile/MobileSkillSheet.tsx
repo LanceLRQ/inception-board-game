@@ -30,6 +30,7 @@ export function MobileSkillSheet({ open, onOpenChange, panel }: MobileSkillSheet
             <ActiveSkillPanel
               context={panel.context}
               availableTargetIds={panel.targetIds}
+              lostTargetIds={panel.lostTargetIds}
               playerNicknames={panel.nicknames}
               onInvoke={(skill, args) => {
                 panel.invoke(skill, args);

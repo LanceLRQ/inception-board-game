@@ -35,6 +35,10 @@ export interface TargetPlayerPickerDialogProps {
   dreamMasterID?: string;
   viewerIsMaster?: boolean;
   bribeHolderIds?: readonly string[];
+  /** 本人的角色与手牌张数、梦主的角色：SHOOT 跨层的豁免（摩羯 / 恐怖分子 / 木星）要用 */
+  viewerCharacterId?: string | null;
+  viewerHandCount?: number;
+  masterCharacterId?: string | null;
   /** 卡牌显示名（可选） */
   cardNameOf?: (cardId: string) => string;
   onPick: (targetPlayerID: string) => void;
@@ -51,6 +55,9 @@ export function TargetPlayerPickerDialog({
   dreamMasterID,
   viewerIsMaster,
   bribeHolderIds,
+  viewerCharacterId,
+  viewerHandCount,
+  masterCharacterId,
   cardNameOf,
   onPick,
   onCancel,
@@ -66,6 +73,9 @@ export function TargetPlayerPickerDialog({
     ...(dreamMasterID !== undefined ? { dreamMasterID } : {}),
     ...(viewerIsMaster !== undefined ? { viewerIsMaster } : {}),
     ...(bribeHolderIds !== undefined ? { bribeHolderIds } : {}),
+    ...(viewerCharacterId !== undefined ? { viewerCharacterId } : {}),
+    ...(viewerHandCount !== undefined ? { viewerHandCount } : {}),
+    ...(masterCharacterId !== undefined ? { masterCharacterId } : {}),
   });
 
   return (
@@ -109,7 +119,9 @@ export function TargetPlayerPickerDialog({
                     ? '盗梦者不能对梦主使用移形换影'
                     : opt.reason === 'sameLayer'
                       ? '该 SHOOT 仅限同层目标'
-                      : undefined
+                      : opt.crossLayerAllowed
+                        ? '你的角色或世界观允许这张 SHOOT 打向别的层'
+                        : undefined
                 }
                 data-reason={opt.reason ?? undefined}
                 onClick={() => {
@@ -124,7 +136,9 @@ export function TargetPlayerPickerDialog({
                   ? ' · 梦主（不可选）'
                   : opt.reason === 'sameLayer' && opt.crossLayerNumber !== null
                     ? ` · L${opt.crossLayerNumber}（跨层）`
-                    : ''}
+                    : opt.crossLayerAllowed && opt.crossLayerNumber !== null
+                      ? ` · L${opt.crossLayerNumber}（跨层可射）`
+                      : ''}
               </button>
             ))
           )}

@@ -5,7 +5,8 @@ import { isShootClassCard } from '@icgame/game-engine';
 import type { MatchView, MatchViewState, PlayerView, RunnerCtx } from '@icgame/game-engine';
 import { actionMoveFor, getCardName, type PlayRole } from '../../lib/cards';
 import { getCardImageUrl } from '../../lib/cardImages';
-import type { ActiveSkillContext } from '../../lib/activeSkills';
+import type { ActiveSkillContext, SkillLayerInfo, SkillPlayerInfo } from '../../lib/activeSkills';
+import { unlockLimitExhausted } from '../../lib/unlockLimit';
 import { peekMasterTargetIds } from '../TargetPlayerPickerDialog/logic';
 import type { HandCardItem, HandCardMode, PendingPlay } from './controllerTypes';
 import { REVIVED_SELF_KEY } from './model/dockEntries';
@@ -62,12 +63,15 @@ export interface HandModeInput {
  * 梦主的梦境窥视有没有可选目标（贿赂池里的 heldBy 是公开的）。
  */
 export function derivePlayRules(
-  G: Pick<MatchView, 'players' | 'dreamMasterID' | 'bribePool'> | undefined,
+  G:
+    | Pick<MatchView, 'players' | 'dreamMasterID' | 'bribePool' | 'layers' | 'maxUnlockPerTurn'>
+    | undefined,
   seat: string | null,
 ): PlayRuleContext {
   if (!G || seat === null) return DEFAULT_PLAY_RULES;
   const me = G.players?.[seat];
   const role: PlayRole = seat === G.dreamMasterID ? 'master' : 'thief';
+  const myLayer = me ? G.layers?.[me.currentLayer as number] : undefined;
   return {
     role,
     alive: me ? !!me.isAlive : true,
@@ -76,7 +80,33 @@ export function derivePlayRules(
       role === 'master' &&
       peekMasterTargetIds(G.players ?? {}, G.dreamMasterID, seat, bribeHolderIds(G.bribePool))
         .length > 0,
+    layerHeartLock: myLayer ? myLayer.heartLockValue : null,
+    unlockExhausted:
+      me && typeof G.maxUnlockPerTurn === 'number' ? unlockExhaustedFor(G, me) : false,
+    hasNightmareUnlockTarget: nightmareUnlockLayers(G.layers).length > 0,
   };
+}
+
+/**
+ * 【梦魇解封】能选的层：还盖着暗置梦魇的层。
+ * 梦魇是什么只有梦主看得到，但「已翻开」「已发动 / 弃掉」两个标记是公开的，开局每层都有一张，
+ * 所以「没翻开且没被清走」就等价于引擎要求的「这层有梦魇且未翻开」。
+ * 对照：docs/manual/04-action-cards.md 梦魇解封；引擎的 playNightmareUnlock
+ */
+export function nightmareUnlockLayers(layers: MatchView['layers'] | undefined): number[] {
+  return Object.entries(layers ?? {})
+    .filter(([, l]) => !l.nightmareRevealed && !l.nightmareTriggered)
+    .map(([layer]) => Number(layer))
+    .filter((layer) => layer >= 1 && layer <= 4)
+    .sort((a, b) => a - b);
+}
+
+/** 打出这张牌选目标层时可选的层；没有特别限制（交给弹层的默认推导）返回 null */
+export function playLayerChoices(
+  card: string,
+  layers: MatchView['layers'] | undefined,
+): number[] | null {
+  return card === 'action_nightmare_unlock' ? nightmareUnlockLayers(layers) : null;
 }
 
 /** 持有贿赂牌的座位（不区分成败：视图里只公开谁持有） */
@@ -316,11 +346,13 @@ export function decreeApplicable(pending: PendingPlay | null, hand: readonly str
  *   - 目标玩家：梦境穿梭剂 (牌, 模式, 目标[, 宣言])；card_first (牌, 目标)；target_first (目标, 牌[, 宣言])
  *   - 目标层：梦境穿梭剂 (牌, 模式, 层)；其余 (牌, 层)
  * 死亡宣言只附在 SHOOT 系：穿梭剂的 shoot 模式，或 target_first 的 SHOOT 系 move。
+ * 射手·禁足（preventMove）是普通 SHOOT（playShoot）的末位参数：(目标, 牌, 宣言或空, true)。
  */
 export function buildPlayArgs(
   pending: PendingPlay,
   target?: string | number,
   decree: string | null = null,
+  preventMove = false,
 ): unknown[] {
   if (pending.needsTarget === 'none') return [pending.card];
   if (pending.needsTarget === 'layer') {
@@ -334,7 +366,9 @@ export function buildPlayArgs(
   if (pending.argOrder === 'card_first') return [pending.card, target];
   // SHOOT 系列：末位可附 decree
   const args: unknown[] = [target, pending.card];
-  return decree && isShootMove(pending.move) ? [...args, decree] : args;
+  const withDecree = decree && isShootMove(pending.move) ? decree : null;
+  if (preventMove && pending.move === 'playShoot') return [...args, withDecree ?? undefined, true];
+  return withDecree ? [...args, withDecree] : args;
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +506,74 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
       !!players && !!dreamMasterID && players[dreamMasterID]?.characterId === 'dm_mars_battlefield',
     skillUsedThisGame: humanPlayer?.skillUsedThisGame ?? {},
     unopenedVaults: Array.isArray(G.vaults) ? unopenedVaultCount(G.vaults) : 0,
+    ...(seat !== null ? { seat } : {}),
+    isDreamMaster: seat !== null && seat === dreamMasterID,
+    dreamMasterID,
+    ...(masterPlayer?.characterId ? { masterCharacterId: masterPlayer.characterId as string } : {}),
+    players: skillPlayersOf(players),
+    layers: skillLayersOf(G.layers),
+    imperialShootCharges: humanPlayer?.imperialShootCharges ?? 0,
+    deckCount: typeof G.deck?.cardCount === 'number' ? G.deck.cardCount : undefined,
+    unlockExhausted: humanPlayer ? unlockExhaustedFor(G, humanPlayer) : false,
   };
+}
+
+/** 各玩家公开的、技能推导要用的信息 */
+function skillPlayersOf(
+  players: MatchView['players'] | undefined,
+): Record<string, SkillPlayerInfo> {
+  return Object.fromEntries(
+    Object.entries(players ?? {}).map(([id, p]) => [
+      id,
+      {
+        isAlive: !!p.isAlive,
+        currentLayer: p.currentLayer as number,
+        bribeReceived: p.bribeReceived ?? 0,
+        handCount: p.handCount ?? 0,
+      },
+    ]),
+  );
+}
+
+/** 各层公开的信息；梦魇是什么只有梦主（和已翻开时）看得到 */
+function skillLayersOf(layers: MatchView['layers'] | undefined): Record<number, SkillLayerInfo> {
+  return Object.fromEntries(
+    Object.entries(layers ?? {}).map(([key, l]) => [
+      Number(key),
+      {
+        heartLockValue: l.heartLockValue,
+        nightmareRevealed: l.nightmareRevealed,
+        nightmareTriggered: l.nightmareTriggered,
+        nightmareId: l.nightmareId ?? null,
+        playersInLayer: l.playersInLayer ?? [],
+      },
+    ]),
+  );
+}
+
+/** 本人本回合的解封次数是否已用尽（摩羯·节奏 / 水瓶·同流豁免）；全部来自本人视图 */
+export function unlockExhaustedFor(
+  G: Pick<MatchView, 'maxUnlockPerTurn'>,
+  me: Pick<
+    PlayerView,
+    | 'characterId'
+    | 'isAlive'
+    | 'currentLayer'
+    | 'handCount'
+    | 'hand'
+    | 'successfulUnlocksThisTurn'
+    | 'skillUsedThisTurn'
+  >,
+): boolean {
+  return unlockLimitExhausted({
+    characterId: me.characterId,
+    isAlive: !!me.isAlive,
+    currentLayer: me.currentLayer as number,
+    handCount: me.hand?.length ?? me.handCount ?? 0,
+    successfulUnlocksThisTurn: me.successfulUnlocksThisTurn ?? 0,
+    skillUsedThisTurn: me.skillUsedThisTurn,
+    maxUnlockPerTurn: G.maxUnlockPerTurn,
+  });
 }
 
 /** 主动技能目标列表：除本人外的存活玩家 */

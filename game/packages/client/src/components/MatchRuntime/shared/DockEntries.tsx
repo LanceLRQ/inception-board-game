@@ -46,7 +46,7 @@ export function DockEntries({ entries, variant, className }: DockEntriesProps) {
             className={cn(
               'flex min-w-0 flex-auto items-center justify-center gap-1 whitespace-nowrap',
               variant === 'desktop'
-                ? 'ms-btn min-h-8 px-2 text-[12px] tracking-[.08em]'
+                ? 'ms-btn min-h-8 px-1 text-[11px] tracking-[.04em]'
                 : cn(
                     'min-h-11 min-w-11 touch-manipulation border px-3 text-[11.5px] tracking-[.08em] active:translate-y-px tablet:min-h-12 tablet:text-sm',
                     entry.enabled

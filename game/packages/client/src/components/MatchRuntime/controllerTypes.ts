@@ -129,6 +129,14 @@ export interface DecreeModel {
   readonly applicable: boolean;
 }
 
+/** 射手·禁足：打出普通 SHOOT 时可以选择令目标不移动 */
+export interface PreventMoveModel {
+  /** 此刻应当显示：本人是射手，出牌意图是普通 SHOOT */
+  readonly applicable: boolean;
+  readonly value: boolean;
+  readonly toggle: () => void;
+}
+
 export interface PlayModel {
   /** 当前有效的出牌意图；牌不在手牌或不在行动阶段时为 null */
   readonly pending: PendingPlay | null;
@@ -145,6 +153,8 @@ export interface PlayModel {
   readonly targetPlayerPending: { readonly card: string; readonly move: string } | null;
   /** 选目标层的弹层所需的出牌意图；弹层不该开时为 null */
   readonly targetLayerPending: { readonly card: string; readonly move: string } | null;
+  /** 选目标层时引擎会接受的层（梦魇解封只列还盖着暗置梦魇的层）；没有特别限制为 null，交给弹层默认推导 */
+  readonly targetLayerChoices: readonly number[] | null;
   /** 取消选目标玩家：同时清掉已选的死亡宣言 */
   readonly cancelTargetPlayer: () => void;
   /** 梦境穿梭剂的模式选择 */
@@ -154,6 +164,7 @@ export interface PlayModel {
     readonly cancel: () => void;
   };
   readonly decree: DecreeModel;
+  readonly preventMove: PreventMoveModel;
 }
 
 export interface TurnActions {

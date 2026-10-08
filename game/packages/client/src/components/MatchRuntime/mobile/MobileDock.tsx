@@ -10,7 +10,7 @@ import { useRef, useState } from 'react';
 import { cn } from '../../../lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useDrag } from '@use-gesture/react';
-import { getAvailableActiveSkills } from '../../../lib/activeSkills';
+import { getSkillEntries } from '../../../lib/activeSkills';
 import { CopyrightNotice } from '../../CopyrightNotice';
 import type { MatchController } from '../controllerTypes';
 import { DockInfoBar } from './DockInfoBar';
@@ -87,8 +87,10 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
   const verdictCtx = { isMyTurn: turn.isMine, turnPhase: turn.phase, winner };
   const inDiscard = turn.phase === 'discard' && hand.mustDiscard;
 
-  const skills = skillPanel ? getAvailableActiveSkills(skillPanel.context) : [];
-  const skillName = skills[0] ? t(skills[0].nameKey) : null;
+  // 有技能项就让「技能」按钮可点（用不了的技能在面板里置灰并说明原因）；身份块的提示只认此刻能发动的第一个
+  const skillEntries = skillPanel ? getSkillEntries(skillPanel.context) : [];
+  const firstReady = skillEntries.find((e) => e.enabled)?.skill;
+  const skillName = firstReady ? t(firstReady.nameKey) : null;
 
   const handleTap = (index: number) => {
     const item = hand.items[index];
@@ -204,7 +206,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
               <div className="min-w-0 flex-1">
                 <DockOps
                   controller={controller}
-                  skillReady={skills.length > 0}
+                  skillReady={skillEntries.length > 0}
                   onOpenSkill={() => setSkillOpen(true)}
                   onOpenChat={openChat}
                   layout="row"
@@ -231,7 +233,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
             </div>
             <DockOps
               controller={controller}
-              skillReady={skills.length > 0}
+              skillReady={skillEntries.length > 0}
               onOpenSkill={() => setSkillOpen(true)}
               onOpenChat={openChat}
               layout="column"
@@ -265,7 +267,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
             <div className="shrink-0 border-t border-line px-4 pb-2 pt-2">
               <DockOps
                 controller={controller}
-                skillReady={skills.length > 0}
+                skillReady={skillEntries.length > 0}
                 onOpenSkill={() => setSkillOpen(true)}
                 onOpenChat={openChat}
                 layout="row"
