@@ -5,7 +5,7 @@
 
 import { test, expect, type Browser, type Page } from '@playwright/test';
 
-const SERVER_URL = 'http://localhost:3101';
+const SERVER_URL = 'http://localhost:13101';
 
 interface Tab {
   page: Page;

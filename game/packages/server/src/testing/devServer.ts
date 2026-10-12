@@ -147,7 +147,7 @@ function devTimingFromEnv(env: NodeJS.ProcessEnv): TimingConfig {
 
 // 直接用 tsx 运行时监听 PORT
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const port = parseInt(process.env.PORT ?? '3101', 10);
+  const port = parseInt(process.env.PORT ?? '13101', 10);
   const corsOrigin = process.env.WS_CORS_ORIGIN;
   startDevServer({ port, ...(corsOrigin ? { corsOrigin } : {}) }).catch((err: unknown) => {
     logger.error({ err }, 'dev server failed to start');

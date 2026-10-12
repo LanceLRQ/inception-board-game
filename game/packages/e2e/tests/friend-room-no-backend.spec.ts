@@ -6,7 +6,7 @@
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = 'http://localhost:13001';
 
 test.describe('好友房纯前端（后端离线）', () => {
   test('无后端：Lobby → 创建房间 → 补 AI → 开始 → Game 页', async ({ page }) => {

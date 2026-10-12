@@ -7,8 +7,8 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
-const SERVER_PORT = 3101;
-const CLIENT_PORT = 3100;
+const SERVER_PORT = 13101;
+const CLIENT_PORT = 13100;
 const CLIENT_URL = `http://localhost:${CLIENT_PORT}`;
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 

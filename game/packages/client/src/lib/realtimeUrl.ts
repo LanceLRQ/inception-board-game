@@ -5,7 +5,7 @@ interface RealtimeEnv {
   VITE_API_URL?: string;
 }
 
-const DEFAULT_API_URL = 'http://localhost:3001';
+const DEFAULT_API_URL = 'http://localhost:13001';
 
 function originOf(value: string): string | null {
   try {

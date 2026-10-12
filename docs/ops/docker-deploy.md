@@ -226,7 +226,7 @@ cp .env.example .env              # 开发用的变量保持默认即可
 ./scripts/dev.sh dev              # pnpm dev：服务端 + 客户端
 ```
 
-`dev.sh` 启动时会把 `.env` 导出到环境，服务端运行时不读 `.env` 文件，靠的就是这里导出的 `DATABASE_URL`、`REDIS_URL`。`VITE_API_URL`、`VITE_WS_URL` 是生产镜像的构建参数，开发时不会导出（前端直连 `localhost:3001`）。开发时前端（`localhost:3000`）直连后端（`localhost:3001`），属于跨域，所以服务端的 `dev` 脚本在 `WS_CORS_ORIGIN` 未设置时默认放行 `http://localhost:3000` 与 `http://127.0.0.1:3000`；前端换了端口或地址时，在 `.env` 里写上 `WS_CORS_ORIGIN`。不带参数运行 `./scripts/dev.sh` 进入交互菜单。
+`dev.sh` 启动时会把 `.env` 导出到环境，服务端运行时不读 `.env` 文件，靠的就是这里导出的 `DATABASE_URL`、`REDIS_URL`。`VITE_API_URL`、`VITE_WS_URL` 是生产镜像的构建参数，开发时不会导出（前端直连 `localhost:13001`）。开发时前端（`localhost:13000`）直连后端（`localhost:13001`），属于跨域，所以服务端的 `dev` 脚本在 `WS_CORS_ORIGIN` 未设置时默认放行 `http://localhost:13000` 与 `http://127.0.0.1:13000`；前端换了端口或地址时，在 `.env` 里写上 `WS_CORS_ORIGIN`。不带参数运行 `./scripts/dev.sh` 进入交互菜单。
 
 | 命令 | 作用 |
 | --- | --- |

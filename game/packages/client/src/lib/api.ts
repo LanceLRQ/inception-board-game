@@ -4,7 +4,7 @@
 import { logger } from './logger';
 import { TOKEN_REVOKED_CODE, notifyIdentityRevoked } from './identityRevoked';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:13001';
 
 interface ApiError {
   error: {

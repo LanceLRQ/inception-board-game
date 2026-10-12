@@ -17,7 +17,7 @@ import {
   RedisRecoverAttemptLimiter,
 } from './services/RecoverAttemptLimiter.js';
 
-const PORT = parseInt(process.env.PORT ?? '3001', 10);
+const PORT = parseInt(process.env.PORT ?? '13001', 10);
 
 // 生产环境缺少恢复码哈希密钥时直接退出，避免用开发值签发恢复码
 try {

@@ -280,7 +280,7 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
     const token = await a.page.evaluate(() => localStorage.getItem('icgame-token'));
     const matchID = /\/game\/([^/?]+)/.exec(a.page.url())![1]!;
     const dup = await a.page.request.post(
-      `${process.env.E2E_API_URL ?? 'http://localhost:3101'}/matches/${matchID}/report`,
+      `${process.env.E2E_API_URL ?? 'http://localhost:13101'}/matches/${matchID}/report`,
       {
         headers: { Authorization: `Bearer ${token}` },
         data: { targetSeat: Number(seatB), reason: 'afk' },
@@ -289,7 +289,7 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
     expect(dup.status()).toBe(409);
     // 举报自己与 Bot 座位被拒绝
     const self = await a.page.request.post(
-      `${process.env.E2E_API_URL ?? 'http://localhost:3101'}/matches/${matchID}/report`,
+      `${process.env.E2E_API_URL ?? 'http://localhost:13101'}/matches/${matchID}/report`,
       {
         headers: { Authorization: `Bearer ${token}` },
         data: { targetSeat: Number(seatA), reason: 'afk' },

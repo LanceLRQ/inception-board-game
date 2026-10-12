@@ -10,7 +10,7 @@
 
 import { test, expect, waitForAppReady } from './fixtures/index.js';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = 'http://localhost:13001';
 const FAKE_TOKEN = 'fake-jwt';
 const FAKE_PLAYER_ID = 'p-owner';
 const FAKE_NICKNAME = '测试玩家';

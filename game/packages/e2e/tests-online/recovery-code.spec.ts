@@ -6,7 +6,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test';
 
 const CODE_PATTERN = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
 /** 联机端到端用的服务端地址（见 playwright.online.config.ts） */
-const SERVER_URL = 'http://localhost:3101';
+const SERVER_URL = 'http://localhost:13101';
 
 const stripDashes = (code: string): string => code.replace(/-/g, '');
 

@@ -19,7 +19,7 @@ describe('realtimeUrl', () => {
   });
 
   it('两者都未设置时用默认的本地服务端地址', () => {
-    expect(realtimeUrl({})).toBe('http://localhost:3001');
+    expect(realtimeUrl({})).toBe('http://localhost:13001');
   });
 
   it('VITE_API_URL 为空或相对路径时退回页面的源', () => {

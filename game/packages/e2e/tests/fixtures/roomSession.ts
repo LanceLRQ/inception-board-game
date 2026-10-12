@@ -4,7 +4,7 @@
 
 import type { Page } from '@playwright/test';
 
-export const API_BASE = 'http://localhost:3001';
+export const API_BASE = 'http://localhost:13001';
 export const ROOM_CODE = 'ABC234';
 export const ME = { playerId: 'p-owner', nickname: '测试玩家' };
 

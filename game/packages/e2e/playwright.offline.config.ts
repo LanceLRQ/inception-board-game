@@ -4,7 +4,7 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
-const PREVIEW_URL = process.env.E2E_OFFLINE_BASE_URL ?? 'http://localhost:4173';
+const PREVIEW_URL = process.env.E2E_OFFLINE_BASE_URL ?? 'http://localhost:14173';
 
 export default defineConfig({
   testDir: './tests-offline',
@@ -29,7 +29,7 @@ export default defineConfig({
   webServer: {
     // 先清理残留端口，再构建，再起 preview
     command:
-      'cd ../.. && pnpm kill:dev >/dev/null 2>&1; pnpm --filter @icgame/client build && pnpm --filter @icgame/client exec vite preview --port 4173 --host',
+      'cd ../.. && pnpm kill:dev >/dev/null 2>&1; pnpm --filter @icgame/client build && pnpm --filter @icgame/client exec vite preview --port 14173 --host',
     url: PREVIEW_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
