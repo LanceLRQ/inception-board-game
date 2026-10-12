@@ -13,5 +13,7 @@ export { MOVES_BY_PHASE, MOVE_PRIORITY, legalMovesFor } from './moveTables.js';
 export { pickBotMove, defaultArgsFor } from './botMoves.js';
 export { nextAutoAction } from './autoAction.js';
 export type { AutoAction, AutoActionOptions } from './autoAction.js';
+export { planActionPlays, MAX_PLAYS_PER_TURN } from './actionPolicy.js';
+export type { PlannedPlay } from './actionPolicy.js';
 export { runBotPlayout } from './playout.js';
 export type { BotPlayoutOptions, BotPlayoutResult, StallInfo, RejectedStep } from './playout.js';

@@ -486,15 +486,24 @@ describe('MatchService 对局过程', () => {
 });
 
 describe('MatchService 挂机托管', () => {
-  type StepArgs = [string, { source: string; request: { playerID: string } }];
+  type StepArgs = [string, { source: string; request: { playerID: string; move: string } }];
 
   function sources(h: Harness): string[] {
     return (h.onStep.mock.calls as StepArgs[]).map(
       (c) => `${c[1].source}:${c[1].request.playerID}`,
     );
   }
+  /**
+   * 回合主人自己的超时代发次数。回合外的应答（放弃响应、接受惩罚等）被代发不算挂机，
+   * Bot 出牌后真人座位会收到这类应答窗口，它们不计入。
+   */
   function timeoutCount(h: Harness): number {
-    return (h.onStep.mock.calls as StepArgs[]).filter((c) => c[1].source === 'timeout').length;
+    return (h.onStep.mock.calls as StepArgs[]).filter(
+      (c) =>
+        c[1].source === 'timeout' &&
+        !c[1].request.move.startsWith('pass') &&
+        !c[1].request.move.startsWith('respond'),
+    ).length;
   }
 
   /** 一直推进，直到条件成立（每次只触发一个计时器） */

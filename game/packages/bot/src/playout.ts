@@ -13,6 +13,7 @@ import {
   type MoveRequest,
   type RejectReason,
 } from '@icgame/game-engine/runner';
+import { PLAY_MOVE_CARD_IDS } from '@icgame/game-engine';
 import { nextAutoAction } from './autoAction.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
@@ -22,6 +23,8 @@ export interface BotPlayoutOptions {
   seed: string;
   /** 步数上限（每接受一个 move 算一步） */
   maxSteps: number;
+  /** 是否让所有座位在出牌阶段按 Bot 出牌策略打行动牌，缺省关闭 */
+  cardPlay?: boolean;
 }
 
 /** 找不到下一步时的局面 */
@@ -53,6 +56,8 @@ export interface BotPlayoutResult {
   rejected: RejectedStep | null;
   /** 每步之后检查出的不变量违规（带出现的步数） */
   invariantViolations: (InvariantViolation & { step: number })[];
+  /** 被接受的出牌类 move（出牌记录表里的 move），按 move 名统计 */
+  cardMoves: Record<string, number>;
 }
 
 /** 局面里仍有值的待结算字段：以 pending 开头的字段，加上窥视结果 peekReveal */
@@ -64,6 +69,7 @@ function pendingFieldsOf(G: SetupState): string[] {
 
 export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
   const { numPlayers, seed, maxSteps } = options;
+  const cardMoves: Record<string, number> = {};
   let state = createMatch(game, { numPlayers, setupData: { rngSeed: seed }, seed });
   let steps = 0;
   let stalledOn: StallInfo | null = null;
@@ -71,7 +77,10 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
   const invariantViolations: BotPlayoutResult['invariantViolations'] = [];
 
   while (steps < maxSteps && state.ctx.gameover === undefined) {
-    const action = nextAutoAction(state, { humanPlayerIDs: [] });
+    const action = nextAutoAction(state, {
+      humanPlayerIDs: [],
+      ...(options.cardPlay ? { cardPlaySeatIDs: state.ctx.playOrder } : {}),
+    });
     if (action === null) {
       stalledOn = {
         pendingFields: pendingFieldsOf(state.G),
@@ -100,8 +109,18 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
     }
     state = outcome.state;
     steps++;
+    if (Object.hasOwn(PLAY_MOVE_CARD_IDS, request.move)) {
+      cardMoves[request.move] = (cardMoves[request.move] ?? 0) + 1;
+    }
     for (const v of checkInvariants(state.G)) invariantViolations.push({ ...v, step: steps });
   }
 
-  return { steps, gameover: state.ctx.gameover, stalledOn, rejected, invariantViolations };
+  return {
+    steps,
+    gameover: state.ctx.gameover,
+    stalledOn,
+    rejected,
+    invariantViolations,
+    cardMoves,
+  };
 }

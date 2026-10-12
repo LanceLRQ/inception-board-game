@@ -256,6 +256,11 @@ export class MatchRoom {
       .map((s) => s.seat);
   }
 
+  /** 真正的 Bot 座位：才会在出牌阶段按策略打行动牌（托管中的真人座位不算） */
+  private botSeats(): string[] {
+    return this.seatList.filter((s) => s.isBot).map((s) => s.seat);
+  }
+
   private clearTimer(): void {
     this.generation += 1;
     this.storageRetryPending = false;
@@ -299,7 +304,7 @@ export class MatchRoom {
     // 只认退避计时器；存储不可用期间挂着的普通截止计时器照常允许被提前
     if (keepExisting && this.storageRetryPending && this.timer !== null) return;
 
-    const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
+    const plan = planNext(this.state, this.humanSeats(), this.deps.timing, this.botSeats());
     if (
       plan.kind === 'none' ||
       (plan.kind === 'deadline' && this.timeoutMisses >= MAX_AUTO_FAILURES)
@@ -335,14 +340,14 @@ export class MatchRoom {
   private async runAuto(gen: number): Promise<void> {
     if (gen !== this.generation || this.closed || this.over) return;
     try {
-      const plan = planNext(this.state, this.humanSeats(), this.deps.timing);
+      const plan = planNext(this.state, this.humanSeats(), this.deps.timing, this.botSeats());
       if (plan.kind !== 'auto') {
         this.schedule();
         return;
       }
       const { action } = plan;
       logger.debug(
-        { matchID: this.matchID, seat: action.playerID, move: action.move },
+        { matchID: this.matchID, seat: action.playerID, move: action.move, why: action.why },
         'bot decided',
       );
       const outcome = await this.step(

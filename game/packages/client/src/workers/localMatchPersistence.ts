@@ -22,6 +22,8 @@ export interface StartLocalMatchRequest {
   resume: boolean;
   /** 固定种子（端到端与走查用）；不给就按房间号与当前时刻生成。恢复存档时不起作用 */
   seed?: string;
+  /** Bot 是否在出牌阶段打行动牌，缺省是 */
+  botPlaysCards?: boolean;
 }
 
 export interface StartLocalMatchResult {
@@ -48,6 +50,7 @@ export async function startLocalMatch(
           playerCount: record.playerCount,
           seed: buildMatchSeed(request.matchID, now()),
           humanPlayerID: LOCAL_HUMAN_SEAT,
+          botPlaysCards: request.botPlaysCards,
         });
         log.flow('local match restored', {
           playerCount: record.playerCount,
@@ -69,6 +72,7 @@ export async function startLocalMatch(
     playerCount: request.playerCount,
     seed: request.seed ?? buildMatchSeed(request.matchID, now()),
     humanPlayerID: LOCAL_HUMAN_SEAT,
+    botPlaysCards: request.botPlaysCards,
   });
   return { session, resumed: false, fellBack };
 }

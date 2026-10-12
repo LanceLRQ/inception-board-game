@@ -3,8 +3,10 @@
 // 把「待结算事项该由谁、用哪个 move 收尾」与「Bot 回合怎么出牌」统一成一个判定：
 // 调用方（本地对局 Worker、全 Bot 对局回归）循环调用它，再交给运行器执行即可。
 
+import { InceptionCityGame, viewFor } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
-import type { MatchState } from '@icgame/game-engine/runner';
+import { applyMove, type GameDef, type MatchState } from '@icgame/game-engine/runner';
+import { MAX_PLAYS_PER_TURN, planActionPlays } from './actionPolicy.js';
 import { legalMovesFor } from './moveTables.js';
 import { defaultArgsFor, pickBotMove } from './botMoves.js';
 
@@ -17,9 +19,44 @@ export interface AutoAction {
   why: string;
 }
 
+const game: GameDef<SetupState> = InceptionCityGame;
+
 export interface AutoActionOptions {
   /** 由真人操作的玩家；轮到他们决定时返回 null */
   humanPlayerIDs: readonly string[];
+  /**
+   * 在自己回合的出牌阶段按 Bot 策略打行动牌的座位；缺省不列任何座位（行动阶段只结束出牌）。
+   * 只应列真正的 Bot 座位：超时代发、挂机托管的真人座位不要列入。
+   */
+  cardPlaySeatIDs?: readonly string[];
+  /** 一个 Bot 一回合最多打出的行动牌张数，缺省 MAX_PLAYS_PER_TURN */
+  maxPlaysPerTurn?: number;
+}
+
+/**
+ * 出牌阶段的 Bot 出牌：按策略给出的候选顺序，用运行器试跑，取第一个被接受的。
+ * 试跑只用「接受 / 拒绝」一位信息，不看试跑后的状态；没有候选或都被拒绝返回 null。
+ */
+function pickPlay(
+  state: MatchState<SetupState>,
+  botID: string,
+  maxPlays: number,
+): AutoAction | null {
+  const { G } = state;
+  if (G.playedCardsThisTurn.length >= maxPlays) return null;
+  const view = viewFor(G, botID, { gameOver: false });
+  for (const plan of planActionPlays(view, botID)) {
+    const outcome = applyMove(game, state, { playerID: botID, move: plan.move, args: plan.args });
+    if (outcome.ok) {
+      return {
+        playerID: botID,
+        move: plan.move,
+        args: plan.args,
+        why: `Bot ${botID} 出牌 · ${plan.why}`,
+      };
+    }
+  }
+  return null;
 }
 
 /** 当前状态下应当自动执行的下一步；该等真人、对局已结束、或无事可做时返回 null */
@@ -191,6 +228,15 @@ export function nextAutoAction(
   const legal = legalMovesFor(ctx.phase, G.turnPhase);
   const move = pickBotMove(G, owner, legal);
   if (move === null) return null;
+  // 出牌阶段：没有待结算的挑选要处理时（pickBotMove 落到 endActionPhase），按策略试着出牌
+  if (
+    move === 'endActionPhase' &&
+    G.turnPhase === 'action' &&
+    options.cardPlaySeatIDs?.includes(owner)
+  ) {
+    const play = pickPlay(state, owner, options.maxPlaysPerTurn ?? MAX_PLAYS_PER_TURN);
+    if (play !== null) return play;
+  }
   return {
     playerID: owner,
     move,

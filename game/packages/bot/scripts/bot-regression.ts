@@ -24,6 +24,8 @@ interface Args {
   players: number;
   maxSteps: number;
   seed: string;
+  /** 座位在出牌阶段按 Bot 出牌策略打行动牌（与线上 Bot 一致），--no-card-play 关闭 */
+  cardPlay: boolean;
 }
 
 function parseIntArg(flag: string, raw: string | undefined): number {
@@ -41,6 +43,7 @@ function parseArgs(argv: readonly string[]): Args {
     players: 5,
     maxSteps: 20000,
     seed: `nightly-${new Date().toISOString().slice(0, 10)}`,
+    cardPlay: true,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -63,6 +66,9 @@ function parseArgs(argv: readonly string[]): Args {
       case '--seed':
         if (val) args.seed = val;
         i++;
+        break;
+      case '--no-card-play':
+        args.cardPlay = false;
         break;
       default:
         console.error(`[bot-regression] 未知参数 ${String(flag)}（--turns 已改名为 --max-steps）`);
@@ -101,6 +107,7 @@ for (let i = 0; i < args.count; i++) {
     numPlayers: args.players,
     seed,
     maxSteps: args.maxSteps,
+    cardPlay: args.cardPlay,
   });
   totalSteps += result.steps;
   for (const v of result.invariantViolations) {

@@ -56,7 +56,7 @@ test.describe('人机对战 LocalMatch', () => {
 
     // 等待轮到自己
     const drawBtn = page.getByTestId('action-draw');
-    await drawBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await waitVisibleAnswering(page, drawBtn, 15_000);
     await drawBtn.click();
 
     // 抽牌后进入 action 阶段

@@ -12,6 +12,7 @@ import {
   type SubmitResult,
 } from './MatchRoom.js';
 import type { TimingConfig } from './scheduling.js';
+import { thiefActionTurn } from '../testing/botTurnState.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import { logger } from '../infra/logger.js';
 
@@ -1374,5 +1375,44 @@ describe('MatchRoom 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智的截
     expect(after.pendingSaturnDecree ?? null).toBeNull();
     expect(after.players[master]!.hand).not.toContain(KICK);
     expect(after.deck.discardPile.filter((c) => c === KICK)).toHaveLength(2);
+  });
+});
+
+describe('MatchRoom Bot 出牌策略', () => {
+  /** 回合主人所在座位的席位表：actor 是 Bot / 真人 */
+  function harnessFor(actorIsBot: boolean) {
+    const { state, actor } = thiefActionTurn();
+    const humans = actorIsBot ? [] : [actor];
+    const h = makeHarness(5, humans, {}, state);
+    return { h, actor };
+  }
+
+  it('Bot 座位在自己回合的出牌阶段打出行动牌', async () => {
+    const { h, actor } = harnessFor(true);
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.request).toMatchObject({ playerID: actor, move: 'playUnlock' });
+    expect(h.steps[0]!.source).toBe('bot');
+  });
+
+  it('托管中的真人座位不出牌：自动步只结束出牌阶段', async () => {
+    const { h, actor } = harnessFor(false);
+    h.takenOver.add(actor);
+    h.room.start();
+    expect(h.room.deadlineAt()).toBeNull();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.request).toMatchObject({ playerID: actor, move: 'endActionPhase' });
+  });
+
+  it('真人座位超时代发只结束出牌阶段，不出牌', async () => {
+    const { h, actor } = harnessFor(false);
+    h.room.start();
+    expect(h.room.deadlineAt()).not.toBeNull();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+    expect(h.steps[0]!.request).toMatchObject({ playerID: actor, move: 'endActionPhase' });
   });
 });

@@ -32,8 +32,12 @@ afterEach(() => {
 const HUMAN = '0';
 const MAX_STEPS = 20000;
 
-function makeSession(playerCount = 5, seed = 'sess'): LocalMatchSession {
-  return new LocalMatchSession({ playerCount, seed });
+/**
+ * 会话机制的用例不关心 Bot 出牌：缺省关闭 Bot 出牌策略，避免真人被动收到应答窗口、
+ * 让「自动循环停下就是轮到真人回合」的前提不成立。Bot 出牌自己的用例显式打开。
+ */
+function makeSession(playerCount = 5, seed = 'sess', botPlaysCards = false): LocalMatchSession {
+  return new LocalMatchSession({ playerCount, seed, botPlaysCards });
 }
 
 /** 一直 step，直到不再继续调度；返回被拒的步数 */
@@ -490,6 +494,7 @@ describe('LocalMatchSession · 真人白羊的宽限期', () => {
     const session = new LocalMatchSession({
       playerCount: 5,
       seed: 'aries-grace',
+      botPlaysCards: false,
       now: () => clock,
     });
     intoBotTurn(session);
@@ -526,6 +531,7 @@ describe('LocalMatchSession · 存档与恢复', () => {
     const restored = new LocalMatchSession({
       playerCount: 5,
       seed: 'ignored-on-restore',
+      botPlaysCards: false,
       restoredState: restoreMatchState(raw),
     });
     expect(restored.view()).toEqual(beforeView);
@@ -560,5 +566,132 @@ describe('LocalMatchSession · 存档与恢复', () => {
     state.ctx.playOrder = state.ctx.playOrder.filter((p) => p !== HUMAN);
     state.ctx.currentPlayer = state.ctx.playOrder[0]!;
     expect(() => LocalMatchSession.fromSnapshot(state, { playerCount: 4, seed: 'x' })).toThrow();
+  });
+});
+
+describe('LocalMatchSession · Bot 出牌', () => {
+  /** 轮到 Bot 座位出牌：它在第 2 层、手里有解封，各层心锁大于 0；真人在别处 */
+  function botActionTurn(options: { botPlaysCards?: boolean } = {}): {
+    session: LocalMatchSession;
+    bot: string;
+  } {
+    // 先用安静的 Bot 走到 Bot 的回合，再按需要打开出牌策略
+    const session = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'bot-play',
+      botPlaysCards: false,
+    });
+    intoBotTurn(session);
+    (session as unknown as { botPlaysCards: boolean }).botPlaysCards =
+      options.botPlaysCards ?? true;
+    const G = session.snapshot().G;
+    const bot = G.currentPlayerID;
+    expect(bot).not.toBe(HUMAN);
+    const players = { ...G.players };
+    for (const id of G.playerOrder) {
+      players[id] = { ...players[id]!, hand: [], currentLayer: 1 as never };
+    }
+    players[bot] = { ...players[bot]!, hand: ['action_unlock'] as never, currentLayer: 2 as never };
+    const layers = { ...G.layers };
+    for (const n of [1, 2, 3, 4] as const) {
+      layers[n] = {
+        ...layers[n]!,
+        heartLockValue: 3,
+        playersInLayer: G.playerOrder.filter((id) => players[id]!.currentLayer === n),
+      };
+    }
+    patchState(session, { players, layers, turnPhase: 'action', playedCardsThisTurn: [] });
+    return { session, bot };
+  }
+
+  it('Bot 座位在自己回合的出牌阶段会打牌', () => {
+    const { session, bot } = botActionTurn();
+    // 梦主是土星时出牌前会多一个律令窗口，但打出的第一步仍是这张牌
+    const r = session.step();
+    expect(r.ok).toBe(true);
+    expect(r.action).toMatchObject({ playerID: bot, move: 'playUnlock' });
+    expect(r.action?.why).toContain('解封');
+  });
+
+  it('关闭出牌策略后只结束出牌阶段', () => {
+    const { session, bot } = botActionTurn({ botPlaysCards: false });
+    expect(session.step().action).toMatchObject({ playerID: bot, move: 'endActionPhase' });
+  });
+
+  it('Bot 出牌引来真人要应答的窗口时停下等真人，真人放弃后继续', () => {
+    const { session } = botActionTurn();
+    patchState(session, {
+      players: {
+        ...session.snapshot().G.players,
+        [HUMAN]: { ...session.snapshot().G.players[HUMAN]!, hand: ['action_unlock'] as never },
+      },
+    });
+    const played = session.step();
+    expect(played.action?.move).toBe('playUnlock');
+    expect(session.snapshot().G.pendingResponseWindow).not.toBeNull();
+    // 逐步走：直到轮到真人应答，自动循环停下（返回 null）
+    let guard = 0;
+    while (session.view().G.pendingResponseWindow !== null && guard++ < 10) {
+      const w = session.view().G.pendingResponseWindow!;
+      const next = w.responders.find((id) => !w.responded.includes(id));
+      const r = session.step();
+      if (next === HUMAN) {
+        expect(r.action).toBeNull();
+        expect(r.continue).toBe(false);
+        expect(session.humanMove('passResponse', []).ok).toBe(true);
+      } else {
+        expect(r.action).toMatchObject({ move: 'passResponse', playerID: next });
+      }
+    }
+    expect(session.view().G.pendingResponseWindow).toBeNull();
+  });
+
+  /** 真人对自己面前的待应答事项给一个最简答复；没有待应答返回 false */
+  function answerPending(session: LocalMatchSession): boolean {
+    const G = session.view().G;
+    const w = G.pendingResponseWindow;
+    if (w && w.responders.includes(HUMAN) && !w.responded.includes(HUMAN)) {
+      return session.humanMove('passResponse', []).ok;
+    }
+    if (G.pendingShootResponse?.targetPlayerID === HUMAN) {
+      const move =
+        G.pendingShootResponse.responseType === 'terrorist'
+          ? 'respondTerroristAccept'
+          : 'respondShootPass';
+      return session.humanMove(move, []).ok;
+    }
+    if (G.pendingSaturnDecree?.masterID === HUMAN) {
+      return session.humanMove('respondSaturnDecree', [null]).ok;
+    }
+    if (G.pendingAthenaWit?.athenaID === HUMAN) {
+      return session.humanMove('respondAthenaWit', [null]).ok;
+    }
+    return false;
+  }
+
+  it('整局本地对局里 Bot 出牌后能打到终局：真人答完应答继续，没有被拒的自动动作', () => {
+    const session = makeSession(6, 'bot-play-full', true);
+    let rejected = 0;
+    let humanPassed = 0;
+    for (let i = 0; i < MAX_STEPS && session.view().ctx.gameover === undefined; i++) {
+      const r = session.step();
+      if (!r.ok) rejected++;
+      if (r.continue) continue;
+      if (answerPending(session)) {
+        humanPassed++;
+        continue;
+      }
+      const view = session.view();
+      if (view.ctx.currentPlayer !== HUMAN) {
+        throw new Error(`自动循环停在 Bot 回合，没有待真人应答的事项：${view.G.turnPhase}`);
+      }
+      const { move, args } = humanPolicy(session);
+      const res = session.humanMove(move, args);
+      if (!res.ok) throw new Error(`真人 move 被拒绝：${move} ${res.detail}`);
+    }
+    expect(rejected).toBe(0);
+    expect(session.view().ctx.gameover).toBeDefined();
+    // 真人确实收到过 Bot 出牌引来的应答
+    expect(humanPassed).toBeGreaterThan(0);
   });
 });

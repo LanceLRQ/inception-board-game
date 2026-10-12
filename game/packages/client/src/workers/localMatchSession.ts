@@ -59,6 +59,11 @@ export interface LocalMatchSessionOptions {
   humanPlayerID?: string;
   /** 当前时刻（毫秒）；测试用，默认 Date.now */
   now?: () => number;
+  /**
+   * Bot 座位是否在自己回合的出牌阶段按策略打行动牌，缺省是。
+   * 只有端到端等需要安静 Bot 的场合关闭（地址参数 `botplay=off`）。
+   */
+  botPlaysCards?: boolean;
   /** 从存档恢复的状态；给了就沿用它，不再新建对局（playerCount 与 seed 此时不起作用） */
   restoredState?: MatchState<SetupState>;
 }
@@ -94,12 +99,14 @@ export class LocalMatchSession {
   private rejectedKey: string | null = null;
   private rejectedCount = 0;
   private readonly now: () => number;
+  private readonly botPlaysCards: boolean;
   /** 正在等真人白羊选择：哪一次选择、从什么时候开始等 */
   private ariesWait: { key: string; since: number } | null = null;
 
   constructor(options: LocalMatchSessionOptions) {
     this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
     this.now = options.now ?? Date.now;
+    this.botPlaysCards = options.botPlaysCards ?? true;
     this.state =
       options.restoredState ??
       createMatch(game, {
@@ -172,7 +179,13 @@ export class LocalMatchSession {
   /** 执行一步自动行动 */
   step(): StepResult {
     if (this.waitingForAries()) return { action: null, ok: true, continue: true, waiting: true };
-    const action = nextAutoAction(this.state, { humanPlayerIDs: [this.humanPlayerID] });
+    const action = nextAutoAction(this.state, {
+      humanPlayerIDs: [this.humanPlayerID],
+      // 除真人座位外都是 Bot 座位
+      cardPlaySeatIDs: this.botPlaysCards
+        ? this.state.ctx.playOrder.filter((id) => id !== this.humanPlayerID)
+        : [],
+    });
     if (action === null) return { action: null, ok: true, continue: false };
 
     const outcome = applyMove(game, this.state, {

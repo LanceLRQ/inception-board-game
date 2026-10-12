@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
+import { thiefActionTurn } from '../testing/botTurnState.js';
 import { DEFAULT_TIMING, planNext, timeoutAction, type TimingConfig } from './scheduling.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
@@ -238,5 +239,29 @@ describe('timeoutAction', () => {
       ctx: { ...s.ctx, gameover: { winner: 'thief' } },
     } as MatchState<SetupState>;
     expect(timeoutAction(over)).toBeNull();
+  });
+});
+
+describe('Bot 出牌策略的座位范围', () => {
+  it('Bot 座位（列入出牌座位）在出牌阶段出牌；没列入的座位只结束出牌阶段', () => {
+    const { state, actor } = thiefActionTurn();
+    const plan = planNext(state, [], timing, [actor]);
+    expect(plan.kind).toBe('auto');
+    if (plan.kind === 'auto') expect(plan.action.move).toBe('playUnlock');
+
+    const unlisted = planNext(state, [], timing);
+    expect(unlisted.kind === 'auto' && unlisted.action.move).toBe('endActionPhase');
+    const other = planNext(state, [], timing, ['999']);
+    expect(other.kind === 'auto' && other.action.move).toBe('endActionPhase');
+  });
+
+  it('真人座位轮到出牌时仍然等真人，即使列入了出牌座位', () => {
+    const { state, actor } = thiefActionTurn();
+    expect(planNext(state, [actor], timing, [actor]).kind).toBe('deadline');
+  });
+
+  it('超时代发永远不替座位出牌', () => {
+    const { state } = thiefActionTurn();
+    expect(timeoutAction(state)?.move).toBe('endActionPhase');
   });
 });

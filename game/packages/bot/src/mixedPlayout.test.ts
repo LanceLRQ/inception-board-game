@@ -41,7 +41,7 @@ function pendingFieldsOf(G: SetupState): string[] {
     .map(([key]) => key);
 }
 
-function playMixed(numPlayers: number, seed: string): MixedResult {
+function playMixed(numPlayers: number, seed: string, cardPlay = false): MixedResult {
   const rnd = makeTestRng(
     [...seed].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) | 0, numPlayers),
   );
@@ -61,7 +61,10 @@ function playMixed(numPlayers: number, seed: string): MixedResult {
   };
 
   while (result.steps < MAX_STEPS && state.ctx.gameover === undefined) {
-    const action = nextAutoAction(state, { humanPlayerIDs: [HUMAN] });
+    const action = nextAutoAction(state, {
+      humanPlayerIDs: [HUMAN],
+      ...(cardPlay ? { cardPlaySeatIDs: state.ctx.playOrder.filter((id) => id !== HUMAN) } : {}),
+    });
     if (action !== null) {
       const outcome = applyMove(game, state, action);
       if (!outcome.ok) {
@@ -150,5 +153,30 @@ describe('混合对局 · 随机真人 + 自动行动', () => {
     const seen = settleMoves.filter((m) => (totals[m] ?? 0) > 0);
     expect(totals['passResponse'] ?? 0).toBeGreaterThan(0);
     expect(seen.length).toBeGreaterThanOrEqual(3);
+  }, 60_000);
+});
+
+describe('混合对局 · 随机真人 + Bot 出牌策略', () => {
+  it('4–10 人全部打到终局，真人收到 Bot 出牌引发的应答也不会停住，自动动作没有被拒', () => {
+    const results: MixedResult[] = [];
+    for (let numPlayers = 4; numPlayers <= 10; numPlayers++) {
+      for (let i = 0; i < 8; i++) {
+        results.push(playMixed(numPlayers, `mixcp-${numPlayers}-${i}`, true));
+      }
+    }
+    const totals: Record<string, number> = {};
+    for (const r of results) {
+      for (const [move, count] of Object.entries(r.autoMoves)) {
+        totals[move] = (totals[move] ?? 0) + count;
+      }
+    }
+    expect(results.flatMap((r) => r.rejected)).toEqual([]);
+    expect(results.filter((r) => r.stalled !== null).map((r) => r.seed)).toEqual([]);
+    expect(results.filter((r) => !r.gameover).map((r) => r.seed)).toEqual([]);
+    // Bot 确实出了牌（出牌类 move 由自动行动发出）
+    const played = ['playUnlock', 'playShoot', 'playDreamTransit', 'playCreation'].filter(
+      (m) => (totals[m] ?? 0) > 0,
+    );
+    expect(played.length).toBeGreaterThanOrEqual(2);
   }, 60_000);
 });

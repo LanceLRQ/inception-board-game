@@ -30,6 +30,8 @@ export interface CreateLocalMatchOptions {
   resume?: boolean;
   /** 固定种子（端到端与走查用）：同样的种子与人数开出同一局 */
   seed?: string;
+  /** Bot 是否在出牌阶段打行动牌，缺省是（端到端需要安静 Bot 时关闭） */
+  botPlaysCards?: boolean;
 }
 
 export interface CreateLocalMatchResult {
@@ -222,7 +224,14 @@ const workerApi: LocalMatchWorker = {
     const resume = options?.resume === true;
     const saves = persist || resume ? await getSaves() : NO_LOCAL_SAVES;
     const started = await startLocalMatch(
-      { playerCount, matchID, persist, resume, seed: options?.seed },
+      {
+        playerCount,
+        matchID,
+        persist,
+        resume,
+        seed: options?.seed,
+        botPlaysCards: options?.botPlaysCards,
+      },
       saves,
       saveLog,
     );
@@ -240,6 +249,7 @@ const workerApi: LocalMatchWorker = {
       fellBack: started.fellBack,
       persist,
       fixedSeed: options?.seed !== undefined,
+      botPlaysCards: options?.botPlaysCards !== false,
     });
     logFlowChanges(started.session);
     scheduleNext();

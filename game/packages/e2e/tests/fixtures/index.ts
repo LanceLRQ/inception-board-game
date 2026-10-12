@@ -124,11 +124,17 @@ export async function pickCardsToDiscard(page: Page, required: number): Promise<
 }
 
 /**
- * 本地对局里轮到真人应答时（被 SHOOT、天秤、处女、意念判官、白羊），对局会等真人操作而不是代答。
+ * 本地对局里轮到真人应答时（被 SHOOT、天秤、处女、意念判官、白羊，以及 Bot 打出【解封】后的响应窗口），对局会等真人操作而不是代答。
  * 随机对局的用例不关心这些选择，用这个函数给出最简单的答复：能放弃就放弃，没有放弃选项的选第一个合法操作。
  * 返回这一轮是否答复过。
  */
 export async function answerAwaitedResponse(page: Page): Promise<boolean> {
+  // Bot 打出【解封】后，真人在响应窗口里：放弃响应
+  const unlockPass = page.getByTestId('unlock-response-pass');
+  if (await unlockPass.isVisible()) {
+    await unlockPass.click({ timeout: 1_500 });
+    return true;
+  }
   const panel = page.locator('[data-testid="awaited-window"], [data-testid="awaited-bar"]').first();
   if (!(await panel.isVisible())) return false;
   const decline = panel.locator('[data-testid^="awaited-action-"][data-decline="true"]').first();
