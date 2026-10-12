@@ -1,7 +1,7 @@
 // Bot 出牌相关测试的局面：回合主人是一名盗梦者，处在出牌阶段、手里有【解封】、所在层心锁大于 0。
 // 在真实建局产物上改写，保证结构与引擎一致。
 
-import { InceptionCityGame } from '@icgame/game-engine';
+import { InceptionCityGame, sendToLimbo } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type MatchState } from '@icgame/game-engine/runner';
 import type { CardID, Layer } from '@icgame/shared';
@@ -104,4 +104,55 @@ export function unlockWindowForMaster(numPlayers = 5): {
     },
   };
   return { state: open, actor, master };
+}
+
+/** 回合主人是迷失层里的盗梦者，手里有 2 张不会打的牌：出牌阶段能复活自己 */
+export function limboThiefTurn(): ThiefActionTurn {
+  const base = thiefActionTurn();
+  let G = sendToLimbo(base.state.G, base.actor);
+  G = {
+    ...G,
+    players: {
+      ...G.players,
+      [base.actor]: {
+        ...G.players[base.actor]!,
+        hand: ['action_kick', 'action_graft'] as CardID[],
+      },
+    },
+  };
+  return { ...base, state: { ...base.state, G } };
+}
+
+/** 回合主人是梦主（第 1 层），唯一存活的盗梦者在第 4 层：出牌阶段梦主会朝它走一步 */
+export function masterMoveTurn(): ThiefActionTurn {
+  const base = thiefActionTurn();
+  const { master, actor } = base;
+  let G = base.state.G;
+  for (const id of G.playerOrder) {
+    if (id !== master && id !== actor) G = sendToLimbo(G, id);
+  }
+  const players = { ...G.players };
+  players[master] = { ...players[master]!, currentLayer: 1 as Layer, hand: [] };
+  players[actor] = { ...players[actor]!, currentLayer: 4 as Layer, hand: [] };
+  const layers = { ...G.layers };
+  for (const n of [1, 2, 3, 4] as const) {
+    layers[n] = {
+      ...layers[n]!,
+      playersInLayer: G.playerOrder.filter((id) => players[id]!.currentLayer === n),
+    };
+  }
+  G = { ...G, players, layers, currentPlayerID: master };
+  return {
+    state: {
+      ...base.state,
+      G,
+      ctx: {
+        ...base.state.ctx,
+        currentPlayer: master,
+        playOrderPos: base.state.ctx.playOrder.indexOf(master),
+      },
+    },
+    actor: master,
+    master,
+  };
 }

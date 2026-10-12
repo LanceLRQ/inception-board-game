@@ -232,13 +232,6 @@ describe('defaultArgsFor', () => {
     expect(defaultArgsFor('doDiscard', G, '1')).toEqual([[]]);
   });
 
-  it('dreamMasterMove steps one layer deeper, clamped to 1..4', () => {
-    const at = (layer: number): SetupState =>
-      makeState({ players: { '1': makePlayer({ id: '1', currentLayer: layer as never }) } });
-    expect(defaultArgsFor('dreamMasterMove', at(1), '1')).toEqual([2]);
-    expect(defaultArgsFor('dreamMasterMove', at(4), '1')).toEqual([4]);
-  });
-
   it('resolveGraft returns the first 2 cards of the hand', () => {
     const G = makeState({}, { '1': ['a', 'b', 'c', 'd'] });
     expect(defaultArgsFor('resolveGraft', G, '1')).toEqual([['a', 'b']]);

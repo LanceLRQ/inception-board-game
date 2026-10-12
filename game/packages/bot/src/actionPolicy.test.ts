@@ -131,7 +131,7 @@ describe('planActionPlays · 盗梦者', () => {
 });
 
 describe('planActionPlays · 梦主', () => {
-  it('与盗梦者同层：SHOOT 类在前，KICK 在后；不射异层的盗梦者', () => {
+  it('与盗梦者同层：射 SHOOT 类，不打 KICK；不射异层的盗梦者', () => {
     const s = actionScene({
       actor: 'master',
       seats: {
@@ -144,20 +144,21 @@ describe('planActionPlays · 梦主', () => {
     const out = plan(s, master);
     expect(out.map((p) => [p.move, p.args[0], p.args[1]])).toEqual([
       ['playShoot', thieves[0], 'action_shoot'],
-      ['playKick', 'action_kick', thieves[0]],
     ]);
   });
 
   it('梦主有抽牌类就打，不主动打解封与复杂牌', () => {
     const s = actionScene({
       actor: 'master',
+      rest: 'limbo',
       seats: {
         master: { layer: 2, hand: ['action_unlock', 'action_graft', 'action_creation'] },
         t0: { layer: 4, hand: [] },
       },
     });
     const { master } = seatIds(s.G);
-    expect(plan(s, master).map((p) => p.move)).toEqual(['playCreation']);
+    // 唯一的盗梦者在第 4 层，梦主在第 2 层：先朝它走一步，再抽牌
+    expect(plan(s, master).map((p) => p.move)).toEqual(['dreamMasterMove', 'playCreation']);
   });
 });
 
@@ -194,5 +195,156 @@ describe('planActionPlays · 只吃视图', () => {
     const { thieves } = seatIds(s.G);
     const v = viewOf(s, thieves[0]!);
     expect(v.players[thieves[1]!]!.hand).toBeNull();
+  });
+});
+
+describe('planActionPlays · 复活', () => {
+  it('迷失层的盗梦者：手牌够就复活自己，其余动作都不给', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 1, hand: ['action_kick', 'action_graft', 'action_unlock'], limbo: true },
+        master: { layer: 2, hand: [] },
+      },
+    });
+    const { thieves } = seatIds(s.G);
+    const out = plan(s, thieves[0]!);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      move: 'playRevive',
+      args: [null, ['action_kick', 'action_graft']],
+    });
+  });
+
+  it('迷失层手牌不够 2 张：不给', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 1, hand: ['action_kick'], limbo: true },
+        master: { layer: 2, hand: [] },
+      },
+    });
+    expect(plan(s, seatIds(s.G).thieves[0]!)).toEqual([]);
+  });
+
+  it('弃牌价值：先弃不会打的牌，再弃重复牌，最后才是解封', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 1, hand: ['action_unlock', 'action_unlock', 'action_creation'], limbo: true },
+        master: { layer: 2, hand: [] },
+      },
+    });
+    const out = plan(s, seatIds(s.G).thieves[0]!);
+    // 第二张解封是重复牌，先于凭空造物弃出
+    expect(out[0]!.args[1]).toEqual(['action_unlock', 'action_creation']);
+  });
+
+  it('密道世界观：另给只弃 1 张梦境穿梭剂的候选', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 1, hand: ['action_dream_transit', 'action_kick'], limbo: true },
+        master: { layer: 2, hand: [] },
+      },
+    });
+    const out = plan(s, seatIds(s.G).thieves[0]!);
+    expect(out.map((p) => p.args[1])).toEqual([
+      ['action_kick', 'action_dream_transit'],
+      ['action_dream_transit'],
+    ]);
+  });
+
+  it('盗梦者复活同伴：排在解封之后、造物之前；用不会打的牌付代价，保留解封与 SHOOT', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: {
+          layer: 2,
+          hand: [
+            'action_unlock',
+            'action_creation',
+            'action_graft',
+            'action_gravity',
+            'action_shoot',
+          ],
+        },
+        t1: { layer: 1, hand: [], limbo: true },
+        master: { layer: 4, hand: [] },
+      },
+    });
+    const { thieves } = seatIds(s.G);
+    const out = plan(s, thieves[0]!);
+    expect(out.map((p) => p.move)).toEqual(['playUnlock', 'playRevive', 'playCreation']);
+    expect(out[1]!.args).toEqual([thieves[1], ['action_graft', 'action_gravity']]);
+  });
+
+  it('同伴复活的代价只肯用不重要的牌：只剩解封 / SHOOT 时不复活同伴', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 2, hand: ['action_unlock', 'action_shoot', 'action_graft'] },
+        t1: { layer: 1, hand: [], limbo: true },
+        master: { layer: 4, hand: [] },
+      },
+    });
+    const { thieves } = seatIds(s.G);
+    expect(plan(s, thieves[0]!).map((p) => p.move)).toEqual(['playUnlock']);
+  });
+
+  it('梦主不复活盗梦者', () => {
+    const s = actionScene({
+      actor: 'master',
+      seats: {
+        master: { layer: 2, hand: ['action_graft', 'action_gravity', 'action_resonance'] },
+        t0: { layer: 1, hand: [], limbo: true },
+      },
+    });
+    expect(plan(s, seatIds(s.G).master).map((p) => p.move)).not.toContain('playRevive');
+  });
+});
+
+describe('planActionPlays · 梦主移动', () => {
+  const masterScene = (seats: Record<string, { layer: number; hand: string[] }>, locks = {}) =>
+    actionScene({ actor: 'master', seats, locks, rest: 'limbo' });
+
+  it('同层已有盗梦者：不动', () => {
+    const s = masterScene({ master: { layer: 2, hand: [] }, t0: { layer: 2, hand: [] } });
+    expect(plan(s, seatIds(s.G).master).map((p) => p.move)).not.toContain('dreamMasterMove');
+  });
+
+  it('相邻层有盗梦者：移过去，且排在出牌之前', () => {
+    const s = masterScene({
+      master: { layer: 2, hand: ['action_creation'] },
+      t0: { layer: 3, hand: [] },
+    });
+    const out = plan(s, seatIds(s.G).master);
+    expect(out[0]).toMatchObject({ move: 'dreamMasterMove', args: [3] });
+    expect(out.map((p) => p.move)).toEqual(['dreamMasterMove', 'playCreation']);
+  });
+
+  it('远处有盗梦者：朝最近的有人层走一步', () => {
+    const s = masterScene({ master: { layer: 1, hand: [] }, t0: { layer: 4, hand: [] } });
+    expect(plan(s, seatIds(s.G).master)).toMatchObject([{ move: 'dreamMasterMove', args: [2] }]);
+  });
+
+  it('两侧相邻都有人：人数多的优先，人数相同取心锁少的', () => {
+    const many = masterScene({
+      master: { layer: 2, hand: [] },
+      t0: { layer: 1, hand: [] },
+      t1: { layer: 3, hand: [] },
+      t2: { layer: 3, hand: [] },
+    });
+    expect(plan(many, seatIds(many.G).master)[0]).toMatchObject({ args: [3] });
+    const tie = masterScene(
+      { master: { layer: 2, hand: [] }, t0: { layer: 1, hand: [] }, t1: { layer: 3, hand: [] } },
+      { 1: 1, 3: 2 },
+    );
+    expect(plan(tie, seatIds(tie.G).master)[0]).toMatchObject({ args: [1] });
+  });
+
+  it('没有存活的盗梦者：不动', () => {
+    const s = masterScene({ master: { layer: 2, hand: [] } });
+    expect(plan(s, seatIds(s.G).master)).toEqual([]);
   });
 });

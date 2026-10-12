@@ -334,3 +334,67 @@ describe('nextAutoAction · Bot 应答策略', () => {
     });
   });
 });
+
+describe('nextAutoAction · 复活与梦主移动', () => {
+  const on = (ids: string[]) => ({ humanPlayerIDs: [] as string[], policySeatIDs: ids });
+
+  it('迷失层的 Bot 在出牌阶段复活自己；开关关闭时只结束出牌阶段', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 1, hand: ['action_kick', 'action_graft', 'action_unlock'], limbo: true },
+        master: { layer: 2, hand: [] },
+      },
+    });
+    const bot = seatIds(s.G).thieves[0]!;
+    const a = nextAutoAction(s, on([bot]));
+    expect(a).toMatchObject({
+      playerID: bot,
+      move: 'playRevive',
+      args: [null, ['action_kick', 'action_graft']],
+    });
+    expect(applyMove(game, s, a!).ok).toBe(true);
+    expect(nextAutoAction(s, { humanPlayerIDs: [] })?.move).toBe('endActionPhase');
+  });
+
+  it('迷失层手牌不够：结束出牌阶段', () => {
+    const s = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 1, hand: ['action_kick'], limbo: true },
+        master: { layer: 2, hand: [] },
+      },
+    });
+    const bot = seatIds(s.G).thieves[0]!;
+    expect(nextAutoAction(s, on([bot]))?.move).toBe('endActionPhase');
+  });
+
+  it('梦主 Bot 先发 dreamMasterMove，被引擎拒绝（本回合已移动）后不再重复，转而结束出牌', () => {
+    const s = actionScene({
+      actor: 'master',
+      rest: 'limbo',
+      seats: { master: { layer: 1, hand: [] }, t0: { layer: 4, hand: [] } },
+    });
+    const master = seatIds(s.G).master;
+    const first = nextAutoAction(s, on([master]));
+    expect(first).toMatchObject({ playerID: master, move: 'dreamMasterMove', args: [2] });
+    const moved = applyMove(game, s, first!);
+    if (!moved.ok) throw new Error('移动被拒绝');
+    expect(nextAutoAction(moved.state, on([master]))?.move).toBe('endActionPhase');
+    expect(nextAutoAction(s, { humanPlayerIDs: [] })?.move).toBe('endActionPhase');
+  });
+
+  it('梦主移动到盗梦者所在层后，同一回合接着出牌', () => {
+    const s = actionScene({
+      actor: 'master',
+      rest: 'limbo',
+      seats: { master: { layer: 2, hand: ['action_shoot'] }, t0: { layer: 3, hand: [] } },
+    });
+    const master = seatIds(s.G).master;
+    const first = nextAutoAction(s, on([master]))!;
+    expect(first.move).toBe('dreamMasterMove');
+    const moved = applyMove(game, s, first);
+    if (!moved.ok) throw new Error('移动被拒绝');
+    expect(nextAutoAction(moved.state, on([master]))?.move).toBe('playShoot');
+  });
+});

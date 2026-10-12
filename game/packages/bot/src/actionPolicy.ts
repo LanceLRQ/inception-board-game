@@ -27,7 +27,6 @@ const CARD = {
   creation: 'action_creation',
   transit: 'action_dream_transit',
   shootTransit: 'action_shoot_dream_transit',
-  kick: 'action_kick',
 } as const;
 
 /**
@@ -98,6 +97,100 @@ export const POLICY_CARD_IDS: readonly string[] = [
   ...SAME_LAYER_SHOOTS.map((s) => s.card),
 ];
 
+/** 策略会打出的牌（其余牌手里放着也没用，付复活代价时先弃） */
+const PLAYED_CARDS: ReadonlySet<string> = new Set([
+  CARD.unlock,
+  CARD.creation,
+  CARD.transit,
+  CARD.shootTransit,
+  ...SAME_LAYER_SHOOTS.map((s) => s.card),
+]);
+
+/**
+ * 复活付代价时一张牌的价值（越小越先弃）：
+ * 0 策略不会打的牌；1 重复的第 2 张及以后（同名牌各留一张）；2 凭空造物 / 梦境穿梭剂；3 SHOOT 类；4 解封。
+ * 重复牌的价值取 min(原价值, 1)。
+ */
+function cardValues(hand: readonly string[]): number[] {
+  const seen = new Map<string, number>();
+  return hand.map((c) => {
+    const base = !PLAYED_CARDS.has(c)
+      ? 0
+      : c === CARD.unlock
+        ? 4
+        : c === CARD.creation || c === CARD.transit
+          ? 2
+          : 3;
+    const n = seen.get(c) ?? 0;
+    seen.set(c, n + 1);
+    return n > 0 ? Math.min(base, 1) : base;
+  });
+}
+
+/** 价值最低的 count 张牌（按价值升序、同价值保持手牌顺序）；maxValue 给出时只在价值不超过它的牌里挑，不够返回 null */
+function cheapestCards(hand: readonly string[], count: number, maxValue = 4): string[] | null {
+  const values = cardValues(hand);
+  const picked = hand
+    .map((card, i) => ({ card, v: values[i]!, i }))
+    .filter((x) => x.v <= maxValue)
+    .sort((a, b) => a.v - b.v || a.i - b.i)
+    .slice(0, count);
+  return picked.length === count ? picked.map((x) => x.card) : null;
+}
+
+/** 复活的代价候选：基础规则弃 2 张；手里有梦境穿梭剂时再给一个「只弃它」的候选（密道世界观，引擎会拒掉不适用的那个） */
+function reviveCosts(hand: readonly string[], maxValue: number): string[][] {
+  const out: string[][] = [];
+  const basic = cheapestCards(hand, 2, maxValue);
+  if (basic) out.push(basic);
+  if (hand.includes(CARD.transit)) out.push([CARD.transit]);
+  return out;
+}
+
+/** 复活的牌价值上限：复活同伴不动用 SHOOT 类与解封（价值 3 及以上），保住战斗力 */
+const ALLY_REVIVE_MAX_VALUE = 2;
+
+/** 梦主的免费移动：同层没有盗梦者时朝有盗梦者的层走一步 */
+function masterMovePlan(view: MatchView, me: PlayerView): PlannedPlay[] {
+  const thieves = view.playerOrder
+    .map((id) => view.players[id])
+    .filter(
+      (p): p is PlayerView =>
+        p !== undefined &&
+        p.id !== me.id &&
+        inDream(p) &&
+        p.faction === 'thief' &&
+        p.id !== view.dreamMasterID,
+    );
+  if (thieves.length === 0 || thieves.some((p) => p.currentLayer === me.currentLayer)) return [];
+  const countAt = (layer: number): number => thieves.filter((p) => p.currentLayer === layer).length;
+  const lockAt = (layer: number): number => view.layers[layer]?.heartLockValue ?? 0;
+  // 只考虑能缩短与某名盗梦者距离的相邻层：有人的层优先（人多、心锁少者在前），其余按层号
+  const options = adjacentLayers(me.currentLayer)
+    .map((layer) => ({
+      layer,
+      people: countAt(layer),
+      closer: thieves.some(
+        (p) => Math.abs(p.currentLayer - layer) < Math.abs(p.currentLayer - me.currentLayer),
+      ),
+    }))
+    .filter((o) => o.closer)
+    .sort(
+      (a, b) =>
+        b.people - a.people ||
+        (a.people > 0 ? lockAt(a.layer) - lockAt(b.layer) : 0) ||
+        a.layer - b.layer,
+    );
+  return options.map((o) => ({
+    move: 'dreamMasterMove',
+    args: [o.layer],
+    why:
+      o.people > 0
+        ? `同层没有盗梦者，去有 ${o.people} 名盗梦者的第 ${o.layer} 层`
+        : `同层没有盗梦者，朝最近的盗梦者走到第 ${o.layer} 层`,
+  }));
+}
+
 function thiefPlan(view: MatchView, me: PlayerView, hand: readonly string[]): PlannedPlay[] {
   const out: PlannedPlay[] = [];
   const layer = view.layers[me.currentLayer];
@@ -110,6 +203,27 @@ function thiefPlan(view: MatchView, me: PlayerView, hand: readonly string[]): Pl
       args: [CARD.unlock],
       why: `所在层 ${me.currentLayer} 心锁 ${lock}，解封`,
     });
+  }
+
+  // 复活迷失层里的同伴（对外同为盗梦者，视图里看得到）：代价只用不重要的牌
+  const allies = view.playerOrder.filter((id) => {
+    const p = view.players[id];
+    return (
+      p !== undefined &&
+      !p.isAlive &&
+      id !== me.id &&
+      id !== view.dreamMasterID &&
+      p.faction === me.faction
+    );
+  });
+  for (const id of allies) {
+    for (const cost of reviveCosts(hand, ALLY_REVIVE_MAX_VALUE)) {
+      out.push({
+        move: 'playRevive',
+        args: [id, cost],
+        why: `复活迷失层的同伴 ${id}，弃 ${cost.join('、')}`,
+      });
+    }
   }
 
   // 抽牌类：白赚手牌
@@ -152,24 +266,16 @@ function thiefPlan(view: MatchView, me: PlayerView, hand: readonly string[]): Pl
 }
 
 function masterPlan(view: MatchView, me: PlayerView, hand: readonly string[]): PlannedPlay[] {
-  const out: PlannedPlay[] = [];
+  // 先移动再出牌：到了同层才能 SHOOT
+  const out: PlannedPlay[] = masterMovePlan(view, me);
 
   if (hand.includes(CARD.creation)) {
     out.push({ move: 'playCreation', args: [CARD.creation], why: '凭空造物，抽 2 张' });
   }
 
-  // 与盗梦者同层：先 SHOOT 类，再 KICK
+  // 与盗梦者同层：SHOOT 类。KICK 只是与对方换层，同层时白耗一张牌、异层时也换不到同层，所以不打
   const targets = thievesWithMe(view, me);
   for (const t of targets) out.push(...shootCandidates(hand, t.id, '与盗梦者同层'));
-  if (hand.includes(CARD.kick)) {
-    for (const t of targets) {
-      out.push({
-        move: 'playKick',
-        args: [CARD.kick, t.id],
-        why: `与盗梦者 ${t.id} 同层，KICK 消耗手牌`,
-      });
-    }
-  }
   return out;
 }
 
@@ -180,7 +286,17 @@ function masterPlan(view: MatchView, me: PlayerView, hand: readonly string[]): P
 export function planActionPlays(view: MatchView, botID: string): PlannedPlay[] {
   if (view.turnPhase !== 'action' || view.currentPlayerID !== botID) return [];
   const me = view.players[botID];
-  if (!me || !inDream(me) || me.hand === null) return [];
+  if (!me || me.hand === null) return [];
+  // 迷失层里除了复活自己什么都不能做（梦主在自己回合开始时自动复活，不走这里）
+  if (!me.isAlive) {
+    if (botID === view.dreamMasterID || me.faction !== 'thief') return [];
+    return reviveCosts(me.hand, 4).map((cost) => ({
+      move: 'playRevive',
+      args: [null, cost],
+      why: `在迷失层，弃 ${cost.join('、')} 复活自己`,
+    }));
+  }
+  if (!inDream(me)) return [];
   if (botID === view.dreamMasterID) return masterPlan(view, me, me.hand);
   // 背叛者之类自己已不是盗梦者阵营的座位：这一版不出牌
   if (me.faction !== 'thief') return [];

@@ -12,7 +12,12 @@ import {
   type SubmitResult,
 } from './MatchRoom.js';
 import type { TimingConfig } from './scheduling.js';
-import { thiefActionTurn, unlockWindowForMaster } from '../testing/botTurnState.js';
+import {
+  limboThiefTurn,
+  masterMoveTurn,
+  thiefActionTurn,
+  unlockWindowForMaster,
+} from '../testing/botTurnState.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import { logger } from '../infra/logger.js';
 
@@ -1447,5 +1452,37 @@ describe('MatchRoom Bot 应答策略', () => {
     await h.room.idle();
     expect(h.steps[0]!.source).toBe('timeout');
     expect(h.steps[0]!.request).toMatchObject({ playerID: master, move: 'passResponse' });
+  });
+});
+
+describe('MatchRoom Bot 复活与梦主移动', () => {
+  async function firstStep(
+    turn: { state: MatchState<SetupState>; actor: string },
+    humanActor: boolean,
+    takenOver = false,
+  ) {
+    const humans = humanActor ? [turn.actor] : [];
+    const h = makeHarness(5, humans, {}, turn.state);
+    if (takenOver) h.takenOver.add(turn.actor);
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    return h.steps[0]!;
+  }
+
+  it('Bot 座位复活自己、梦主 Bot 向盗梦者移动', async () => {
+    const limbo = limboThiefTurn();
+    expect((await firstStep(limbo, false)).request.move).toBe('playRevive');
+    const mm = masterMoveTurn();
+    expect((await firstStep(mm, false)).request).toMatchObject({ move: 'dreamMasterMove' });
+  });
+
+  it('托管与超时代发的真人座位不复活、不移动', async () => {
+    const limbo = limboThiefTurn();
+    expect((await firstStep(limbo, true, true)).request.move).toBe('endActionPhase');
+    expect((await firstStep(limbo, true)).request.move).toBe('endActionPhase');
+    const mm = masterMoveTurn();
+    expect((await firstStep(mm, true, true)).request.move).toBe('endActionPhase');
+    expect((await firstStep(mm, true)).request.move).toBe('endActionPhase');
   });
 });

@@ -48,6 +48,7 @@ describe('runBotPlayout', () => {
 describe('runBotPlayout · 打开出牌策略', () => {
   const totals: Record<string, number> = {};
   const responses: Record<string, number> = {};
+  const movements: Record<string, number> = {};
   const games: { numPlayers: number; seed: string; r: ReturnType<typeof runBotPlayout> }[] = [];
 
   for (let numPlayers = 4; numPlayers <= 10; numPlayers++) {
@@ -61,6 +62,8 @@ describe('runBotPlayout · 打开出牌策略', () => {
         });
         games.push({ numPlayers, seed, r });
         for (const [m, n] of Object.entries(r.cardMoves)) totals[m] = (totals[m] ?? 0) + n;
+        for (const [m, n] of Object.entries(r.movementMoves))
+          movements[m] = (movements[m] ?? 0) + n;
         for (const [m, n] of Object.entries(r.responseMoves))
           responses[m] = (responses[m] ?? 0) + n;
         expect({
@@ -80,6 +83,11 @@ describe('runBotPlayout · 打开出牌策略', () => {
     expect(Object.values(totals).reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
     expect(kinds).toContain('playUnlock');
     expect(kinds.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('Bot 确实复活过人、梦主确实移动过', () => {
+    expect(movements['playRevive'] ?? 0).toBeGreaterThan(0);
+    expect(movements['dreamMasterMove'] ?? 0).toBeGreaterThan(0);
   });
 
   it('Bot 梦主确实抵消过解封（对局仍全部打到终局）', () => {
@@ -107,6 +115,7 @@ describe('runBotPlayout · 打开出牌策略', () => {
     const r = runBotPlayout({ numPlayers: 6, seed: 'cp-off', maxSteps: MAX_STEPS });
     expect(r.cardMoves).toEqual({});
     expect(r.responseMoves).toEqual({});
+    expect(r.movementMoves).toEqual({});
   });
 
   it('同一种子两次结果完全相同', () => {

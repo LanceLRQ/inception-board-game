@@ -67,10 +67,6 @@ export function defaultArgsFor(move: string, G: SetupState, botID: string): unkn
       const hand = self?.hand ?? [];
       return [hand.slice(0, getDiscardRequired(G, botID))];
     }
-    case 'dreamMasterMove': {
-      const cur = self?.currentLayer ?? 1;
-      return [Math.max(1, Math.min(4, cur + 1))];
-    }
     case 'resolveGraft': {
       // 简单策略：取手牌前 2 张放回牌库顶
       const hand = self?.hand ?? [];

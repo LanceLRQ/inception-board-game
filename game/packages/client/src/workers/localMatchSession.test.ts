@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { AutoAction } from '@icgame/bot';
+import { sendToLimbo } from '@icgame/game-engine';
 import { HAND_LIMIT } from '@icgame/game-engine/config';
 import {
   ARIES_GRACE_MS,
@@ -644,6 +645,26 @@ describe('LocalMatchSession · Bot 出牌', () => {
       }
     }
     expect(session.view().G.pendingResponseWindow).toBeNull();
+  });
+
+  it('迷失层里的 Bot 座位会复活自己；关闭 Bot 策略时只结束出牌阶段', () => {
+    for (const policy of [true, false]) {
+      const { session, bot } = botActionTurn();
+      (session as unknown as { botPlaysCards: boolean }).botPlaysCards = policy;
+      const G = session.snapshot().G;
+      const limbo = sendToLimbo(G, bot);
+      patchState(session, {
+        players: {
+          ...limbo.players,
+          [bot]: { ...limbo.players[bot]!, hand: ['action_kick', 'action_graft'] as never },
+        },
+        layers: limbo.layers,
+      });
+      expect(session.step().action).toMatchObject({
+        playerID: bot,
+        move: policy ? 'playRevive' : 'endActionPhase',
+      });
+    }
   });
 
   /** 真人对自己面前的待应答事项给一个最简答复；没有待应答返回 false */

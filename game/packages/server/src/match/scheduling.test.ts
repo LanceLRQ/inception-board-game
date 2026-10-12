@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
-import { thiefActionTurn, unlockWindowForMaster } from '../testing/botTurnState.js';
+import {
+  limboThiefTurn,
+  masterMoveTurn,
+  thiefActionTurn,
+  unlockWindowForMaster,
+} from '../testing/botTurnState.js';
 import { DEFAULT_TIMING, planNext, timeoutAction, type TimingConfig } from './scheduling.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
@@ -279,5 +284,23 @@ describe('Bot 应答策略的座位范围', () => {
   it('真人梦主仍然等真人', () => {
     const { state, master } = unlockWindowForMaster();
     expect(planNext(state, [master], timing, [master]).kind).toBe('deadline');
+  });
+});
+
+describe('Bot 复活与梦主移动的座位范围', () => {
+  it('列入的 Bot 座位复活 / 移动；没列入的座位与超时代发只结束出牌阶段', () => {
+    const limbo = limboThiefTurn();
+    const revive = planNext(limbo.state, [], timing, [limbo.actor]);
+    expect(revive.kind === 'auto' && revive.action.move).toBe('playRevive');
+    const quiet = planNext(limbo.state, [], timing);
+    expect(quiet.kind === 'auto' && quiet.action.move).toBe('endActionPhase');
+    expect(timeoutAction(limbo.state)?.move).toBe('endActionPhase');
+
+    const mm = masterMoveTurn();
+    const move = planNext(mm.state, [], timing, [mm.actor]);
+    expect(move.kind === 'auto' && move.action.move).toBe('dreamMasterMove');
+    const still = planNext(mm.state, [], timing);
+    expect(still.kind === 'auto' && still.action.move).toBe('endActionPhase');
+    expect(timeoutAction(mm.state)?.move).toBe('endActionPhase');
   });
 });

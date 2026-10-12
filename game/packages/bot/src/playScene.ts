@@ -2,7 +2,7 @@
 // 仅供测试使用，不从包入口导出。
 
 import type { CardID, Layer } from '@icgame/shared';
-import { InceptionCityGame } from '@icgame/game-engine';
+import { InceptionCityGame, sendToLimbo } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
 
@@ -15,6 +15,8 @@ export type State = MatchState<SetupState>;
 export interface SceneSeat {
   layer: number;
   hand: string[];
+  /** 在迷失层（用引擎的 sendToLimbo 送入，layer 字段此时无意义） */
+  limbo?: boolean;
 }
 
 export interface SceneOptions {
@@ -28,6 +30,8 @@ export interface SceneOptions {
   locks?: Partial<Record<1 | 2 | 3 | 4, number>>;
   /** 梦主是土星·领地（缺省避开土星局） */
   saturn?: boolean;
+  /** 没写进 seats 的盗梦者：缺省留在第 1 层，'limbo' 把他们送进迷失层 */
+  rest?: 'limbo';
 }
 
 /** 座位别名：'master' 或盗梦者序号（'t0'、't1'…）换成真实玩家 ID */
@@ -99,7 +103,7 @@ export function actionScene(options: SceneOptions): State {
   if (options.saturn) {
     players[master] = { ...players[master]!, characterId: SATURN as CardID };
   }
-  const G: SetupState = {
+  let G: SetupState = {
     ...s.G,
     players,
     layers,
@@ -108,6 +112,19 @@ export function actionScene(options: SceneOptions): State {
     unlockThisTurn: 0,
     playedCardsThisTurn: [],
   };
+  if (options.rest === 'limbo') {
+    const listed = new Set(Object.keys(options.seats).map((a) => resolveSeat(G, a)));
+    for (const id of seatIds(G).thieves) {
+      if (!listed.has(id)) G = sendToLimbo(G, id);
+    }
+  }
+  for (const [alias, seat] of Object.entries(options.seats)) {
+    if (!seat.limbo) continue;
+    const id = resolveSeat(G, alias);
+    const hand = G.players[id]!.hand;
+    G = sendToLimbo(G, id);
+    G = { ...G, players: { ...G.players, [id]: { ...G.players[id]!, hand } } };
+  }
   return {
     ...s,
     G,

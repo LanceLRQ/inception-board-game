@@ -60,6 +60,8 @@ export interface BotPlayoutResult {
   cardMoves: Record<string, number>;
   /** 被接受的真实应答（解封抵消、土星·律令的抵消，不含放弃与放过），按 move 名统计 */
   responseMoves: Record<string, number>;
+  /** 被接受的复活与梦主移动（不是出牌类 move），按 move 名统计 */
+  movementMoves: Record<string, number>;
 }
 
 /** 局面里仍有值的待结算字段：以 pending 开头的字段，加上窥视结果 peekReveal */
@@ -73,6 +75,7 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
   const { numPlayers, seed, maxSteps } = options;
   const cardMoves: Record<string, number> = {};
   const responseMoves: Record<string, number> = {};
+  const movementMoves: Record<string, number> = {};
   let state = createMatch(game, { numPlayers, setupData: { rngSeed: seed }, seed });
   let steps = 0;
   let stalledOn: StallInfo | null = null;
@@ -112,6 +115,9 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
     }
     state = outcome.state;
     steps++;
+    if (request.move === 'playRevive' || request.move === 'dreamMasterMove') {
+      movementMoves[request.move] = (movementMoves[request.move] ?? 0) + 1;
+    }
     if (
       request.move === 'respondCancelUnlock' ||
       (request.move === 'respondSaturnDecree' && request.args[0] !== null)
@@ -132,5 +138,6 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
     invariantViolations,
     cardMoves,
     responseMoves,
+    movementMoves,
   };
 }
