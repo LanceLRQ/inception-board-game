@@ -25,14 +25,14 @@ describe('nextAutoAction · Bot 出牌策略', () => {
       playerID: bot,
       move: 'endActionPhase',
     });
-    expect(nextAutoAction(s, { humanPlayerIDs: [], cardPlaySeatIDs: [] })?.move).toBe(
+    expect(nextAutoAction(s, { humanPlayerIDs: [], policySeatIDs: [] })?.move).toBe(
       'endActionPhase',
     );
   });
 
   it('打开后在能解封的局面发 playUnlock，且被运行器接受', () => {
     const { s, bot } = unlockScene();
-    const action = nextAutoAction(s, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] });
+    const action = nextAutoAction(s, { humanPlayerIDs: [], policySeatIDs: [bot] });
     expect(action).toMatchObject({ playerID: bot, move: 'playUnlock', args: ['action_unlock'] });
     expect(action?.why).toContain('解封');
     expect(applyMove(game, s, action!).ok).toBe(true);
@@ -58,7 +58,7 @@ describe('nextAutoAction · Bot 出牌策略', () => {
       args: ['action_unlock'],
     });
     expect(probe.ok).toBe(false);
-    expect(nextAutoAction(blocked, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] })?.move).toBe(
+    expect(nextAutoAction(blocked, { humanPlayerIDs: [], policySeatIDs: [bot] })?.move).toBe(
       'endActionPhase',
     );
   });
@@ -76,7 +76,7 @@ describe('nextAutoAction · Bot 出牌策略', () => {
         unlockThisTurn: 1,
       },
     };
-    const action = nextAutoAction(blocked, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] });
+    const action = nextAutoAction(blocked, { humanPlayerIDs: [], policySeatIDs: [bot] });
     // 解封被拒，凭空造物被接受
     expect(action?.move).toBe('playCreation');
   });
@@ -87,7 +87,7 @@ describe('nextAutoAction · Bot 出牌策略', () => {
       ...s,
       G: { ...s.G, playedCardsThisTurn: Array(4).fill('action_kick') as never },
     };
-    expect(nextAutoAction(capped, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] })?.move).toBe(
+    expect(nextAutoAction(capped, { humanPlayerIDs: [], policySeatIDs: [bot] })?.move).toBe(
       'endActionPhase',
     );
     const three: State = {
@@ -97,12 +97,12 @@ describe('nextAutoAction · Bot 出牌策略', () => {
         playedCardsThisTurn: ['action_kick', 'action_kick', 'action_kick'] as never,
       },
     };
-    expect(nextAutoAction(three, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] })?.move).toBe(
+    expect(nextAutoAction(three, { humanPlayerIDs: [], policySeatIDs: [bot] })?.move).toBe(
       'playUnlock',
     );
     const custom = nextAutoAction(three, {
       humanPlayerIDs: [],
-      cardPlaySeatIDs: [bot],
+      policySeatIDs: [bot],
       maxPlaysPerTurn: 3,
     });
     expect(custom?.move).toBe('endActionPhase');
@@ -110,8 +110,8 @@ describe('nextAutoAction · Bot 出牌策略', () => {
 
   it('真人座位不出牌（等真人），未列入的座位只结束出牌阶段', () => {
     const { s, bot, others } = unlockScene();
-    expect(nextAutoAction(s, { humanPlayerIDs: [bot], cardPlaySeatIDs: [bot] })).toBeNull();
-    expect(nextAutoAction(s, { humanPlayerIDs: [], cardPlaySeatIDs: [others[0]!] })?.move).toBe(
+    expect(nextAutoAction(s, { humanPlayerIDs: [bot], policySeatIDs: [bot] })).toBeNull();
+    expect(nextAutoAction(s, { humanPlayerIDs: [], policySeatIDs: [others[0]!] })?.move).toBe(
       'endActionPhase',
     );
   });
@@ -121,17 +121,17 @@ describe('nextAutoAction · Bot 出牌策略', () => {
     const played = applyMove(
       game,
       s,
-      nextAutoAction(s, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] })!,
+      nextAutoAction(s, { humanPlayerIDs: [], policySeatIDs: [bot] })!,
     );
     if (!played.ok) throw new Error('playUnlock 被拒绝');
     const window = played.state.G.pendingResponseWindow;
     expect(window).not.toBeNull();
     const first = window!.responders[0]!;
     expect(
-      nextAutoAction(played.state, { humanPlayerIDs: [first], cardPlaySeatIDs: [bot] }),
+      nextAutoAction(played.state, { humanPlayerIDs: [first], policySeatIDs: [bot] }),
     ).toBeNull();
     expect(
-      nextAutoAction(played.state, { humanPlayerIDs: [], cardPlaySeatIDs: [bot] }),
+      nextAutoAction(played.state, { humanPlayerIDs: [], policySeatIDs: [bot] }),
     ).toMatchObject({ playerID: first, move: 'passResponse' });
     expect(others).toContain(first);
   });
@@ -145,7 +145,7 @@ describe('nextAutoAction · Bot 出牌策略', () => {
       },
     });
     const { master, thieves } = seatIds(s.G);
-    const action = nextAutoAction(s, { humanPlayerIDs: [], cardPlaySeatIDs: [master] });
+    const action = nextAutoAction(s, { humanPlayerIDs: [], policySeatIDs: [master] });
     expect(action).toMatchObject({
       playerID: master,
       move: 'playShoot',
@@ -173,7 +173,164 @@ describe('nextAutoAction · Bot 出牌策略', () => {
       },
     };
     expect(
-      nextAutoAction(pending, { humanPlayerIDs: [], cardPlaySeatIDs: [thieves[0]!] })?.move,
+      nextAutoAction(pending, { humanPlayerIDs: [], policySeatIDs: [thieves[0]!] })?.move,
     ).toBe('resolveShootMove');
+  });
+});
+
+describe('nextAutoAction · Bot 应答策略', () => {
+  /** t0 打出解封，窗口打开；梦主与 t1 手里都有解封 */
+  function openWindow(masterHand = ['action_unlock']): {
+    s: State;
+    master: string;
+    t0: string;
+    t1: string;
+  } {
+    const base = actionScene({
+      actor: 0,
+      seats: {
+        t0: { layer: 2, hand: ['action_unlock'] },
+        t1: { layer: 2, hand: ['action_unlock'] },
+        master: { layer: 3, hand: masterHand },
+      },
+    });
+    const { master, thieves } = seatIds(base.G);
+    const r = applyMove(game, base, {
+      playerID: thieves[0]!,
+      move: 'playUnlock',
+      args: ['action_unlock'],
+    });
+    if (!r.ok) throw new Error('playUnlock 被拒绝');
+    return { s: r.state, master, t0: thieves[0]!, t1: thieves[1]! };
+  }
+
+  it('开关缺省关闭：Bot 响应者一律放弃', () => {
+    const { s } = openWindow();
+    const first = s.G.pendingResponseWindow!.responders[0]!;
+    expect(nextAutoAction(s, { humanPlayerIDs: [] })).toMatchObject({
+      playerID: first,
+      move: 'passResponse',
+    });
+  });
+
+  it('打开后：轮到 Bot 梦主时抵消盗梦者的解封，轮到同阵营的 Bot 盗梦者时放弃', () => {
+    const { s, master, t1 } = openWindow();
+    const opts = { humanPlayerIDs: [], policySeatIDs: s.G.playerOrder };
+    let state = s;
+    const seen: Record<string, string> = {};
+    for (let i = 0; i < 6 && state.G.pendingResponseWindow; i++) {
+      const a = nextAutoAction(state, opts)!;
+      seen[a.playerID] = a.move;
+      const r = applyMove(game, state, a);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      state = r.state;
+      if (a.move === 'respondCancelUnlock') break;
+    }
+    expect(seen[t1] ?? 'passResponse').toBe('passResponse');
+    expect(seen[master] ?? 'respondCancelUnlock').toBe('respondCancelUnlock');
+  });
+
+  it('梦主响应者直接被点到时发 respondCancelUnlock，且被运行器接受', () => {
+    const { s, master } = openWindow();
+    // 让梦主成为下一个响应者：其余人都已响应
+    const w = s.G.pendingResponseWindow!;
+    const others = w.responders.filter((id) => id !== master);
+    const only: State = {
+      ...s,
+      G: { ...s.G, pendingResponseWindow: { ...w, responded: others } },
+    };
+    const a = nextAutoAction(only, { humanPlayerIDs: [], policySeatIDs: [master] });
+    expect(a).toMatchObject({ playerID: master, move: 'respondCancelUnlock' });
+    expect(applyMove(game, only, a!).ok).toBe(true);
+    // 开关里没有梦主：放弃
+    expect(nextAutoAction(only, { humanPlayerIDs: [], policySeatIDs: [] })?.move).toBe(
+      'passResponse',
+    );
+  });
+
+  it('候选被运行器拒绝时回到放弃', () => {
+    const { s, master } = openWindow();
+    const w = s.G.pendingResponseWindow!;
+    const only: State = {
+      ...s,
+      G: {
+        ...s.G,
+        // 窗口来源不是解封效果①：抵消会被引擎拒绝，策略也不给候选 -> 放弃
+        pendingResponseWindow: {
+          ...w,
+          responded: w.responders.filter((id) => id !== master),
+        },
+        pendingUnlock: null,
+      },
+    };
+    expect(nextAutoAction(only, { humanPlayerIDs: [], policySeatIDs: [master] })?.move).toBe(
+      'passResponse',
+    );
+  });
+
+  it('真人响应者仍然等真人', () => {
+    const { s, master } = openWindow();
+    const w = s.G.pendingResponseWindow!;
+    const only: State = {
+      ...s,
+      G: {
+        ...s.G,
+        pendingResponseWindow: { ...w, responded: w.responders.filter((id) => id !== master) },
+      },
+    };
+    expect(nextAutoAction(only, { humanPlayerIDs: [master], policySeatIDs: [master] })).toBeNull();
+  });
+
+  describe('土星·律令', () => {
+    function decree(masterHand: string[]): { s: State; master: string } {
+      const base = actionScene({
+        actor: 0,
+        saturn: true,
+        seats: {
+          t0: { layer: 2, hand: ['action_kick'] },
+          t1: { layer: 2, hand: [] },
+          master: { layer: 3, hand: masterHand },
+        },
+      });
+      const { master, thieves } = seatIds(base.G);
+      const r = applyMove(game, base, {
+        playerID: thieves[0]!,
+        move: 'playKick',
+        args: ['action_kick', thieves[1]!],
+      });
+      if (!r.ok) throw new Error('playKick 被拒绝');
+      return { s: r.state, master };
+    }
+
+    it('开关缺省关闭：梦主放过', () => {
+      const { s, master } = decree(['action_kick']);
+      expect(nextAutoAction(s, { humanPlayerIDs: [] })).toMatchObject({
+        playerID: master,
+        move: 'respondSaturnDecree',
+        args: [null],
+      });
+    });
+
+    it('打开后：Bot 梦主有同名牌就弃牌抵消，没有就放过', () => {
+      const { s, master } = decree(['action_kick', 'action_unlock']);
+      const a = nextAutoAction(s, { humanPlayerIDs: [], policySeatIDs: [master] });
+      expect(a).toMatchObject({
+        playerID: master,
+        move: 'respondSaturnDecree',
+        args: ['action_kick'],
+      });
+      expect(applyMove(game, s, a!).ok).toBe(true);
+
+      const none = decree(['action_unlock']);
+      expect(
+        nextAutoAction(none.s, { humanPlayerIDs: [], policySeatIDs: [none.master] }),
+      ).toMatchObject({ move: 'respondSaturnDecree', args: [null] });
+    });
+
+    it('真人梦主仍等真人', () => {
+      const { s, master } = decree(['action_kick']);
+      expect(nextAutoAction(s, { humanPlayerIDs: [master], policySeatIDs: [master] })).toBeNull();
+    });
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, createMatch, type GameDef, type MatchState } from '@icgame/game-engine/runner';
-import { thiefActionTurn } from '../testing/botTurnState.js';
+import { thiefActionTurn, unlockWindowForMaster } from '../testing/botTurnState.js';
 import { DEFAULT_TIMING, planNext, timeoutAction, type TimingConfig } from './scheduling.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
@@ -263,5 +263,21 @@ describe('Bot 出牌策略的座位范围', () => {
   it('超时代发永远不替座位出牌', () => {
     const { state } = thiefActionTurn();
     expect(timeoutAction(state)?.move).toBe('endActionPhase');
+  });
+});
+
+describe('Bot 应答策略的座位范围', () => {
+  it('列入的 Bot 梦主抵消盗梦者的解封；没列入的座位与超时代发一律放弃', () => {
+    const { state, master } = unlockWindowForMaster();
+    const on = planNext(state, [], timing, [master]);
+    expect(on.kind === 'auto' && on.action.move).toBe('respondCancelUnlock');
+    const off = planNext(state, [], timing);
+    expect(off.kind === 'auto' && off.action.move).toBe('passResponse');
+    expect(timeoutAction(state)?.move).toBe('passResponse');
+  });
+
+  it('真人梦主仍然等真人', () => {
+    const { state, master } = unlockWindowForMaster();
+    expect(planNext(state, [master], timing, [master]).kind).toBe('deadline');
   });
 });

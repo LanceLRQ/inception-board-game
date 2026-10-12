@@ -182,7 +182,7 @@ export class LocalMatchSession {
     const action = nextAutoAction(this.state, {
       humanPlayerIDs: [this.humanPlayerID],
       // 除真人座位外都是 Bot 座位
-      cardPlaySeatIDs: this.botPlaysCards
+      policySeatIDs: this.botPlaysCards
         ? this.state.ctx.playOrder.filter((id) => id !== this.humanPlayerID)
         : [],
     });

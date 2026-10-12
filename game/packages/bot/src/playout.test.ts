@@ -47,6 +47,7 @@ describe('runBotPlayout', () => {
 
 describe('runBotPlayout · 打开出牌策略', () => {
   const totals: Record<string, number> = {};
+  const responses: Record<string, number> = {};
   const games: { numPlayers: number; seed: string; r: ReturnType<typeof runBotPlayout> }[] = [];
 
   for (let numPlayers = 4; numPlayers <= 10; numPlayers++) {
@@ -60,6 +61,8 @@ describe('runBotPlayout · 打开出牌策略', () => {
         });
         games.push({ numPlayers, seed, r });
         for (const [m, n] of Object.entries(r.cardMoves)) totals[m] = (totals[m] ?? 0) + n;
+        for (const [m, n] of Object.entries(r.responseMoves))
+          responses[m] = (responses[m] ?? 0) + n;
         expect({
           gameover: r.gameover !== undefined,
           stalledOn: r.stalledOn,
@@ -79,9 +82,31 @@ describe('runBotPlayout · 打开出牌策略', () => {
     expect(kinds.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('Bot 梦主确实抵消过解封（对局仍全部打到终局）', () => {
+    expect(responses['respondCancelUnlock'] ?? 0).toBeGreaterThan(0);
+  });
+
+  it('土星局里 Bot 梦主确实弃牌抵消过（扫种子直到出现，全部对局无被拒、无停滞）', () => {
+    let decrees = 0;
+    for (let i = 0; i < 120 && decrees === 0; i++) {
+      const r = runBotPlayout({
+        numPlayers: 6,
+        seed: `sat-${i}`,
+        maxSteps: MAX_STEPS,
+        cardPlay: true,
+      });
+      expect(r.rejected).toBeNull();
+      expect(r.stalledOn).toBeNull();
+      expect(r.gameover).toBeDefined();
+      decrees += r.responseMoves['respondSaturnDecree'] ?? 0;
+    }
+    expect(decrees).toBeGreaterThan(0);
+  });
+
   it('关闭时没有任何出牌类 move', () => {
     const r = runBotPlayout({ numPlayers: 6, seed: 'cp-off', maxSteps: MAX_STEPS });
     expect(r.cardMoves).toEqual({});
+    expect(r.responseMoves).toEqual({});
   });
 
   it('同一种子两次结果完全相同', () => {

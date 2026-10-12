@@ -669,6 +669,45 @@ describe('LocalMatchSession · Bot 出牌', () => {
     return false;
   }
 
+  /** Bot 盗梦者打出解封，Bot 梦主手里有解封：返回依次发出的自动动作（真人遇到窗口就放弃） */
+  function unlockExchange(respondWithPolicy: boolean): { moves: string[]; master: string } {
+    const { session, bot } = botActionTurn();
+    const G = session.snapshot().G;
+    const master = G.dreamMasterID;
+    expect(master).not.toBe(HUMAN);
+    expect(bot).not.toBe(master);
+    patchState(session, {
+      players: {
+        ...G.players,
+        [master]: { ...G.players[master]!, hand: ['action_unlock'] as never },
+      },
+    });
+    const moves: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const r = session.step();
+      if (r.action) {
+        moves.push(`${r.action.playerID}:${r.action.move}`);
+        // 打出解封之后，按需要关闭 Bot 策略：此后的应答只会放弃
+        if (!respondWithPolicy) {
+          (session as unknown as { botPlaysCards: boolean }).botPlaysCards = false;
+        }
+      } else if (session.view().G.pendingResponseWindow !== null) {
+        session.humanMove('passResponse', []);
+      }
+      if (moves.length > 0 && session.view().G.pendingResponseWindow === null) break;
+    }
+    return { moves, master };
+  }
+
+  it('Bot 梦主抵消 Bot 盗梦者的解封；关闭 Bot 策略时只放弃', () => {
+    const on = unlockExchange(true);
+    expect(on.moves).toContain(`${on.master}:respondCancelUnlock`);
+    const off = unlockExchange(false);
+    expect(off.moves.join(',')).not.toContain('respondCancelUnlock');
+    expect(off.moves).toContain(`${off.master}:passResponse`);
+    expect(on.moves[0]).toContain('playUnlock');
+  });
+
   it('整局本地对局里 Bot 出牌后能打到终局：真人答完应答继续，没有被拒的自动动作', () => {
     const session = makeSession(6, 'bot-play-full', true);
     let rejected = 0;

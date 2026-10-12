@@ -63,7 +63,7 @@ function playMixed(numPlayers: number, seed: string, cardPlay = false): MixedRes
   while (result.steps < MAX_STEPS && state.ctx.gameover === undefined) {
     const action = nextAutoAction(state, {
       humanPlayerIDs: [HUMAN],
-      ...(cardPlay ? { cardPlaySeatIDs: state.ctx.playOrder.filter((id) => id !== HUMAN) } : {}),
+      ...(cardPlay ? { policySeatIDs: state.ctx.playOrder.filter((id) => id !== HUMAN) } : {}),
     });
     if (action !== null) {
       const outcome = applyMove(game, state, action);

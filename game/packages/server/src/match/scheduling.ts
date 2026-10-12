@@ -50,19 +50,19 @@ function deadlineMs(state: MatchState<SetupState>, timing: TimingConfig): number
 }
 
 /**
- * cardPlaySeats：按 Bot 策略在出牌阶段打行动牌的座位，只应是真正的 Bot 座位。
+ * policySeats：按 Bot 策略在出牌阶段打行动牌的座位，只应是真正的 Bot 座位。
  * 托管中的真人座位不列入（它们只是代为推进，不替真人出牌）；缺省不列任何座位。
  */
 export function planNext(
   state: MatchState<SetupState>,
   humanSeats: readonly string[],
   timing: TimingConfig,
-  cardPlaySeats: readonly string[] = [],
+  policySeats: readonly string[] = [],
 ): NextSchedule {
   if (state.ctx.gameover !== undefined) return { kind: 'none' };
   const action = nextAutoAction(state, {
     humanPlayerIDs: humanSeats,
-    cardPlaySeatIDs: cardPlaySeats,
+    policySeatIDs: policySeats,
   });
   if (action !== null) return { kind: 'auto', action, delayMs: timing.botStepDelayMs };
   return { kind: 'deadline', delayMs: deadlineMs(state, timing) };

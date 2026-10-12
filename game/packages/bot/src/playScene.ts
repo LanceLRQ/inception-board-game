@@ -26,6 +26,8 @@ export interface SceneOptions {
   seats: Record<string, SceneSeat>;
   /** 各层心锁，缺省 3 */
   locks?: Partial<Record<1 | 2 | 3 | 4, number>>;
+  /** 梦主是土星·领地（缺省避开土星局） */
+  saturn?: boolean;
 }
 
 /** 座位别名：'master' 或盗梦者序号（'t0'、't1'…）换成真实玩家 ID */
@@ -62,7 +64,11 @@ export function actionScene(options: SceneOptions): State {
   let seed = options.seed ?? 'play-scene';
   let s = startedMatch(numPlayers, seed);
   // 土星·领地局里每张出牌都要先问梦主，会让局面多出一个待应答窗口；这里的场景要的是普通梦主
-  for (let i = 0; i < 20 && s.G.players[s.G.dreamMasterID]?.characterId === SATURN; i++) {
+  for (
+    let i = 0;
+    i < 20 && !options.saturn && s.G.players[s.G.dreamMasterID]?.characterId === SATURN;
+    i++
+  ) {
     seed = `${seed}-r`;
     s = startedMatch(numPlayers, seed);
   }
@@ -89,6 +95,9 @@ export function actionScene(options: SceneOptions): State {
       heartLockValue: options.locks?.[n] ?? 3,
       playersInLayer: s.G.playerOrder.filter((id) => players[id]!.currentLayer === n),
     };
+  }
+  if (options.saturn) {
+    players[master] = { ...players[master]!, characterId: SATURN as CardID };
   }
   const G: SetupState = {
     ...s.G,

@@ -12,7 +12,7 @@ import {
   type SubmitResult,
 } from './MatchRoom.js';
 import type { TimingConfig } from './scheduling.js';
-import { thiefActionTurn } from '../testing/botTurnState.js';
+import { thiefActionTurn, unlockWindowForMaster } from '../testing/botTurnState.js';
 import { FakeTimers } from '../testing/fakeTimers.js';
 import { logger } from '../infra/logger.js';
 
@@ -1414,5 +1414,38 @@ describe('MatchRoom Bot 出牌策略', () => {
     await h.room.idle();
     expect(h.steps[0]!.source).toBe('timeout');
     expect(h.steps[0]!.request).toMatchObject({ playerID: actor, move: 'endActionPhase' });
+  });
+});
+
+describe('MatchRoom Bot 应答策略', () => {
+  it('Bot 梦主座位抵消盗梦者的解封', async () => {
+    const { state, master } = unlockWindowForMaster();
+    const h = makeHarness(5, [], {}, state);
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.request).toMatchObject({ playerID: master, move: 'respondCancelUnlock' });
+    expect(h.steps[0]!.source).toBe('bot');
+  });
+
+  it('托管中的真人梦主只放弃，不抵消', async () => {
+    const { state, master } = unlockWindowForMaster();
+    const h = makeHarness(5, [master], {}, state);
+    h.takenOver.add(master);
+    h.room.start();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.request).toMatchObject({ playerID: master, move: 'passResponse' });
+  });
+
+  it('真人梦主超时代发只放弃，不抵消', async () => {
+    const { state, master } = unlockWindowForMaster();
+    const h = makeHarness(5, [master], {}, state);
+    h.room.start();
+    expect(h.room.deadlineAt()).not.toBeNull();
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.source).toBe('timeout');
+    expect(h.steps[0]!.request).toMatchObject({ playerID: master, move: 'passResponse' });
   });
 });

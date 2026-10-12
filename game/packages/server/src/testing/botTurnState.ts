@@ -68,3 +68,40 @@ export function thiefActionTurn(numPlayers = 5): ThiefActionTurn {
   }
   throw new Error('找不到合适的种子');
 }
+
+/**
+ * 盗梦者打出解封后的响应窗口，且除梦主外的响应者都已响应：下一个响应的是梦主，梦主手里有解封。
+ */
+export function unlockWindowForMaster(numPlayers = 5): {
+  state: MatchState<SetupState>;
+  actor: string;
+  master: string;
+} {
+  const { state, actor, master } = thiefActionTurn(numPlayers);
+  const withHand: MatchState<SetupState> = {
+    ...state,
+    G: {
+      ...state.G,
+      players: {
+        ...state.G.players,
+        [master]: { ...state.G.players[master]!, hand: ['action_unlock'] as CardID[] },
+      },
+    },
+  };
+  const played = applyMove(InceptionCityGame, withHand, {
+    playerID: actor,
+    move: 'playUnlock',
+    args: ['action_unlock'],
+  });
+  if (!played.ok) throw new Error('playUnlock 被拒绝');
+  const w = played.state.G.pendingResponseWindow;
+  if (!w) throw new Error('没有打开响应窗口');
+  const open = {
+    ...played.state,
+    G: {
+      ...played.state.G,
+      pendingResponseWindow: { ...w, responded: w.responders.filter((id) => id !== master) },
+    },
+  };
+  return { state: open, actor, master };
+}

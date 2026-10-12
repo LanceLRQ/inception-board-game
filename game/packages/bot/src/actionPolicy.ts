@@ -8,6 +8,7 @@
 // 规则对照：docs/manual/04-action-cards.md
 
 import type { MatchView, PlayerView } from '@icgame/game-engine';
+import { isSameNameCard, type CardID } from '@icgame/shared';
 
 /** 一条候选出牌 */
 export interface PlannedPlay {
@@ -184,4 +185,62 @@ export function planActionPlays(view: MatchView, botID: string): PlannedPlay[] {
   // 背叛者之类自己已不是盗梦者阵营的座位：这一版不出牌
   if (me.faction !== 'thief') return [];
   return thiefPlan(view, me, me.hand);
+}
+
+/** 解封响应窗口的来源标识：打出解封的效果① */
+const UNLOCK_EFFECT_1 = 'action_unlock_effect_1';
+
+/**
+ * 解封响应窗口里，轮到该座位时的应答候选：手里有解封，且打出解封的人在自己看得到的信息里是对立阵营，
+ * 就用解封效果②抵消。未翻开的他人在视图里一律显示为盗梦者，所以：梦主（或自己已站在梦主方）抵消盗梦者的解封，
+ * 盗梦者只会抵消已翻开的梦主方（背叛者）的解封，同阵营与判断不了的一律不抵消。
+ * 对照：docs/manual/04-action-cards.md 解封 效果②
+ */
+function unlockResponsePlan(
+  view: MatchView,
+  me: PlayerView,
+  hand: readonly string[],
+): PlannedPlay[] {
+  const window = view.pendingResponseWindow;
+  const unlock = view.pendingUnlock;
+  if (!window || !unlock || window.sourceAbilityID !== UNLOCK_EFFECT_1) return [];
+  if (!window.responders.includes(me.id) || window.responded.includes(me.id)) return [];
+  if (!hand.includes(CARD.unlock)) return [];
+  const user = view.players[unlock.playerID];
+  if (!user || user.id === me.id || user.faction === me.faction) return [];
+  return [
+    {
+      move: 'respondCancelUnlock',
+      args: [],
+      why: `${unlock.playerID} 的解封是对立阵营打出的，用解封抵消`,
+    },
+  ];
+}
+
+/**
+ * 土星·律令窗口里梦主的应答候选：手里有与被打出的牌同名的牌，就弃 1 张抵消，完全相同的 id 优先。
+ * 没有同名牌时返回空数组，调用方回到「放过」。
+ * 对照：docs/manual/06-dream-master.md 土星·领地 律令
+ */
+function decreePlan(view: MatchView, me: PlayerView, hand: readonly string[]): PlannedPlay[] {
+  const pending = view.pendingSaturnDecree;
+  if (!pending || pending.masterID !== me.id) return [];
+  const played = pending.cardId;
+  const ids = [...new Set(hand)].filter((c) => isSameNameCard(c as CardID, played));
+  ids.sort((a, b) => Number(b === played) - Number(a === played));
+  return ids.map((id) => ({
+    move: 'respondSaturnDecree',
+    args: [id],
+    why: `律令：弃 ${id} 抵消 ${pending.userID} 打出的 ${played}`,
+  }));
+}
+
+/**
+ * 该座位此刻在回合外应答时可以尝试的动作，按优先级排序；没有就返回空数组（调用方保持放弃 / 放过）。
+ * 只覆盖解封响应窗口与土星·律令；其余应答一律不在这里。
+ */
+export function planResponses(view: MatchView, botID: string): PlannedPlay[] {
+  const me = view.players[botID];
+  if (!me || !me.isAlive || me.hand === null) return [];
+  return [...unlockResponsePlan(view, me, me.hand), ...decreePlan(view, me, me.hand)];
 }

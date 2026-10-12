@@ -6,7 +6,7 @@
 import { InceptionCityGame, viewFor } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import { applyMove, type GameDef, type MatchState } from '@icgame/game-engine/runner';
-import { MAX_PLAYS_PER_TURN, planActionPlays } from './actionPolicy.js';
+import { MAX_PLAYS_PER_TURN, planActionPlays, planResponses } from './actionPolicy.js';
 import { legalMovesFor } from './moveTables.js';
 import { defaultArgsFor, pickBotMove } from './botMoves.js';
 
@@ -25,18 +25,49 @@ export interface AutoActionOptions {
   /** 由真人操作的玩家；轮到他们决定时返回 null */
   humanPlayerIDs: readonly string[];
   /**
-   * 在自己回合的出牌阶段按 Bot 策略打行动牌的座位；缺省不列任何座位（行动阶段只结束出牌）。
+   * 按 Bot 策略行动的座位：自己回合的出牌阶段打行动牌，回合外应答解封响应窗口与土星·律令；
+   * 缺省不列任何座位（行动阶段只结束出牌，应答一律放弃 / 放过）。
    * 只应列真正的 Bot 座位：超时代发、挂机托管的真人座位不要列入。
    */
-  cardPlaySeatIDs?: readonly string[];
+  policySeatIDs?: readonly string[];
   /** 一个 Bot 一回合最多打出的行动牌张数，缺省 MAX_PLAYS_PER_TURN */
   maxPlaysPerTurn?: number;
 }
 
 /**
- * 出牌阶段的 Bot 出牌：按策略给出的候选顺序，用运行器试跑，取第一个被接受的。
+ * 按策略给出的候选顺序，用运行器试跑，取第一个被接受的。
  * 试跑只用「接受 / 拒绝」一位信息，不看试跑后的状态；没有候选或都被拒绝返回 null。
  */
+function firstAccepted(
+  state: MatchState<SetupState>,
+  botID: string,
+  plans: readonly { move: string; args: unknown[]; why: string }[],
+  label: string,
+): AutoAction | null {
+  for (const plan of plans) {
+    const outcome = applyMove(game, state, { playerID: botID, move: plan.move, args: plan.args });
+    if (outcome.ok) {
+      return {
+        playerID: botID,
+        move: plan.move,
+        args: plan.args,
+        why: `Bot ${botID} ${label} · ${plan.why}`,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * 回合外应答：按应答策略的候选顺序试跑，取第一个被接受的；没有候选或都被拒绝返回 null，
+ * 调用方回到放弃 / 放过。
+ */
+function pickResponse(state: MatchState<SetupState>, botID: string): AutoAction | null {
+  const view = viewFor(state.G, botID, { gameOver: false });
+  return firstAccepted(state, botID, planResponses(view, botID), '应答');
+}
+
+/** 出牌阶段的 Bot 出牌，受每回合张数上限约束 */
 function pickPlay(
   state: MatchState<SetupState>,
   botID: string,
@@ -45,18 +76,7 @@ function pickPlay(
   const { G } = state;
   if (G.playedCardsThisTurn.length >= maxPlays) return null;
   const view = viewFor(G, botID, { gameOver: false });
-  for (const plan of planActionPlays(view, botID)) {
-    const outcome = applyMove(game, state, { playerID: botID, move: plan.move, args: plan.args });
-    if (outcome.ok) {
-      return {
-        playerID: botID,
-        move: plan.move,
-        args: plan.args,
-        why: `Bot ${botID} 出牌 · ${plan.why}`,
-      };
-    }
-  }
-  return null;
+  return firstAccepted(state, botID, planActionPlays(view, botID), '出牌');
 }
 
 /** 当前状态下应当自动执行的下一步；该等真人、对局已结束、或无事可做时返回 null */
@@ -76,12 +96,16 @@ export function nextAutoAction(
     return { playerID: owner, move: 'completeSetup', args: [], why: '完成布置，进入对局' };
   }
 
-  // 响应窗口：取第一个还没响应的响应者；Bot 一律放弃响应，由响应者本人发
+  // 响应窗口：取第一个还没响应的响应者，由响应者本人发；按策略行动的 Bot 座位可能抵消，其余一律放弃
   const window = G.pendingResponseWindow;
   if (window) {
     const next = window.responders.find((id) => !window.responded.includes(id));
     if (next !== undefined) {
       if (isHuman(next)) return null;
+      if (options.policySeatIDs?.includes(next)) {
+        const cancel = pickResponse(state, next);
+        if (cancel !== null) return cancel;
+      }
       return {
         playerID: next,
         move: 'passResponse',
@@ -209,10 +233,14 @@ export function nextAutoAction(
     };
   }
 
-  // 土星·律令：Bot 一律放过（缺省不抵消），以梦主本人的名义应答；梦主是真人就等他选择。
+  // 土星·律令：以梦主本人的名义应答；按策略行动的 Bot 梦主有同名牌就抵消，否则放过；梦主是真人就等他选择。
   const decree = G.pendingSaturnDecree;
   if (decree) {
     if (isHuman(decree.masterID)) return null;
+    if (options.policySeatIDs?.includes(decree.masterID)) {
+      const counter = pickResponse(state, decree.masterID);
+      if (counter !== null) return counter;
+    }
     return {
       playerID: decree.masterID,
       move: 'respondSaturnDecree',
@@ -232,7 +260,7 @@ export function nextAutoAction(
   if (
     move === 'endActionPhase' &&
     G.turnPhase === 'action' &&
-    options.cardPlaySeatIDs?.includes(owner)
+    options.policySeatIDs?.includes(owner)
   ) {
     const play = pickPlay(state, owner, options.maxPlaysPerTurn ?? MAX_PLAYS_PER_TURN);
     if (play !== null) return play;

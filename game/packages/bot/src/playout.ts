@@ -58,6 +58,8 @@ export interface BotPlayoutResult {
   invariantViolations: (InvariantViolation & { step: number })[];
   /** 被接受的出牌类 move（出牌记录表里的 move），按 move 名统计 */
   cardMoves: Record<string, number>;
+  /** 被接受的真实应答（解封抵消、土星·律令的抵消，不含放弃与放过），按 move 名统计 */
+  responseMoves: Record<string, number>;
 }
 
 /** 局面里仍有值的待结算字段：以 pending 开头的字段，加上窥视结果 peekReveal */
@@ -70,6 +72,7 @@ function pendingFieldsOf(G: SetupState): string[] {
 export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
   const { numPlayers, seed, maxSteps } = options;
   const cardMoves: Record<string, number> = {};
+  const responseMoves: Record<string, number> = {};
   let state = createMatch(game, { numPlayers, setupData: { rngSeed: seed }, seed });
   let steps = 0;
   let stalledOn: StallInfo | null = null;
@@ -79,7 +82,7 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
   while (steps < maxSteps && state.ctx.gameover === undefined) {
     const action = nextAutoAction(state, {
       humanPlayerIDs: [],
-      ...(options.cardPlay ? { cardPlaySeatIDs: state.ctx.playOrder } : {}),
+      ...(options.cardPlay ? { policySeatIDs: state.ctx.playOrder } : {}),
     });
     if (action === null) {
       stalledOn = {
@@ -109,6 +112,12 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
     }
     state = outcome.state;
     steps++;
+    if (
+      request.move === 'respondCancelUnlock' ||
+      (request.move === 'respondSaturnDecree' && request.args[0] !== null)
+    ) {
+      responseMoves[request.move] = (responseMoves[request.move] ?? 0) + 1;
+    }
     if (Object.hasOwn(PLAY_MOVE_CARD_IDS, request.move)) {
       cardMoves[request.move] = (cardMoves[request.move] ?? 0) + 1;
     }
@@ -122,5 +131,6 @@ export function runBotPlayout(options: BotPlayoutOptions): BotPlayoutResult {
     rejected,
     invariantViolations,
     cardMoves,
+    responseMoves,
   };
 }
