@@ -521,6 +521,65 @@ describe('LocalMatchSession · 真人白羊的宽限期', () => {
   });
 });
 
+describe('LocalMatchSession · Bot 的节奏', () => {
+  it('Bot 的每一步至少与上一步落地相隔 botStepMs；没到点时只等不动', () => {
+    let clock = 10_000;
+    const session = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'pace',
+      botPlaysCards: false,
+      botStepMs: 800,
+      now: () => clock,
+    });
+    // 建局之后的第一步也要等满一档
+    expect(session.step()).toMatchObject({ action: null, continue: true, waiting: true });
+    clock += 799;
+    expect(session.step().waiting).toBe(true);
+    clock += 1;
+    const first = session.step();
+    expect(first.action).not.toBeNull();
+    // 紧接着的下一步又要等
+    const next = session.step();
+    if (next.continue) expect(next.waiting).toBe(true);
+  });
+
+  it('真人刚出过 move，Bot 也要隔一档再动', () => {
+    let clock = 0;
+    const session = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'pace-human',
+      botPlaysCards: false,
+      now: () => clock,
+    });
+    runUntilIdle(session);
+    // 轮到真人：之后才打开节奏，模拟真人出牌
+    const paced = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'ignored',
+      botPlaysCards: false,
+      botStepMs: 800,
+      now: () => clock,
+      restoredState: session.snapshot(),
+    });
+    // 真人走完自己的回合（抽牌 → 结束出牌 → 弃牌），下一步就该 Bot 动了
+    while (paced.view().G.currentPlayerID === HUMAN) {
+      const { move, args } = humanPolicy(paced);
+      expect(paced.humanMove(move, args).ok).toBe(true);
+    }
+    clock += 500;
+    expect(paced.step().waiting).toBe(true);
+    clock += 300;
+    expect(paced.step().action).not.toBeNull();
+  });
+
+  it('缺省不限节奏（端到端用 botpace=fast 时 Worker 也传 0）', () => {
+    const session = makeSession();
+    const r = session.step();
+    expect(r.waiting).toBeUndefined();
+    expect(r.action).not.toBeNull();
+  });
+});
+
 describe('LocalMatchSession · 存档与恢复', () => {
   it('快照经 JSON 往返后恢复，视图与原会话一致，并能继续走下去', () => {
     const original = makeSession(5, 'save-1');

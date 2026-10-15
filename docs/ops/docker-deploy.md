@@ -97,7 +97,7 @@ cd inception-board-game/game
 | `CLIENT_PORT` | 可选 | 前端对外端口，默认 80（对所有网卡开放）；如被占用改为 8080 |
 | `API_PORT` | 可选 | 后端在宿主机上的端口，默认 3001；只绑定本机（`127.0.0.1`），用于本机探活与排查。局域网和公网用户通过前端端口访问，由 nginx 转发到后端。Postgres 与 Redis 不映射宿主机端口 |
 | `LOG_LEVEL` | 可选 | 生产建议 `info`，调试用 `debug` |
-| `MATCH_BOT_STEP_DELAY_MS` | 可选 | Bot 每一步之间的间隔，默认 600 毫秒 |
+| `MATCH_BOT_STEP_DELAY_MS` | 可选 | Bot 每一步之间的间隔，默认 800 毫秒 |
 | `MATCH_PENDING_TIMEOUT_MS` | 可选 | 等待玩家应答（响应、选择目标等）的时限，默认 45000 毫秒；超时由服务端代为行动 |
 | `MATCH_TURN_TIMEOUT_MS` | 可选 | 一个回合的时限，默认 120000 毫秒；超时由服务端代为结束回合 |
 | `IMAGE_NAMESPACE` / `IMAGE_TAG` | 可选 | 镜像命名空间与标签，默认 `icgame` / `latest` |

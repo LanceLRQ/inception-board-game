@@ -49,8 +49,9 @@ export function isMobileProject(projectName: string): boolean {
  * 人机对战页的固定种子地址：同样的种子与人数每次开出同一局，用例不再被随机到的角色与布局影响。
  * 这个种子下真人是一名没有开局弹窗、前几回合不会被点名应答的盗梦者；
  * 4 人局与 5 人局都已验证。想覆盖别的角色，换一个种子并跑一遍相关用例。
+ * `botpace=fast` 让 Bot 不等节奏（正常对局 Bot 每步隔 0.8 秒），用例不必为 Bot 的回合久等。
  */
-export const LOCAL_MATCH_URL = '/local?seed=e2e-local-1';
+export const LOCAL_MATCH_URL = '/local?seed=e2e-local-1&botpace=fast';
 
 // 等待页面就绪
 // - 不依赖 networkidle（Web Worker / WS 长连接会让它永不触发）

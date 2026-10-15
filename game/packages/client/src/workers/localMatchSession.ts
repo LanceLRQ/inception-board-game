@@ -48,7 +48,7 @@ export interface StepResult {
   reason?: string;
   /** 是否还应当继续调度下一步 */
   continue: boolean;
-  /** 没有动作是因为在等真人做可选的选择（白羊·星尘）：需要稍后再来看一眼 */
+  /** 没有动作是因为在等（真人白羊·星尘的选择，或 Bot 的节奏没到点）：需要稍后再来看一眼 */
   waiting?: boolean;
 }
 
@@ -64,6 +64,11 @@ export interface LocalMatchSessionOptions {
    * 只有端到端等需要安静 Bot 的场合关闭（地址参数 `botplay=off`）。
    */
   botPlaysCards?: boolean;
+  /**
+   * Bot 每一步与上一步（无论谁的）落地之间至少相隔多少毫秒，缺省 0（不限）。
+   * 本地对局由 Worker 传入，让玩家看得清 Bot 在做什么；端到端用 `botpace=fast` 时为 0。
+   */
+  botStepMs?: number;
   /** 从存档恢复的状态；给了就沿用它，不再新建对局（playerCount 与 seed 此时不起作用） */
   restoredState?: MatchState<SetupState>;
 }
@@ -100,6 +105,9 @@ export class LocalMatchSession {
   private rejectedCount = 0;
   private readonly now: () => number;
   private readonly botPlaysCards: boolean;
+  private readonly botStepMs: number;
+  /** 上一步 move 落地的时刻；建局也算一步 */
+  private lastAppliedAt: number;
   /** 正在等真人白羊选择：哪一次选择、从什么时候开始等 */
   private ariesWait: { key: string; since: number } | null = null;
 
@@ -107,6 +115,8 @@ export class LocalMatchSession {
     this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
     this.now = options.now ?? Date.now;
     this.botPlaysCards = options.botPlaysCards ?? true;
+    this.botStepMs = options.botStepMs ?? 0;
+    this.lastAppliedAt = this.now();
     this.state =
       options.restoredState ??
       createMatch(game, {
@@ -157,6 +167,7 @@ export class LocalMatchSession {
       return { ok: false, reason: outcome.reason, detail: describeReject(outcome) };
     }
     this.state = outcome.state;
+    this.lastAppliedAt = this.now();
     this.clearRejects();
     return { ok: true };
   }
@@ -187,6 +198,10 @@ export class LocalMatchSession {
         : [],
     });
     if (action === null) return { action: null, ok: true, continue: false };
+    // 节奏：离上一步落地还不到一档，先等（动作留到下次再算，状态可能已被真人改变）
+    if (this.now() - this.lastAppliedAt < this.botStepMs) {
+      return { action: null, ok: true, continue: true, waiting: true };
+    }
 
     const outcome = applyMove(game, this.state, {
       playerID: action.playerID,
@@ -195,6 +210,7 @@ export class LocalMatchSession {
     });
     if (outcome.ok) {
       this.state = outcome.state;
+      this.lastAppliedAt = this.now();
       this.clearRejects();
       return { action, ok: true, continue: true };
     }

@@ -77,7 +77,7 @@ export function MobileHandCard({
       <span
         className={cn(
           'relative block w-full overflow-hidden border bg-panel',
-          big ? 'aspect-[88/122]' : 'aspect-[58/80]',
+          'aspect-[745/1040]',
           highlighted
             ? 'border-acc shadow-[0_0_0_1px_var(--ms-acc),0_8px_20px_-8px_var(--ms-acc)]'
             : 'border-line-strong',

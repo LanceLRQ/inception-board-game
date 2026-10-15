@@ -39,17 +39,30 @@ describe('buildSeatViews', () => {
     expect(slots.find((s) => s.isViewer)!.id).toBe(state.viewerID);
   });
 
-  it('未翻开的他人显示阵营背面，且没有可看详情的角色', () => {
+  it('角色牌开局全员翻开：未翻开阵营的他人也显示角色卡面，可看详情', () => {
     const state = stageOf('thief');
     const slots = buildSeatViews(state, undefined);
-    const hidden = slots.filter(
+    const others = slots.filter(
       (s) => !s.isViewer && !s.isMaster && !state.players[s.id]!.isRevealed,
     );
-    expect(hidden.length).toBeGreaterThan(0);
-    for (const s of hidden) {
-      expect(s.characterId).toBeNull();
-      expect(s.imageUrl).toBe(GENERIC_BACK_IMAGES.thief);
+    expect(others.length).toBeGreaterThan(0);
+    for (const s of others) {
+      expect(s.characterId).toBe(state.players[s.id]!.characterId);
+      expect(s.characterName).toBeTruthy();
+      expect(s.imageUrl).not.toBe(GENERIC_BACK_IMAGES.thief);
     }
+  });
+
+  it('视图里还没有角色时显示阵营背面，且没有可看详情的角色', () => {
+    const state = stageOf('thief');
+    const id = state.playerOrder.find((p) => p !== state.viewerID && p !== state.dreamMasterID)!;
+    const blank = {
+      ...state,
+      players: { ...state.players, [id]: { ...state.players[id]!, characterId: '' as const } },
+    };
+    const seat = buildSeatViews(blank, undefined).find((s) => s.id === id)!;
+    expect(seat.characterId).toBeNull();
+    expect(seat.imageUrl).toBe(GENERIC_BACK_IMAGES.thief);
   });
 
   it('本人与梦主的角色始终可见', () => {

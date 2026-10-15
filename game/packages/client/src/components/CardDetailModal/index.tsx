@@ -118,6 +118,7 @@ function ModalContent({
                 src={displayUrl}
                 alt={displayName}
                 fallback={displayName || cardId}
+                trimBorder={false}
                 className={cn(
                   'h-auto w-full rounded-md text-base shadow-lg short-land:max-h-[calc(100dvh-5rem)] short-land:object-contain',
                   // 梦主角色牌是横版：按卡图的实际朝向给比例，不然竖版框会把两侧的文字裁掉

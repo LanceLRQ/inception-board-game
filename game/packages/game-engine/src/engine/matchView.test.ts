@@ -110,7 +110,8 @@ describe('对局视图 · 玩家', () => {
     expect(view.players[d]!.hand).toHaveLength(4);
   });
 
-  it('角色与阵营：本人看到真实值；别人看到的未翻开玩家角色为空、阵营是盗梦者（梦主也一样）', () => {
+  it('角色开局对所有人公开；阵营只有本人看到真实值，别人看到的未翻开玩家阵营是盗梦者（梦主也一样）', () => {
+    // 开局所有玩家翻开角色牌：docs/manual/02-game-setup.md:43
     // a 因成功的贿赂牌已经转为梦主阵营，但没有翻开
     expect(G.players[a]!.faction).toBe('master');
     const own = v(G, a).players[a]!;
@@ -118,7 +119,7 @@ describe('对局视图 · 玩家', () => {
     expect(own.faction).toBe('master');
     for (const viewer of [b, master, null]) {
       const p = v(G, viewer).players[a]!;
-      expect(p.characterId).toBeNull();
+      expect(p.characterId).toBe(G.players[a]!.characterId);
       expect(p.faction).toBe('thief' satisfies Faction);
       expect(p.isRevealed).toBe(false);
     }
@@ -722,27 +723,12 @@ describe('对局视图 · 移形换影的角色快照', () => {
     },
   };
 
-  it('只保留已翻开玩家和本人的条目', () => {
-    const forB = v(snapshot, b).shiftSnapshot!;
-    expect(Object.keys(forB).sort()).toEqual([master, b, d].sort());
-    expect(forB[b]).toBe(G.players[b]!.characterId);
-    const forSpectator = v(snapshot, null).shiftSnapshot!;
-    expect(Object.keys(forSpectator).sort()).toEqual([master, d].sort());
-    const forMaster = v(snapshot, master).shiftSnapshot!;
-    expect(Object.keys(forMaster).sort()).toEqual([master, d].sort());
-  });
-
-  it('已翻开玩家换牌前的角色此刻在未翻开的别人身上时，该条目不给无关观察者', () => {
-    // d 已翻开，他换牌前的角色现在在未翻开的 a 手上
-    const swapped: SetupState = {
-      ...snapshot,
-      shiftSnapshot: { [d]: G.players[a]!.characterId },
-    };
-    expect(v(swapped, b).shiftSnapshot).toEqual({});
-    expect(v(swapped, null).shiftSnapshot).toEqual({});
-    // 持有者本人与对局结束后的视图不受影响
-    expect(Object.keys(v(swapped, a).shiftSnapshot!)).toEqual([d]);
-    expect(Object.keys(v(swapped, null, true).shiftSnapshot!)).toEqual([d]);
+  it('角色公开，快照条目对所有人保留', () => {
+    const all = [master, a, b, c, d].sort();
+    for (const viewer of [b, master, null]) {
+      expect(Object.keys(v(snapshot, viewer).shiftSnapshot!).sort()).toEqual(all);
+    }
+    expect(v(snapshot, b).shiftSnapshot![a]).toBe(G.players[a]!.characterId);
   });
 
   it('对局结束后全部公开', () => {

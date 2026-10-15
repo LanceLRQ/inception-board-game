@@ -154,8 +154,9 @@ describe('buildFixtureScenario · 盗梦者视角', () => {
         expect(p.skillUsedThisGame).toBeNull();
         // 张数来自真实状态，不是随手写的
         expect(p.handCount).toBe(state.G.players[seat]!.hand.length);
-        // 未翻开的他人没有角色
-        if (!p.isRevealed) expect(p.characterId).toBeNull();
+        // 角色牌开局全员翻开，阵营照旧保密
+        expect(p.characterId).toBe(state.G.players[seat]!.characterId);
+        if (!p.isRevealed) expect(p.faction).toBe('thief');
       }
       expect(G.players[viewer]!.handCount).toBeGreaterThan(0);
     },

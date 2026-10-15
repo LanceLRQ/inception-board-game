@@ -23,6 +23,8 @@ interface LocalMatchRuntimeProps {
   readonly seed?: string;
   /** Bot 是否在出牌阶段打行动牌，缺省是（端到端需要安静 Bot 时关闭） */
   readonly botPlaysCards?: boolean;
+  /** Bot 每一步的最小间隔（毫秒）；不给按缺省节奏（端到端传 0） */
+  readonly botStepMs?: number;
 }
 
 export function LocalMatchRuntime({
@@ -35,6 +37,7 @@ export function LocalMatchRuntime({
   onResumeFallback,
   seed,
   botPlaysCards,
+  botStepMs,
 }: LocalMatchRuntimeProps) {
   const [restartKey, setRestartKey] = useState(0);
   const source = useLocalMatchSource({
@@ -46,6 +49,7 @@ export function LocalMatchRuntime({
     onResumeFallback,
     seed,
     botPlaysCards,
+    botStepMs,
   });
 
   const handleRestart = useCallback(() => {

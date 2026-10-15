@@ -1,6 +1,6 @@
 // 座位牌：阵营点、角色卡面、角色名 / 昵称、所在层徽、手牌数、状态标识
-// 座位只看不选目标：点角色卡只会为已翻开的角色打开卡牌详情。
-// 当前行动者、已迷失、未翻露各有自己的状态样式，且都不只靠颜色表达（文字标签 + 形状）。
+// 座位只看不选目标：点角色卡打开卡牌详情（角色牌开局全员翻开）。
+// 当前行动者、已迷失、尚无角色各有自己的状态样式，且都不只靠颜色表达（文字标签 + 形状）。
 // 样式钩子类名：ms-seat / ms-card / ms-layerbadge（具体样式见 styles/skins）。
 
 import { useTranslation } from 'react-i18next';
@@ -29,7 +29,7 @@ const ART_SIZE: Record<SeatDensity, { thief: [number, number]; master: [number, 
   compact: { thief: [40, 54], master: [72, 48] },
 };
 
-/** 已翻露的座位在卡面角上叠一个小头像的边长；未翻露的座位用头像填满卡面槽 */
+/** 有角色的座位在卡面角上叠一个小头像的边长；还没有角色的座位用头像填满卡面槽 */
 const BADGE_SIZE: Record<SeatDensity, number> = { grand: 30, full: 26, mid: 20, compact: 16 };
 
 export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: SeatPlateProps) {
@@ -76,14 +76,14 @@ export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: 
           />
         </>
       ) : (
-        // 未翻露：卡面槽里显示玩家的像素头像（不是角色信息，不泄露身份）
+        // 还没有角色（开局选角前）：卡面槽里显示玩家的像素头像
         <span className="grid size-full place-items-center bg-panel-2">
           <PixelAvatar seed={seat.avatarSeed} size={Math.min(artW, artH) - 10} />
         </span>
       )}
-      {!compact && !seat.isMaster && (
+      {!compact && !seat.isMaster && !seat.characterId && (
         <span className="ms-seat-revtag absolute bottom-1 left-1">
-          {seat.characterId ? t('desktop.seat.revealed') : t('desktop.seat.unrevealed')}
+          {t('desktop.seat.unrevealed')}
         </span>
       )}
     </button>

@@ -1,4 +1,4 @@
-// 片头条：对局标识 / 房间码、回合与阶段、当前行动者、截止剩余秒数
+// 片头条：对局标识 / 房间码、回合与阶段、当前行动者、截止剩余秒数、短语与主题入口
 // 样式钩子类名：ms-topbar。
 
 import type { ReactNode } from 'react';
@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Timer } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { MatchController } from '../controllerTypes';
+import { ThemeMenu } from '../shared/ThemeMenu';
 import { ChatMenu } from './ChatMenu';
 
 interface DesktopTopBarProps {
@@ -64,6 +65,7 @@ export function DesktopTopBar({ controller, topRight }: DesktopTopBarProps) {
       </div>
       <span className="flex shrink-0 items-center gap-2">
         <ChatMenu controller={controller} />
+        <ThemeMenu className="size-6 border border-line-strong" />
         {topRight}
       </span>
     </header>

@@ -1,10 +1,11 @@
-// 移动布局顶栏：回合与阶段 · 当前行动者 · 牌库张数；有截止时间时多一行剩余秒数
+// 移动布局顶栏：回合与阶段 · 当前行动者 · 牌库张数 · 主题入口；有截止时间时多一行剩余秒数
 // 顶部让出刘海 / 状态栏的安全区。
 
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Timer } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { ThemeMenu } from '../shared/ThemeMenu';
 import type { MatchController } from '../controllerTypes';
 
 interface MobileTopBarProps {
@@ -23,7 +24,7 @@ export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
 
   return (
     <div className="shrink-0 border-b border-line pt-safe">
-      <header className="flex h-11 items-center gap-2.5 px-3.5 tablet:h-14 tablet:px-6 short-land:h-9">
+      <header className="flex h-11 items-center gap-2.5 px-3.5 tablet:h-14 tablet:px-6">
         <div className="flex shrink-0 flex-col font-mono text-[9.5px] leading-tight tracking-[.08em] text-dim tablet:text-xs">
           <span>
             {t('localMatch.turn')} {turn.number}
@@ -57,6 +58,7 @@ export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
           </span>
           {topRight && <span className="max-[359px]:hidden">{topRight}</span>}
         </div>
+        <ThemeMenu className="-mr-2 size-11 tablet:size-12" />
       </header>
     </div>
   );

@@ -139,8 +139,7 @@ export function buildBoardLayers(
       if (!p) return [];
       const isSelf = id === state.viewerID;
       const isMaster = id === state.dreamMasterID;
-      const characterId =
-        (isSelf || isMaster || p.isRevealed) && p.characterId ? p.characterId : null;
+      const characterId = p.characterId || null;
       return [
         {
           id,
@@ -212,12 +211,11 @@ export interface BoardInput {
   readonly nicknameOf: (playerID: string) => string;
 }
 
-/** 行动者已翻开（或就是本人 / 梦主）的角色名；没有为 null */
+/** 行动者的角色名；视图里还没有角色为 null */
 export function currentCharacterNameOf(state: StageState): string | null {
   const p = state.players[state.currentPlayerID];
   if (!p?.characterId) return null;
-  const known = p.isRevealed || p.id === state.viewerID || p.id === state.dreamMasterID;
-  return known ? (getCharacterSkillSummary(p.characterId)?.name ?? null) : null;
+  return getCharacterSkillSummary(p.characterId)?.name ?? null;
 }
 
 export function buildBoardModel(input: BoardInput): BoardModel {

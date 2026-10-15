@@ -14,12 +14,8 @@ describe('visibleCardIds', () => {
     expect(ids).toContain(me.characterId);
   });
 
-  it('不含任何他人的手牌，也不含视图里没有给出的未翻开角色', () => {
+  it('不含任何他人的手牌；视图里给出的角色（开局全员翻开）都在内', () => {
     const ids = new Set(visibleCardIds(view, sc.seat));
-    const hidden = Object.entries(view.players).filter(
-      ([id, p]) => id !== sc.seat && (p.characterId === null || p.characterId === ''),
-    );
-    expect(hidden.length).toBeGreaterThan(0);
     for (const [, p] of Object.entries(view.players)) {
       if (p.characterId) expect(ids.has(p.characterId)).toBe(true);
     }

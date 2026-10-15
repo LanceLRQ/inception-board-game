@@ -80,7 +80,7 @@ function RailSlot({
             />
           </>
         ) : (
-          // 未翻露：显示玩家的像素头像，不显示阵营背面
+          // 还没有角色（开局选角前）：显示玩家的像素头像，不显示阵营背面
           <span className="grid size-full place-items-center bg-panel-2">
             <PixelAvatar seed={slot.avatarSeed} size={36} />
           </span>

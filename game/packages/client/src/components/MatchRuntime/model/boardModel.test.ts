@@ -165,13 +165,12 @@ describe('buildBoardLayers · 解封与占位者', () => {
     expect(layers.find((l) => l.layer === 2)!.note.key).toBe('board.tower.noteUnlock');
   });
 
-  it('占位者的角色只在本人 / 梦主 / 已翻开时给出', () => {
+  it('占位者的角色照视图给出（角色牌开局全员翻开）', () => {
     const { state, G } = stageOf('thief');
     const occupants = buildBoardLayers(state, G.layers, null, nameOf).flatMap((l) => l.occupants);
     for (const o of occupants) {
       const p = state.players[o.id]!;
-      const visible = o.isSelf || o.isMaster || p.isRevealed;
-      expect(o.characterId !== null).toBe(visible && !!p.characterId);
+      expect(o.characterId).toBe(p.characterId || null);
       expect(o.characterName !== null).toBe(o.characterId !== null && !!o.characterName);
     }
   });
@@ -259,11 +258,20 @@ describe('currentCharacterNameOf', () => {
     expect(currentCharacterNameOf(state)).toBeTruthy();
   });
 
-  it('行动者没有翻开角色时没有名字', () => {
+  it('行动者的角色名照视图给出；视图里还没有角色时没有名字', () => {
     const { state } = stageOf('thief');
     const other = state.playerOrder.find(
       (id) => id !== state.viewerID && id !== state.dreamMasterID && !state.players[id]!.isRevealed,
     )!;
-    expect(currentCharacterNameOf({ ...state, currentPlayerID: other })).toBeNull();
+    expect(currentCharacterNameOf({ ...state, currentPlayerID: other })).toBeTruthy();
+    const blank = {
+      ...state,
+      currentPlayerID: other,
+      players: {
+        ...state.players,
+        [other]: { ...state.players[other]!, characterId: '' as const },
+      },
+    };
+    expect(currentCharacterNameOf(blank)).toBeNull();
   });
 });

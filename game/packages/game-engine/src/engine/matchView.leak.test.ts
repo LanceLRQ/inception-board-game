@@ -49,7 +49,6 @@ interface ScanCounts {
   poolBribes: number;
   dispatchedBribesOfOthers: number;
   unrevealedRoles: number;
-  roleTextChecks: number;
 }
 
 const emptyCounts = (): ScanCounts => ({
@@ -59,7 +58,6 @@ const emptyCounts = (): ScanCounts => ({
   poolBribes: 0,
   dispatchedBribesOfOthers: 0,
   unrevealedRoles: 0,
-  roleTextChecks: 0,
 });
 
 function addCounts(into: ScanCounts, from: ScanCounts): void {
@@ -132,9 +130,10 @@ function scanMoment(
         counts.otherHands++;
       }
       expect(p.handCount, at).toBe(real.hand.length);
-      // 非本人、未翻开：角色为空，阵营是盗梦者——即使真实阵营已经因为贿赂变成梦主
+      // 角色开局公开（docs/manual/02-game-setup.md:43）
+      expect(p.characterId, `${at} 玩家${id}角色`).toBe(real.characterId);
+      // 非本人、未翻开：阵营是盗梦者——即使真实阵营已经因为贿赂变成梦主
       if (!mine && !real.isRevealed && !gameOver) {
-        expect(p.characterId, `${at} 玩家${id}角色`).toBeNull();
         expect(p.faction, `${at} 玩家${id}阵营`).toBe('thief');
         expect(p.skillUsedThisGame, at).toBeNull();
         expect(p.skillUsedThisTurn, at).toBeNull();
@@ -192,28 +191,6 @@ function scanMoment(
         expect(seen.kind, `${at} 贿赂${real.id}`).toBeNull();
         if (real.status === 'inPool') counts.poolBribes++;
         else if (real.heldBy !== viewer) counts.dispatchedBribesOfOthers++;
-      }
-    }
-
-    // 未翻开且不是本人的玩家，其角色编号不得出现在序列化文本里。
-    // 角色编号带引号整串匹配，避免子串误报；每名玩家的角色编号互不相同，不会与本人的撞上
-    if (!gameOver) {
-      for (const id of G.playerOrder) {
-        const real = G.players[id]!;
-        if (id === viewer || real.isRevealed) continue;
-        const quoted = `"${real.characterId}"`;
-        // 移形换影之后，观察者自己的快照条目里合法地带着他原来的角色编号，而那个角色此刻在别人身上。
-        // 这一个编号只允许出现在他本人的快照条目里，视图别处出现仍然算泄露。
-        const ownSnapshot = viewer === null ? undefined : G.shiftSnapshot?.[viewer];
-        if (ownSnapshot !== undefined && ownSnapshot === real.characterId) {
-          expect(view.shiftSnapshot?.[viewer!], `${at} 自己的快照条目`).toBe(real.characterId);
-          expect(json.split(quoted).length - 1, `${at} 玩家${id}的角色只在自己的快照条目里`).toBe(
-            1,
-          );
-        } else {
-          expect(json, `${at} 玩家${id}的角色`).not.toContain(quoted);
-        }
-        counts.roleTextChecks++;
       }
     }
   }
@@ -497,12 +474,11 @@ describe('泄露扫描 · 结构性断言：改掉保密的值，视图逐字节
     expectUnchanged(flip, [c, null], '别人看不出窥视结果', peeking);
   });
 
-  it('未翻开玩家的真实角色与真实阵营', () => {
-    // c 是未翻开的盗梦者：改他的角色和阵营，除他本人外任何人的视图都不变
-    const mutated = patchPlayer(G, c, { characterId: 'thief_darwin' as CardID, faction: 'master' });
-    expect(mutated.players[c]!.characterId).not.toBe(G.players[c]!.characterId);
-    expectUnchanged(mutated, exceptOwner(c), '换 c 的角色与阵营');
-    expectChanged(mutated, [c], '换 c 的角色与阵营');
+  it('未翻开玩家的真实阵营保密，角色公开', () => {
+    // 角色开局公开：换 c 的角色，所有人的视图都变
+    const role = patchPlayer(G, c, { characterId: 'thief_darwin' as CardID });
+    expect(role.players[c]!.characterId).not.toBe(G.players[c]!.characterId);
+    expectChanged(role, everyone, '换 c 的角色');
     // 只改阵营（贿赂生效）
     const faction = patchPlayer(G, d, { faction: 'master' });
     expectUnchanged(faction, exceptOwner(d), '改 d 的阵营');
@@ -560,7 +536,7 @@ describe('泄露扫描 · 结构性断言：改掉保密的值，视图逐字节
     expectChanged({ ...G, usedNightmareIds: [] }, [a, null], '已用梦魇少了');
   });
 
-  it('移形换影快照里未翻开的他人条目', () => {
+  it('移形换影快照随角色一起公开', () => {
     const snapshot = (cOwn: CardID): SetupState => ({
       ...G,
       shiftSnapshot: {
@@ -573,9 +549,7 @@ describe('泄露扫描 · 结构性断言：改掉保密的值，视图逐字节
     });
     const base = snapshot('thief_gemini' as CardID);
     const mutated = snapshot('thief_luna' as CardID);
-    // c 本人看得到自己的条目；别人（含梦主、旁观者）看不到
-    expectUnchanged(mutated, exceptOwner(c), '换快照里 c 的条目', base);
-    expectChanged(mutated, [c], '换快照里 c 的条目', base);
+    expectChanged(mutated, everyone, '换快照里 c 的条目', base);
     // 已翻开的梦主的条目：所有人都看得到
     const masterEntry: SetupState = {
       ...base,
@@ -665,12 +639,12 @@ describe('泄露扫描 · 结构性断言：改掉保密的值，视图逐字节
 describe('泄露扫描 · 已死亡的玩家', () => {
   const dead = patchPlayer(G, c, { isAlive: false, deathTurn: 3 });
 
-  it('死者的手牌和角色对别人仍是 null', () => {
+  it('死者的手牌对别人仍是 null，角色仍公开', () => {
     for (const viewer of [a, b, d, master, null, 'ghost']) {
       const p = viewFor(dead, viewer, OPEN).players[c]!;
       expect(p.isAlive).toBe(false);
       expect(p.hand).toBeNull();
-      expect(p.characterId).toBeNull();
+      expect(p.characterId).toBe(G.players[c]!.characterId);
       expect(p.faction).toBe('thief');
       expect(p.handCount).toBe(2);
     }
@@ -686,7 +660,6 @@ describe('泄露扫描 · 已死亡的玩家', () => {
     const view = viewFor(dead, c, OPEN);
     expect(view.players[c]!.hand).toEqual(G.players[c]!.hand);
     for (const id of [a, b, d, master]) expect(view.players[id]!.hand).toBeNull();
-    expect(view.players[a]!.characterId).toBeNull();
     expect(view.players[a]!.faction).toBe('thief');
     expect(view.vaults.every((x) => x.contentType === null)).toBe(true);
     expect(Object.values(view.layers)[0]!.nightmareId).toBeNull();

@@ -19,7 +19,7 @@ export interface TimingConfig {
 }
 
 export const DEFAULT_TIMING: TimingConfig = {
-  botStepDelayMs: 600,
+  botStepDelayMs: 800,
   pendingTimeoutMs: 45_000,
   turnTimeoutMs: 120_000,
 };

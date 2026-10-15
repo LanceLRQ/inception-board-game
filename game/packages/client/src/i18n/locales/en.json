@@ -995,7 +995,6 @@
       "lost": "LOST",
       "master": "MASTER",
       "unrevealed": "HIDDEN",
-      "revealed": "REVEALED",
       "worldView": "World view: {{names}}"
     },
     "top": {

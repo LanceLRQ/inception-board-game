@@ -5,6 +5,7 @@
 import * as Comlink from 'comlink';
 import { CURRENT_SCHEMA_VERSION } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
+import { BOT_STEP_MS } from '../lib/botCardPlay';
 import { LOCAL_HUMAN_SEAT } from './localSeat.js';
 import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS } from './localMatchSession.js';
 import {
@@ -32,6 +33,8 @@ export interface CreateLocalMatchOptions {
   seed?: string;
   /** Bot 是否在出牌阶段打行动牌，缺省是（端到端需要安静 Bot 时关闭） */
   botPlaysCards?: boolean;
+  /** Bot 每一步的最小间隔（毫秒），缺省 BOT_STEP_MS（端到端传 0） */
+  botStepMs?: number;
 }
 
 export interface CreateLocalMatchResult {
@@ -55,7 +58,7 @@ export interface LocalMatchWorker {
 
 const HUMAN_PLAYER_ID = LOCAL_HUMAN_SEAT;
 
-/** 自动循环的步进间隔（毫秒） */
+/** 自动循环的检查间隔（毫秒）；Bot 真正出手的节奏由会话按 botStepMs 控制 */
 const STEP_INTERVAL_MS = 100;
 
 // Worker 内不共享 client 的 logger；改用受控 console.* 模仿等级
@@ -231,6 +234,7 @@ const workerApi: LocalMatchWorker = {
         resume,
         seed: options?.seed,
         botPlaysCards: options?.botPlaysCards,
+        botStepMs: options?.botStepMs ?? BOT_STEP_MS,
       },
       saves,
       saveLog,
@@ -250,6 +254,7 @@ const workerApi: LocalMatchWorker = {
       persist,
       fixedSeed: options?.seed !== undefined,
       botPlaysCards: options?.botPlaysCards !== false,
+      botStepMs: options?.botStepMs ?? BOT_STEP_MS,
     });
     logFlowChanges(started.session);
     scheduleNext();

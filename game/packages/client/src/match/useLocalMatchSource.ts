@@ -137,6 +137,8 @@ export interface UseLocalMatchSourceOptions {
   seed?: string;
   /** Bot 是否在出牌阶段打行动牌，缺省是 */
   botPlaysCards?: boolean;
+  /** Bot 每一步的最小间隔（毫秒）；不给按 Worker 的缺省节奏 */
+  botStepMs?: number;
 }
 
 /** 起一个本机 Worker 跑人机对局，返回对局来源 */
@@ -149,6 +151,7 @@ export function useLocalMatchSource({
   onResumeFallback,
   seed,
   botPlaysCards,
+  botStepMs,
 }: UseLocalMatchSourceOptions): MatchSource {
   const [source, setSource] = useState<MatchSource | null>(null);
   const fallbackRef = useRef(onResumeFallback);
@@ -165,7 +168,7 @@ export function useLocalMatchSource({
     const off = controller.subscribe(() => setSource(controller.getSnapshot()));
 
     void api
-      .createLocalMatch(playerCount, matchId, { persist, resume, seed, botPlaysCards })
+      .createLocalMatch(playerCount, matchId, { persist, resume, seed, botPlaysCards, botStepMs })
       .then((result) => {
         if (result.fellBack) {
           logger.warn('game', 'saved match unavailable, started a new one');
@@ -184,7 +187,7 @@ export function useLocalMatchSource({
       off();
       worker.terminate();
     };
-  }, [playerCount, matchId, restartKey, persist, resume, seed, botPlaysCards]);
+  }, [playerCount, matchId, restartKey, persist, resume, seed, botPlaysCards, botStepMs]);
 
   // 本地来源的座位表没有账号信息：本人座位用身份里的头像，其余座位由界面按座位推导
   const identityAvatar = useIdentityStore((s) =>

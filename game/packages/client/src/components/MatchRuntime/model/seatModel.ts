@@ -20,9 +20,9 @@ export interface SeatView {
   readonly isLost: boolean;
   readonly layer: number;
   readonly handCount: number;
-  /** 已翻开的角色牌；没翻开为 null（头像显示阵营背面，不可看详情） */
+  /** 角色牌（开局全员翻开）；视图里还没有角色时为 null（头像显示阵营背面，不可看详情） */
   readonly characterId: string | null;
-  /** 已翻开角色的名字；没翻开为 null */
+  /** 角色名；没有角色为 null */
   readonly characterName: string | null;
   /** 已翻开（梦主与本人不算「翻露」标记，由调用方按 isMaster / isViewer 判断） */
   readonly isRevealed: boolean;
@@ -45,9 +45,8 @@ export function buildSeatViews(
   return slots.flatMap((slot) => {
     const p = state.players[slot.id];
     if (!p) return [];
-    // 本人的身份对自己永远可见；其他玩家按是否已翻开决定，梦主角色始终公开
-    const reveal = slot.isViewer || p.isRevealed || slot.isMaster;
-    const characterId = reveal && p.characterId ? p.characterId : null;
+    // 角色牌开局全员翻开，视图里给什么就显示什么（阵营另由视图裁剪，这里不读）
+    const characterId = p.characterId || null;
     const back = slot.isMaster ? GENERIC_BACK_IMAGES.master : GENERIC_BACK_IMAGES.thief;
     return [
       {

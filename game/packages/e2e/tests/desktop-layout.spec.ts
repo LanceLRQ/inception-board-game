@@ -148,12 +148,13 @@ test.describe('桌面布局 · 固定场景', () => {
     await expect(page.getByTestId('target-player-picker-dialog')).toBeVisible();
   });
 
-  test('座位只看不选：点未翻露座位的角色卡不会打开任何弹窗', async ({ page }) => {
+  test('座位只看不选：点座位的角色卡只打开卡牌详情，不打开选目标弹窗', async ({ page }) => {
     await openScene(page, '/game/debug');
-    const hidden = page.locator('[data-testid^="player-avatar-"]:disabled').first();
-    await expect(hidden).toBeVisible();
+    const seatCard = page.locator('[data-testid^="player-avatar-"]').first();
+    await expect(seatCard).toBeEnabled();
+    await seatCard.click();
+    await expect(page.getByTestId('card-detail-modal')).toBeVisible();
     await expect(page.getByTestId('target-player-picker-dialog')).toHaveCount(0);
-    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test('梦主视角：能看到各层梦魇，坞里是梦主身份，环上没有梦主座位', async ({ page }) => {

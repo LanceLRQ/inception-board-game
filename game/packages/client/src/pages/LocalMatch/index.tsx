@@ -13,7 +13,7 @@ import { History, Play, Plus, RotateCcw, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatSavedAt } from '../../lib/formatSavedAt';
 import { readFixedSeed } from '../../lib/fixedSeed';
-import { readBotCardPlay } from '../../lib/botCardPlay';
+import { readBotCardPlay, readBotStepMs } from '../../lib/botCardPlay';
 import { clearLocalSave, readLocalSaveMeta } from '../../lib/localSaveAccess';
 import type { LocalSaveMeta } from '../../lib/localMatchSave';
 import { logger } from '../../lib/logger';
@@ -36,6 +36,8 @@ export default function LocalMatch() {
   const fixedSeed = readFixedSeed(search);
   // `/local?botplay=off`：Bot 不在出牌阶段打牌，端到端需要安静 Bot 时用
   const botPlaysCards = readBotCardPlay(search);
+  // `/local?botpace=fast`：Bot 不等节奏，端到端用
+  const botStepMs = readBotStepMs(search);
 
   // 进入页面时看一眼有没有未结束的存档
   useEffect(() => {
@@ -197,6 +199,7 @@ export default function LocalMatch() {
       resume={stage.resume}
       seed={fixedSeed}
       botPlaysCards={botPlaysCards}
+      botStepMs={botStepMs}
       onResumeFallback={handleResumeFallback}
     />
   );

@@ -12,7 +12,13 @@
 // 并在人工审计脚本里用真实对局核对过。
 
 import type { Page } from '@playwright/test';
-import { test, expect, isMobileProject, waitForAppReady } from './fixtures/index.js';
+import {
+  test,
+  expect,
+  isMobileProject,
+  waitForAppReady,
+  waitForAssetsReady,
+} from './fixtures/index.js';
 import { auditTouchTargets } from './fixtures/responsive.js';
 import { seedSave, validMeta } from './fixtures/localSave.js';
 import { ROOM_CODE, mockRoomSession } from './fixtures/roomSession.js';
@@ -42,6 +48,8 @@ async function openScene(page: Page, url: string): Promise<void> {
   await page.goto(url);
   await waitForAppReady(page);
   await expect(page.getByTestId('hand-dock')).toBeVisible({ timeout: 10_000 });
+  // 座位都显示角色卡图，素材加载层可能还盖在上面：等它退场再量
+  await waitForAssetsReady(page);
 }
 
 const PAGES = [

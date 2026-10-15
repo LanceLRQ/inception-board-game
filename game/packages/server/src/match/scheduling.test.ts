@@ -221,7 +221,7 @@ describe('planNext', () => {
 
   it('默认时长符合约定', () => {
     expect(DEFAULT_TIMING).toEqual({
-      botStepDelayMs: 600,
+      botStepDelayMs: 800,
       pendingTimeoutMs: 45_000,
       turnTimeoutMs: 120_000,
     });

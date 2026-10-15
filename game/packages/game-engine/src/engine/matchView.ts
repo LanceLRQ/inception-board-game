@@ -360,7 +360,7 @@ export const FIELD_DISPOSITION: Record<keyof SetupState, Disposition> = {
   pendingGraft: 'public',
   pendingResonance: 'public',
   pendingGravity: 'public',
-  shiftSnapshot: 'conditional',
+  shiftSnapshot: 'public',
   pendingResponseWindow: 'public',
   pendingPeekDecision: 'public',
   pendingVaultDecision: 'public',
@@ -392,7 +392,7 @@ export const PLAYER_FIELD_DISPOSITION: Record<keyof PlayerSetup, Disposition> = 
   type: 'public',
   botLevel: 'withheld',
   faction: 'conditional',
-  characterId: 'conditional',
+  characterId: 'public',
   isRevealed: 'public',
   currentLayer: 'public',
   hand: 'conditional',
@@ -477,7 +477,8 @@ function viewPlayer(id: string, p: PlayerSetup, who: Audience): PlayerView {
     avatarSeed: p.avatarSeed,
     type: p.type,
     faction: identityKnown ? p.faction : 'thief',
-    characterId: identityKnown ? p.characterId : null,
+    // 角色牌开局所有玩家翻开（docs/manual/02-game-setup.md:43）；阵营另算，贿赂转阵营仍是秘密
+    characterId: p.characterId,
     isRevealed: p.isRevealed,
     currentLayer: p.currentLayer,
     isAlive: p.isAlive,
@@ -603,22 +604,9 @@ function viewLibra(l: NonNullable<SetupState['pendingLibra']>, who: Audience): P
 
 function viewShiftSnapshot(
   snapshot: NonNullable<SetupState['shiftSnapshot']>,
-  G: SetupState,
-  who: Audience,
 ): Record<string, CardID> {
-  // 已翻开玩家的条目记着他换牌前的角色；该角色此刻若落在一个未翻开的别人身上，
-  // 带着这条就等于告诉观察者那人的角色，所以这种条目只给本人和对局结束后的视图
-  const heldHiddenByOther = (character: CardID): boolean =>
-    Object.values(G.players).some(
-      (p) => p.characterId === character && !p.isRevealed && p.id !== who.who,
-    );
-  const kept = Object.keys(snapshot).filter(
-    (id) =>
-      who.open ||
-      who.who === id ||
-      (G.players[id]?.isRevealed === true && !heldHiddenByOther(snapshot[id]!)),
-  );
-  return Object.fromEntries(kept.map((id) => [id, snapshot[id]!]));
+  // 角色公开，换牌前的角色也就没有秘密可言
+  return { ...snapshot };
 }
 
 function viewDiscardRequired(G: SetupState, who: Audience): number | null {
@@ -720,7 +708,7 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
           pickCursor: pendingGravity.pickCursor,
         }
       : null,
-    shiftSnapshot: G.shiftSnapshot ? viewShiftSnapshot(G.shiftSnapshot, G, who) : null,
+    shiftSnapshot: G.shiftSnapshot ? viewShiftSnapshot(G.shiftSnapshot) : null,
     pendingResponseWindow: G.pendingResponseWindow ? viewWindow(G.pendingResponseWindow) : null,
     pendingPeekDecision: pendingPeekDecision
       ? { peekerID: pendingPeekDecision.peekerID, targetLayer: pendingPeekDecision.targetLayer }
