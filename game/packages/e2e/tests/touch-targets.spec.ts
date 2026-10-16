@@ -30,22 +30,17 @@ test.beforeEach(({}, testInfo) => {
 
 async function expectTouchClean(page: Page, what: string): Promise<void> {
   // 过渡动画（弹窗淡入、坞展开）进行中量到的尺寸不准（整套并行、机器繁忙时动画更慢，见过 0×0）：
-  // 反复量到干净为止，超时仍不干净才算失败，报出最后一次量到的结果
+  // 等一会儿再量，不干净就再等再量，量满 3 次仍不干净才算失败，报出最后一次量到的结果。
+  // 不用 expect.poll：一次审计是逐像素的同步扫描，CI 上要好几秒，poll 的时限会把没量完的那次截断
   let bad: Awaited<ReturnType<typeof auditTouchTargets>> = [];
-  await expect
-    .poll(
-      async () => {
-        bad = await auditTouchTargets(page);
-        return bad.length;
-      },
-      { timeout: 5_000, intervals: [300, 500, 1_000] },
-    )
-    .toBe(0)
-    .catch(() => {
-      throw new Error(
-        `${what}：命中区不足 44×44 或被相邻目标盖住的元素\n${JSON.stringify(bad, null, 2)}`,
-      );
-    });
+  for (const wait of [500, 500, 1_000]) {
+    await page.waitForTimeout(wait);
+    bad = await auditTouchTargets(page);
+    if (bad.length === 0) return;
+  }
+  throw new Error(
+    `${what}：命中区不足 44×44 或被相邻目标盖住的元素\n${JSON.stringify(bad, null, 2)}`,
+  );
 }
 
 async function openPage(page: Page, url: string): Promise<void> {
