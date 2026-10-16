@@ -9,12 +9,8 @@ import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { findMasterID, getMasterCharacterID } from './engine/skills.js';
 import { createTestState, makePlayer } from './testing/fixtures.js';
-import {
-  applyMove,
-  matchFromSnapshot,
-  type GameDef,
-  type RandomSource,
-} from './runner/matchRunner.js';
+import { matchFromSnapshot, type GameDef, type RandomSource } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -78,7 +74,7 @@ function load(G: SetupState) {
 }
 
 function run(G: SetupState, move: string, args: unknown[], roll = 3) {
-  return applyMove(
+  return applyMoveSettled(
     game,
     load(G),
     { playerID: G.currentPlayerID, move, args },

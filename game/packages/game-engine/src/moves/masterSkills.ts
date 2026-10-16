@@ -19,12 +19,42 @@ import {
   fortressColdnessChancesLeft,
   isOutwardThief,
   markSkillUsed,
+  venusMirrorCopiesShoot,
 } from '../engine/skills.js';
 import { incrementMoveCounter } from '../stateOps.js';
-import { type MoveCtx, guardTurnPhase } from './common.js';
+import type { SetupState } from '../setup.js';
+import { type BGIORandom, type MoveCtx, guardTurnPhase } from './common.js';
+import { openDiceGate } from './diceGate.js';
 import { activateNightmareOnLayer } from './nightmareEffects.js';
 import { getShootProfile } from './shootProfiles.js';
 import { applyShootVariant } from './shootResolution.js';
+
+/** 皇城视为 SHOOT 的骰子掷完：第 1 颗是目标的，金牛·号角再掷的 1 颗是射手的 */
+export function settleImperialShoot(
+  G: SetupState,
+  resume: { shooterID: string; targetID: string },
+  random: BGIORandom,
+): SetupState {
+  const applied = applyImperialCityWorldShoot(
+    G,
+    resume.shooterID,
+    resume.targetID,
+    random.D6(),
+    () => random.D6(),
+  );
+  return applied === null ? G : incrementMoveCounter(applied);
+}
+
+/** 金星·镜界复制 SHOOT 的骰子掷完 */
+export function settleVenusMirror(
+  G: SetupState,
+  resume: { selfID: string; targetID: string; discardedCardIds: CardID[] },
+  roll: number,
+): SetupState {
+  const { selfID, targetID, discardedCardIds } = resume;
+  const applied = applyVenusMirrorWorld(G, selfID, targetID, discardedCardIds, roll);
+  return applied === null ? G : incrementMoveCounter(applied);
+}
 
 export const masterSkillMoves = {
   // 棋局·易位（梦主限定）：交换两个未打开的金库位置，perGame 最多 2 次
@@ -50,7 +80,7 @@ export const masterSkillMoves = {
   // 骰面按普通 SHOOT，梦主是射手所以 M4 卡宾枪照常 -1，其余（双鱼应答窗口、选层、白羊·星尘）走共同结算。
   // 目标按对外身份算：除梦主外的存活玩家都可选（背叛者也可以，否则能不能选就泄露了阵营）。
   useFortressColdness: {
-    move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
+    move: ({ G, ctx }: MoveCtx, targetID: string) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (ctx.currentPlayer !== G.dreamMasterID) return INVALID_MOVE;
       const self = G.players[ctx.currentPlayer];
@@ -60,7 +90,7 @@ export const masterSkillMoves = {
 
       const profile = getShootProfile('action_shoot');
       if (!profile) return INVALID_MOVE;
-      const r = applyShootVariant(G, ctx, random, targetID, null, {
+      const r = applyShootVariant(G, ctx, targetID, null, {
         ...profile,
         sameLayerRequired: false,
         skill: 'fortress_coldness',
@@ -192,16 +222,20 @@ export const masterSkillMoves = {
   // 每收到 1 张贿赂牌获得 1 次机会（imperialShootCharges），发动即消耗
   // 对照：docs/manual/06-dream-master.md 皇城
   useImperialCityWorldShoot: {
-    move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
+    move: ({ G, ctx }: MoveCtx, targetID: string) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const master = G.players[G.dreamMasterID];
       if (!master || master.characterId !== 'dm_imperial_city') return INVALID_MOVE;
-      const roll = random.D6();
-      const applied = applyImperialCityWorldShoot(G, ctx.currentPlayer, targetID, roll, () =>
-        random.D6(),
-      );
-      if (applied === null) return INVALID_MOVE;
-      return incrementMoveCounter(applied);
+      // 能否发动与点数无关：先按任意点数试一次，能发动才开闸门，由目标掷（见 settleImperialShoot）
+      if (applyImperialCityWorldShoot(G, ctx.currentPlayer, targetID, 1) === null) {
+        return INVALID_MOVE;
+      }
+      return openDiceGate(G, {
+        by: ctx.currentPlayer,
+        target: targetID,
+        rollers: [targetID],
+        resume: { purpose: 'imperial', shooterID: ctx.currentPlayer, targetID },
+      })!;
     },
     client: false,
   },
@@ -209,13 +243,19 @@ export const masterSkillMoves = {
   // 金星·镜界世界观：弃 2 张牌复制本回合已用的 SHOOT/KICK 效果
   // 对照：docs/manual/06-dream-master.md 金星·镜界
   useVenusMirrorWorld: {
-    move: ({ G, ctx, random }: MoveCtx, targetID: string, discardedCardIds: CardID[]) => {
+    move: ({ G, ctx }: MoveCtx, targetID: string, discardedCardIds: CardID[]) => {
       if (!isStringArray(discardedCardIds)) return INVALID_MOVE;
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-      const roll = random.D6();
-      const applied = applyVenusMirrorWorld(G, ctx.currentPlayer, targetID, discardedCardIds, roll);
+      const applied = applyVenusMirrorWorld(G, ctx.currentPlayer, targetID, discardedCardIds, 1);
       if (applied === null) return INVALID_MOVE;
-      return incrementMoveCounter(applied);
+      // 复制 KICK 不掷骰，直接生效；复制 SHOOT 由目标掷（见 settleVenusMirror）
+      if (!venusMirrorCopiesShoot(G)) return incrementMoveCounter(applied);
+      return openDiceGate(G, {
+        by: ctx.currentPlayer,
+        target: targetID,
+        rollers: [targetID],
+        resume: { purpose: 'venusMirror', selfID: ctx.currentPlayer, targetID, discardedCardIds },
+      })!;
     },
     client: false,
   },

@@ -96,6 +96,14 @@ export function nextAutoAction(
     return { playerID: owner, move: 'completeSetup', args: [], why: '完成布置，进入对局' };
   }
 
+  // 掷骰闸门：点名还没掷的人里，Bot 座位以本人的名义掷，不限先后；名单里只剩真人时等他们自己点
+  const dice = G.pendingDiceRoll;
+  if (dice) {
+    const roller = dice.rollers.find((id) => !dice.rolled.includes(id) && !isHuman(id));
+    if (roller === undefined) return null;
+    return { playerID: roller, move: 'rollDice', args: [], why: `${roller} 掷骰` };
+  }
+
   // 响应窗口：取第一个还没响应的响应者，由响应者本人发；按策略行动的 Bot 座位可能抵消，其余一律放弃
   const window = G.pendingResponseWindow;
   if (window) {

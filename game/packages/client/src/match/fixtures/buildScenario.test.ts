@@ -305,6 +305,30 @@ function viewFrom(id: FixtureScenarioId, seat: string): MatchView {
   return viewMatch(InceptionCityGame, state, seat).G as MatchView;
 }
 
+describe('buildFixtureScenario · 掷骰闸门', () => {
+  it('被 SHOOT：对方真的打出 SHOOT，引擎停在闸门上只点名本人；视图里没有续接参数', () => {
+    const sc = buildFixtureScenario('thief-pending-dice');
+    const gate = (sc.view.G as MatchView).pendingDiceRoll!;
+    expect(gate).toMatchObject({
+      purpose: 'shoot',
+      target: sc.seat,
+      rollers: [sc.seat],
+      rolled: [],
+    });
+    expect(gate).not.toHaveProperty('resume');
+    expect(awaitingNotice(sc.view.G as MatchView, sc.seat)).toEqual({ mine: true, hasOwnUi: true });
+  });
+
+  it('海啸：存活的盗梦者都被点名，本人已掷、等其他人', () => {
+    const sc = buildFixtureScenario('thief-pending-dice-wait');
+    const gate = (sc.view.G as MatchView).pendingDiceRoll!;
+    expect(gate.purpose).toBe('tsunami');
+    expect(gate.rolled).toEqual([sc.seat]);
+    expect(gate.rollers.length).toBeGreaterThan(1);
+    expect(awaitingNotice(sc.view.G as MatchView, sc.seat)).toEqual({ mine: false });
+  });
+});
+
 describe('buildFixtureScenario · 轮到本人应答的各种待决状态', () => {
   it('被 SHOOT 的双鱼：窗口由对方真的打出 SHOOT 打开，本人可闪避到第 1 层', () => {
     const a = mineOf('thief-pending-shoot');

@@ -117,6 +117,8 @@ export class MatchRoom {
    * 座位在同一局面下从托管回到真人时沿用它，不重新给一整段时限。
    */
   private stateDeadline: { stateID: number; at: number } | null = null;
+  /** 当前掷骰闸门的编号与打开时刻：闸门的时限从打开起算，名单里的人共用 */
+  private diceGate: { id: number; openedAt: number } | null = null;
   /** 每次重新排程加 1，已入队但过期的计时任务据此丢弃 */
   private generation = 0;
   private autoRejects = 0;
@@ -261,6 +263,18 @@ export class MatchRoom {
     return this.seatList.filter((s) => s.isBot).map((s) => s.seat);
   }
 
+  /** 当前掷骰闸门开了多久；换了一道闸门就从现在重新记 */
+  private diceElapsedMs(): number {
+    const gate = this.state.G.pendingDiceRoll;
+    if (!gate) {
+      this.diceGate = null;
+      return 0;
+    }
+    const now = this.deps.timers.now();
+    if (this.diceGate?.id !== gate.id) this.diceGate = { id: gate.id, openedAt: now };
+    return now - this.diceGate.openedAt;
+  }
+
   private clearTimer(): void {
     this.generation += 1;
     this.storageRetryPending = false;
@@ -304,7 +318,13 @@ export class MatchRoom {
     // 只认退避计时器；存储不可用期间挂着的普通截止计时器照常允许被提前
     if (keepExisting && this.storageRetryPending && this.timer !== null) return;
 
-    const plan = planNext(this.state, this.humanSeats(), this.deps.timing, this.botSeats());
+    const plan = planNext(
+      this.state,
+      this.humanSeats(),
+      this.deps.timing,
+      this.botSeats(),
+      this.diceElapsedMs(),
+    );
     if (
       plan.kind === 'none' ||
       (plan.kind === 'deadline' && this.timeoutMisses >= MAX_AUTO_FAILURES)
@@ -340,7 +360,13 @@ export class MatchRoom {
   private async runAuto(gen: number): Promise<void> {
     if (gen !== this.generation || this.closed || this.over) return;
     try {
-      const plan = planNext(this.state, this.humanSeats(), this.deps.timing, this.botSeats());
+      const plan = planNext(
+        this.state,
+        this.humanSeats(),
+        this.deps.timing,
+        this.botSeats(),
+        this.diceElapsedMs(),
+      );
       if (plan.kind !== 'auto') {
         this.schedule();
         return;

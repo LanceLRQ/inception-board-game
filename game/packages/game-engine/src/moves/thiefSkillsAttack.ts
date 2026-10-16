@@ -25,12 +25,7 @@ export const thiefAttackSkillMoves = {
   // 只把掷骰改成「掷 2 颗骰存 pending」；目标是可闪避的双鱼时先开应答窗口，放弃后再掷。
   // 对照：docs/manual/05-dream-thieves.md 意念判官 261 行
   playShootSudger: {
-    move: (
-      { G, ctx, random }: MoveCtx,
-      targetPlayerID: string,
-      cardId: CardID,
-      decreeId?: CardID,
-    ) => {
+    move: ({ G, ctx }: MoveCtx, targetPlayerID: string, cardId: CardID, decreeId?: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const self = G.players[ctx.currentPlayer];
       if (!self || !self.isAlive) return INVALID_MOVE;
@@ -38,7 +33,7 @@ export const thiefAttackSkillMoves = {
       if (!isShootClassCard(cardId)) return INVALID_MOVE;
       // 死亡面 / 移动面 / 附带弃牌 / 是否要求同层取自 SHOOT 参数表；
       // 层数限制由共同结算校验：只有刺客之王不要求同层（意念判官不具备摩羯 / 恐怖分子的豁免）
-      const r = applyShootByCard(G, ctx, random, targetPlayerID, cardId, {
+      const r = applyShootByCard(G, ctx, targetPlayerID, cardId, {
         decreeId,
         skill: 'sudger_verdict',
       });
@@ -65,7 +60,7 @@ export const thiefAttackSkillMoves = {
   // 对照：docs/manual/04-action-cards.md 梦境穿梭剂 / SHOOT；格林射线角色牌「缉捕」
   playGreenRayArrest: {
     move: (
-      { G, ctx, random }: MoveCtx,
+      { G, ctx }: MoveCtx,
       shootCardId: CardID,
       targetPlayerID?: string | null,
       targetLayer?: number | null,
@@ -100,7 +95,7 @@ export const thiefAttackSkillMoves = {
       // 3) 只移动：弃掉 SHOOT 牌作为代价，不射击
       if (!wantsShoot) return incrementMoveCounter(discardCard(s, ctx.currentPlayer, shootCardId));
       // 4) 射击：按牌取 SHOOT 参数表 → 复用 SHOOT 结算
-      const r = applyShootByCard(s, ctx, random, targetPlayerID, shootCardId);
+      const r = applyShootByCard(s, ctx, targetPlayerID, shootCardId);
       return r === INVALID_MOVE ? r : recordCardPlayed(r, shootCardId);
     },
     client: false,
@@ -112,7 +107,7 @@ export const thiefAttackSkillMoves = {
   // 骰面按普通 SHOOT，其余（双鱼应答窗口、选层、白羊·星尘、处女·完美）走共同结算。
   // 设计：可选触发，独立 move；同回合多次解封可多次触发
   playHaleyImpact: {
-    move: ({ G, ctx, random }: MoveCtx, targetID: string) => {
+    move: ({ G, ctx }: MoveCtx, targetID: string) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const self = G.players[ctx.currentPlayer];
       if (!self || !self.isAlive) return INVALID_MOVE;
@@ -123,7 +118,7 @@ export const thiefAttackSkillMoves = {
 
       const profile = getShootProfile('action_shoot');
       if (!profile) return INVALID_MOVE;
-      const r = applyShootVariant(G, ctx, random, targetID, null, {
+      const r = applyShootVariant(G, ctx, targetID, null, {
         ...profile,
         sameLayerRequired: false,
         skill: 'haley_impact',

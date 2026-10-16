@@ -448,6 +448,10 @@ const RESPONSE_SPECS: Partial<Record<FixtureScenarioId, ResponseSpec>> = {
   'thief-pending-darwin': { viewerCharacter: 'thief_darwin', turnOwner: 'viewer' },
   // 本人是雅典娜，同层的对方对本人打出 KICK：结算前可从弃牌堆选 1 张
   'thief-pending-athena': { viewerCharacter: 'thief_athena', turnOwner: 'other' },
+  // 对方对本人打出 SHOOT：引擎停在掷骰闸门上，轮到本人掷
+  'thief-pending-dice': { viewerCharacter: 'thief_dream_interpreter', turnOwner: 'other' },
+  // 港口·海啸：存活的盗梦者各掷 1 颗，本人已掷，等其他人
+  'thief-pending-dice-wait': { viewerCharacter: 'thief_dream_interpreter', turnOwner: 'other' },
 };
 
 /** 白羊场景里被击杀者原来所在的层 */
@@ -562,7 +566,11 @@ export function buildFixtureMatch(
   if (isDiscardScenario(id)) G = dealTop(G, viewer, DISCARD_EXTRA_CARDS);
   if (actor !== viewer) G = dealSpecific(G, actor, cards(UNLOCK_CARD, 'action_kick'));
   // 对方要打出 SHOOT 的场景：给回合主人一张 SHOOT
-  if (id === 'thief-pending-shoot' || id === 'thief-pending-terrorist') {
+  if (
+    id === 'thief-pending-shoot' ||
+    id === 'thief-pending-terrorist' ||
+    id === 'thief-pending-dice'
+  ) {
     G = dealSpecific(G, actor, cards('action_shoot'));
   }
   const others = G.playerOrder.filter((seat) => seat !== viewer && seat !== actor);
@@ -675,8 +683,34 @@ export function buildFixtureMatch(
       // 盗梦者真的打出 KICK：引擎在结算前挂起梦主的律令应答
       state = mustApply(state, actor, 'playKick', ['action_kick', thieves[0]!]);
       break;
+    case 'thief-pending-dice':
+      // 对方真的对本人打出 SHOOT：引擎停在掷骰闸门上，等本人掷
+      state = mustApply(state, actor, 'playShoot', [viewer, 'action_shoot']);
+      break;
+    case 'thief-pending-dice-wait': {
+      // 引擎里这一步由打开金库触发；这里直接摆出闸门：存活的盗梦者各掷 1 颗，本人已掷
+      const rollers = thieves.filter((t) => state.G.players[t]!.isAlive);
+      state = {
+        ...state,
+        G: {
+          ...state.G,
+          pendingDiceRoll: {
+            id: 1,
+            purpose: 'tsunami',
+            by: null,
+            target: null,
+            rollers,
+            rolled: [viewer],
+            resume: { purpose: 'tsunami', roundsLeft: 1, coinVaultLayer: null, unlockerID: null },
+          },
+        },
+      };
+      break;
+    }
     case 'thief-pending-sudger': {
       state = mustApply(state, viewer, 'playShootSudger', [other, 'action_shoot']);
+      // 目标先掷骰，引擎掷出两颗后才挂起本人的选择
+      state = mustApply(state, other, 'rollDice', []);
       // 两颗骰子由引擎掷出；固定场景把点数定为一个击杀、一个移动，两种结果都能走查
       const rolls = state.G.pendingSudgerRolls!;
       state = {

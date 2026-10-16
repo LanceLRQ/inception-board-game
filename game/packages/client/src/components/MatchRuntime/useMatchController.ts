@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MatchView } from '@icgame/game-engine';
 import { logger } from '../../lib/logger';
-import { getCardName, type PlayRole } from '../../lib/cards';
+import type { PlayRole } from '../../lib/cards';
 import type { ActiveSkillDescriptor } from '../../lib/activeSkills';
 import { handCardsAt, validHandPicks, toggleHandPick } from '../../lib/handPick';
 import type { MatchSource } from '../../match/matchSource';
@@ -31,7 +31,6 @@ import {
   unopenedVaultCount,
   buildPlayArgs,
   CHESS_SKILL_ID,
-  classifyShoot,
   commitPlanFor,
   decreeApplicable,
   decreeCardsIn,
@@ -44,11 +43,9 @@ import {
   effectivePendingPlay,
   gravityCurrentPicker,
   handCardMode,
-  layersOfPlayers,
   nicknameMap,
   pendingPlayFor,
   playLayerChoices,
-  shootToastFor,
   toggleDiscardSelection,
   toggleGravityTargets,
   toggleKeepLastTwo,
@@ -262,49 +259,6 @@ export function useMatchController(source: MatchSource): MatchController {
   // 对照：docs/manual/03-game-flow.md §贿赂&背叛者
   const humanFaction = (humanPlayer?.faction as string) ?? 'thief';
   const playerLayer = (humanPlayer?.currentLayer as number) ?? 1;
-
-  // SHOOT 结算 → 骰子动画 + Toast（按结果分级）
-  //   流程：检测到 SHOOT 牌打出 + lastShootRoll 有值 → 显示 ShootDiceOverlay
-  //   骰子动画完成后 → Toast 通知结果
-  //   判定（SHOOT Toast 分级，见 classifyShoot）：
-  //     - pendingShootMove != null → L2/L3 挂起中，不 toast（由 ShooterLayerPickerDialog 承担）
-  //     - 某玩家 currentLayer 从 N → 0 → kill → toast.error
-  //     - 某玩家 currentLayer 变化（非 0）→ move → toast.info
-  //     - 所有玩家 currentLayer 无变化 → miss → toast.warn
-  const lastPlayedCard = (G?.lastPlayedCardThisTurn as string | null | undefined) ?? null;
-  const lastShootRoll = (G?.lastShootRoll as number | null | undefined) ?? null;
-  const [shootDiceRoll, setShootDiceRoll] = useState<number | null>(null);
-  const shootToastTrackRef = useRef<{ card: string | null; layers: Record<string, number> }>({
-    card: null,
-    layers: {},
-  });
-
-  // 检测新的 SHOOT 牌打出 → 启动骰子动画
-  useEffect(() => {
-    if (!G) return;
-    const isShootCard =
-      typeof lastPlayedCard === 'string' && lastPlayedCard.startsWith('action_shoot');
-    const prev = shootToastTrackRef.current;
-    if (isShootCard && lastPlayedCard !== prev.card && lastShootRoll != null) {
-      setShootDiceRoll(lastShootRoll);
-    }
-  }, [G, lastPlayedCard, lastShootRoll]);
-
-  // 骰子动画完成回调 → 显示 Toast
-  const handleDiceComplete = useCallback(() => {
-    setShootDiceRoll(null);
-    if (!G || !lastPlayedCard) return;
-    const nextLayers = layersOfPlayers(players);
-    const prev = shootToastTrackRef.current;
-    const outcome = classifyShoot(prev.layers, nextLayers, G.pendingShootMove != null);
-    shootToastTrackRef.current = { card: lastPlayedCard, layers: nextLayers };
-    const message = shootToastFor(
-      outcome,
-      getCardName(lastPlayedCard),
-      (id) => (players?.[id]?.nickname as string | undefined) ?? `P${id}`,
-    );
-    if (message) toast[message.level](message.text);
-  }, [G, players, lastPlayedCard]);
 
   // 有效的 pendingPlay：card 必须在当前手牌且仍是 action 阶段
   const effectivePending = adaptPlayForCharacter(
@@ -966,7 +920,6 @@ export function useMatchController(source: MatchSource): MatchController {
       cancel: () => setMoveOpenStamp(null),
     },
     response,
-    shootDice: { roll: shootDiceRoll, onComplete: handleDiceComplete },
 
     chat,
     report,

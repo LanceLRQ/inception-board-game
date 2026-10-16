@@ -254,17 +254,20 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     });
   }
 
-  // shoot_rolled：骰值被写入。字段不会被清空，所以同一个值再次出现时，以本步打出了 SHOOT 类牌为准
-  if (after.lastShootRoll !== null) {
-    const changed = after.lastShootRoll !== before.lastShootRoll;
-    const repeated = playedCards.some((c) => c.startsWith('action_shoot'));
-    if (changed || repeated) {
-      events.push({
-        kind: 'shoot_rolled',
-        actor: mover,
-        data: { player: mover, roll: after.lastShootRoll },
-      });
-    }
+  // dice_rolled：掷骰闸门掷完（lastDiceRoll 换了一次），点数公开
+  const dice = after.lastDiceRoll;
+  if (dice && dice.id !== before.lastDiceRoll?.id) {
+    events.push({
+      kind: 'dice_rolled',
+      actor: mover,
+      data: {
+        id: dice.id,
+        purpose: dice.purpose,
+        by: dice.by,
+        target: dice.target,
+        rolls: dice.rolls.map((r) => ({ player: r.player, dice: r.dice.slice() })),
+      },
+    });
   }
 
   // player_moved / player_died / player_revived

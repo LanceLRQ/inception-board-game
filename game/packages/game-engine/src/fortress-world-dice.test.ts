@@ -9,9 +9,17 @@ import { describe, it, expect } from 'vitest';
 import type { CardID } from '@icgame/shared';
 import { applyFortressWorldRoll } from './engine/skills.js';
 import type { SetupState } from './setup.js';
-import { applyMove, type RandomSource } from './runner/matchRunner.js';
+import { type RandomSource } from './runner/matchRunner.js';
 import { rollShootOutcome } from './moves/shootResolution.js';
-import { c, game, KICK, load, scene, withPlayer } from './testing/runnerHarness.js';
+import {
+  c,
+  game,
+  KICK,
+  load,
+  scene,
+  withPlayer,
+  applyMoveSettled,
+} from './testing/runnerHarness.js';
 
 const SHOOT = c('action_shoot');
 const FORTRESS = c('dm_fortress');
@@ -40,7 +48,7 @@ function shootScene(masterChar: CardID, shooterChar: string = 'thief_none'): Set
 }
 
 function shoot(G: SetupState, target: string, ...rolls: number[]) {
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     load(G),
     { playerID: 'p1', move: 'playShoot', args: [target, SHOOT] },
@@ -175,7 +183,7 @@ describe('要塞世界观 · 意念判官·定罪', () => {
 
   it('梦主的两颗骰由射手挑一颗，选中的那颗再 -1', () => {
     const run = (masterChar: CardID) => {
-      const first = applyMove(
+      const first = applyMoveSettled(
         game,
         load(sudgerScene(masterChar)),
         { playerID: 'p1', move: 'playShootSudger', args: ['pM', SHOOT] },
@@ -183,7 +191,7 @@ describe('要塞世界观 · 意念判官·定罪', () => {
       );
       expect(first.ok).toBe(true);
       if (!first.ok) throw new Error('定罪第一步被拒绝');
-      const second = applyMove(
+      const second = applyMoveSettled(
         game,
         first.state,
         { playerID: 'p1', move: 'resolveSudgerPick', args: ['A'] },

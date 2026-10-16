@@ -116,6 +116,8 @@ describe('resolveFixtureScenario', () => {
     expect(idOf('pending=levy')).toBe('thief-pending-levy');
     expect(idOf('pending=darwin')).toBe('thief-pending-darwin');
     expect(idOf('pending=athena')).toBe('thief-pending-athena');
+    expect(idOf('pending=dice')).toBe('thief-pending-dice');
+    expect(idOf('pending=dice-wait')).toBe('thief-pending-dice-wait');
   });
 
   it('as=master&pending=saturn|saturn-nomatch：梦主等待应答律令（有 / 没有同名牌）', () => {

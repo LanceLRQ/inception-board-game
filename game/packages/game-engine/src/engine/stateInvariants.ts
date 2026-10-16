@@ -7,6 +7,8 @@
 // 这里的输入按「可能被写坏」对待：不假定任何字段类型正确，也不会因为坏值而抛异常，
 // 所以可以放心地对任意 move 之后的状态调用。
 
+import type { DicePurpose } from '../moves/diceGate.js';
+
 const LAYER_MAX = 4;
 const MAX_WINDOW_DEPTH = 8;
 const FACTIONS: readonly string[] = ['thief', 'master'];
@@ -467,7 +469,52 @@ function checkPending(c: Collector, G: Rec): void {
     c.card('pendingSaturnDecree.move', o.move);
     if (!Array.isArray(o.args)) c.add('pendingSaturnDecree.args', '必须是数组');
   });
+  c.optional('pendingDiceRoll', G.pendingDiceRoll, (o) => {
+    c.nonNegInt('pendingDiceRoll.id', o.id);
+    c.oneOf('pendingDiceRoll.purpose', o.purpose, DICE_PURPOSES);
+    c.playerOrNull('pendingDiceRoll.by', o.by);
+    c.playerOrNull('pendingDiceRoll.target', o.target);
+    c.players('pendingDiceRoll.rollers', o.rollers);
+    c.players('pendingDiceRoll.rolled', o.rolled);
+    if (c.rec('pendingDiceRoll.resume', o.resume) && o.resume.purpose !== o.purpose) {
+      c.add('pendingDiceRoll.resume.purpose', '必须与 purpose 相同');
+    }
+  });
+  c.optional('lastDiceRoll', G.lastDiceRoll, (o) => {
+    c.nonNegInt('lastDiceRoll.id', o.id);
+    c.oneOf('lastDiceRoll.purpose', o.purpose, DICE_PURPOSES);
+    c.playerOrNull('lastDiceRoll.by', o.by);
+    c.playerOrNull('lastDiceRoll.target', o.target);
+    if (c.array('lastDiceRoll.rolls', o.rolls)) {
+      o.rolls.forEach((row, i) => {
+        if (!c.rec(`lastDiceRoll.rolls[${i}]`, row)) return;
+        c.player(`lastDiceRoll.rolls[${i}].player`, row.player);
+        if (c.array(`lastDiceRoll.rolls[${i}].dice`, row.dice)) {
+          for (const d of row.dice) {
+            if (!Number.isInteger(d) || (d as number) < 1 || (d as number) > 6) {
+              c.add(`lastDiceRoll.rolls[${i}].dice`, `点数必须是 1-6 的整数，收到 ${String(d)}`);
+            }
+          }
+        }
+      });
+    }
+  });
 }
+
+/** 掷骰闸门的用途（与 moves/diceGate.ts 的 DicePurpose 一致） */
+const DICE_PURPOSES: readonly DicePurpose[] = [
+  'shoot',
+  'sudger',
+  'imperial',
+  'venusMirror',
+  'pluto',
+  'joker',
+  'geminiChoice',
+  'geminiSync',
+  'martyr',
+  'spaceFall',
+  'tsunami',
+];
 
 function checkExtraOnMove(c: Collector, path: string, value: unknown): void {
   if (value !== null) c.oneOf(path, value, ['discard_unlocks', 'discard_shoots']);

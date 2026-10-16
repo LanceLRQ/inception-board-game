@@ -1063,6 +1063,29 @@
   "die": {
     "combat": "Combat die {{n}}"
   },
+  "diceGate": {
+    "purpose": {
+      "shoot": "SHOOT roll",
+      "sudger": "Verdict: roll 2 dice",
+      "imperial": "Imperial City: counts as SHOOT",
+      "venusMirror": "Mirror: copy SHOOT",
+      "pluto": "Inferno: draw by the die",
+      "joker": "Gamble: draw by the die",
+      "geminiChoice": "Choice: roll 2 dice to draw",
+      "geminiSync": "Synergy: roll to lower the lock",
+      "martyr": "Sacrifice: roll to change the lock",
+      "spaceFall": "Space Fall: each thief on the layer rolls",
+      "tsunami": "Tsunami: every living thief rolls"
+    },
+    "versus": "{{by}} → {{target}}",
+    "by": "By {{by}}",
+    "roll": "Roll",
+    "rolled": "Rolled",
+    "waiting": "Waiting for other players {{done}}/{{total}}",
+    "waitingOne": "Waiting for {{name}} to roll",
+    "auto": "Auto-roll in {{n}}s",
+    "aria": "Dice roll"
+  },
   "cardArt": {
     "category": {
       "thief": "Thief",
@@ -1162,6 +1185,9 @@
     "revived": "{{name}} revived on layer {{layer}}",
     "lock": "Layer {{layer}} heart lock {{from}} → {{to}}",
     "vault": "Layer {{layer}} vault opened: {{content}}",
-    "lost": "LIMBO"
+    "lost": "LIMBO",
+    "dice": "{{name}} rolled {{dice}}",
+    "diceMany": "Dice: {{list}}",
+    "diceJoin": ", "
   }
 }

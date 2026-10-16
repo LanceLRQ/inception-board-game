@@ -104,6 +104,17 @@ const shootResponse: Partial<SetupState> = {
 const blackHoleLevy: Partial<SetupState> = {
   pendingBlackHoleLevy: { blackHoleID: 'p1', waiting: ['p2', 'p3'] },
 };
+const diceRoll: Partial<SetupState> = {
+  pendingDiceRoll: {
+    id: 1,
+    purpose: 'spaceFall',
+    by: null,
+    target: null,
+    rollers: ['p1', 'p2', 'p3'],
+    rolled: ['p1'],
+    resume: { purpose: 'spaceFall', layer: 1 },
+  },
+};
 const athenaWit: Partial<SetupState> = {
   pendingAthenaWit: {
     athenaID: 'p3',
@@ -250,6 +261,13 @@ const blockingRows: BlockingRow[] = [
     actor: 'p1',
     moves: ['respondDarwinReturn'],
     other: 'p2',
+  },
+  {
+    name: 'pendingDiceRoll（点名还没掷的人都可以掷，已掷的不行）',
+    patch: diceRoll,
+    actor: 'p3',
+    moves: ['rollDice'],
+    other: 'p1',
   },
 ];
 
@@ -472,6 +490,7 @@ describe('行动权表 · 一致性', () => {
           ...virgo,
           ...shootResponse,
           ...blackHoleLevy,
+          ...diceRoll,
           ...darwinReturn,
           ...athenaWit,
           ...saturnDecree,

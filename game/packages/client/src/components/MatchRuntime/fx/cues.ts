@@ -1,6 +1,6 @@
 // 动画提示：把一步的事件（已按本人座位裁剪）翻成界面要播的一个个动作
 // 事件的 data 来自来源，形状不可全信：逐字段检查，认不出的事件或字段直接跳过，不影响对局。
-// 阶段、回合、等待名单的变化由横幅与高亮表达，这里不出动画；掷骰另有专门的演出。
+// 阶段、回合、等待名单的变化由横幅与高亮表达，这里不出动画。
 
 import type { MatchEvent } from '@icgame/game-engine';
 
@@ -26,7 +26,20 @@ export type FxCue =
   | { readonly kind: 'died'; readonly player: string; readonly layer: number }
   | { readonly kind: 'revived'; readonly player: string; readonly layer: number }
   | { readonly kind: 'lock'; readonly layer: number; readonly from: number; readonly to: number }
-  | { readonly kind: 'vault'; readonly layer: number; readonly content: string };
+  | { readonly kind: 'vault'; readonly layer: number; readonly content: string }
+  /** 掷骰闸门掷完：按掷骰人列出原始点数 */
+  | {
+      readonly kind: 'dice';
+      readonly purpose: string;
+      readonly by: string | null;
+      readonly target: string | null;
+      readonly rolls: readonly DiceRow[];
+    };
+
+export interface DiceRow {
+  readonly player: string;
+  readonly dice: readonly number[];
+}
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -47,6 +60,23 @@ function discardCues(data: Record<string, unknown>): FxCue[] {
   }
   if (rest.length > 0) cues.push({ kind: 'discard', player: null, cards: rest });
   return cues;
+}
+
+const isFace = (v: unknown): v is number =>
+  Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 6;
+
+function diceRows(v: unknown): DiceRow[] | null {
+  if (!Array.isArray(v) || v.length === 0) return null;
+  const rows: DiceRow[] = [];
+  for (const entry of v) {
+    const player = str((entry as { player?: unknown })?.player);
+    const dice = (entry as { dice?: unknown })?.dice;
+    if (player === null || !Array.isArray(dice) || dice.length === 0 || !dice.every(isFace)) {
+      return null;
+    }
+    rows.push({ player, dice: [...dice] });
+  }
+  return rows;
 }
 
 function cueOf(ev: MatchEvent): FxCue[] {
@@ -100,6 +130,12 @@ function cueOf(ev: MatchEvent): FxCue[] {
       const content = str(d.content);
       return layer !== null && content !== null ? [{ kind: 'vault', layer, content }] : [];
     }
+    case 'dice_rolled': {
+      const purpose = str(d.purpose);
+      const rolls = diceRows(d.rolls);
+      if (purpose === null || rolls === null) return [];
+      return [{ kind: 'dice', purpose, by: str(d.by), target: str(d.target), rolls }];
+    }
     default:
       return [];
   }
@@ -121,4 +157,6 @@ export const CUE_DURATION_MS: Readonly<Record<FxCue['kind'], number>> = {
   revived: 900,
   lock: 800,
   vault: 1000,
+  // 翻滚约 0.7 秒，停在点数上约 1.5 秒
+  dice: 2200,
 };

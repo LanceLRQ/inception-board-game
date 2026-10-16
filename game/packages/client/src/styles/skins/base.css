@@ -18,7 +18,7 @@
  *   ms-dreamcard（含 -veil / -tag / -occ / -flag）  牌桌上的梦境层卡片；data-layer / data-focus / data-unlocking / data-lost
  *   ms-pile（含 -card / -label / -bar / -empty）     牌堆（抽牌堆、弃牌堆、本回合出牌区）
  *   ms-turn-glow / ms-await-ring        移动行动轴上当前行动者 / 正在应答者的头像
- *   ms-fx-card / ms-fx-ring / ms-fx-badge / ms-fx-caption  动画层的飞行卡牌、区域闪框、闪现徽标、说明；data-tone = blood | lock | acc
+ *   ms-fx-card / ms-fx-ring / ms-fx-badge / ms-fx-caption / ms-fx-dicebox  动画层的飞行卡牌、区域闪框、闪现徽标、说明、掷骰结果；data-tone = blood | lock | acc
  *
  * 状态用数据属性表达：data-current / data-awaited / data-lost / data-master / data-revealed /
  * data-selected / data-blocked / data-category。
@@ -325,6 +325,12 @@ button.ms-pile:not(:disabled):hover {
   color: var(--ms-ink);
   border: 1px solid var(--ms-line2);
   background: color-mix(in srgb, var(--ms-bg) 88%, transparent);
+}
+.ms-fx-dicebox {
+  color: var(--ms-ink);
+  border: 1px solid var(--ms-acc);
+  background: color-mix(in srgb, var(--ms-bg) 92%, transparent);
+  box-shadow: 0 10px 40px color-mix(in srgb, var(--ms-bg) 70%, transparent);
 }
 
 /* ---------- 底部坞 / 按钮 / 响应窗口 ---------- */

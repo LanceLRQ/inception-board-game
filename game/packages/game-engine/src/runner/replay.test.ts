@@ -190,7 +190,7 @@ describe('事件流', () => {
       'unlock_resolved',
       'awaiting_changed',
       'character_revealed',
-      'shoot_rolled',
+      'dice_rolled',
       'player_revived',
       'vault_opened',
       'bribe_dealt',

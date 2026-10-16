@@ -7,12 +7,8 @@ import type { CardID, Layer } from '@icgame/shared';
 import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { createTestState, makePlayer } from './testing/fixtures.js';
-import {
-  applyMove,
-  matchFromSnapshot,
-  type GameDef,
-  type RandomSource,
-} from './runner/matchRunner.js';
+import { matchFromSnapshot, type GameDef, type RandomSource } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -32,6 +28,8 @@ function scene(card: CardID, targetLayer: Layer): SetupState {
   });
   return {
     ...base,
+    // 牌库留几张：空牌库会在出牌后立即判梦主胜，掷骰闸门来不及掷
+    deck: { ...base.deck, cards: [SHOOT, SHOOT, SHOOT] },
     players: {
       ...base.players,
       p1: makePlayer({
@@ -60,7 +58,7 @@ function convict(G: SetupState, card: CardID) {
     rngState: 1,
     stateID: 0,
   });
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     s,
     { playerID: 'p1', move: 'playShootSudger', args: ['p2', card] },

@@ -130,6 +130,12 @@ export async function pickCardsToDiscard(page: Page, required: number): Promise<
  * 返回这一轮是否答复过。
  */
 export async function answerAwaitedResponse(page: Page): Promise<boolean> {
+  // 掷骰闸门点名了真人（被 Bot 的 SHOOT 打中等）：掷骰
+  const roll = page.getByTestId('dice-roll-button');
+  if ((await roll.isVisible()) && (await roll.isEnabled())) {
+    await roll.click({ timeout: 1_500 });
+    return true;
+  }
   // Bot 打出【解封】后，真人在响应窗口里：放弃响应
   const unlockPass = page.getByTestId('unlock-response-pass');
   if (await unlockPass.isVisible()) {

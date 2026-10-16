@@ -23,33 +23,43 @@ import {
   startDarwinEvolution,
 } from '../engine/skills.js';
 import { drawCards, incrementMoveCounter } from '../stateOps.js';
+import type { SetupState } from '../setup.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
+import { openDiceGate } from './diceGate.js';
+
+/**
+ * 小丑·赌博的骰子掷完：抽 D6 张，罚则是发动当回合的弃牌阶段强制全弃（巨蟹·庇佑不豁免）
+ * 对照：docs/manual/05-dream-thieves.md 小丑
+ */
+export function settleJokerGamble(G: SetupState, playerID: string, roll: number): SetupState {
+  let s = drawCards(G, playerID, jokerDrawCount(roll));
+  // 记录当前 turnNumber，discard 检查时与回合号相等才生效，回合结束后自然失效
+  s = {
+    ...s,
+    players: {
+      ...s.players,
+      [playerID]: { ...s.players[playerID]!, forcedDiscardArmedAtTurn: G.turnNumber },
+    },
+  };
+  return endDrawPhase(s);
+}
 
 export const thiefCardSkillMoves = {
   // 小丑·赌博（略过抽牌阶段 → 掷骰 → 抽 D6 张）
   // 对照：docs/manual/05-dream-thieves.md 小丑
   playJokerGamble: {
-    move: ({ G, ctx, random }: MoveCtx) => {
+    move: ({ G, ctx }: MoveCtx) => {
       if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
       const player = G.players[G.currentPlayerID];
       if (!player || !player.isAlive) return INVALID_MOVE;
       if (player.characterId !== 'thief_joker') return INVALID_MOVE;
-      const roll = random.D6();
-      const count = jokerDrawCount(roll);
-      let s = drawCards(G, G.currentPlayerID, count);
-      // 罚则：发动当回合的弃牌阶段强制全弃（巨蟹·庇佑不豁免）
-      // 记录当前 turnNumber，discard 检查时与回合号相等才生效，回合结束后自然失效
-      s = {
-        ...s,
-        players: {
-          ...s.players,
-          [G.currentPlayerID]: {
-            ...s.players[G.currentPlayerID]!,
-            forcedDiscardArmedAtTurn: G.turnNumber,
-          },
-        },
-      };
-      return endDrawPhase(s);
+      // 骰子由小丑自己掷，掷完见 settleJokerGamble
+      return openDiceGate(G, {
+        by: G.currentPlayerID,
+        target: null,
+        rollers: [G.currentPlayerID],
+        resume: { purpose: 'joker', playerID: G.currentPlayerID },
+      })!;
     },
     client: false,
   },
@@ -85,13 +95,16 @@ export const thiefCardSkillMoves = {
   // 双子·抉择（skill_1）：梦主在更小层时，掷 2 骰抽 (r1+r2) 张 → 翻面
   // 对照：docs/manual/05-dream-thieves.md 双子 83-89 行
   playGeminiChoice: {
-    move: ({ G, ctx, random }: MoveCtx) => {
+    move: ({ G, ctx }: MoveCtx) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-      const roll1 = random.D6();
-      const roll2 = random.D6();
-      const next = applyGeminiChoice(G, ctx.currentPlayer, roll1, roll2);
-      if (next === null) return INVALID_MOVE;
-      return next;
+      // 能否发动与点数无关：先按任意点数试一次，能发动才开闸门，掷完由 applyGeminiChoice 结算
+      if (applyGeminiChoice(G, ctx.currentPlayer, 1, 1) === null) return INVALID_MOVE;
+      return openDiceGate(G, {
+        by: ctx.currentPlayer,
+        target: null,
+        rollers: [ctx.currentPlayer],
+        resume: { purpose: 'geminiChoice', playerID: ctx.currentPlayer },
+      })!;
     },
     client: false,
   },

@@ -36,6 +36,7 @@ import {
 } from '../setup.js';
 import { discardCard, discardCards, incrementMoveCounter, movePlayerToLayer } from '../stateOps.js';
 import type { BGIOCtx, BGIORandom } from './common.js';
+import { type DiceResume, openDiceGate } from './diceGate.js';
 import { type ShootExtraOnMove, getShootProfile } from './shootProfiles.js';
 
 /**
@@ -433,7 +434,6 @@ export function settleShootResult(
 export function applyShootVariant(
   G: SetupState,
   ctx: BGIOCtx,
-  random: BGIORandom,
   targetPlayerID: string,
   cardId: CardID | null,
   rawOpts: ShootVariantOpts,
@@ -462,35 +462,77 @@ export function applyShootVariant(
     };
   }
 
-  // 意念判官·定罪：目标改掷 2 颗骰，挂起等射手挑 1 颗；之后由 resolveSudgerPick 落地
-  if (opts.skill === 'sudger_verdict' && cardId !== null) {
-    const rollA = random.D6();
-    const rollB = random.D6();
-    return {
-      ...G,
-      pendingSudgerRolls: {
-        rollA,
-        rollB,
-        targetPlayerID,
-        cardId,
-        deathFaces: checked.deathFaces,
-        moveFaces: opts.moveFaces,
-        extraOnMove: opts.extraOnMove,
-      },
-    };
-  }
+  // 掷骰交给目标：开闸门，目标报到后由 settleShootDice / settleSudgerDice 接着结算
+  // 意念判官·定罪：目标改掷 2 颗骰，掷完挂起等射手挑 1 颗；之后由 resolveSudgerPick 落地
+  const resume: DiceResume =
+    opts.skill === 'sudger_verdict' && cardId !== null
+      ? {
+          purpose: 'sudger',
+          targetPlayerID,
+          cardId,
+          deathFaces: checked.deathFaces,
+          moveFaces: opts.moveFaces,
+          extraOnMove: opts.extraOnMove,
+        }
+      : {
+          purpose: 'shoot',
+          shooterID,
+          targetPlayerID,
+          cardId,
+          deathFaces: checked.deathFaces,
+          opts,
+        };
+  return openDiceGate(G, {
+    by: shooterID,
+    target: targetPlayerID,
+    rollers: [targetPlayerID],
+    resume,
+  })!;
+}
 
+/** SHOOT 的骰子掷完：掷骰修正后落地；目标在掷完前已不在场时不再结算 */
+export function settleShootDice(
+  G: SetupState,
+  resume: Extract<DiceResume, { purpose: 'shoot' }>,
+  random: BGIORandom,
+): SetupState {
+  const { shooterID, targetPlayerID, cardId, deathFaces, opts } = resume;
+  if (!G.players[targetPlayerID]?.isAlive) return G;
   const rolled = rollShootOutcome(
     G,
     shooterID,
     targetPlayerID,
     cardId,
-    { deathFaces: checked.deathFaces, moveFaces: opts.moveFaces },
+    { deathFaces, moveFaces: opts.moveFaces },
     random,
     opts.terroristPenalty,
     opts.skill === 'haley_impact',
   );
   return settleShootResult(rolled, shooterID, targetPlayerID, cardId, opts);
+}
+
+/** 意念判官·定罪的 2 颗骰子掷完：挂起等射手挑 1 颗；目标在掷完前已不在场时不再结算 */
+export function settleSudgerDice(
+  G: SetupState,
+  resume: Extract<DiceResume, { purpose: 'sudger' }>,
+  random: BGIORandom,
+): SetupState {
+  if (!G.players[resume.targetPlayerID]?.isAlive) return G;
+  const rollA = random.D6();
+  const rollB = random.D6();
+  const { targetPlayerID, cardId, deathFaces, moveFaces, extraOnMove } = resume;
+  return {
+    ...G,
+    pendingSudgerRolls: {
+      rollA,
+      rollB,
+      targetPlayerID,
+      cardId,
+      deathFaces,
+      moveFaces,
+      extraOnMove,
+    },
+  };
 }
 
 /**
@@ -525,14 +567,13 @@ export function settleSudgerPick(
 export function applyShootByCard(
   G: SetupState,
   ctx: BGIOCtx,
-  random: BGIORandom,
   targetPlayerID: string,
   cardId: CardID,
   extra: Pick<ShootVariantOpts, 'decreeId' | 'preventMove' | 'skill'> = {},
 ): SetupState | typeof INVALID_MOVE {
   const profile = getShootProfile(cardId);
   if (!profile) return INVALID_MOVE;
-  return applyShootVariant(G, ctx, random, targetPlayerID, cardId, { ...profile, ...extra });
+  return applyShootVariant(G, ctx, targetPlayerID, cardId, { ...profile, ...extra });
 }
 
 /**
@@ -542,12 +583,11 @@ export function applyShootByCard(
 export function resumeShootAfterResponse(
   G: SetupState,
   ctx: BGIOCtx,
-  random: BGIORandom,
   pending: PendingShootResponse,
   skips: Pick<ShootVariantOpts, 'skipPiscesCheck' | 'skipTerroristCheck' | 'terroristPenalty'>,
 ): SetupState | typeof INVALID_MOVE {
   const shooterCtx: BGIOCtx = { ...ctx, currentPlayer: pending.shooterID };
-  return applyShootVariant(G, shooterCtx, random, pending.targetPlayerID, pending.cardId, {
+  return applyShootVariant(G, shooterCtx, pending.targetPlayerID, pending.cardId, {
     ...shootOptsFromPending(pending),
     ...skips,
   });

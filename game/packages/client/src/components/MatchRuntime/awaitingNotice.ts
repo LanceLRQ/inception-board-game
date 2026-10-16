@@ -26,6 +26,13 @@ interface Awaited {
 
 /** 当前正在等待应答的座位；没有待决状态返回 undefined。可以由多人同时应答的待决（黑洞·吞噬）按本人是否在名单里判断 */
 function awaitedSeat(view: MatchView, mySeat: string | null): Awaited | undefined {
+  // 掷骰闸门：点名还没掷的人各自掷，操作界面是骰子弹层；本人在名单里就是本人，否则点名第一个没掷的
+  const dice = view.pendingDiceRoll;
+  if (dice) {
+    const waiting = dice.rollers.filter((id) => !dice.rolled.includes(id));
+    const seat = mySeat !== null && waiting.includes(mySeat) ? mySeat : (waiting[0] ?? null);
+    return { seat, hasOwnUi: true };
+  }
   // 阻塞类先判断，白羊选择不挡住回合主人，放最后
   if (view.pendingShootResponse) return { seat: view.pendingShootResponse.targetPlayerID };
   if (view.pendingLibra) {
@@ -63,8 +70,13 @@ export function awaitingNotice(view: MatchView, seat: string | null): AwaitingNo
   return mine && awaited.hasOwnUi ? { mine, hasOwnUi: true } : { mine, ...masterFlag };
 }
 
-/** 正在等其应答的座位（座位高亮用）：黑洞·吞噬列出名单里的全部座位；对本人不可见的点名不列 */
+/**
+ * 正在等其应答的座位（座位高亮用）：黑洞·吞噬列出名单里的全部座位，掷骰闸门列出还没掷的全部座位；
+ * 对本人不可见的点名不列
+ */
 export function awaitedSeatIDs(view: MatchView, mySeat: string | null): string[] {
+  const dice = view.pendingDiceRoll;
+  if (dice) return dice.rollers.filter((id) => !dice.rolled.includes(id));
   const awaited = awaitedSeat(view, mySeat);
   if (!awaited || awaited.seat === null) return [];
   const levy = view.pendingBlackHoleLevy;

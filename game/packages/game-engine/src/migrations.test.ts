@@ -491,7 +491,7 @@ describe('migrations', () => {
     });
   });
 
-  describe('v13 → v17 · 黑洞吞噬 / 达尔文淘汰 / 雅典娜急智 / 土星律令的等待态', () => {
+  describe('v13 → v18 · 黑洞吞噬 / 达尔文淘汰 / 雅典娜急智 / 土星律令的等待态与掷骰闸门', () => {
     function stateAt(version: number): Record<string, unknown> {
       const fresh = createInitialState({
         playerCount: 5,
@@ -513,13 +513,13 @@ describe('migrations', () => {
       return { ...older, schemaVersion: version };
     }
 
-    it('版本号升到 17', () => {
-      expect(CURRENT_SCHEMA_VERSION).toBe(17);
+    it('版本号升到 18', () => {
+      expect(CURRENT_SCHEMA_VERSION).toBe(18);
     });
 
     it('旧存档补齐四个等待字段为 null，并升到当前版本', () => {
       const migrated = migrateGameState(stateAt(13));
-      expect(migrated.schemaVersion).toBe(17);
+      expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(migrated.pendingSaturnDecree).toBeNull();
       expect(migrated.pendingBlackHoleLevy).toBeNull();
       expect(migrated.pendingDarwinReturn).toBeNull();
@@ -548,7 +548,7 @@ describe('migrations', () => {
         args: ['action_kick', '1'],
       };
       const migrated = migrateGameState({ ...stateAt(16), pendingAthenaWit: wit });
-      expect(migrated.schemaVersion).toBe(17);
+      expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(migrated.pendingAthenaWit).toEqual(wit);
       expect(migrated.pendingSaturnDecree).toBeNull();
     });
@@ -556,6 +556,24 @@ describe('migrations', () => {
     it('当前版本的状态原样通过', () => {
       const current = migrateGameState(stateAt(13));
       expect(migrateGameState(current as unknown as Record<string, unknown>)).toEqual(current);
+    });
+
+    it('从 17 版出发补上掷骰闸门与最近一次掷骰，律令的等待态原样保留', () => {
+      const decree = {
+        masterID: '0',
+        userID: '1',
+        cardId: 'action_kick',
+        move: 'playKick',
+        args: ['action_kick', '2'],
+      };
+      const at17: Record<string, unknown> = { ...stateAt(17), pendingSaturnDecree: decree };
+      delete at17.pendingDiceRoll;
+      delete at17.lastDiceRoll;
+      const migrated = migrateGameState(at17);
+      expect(migrated.schemaVersion).toBe(18);
+      expect(migrated.pendingDiceRoll).toBeNull();
+      expect(migrated.lastDiceRoll).toBeNull();
+      expect(migrated.pendingSaturnDecree).toEqual(decree);
     });
   });
 });

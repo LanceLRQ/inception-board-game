@@ -46,9 +46,19 @@ const setLayer = (state: S, layer: number, patch: Partial<SetupState['layers'][n
     layers: { ...G.layers, [layer]: { ...G.layers[layer]!, ...patch } },
   }));
 
+/** 发一个 move；开了掷骰闸门就按点名顺序让每个人掷完，返回结算后的状态。被拒返回 null */
 function apply(state: S, seat: string, move: string, args: unknown[]): S | null {
   const res = applyMove(game, state, { playerID: seat, move, args });
-  return res.ok ? res.state : null;
+  if (!res.ok) return null;
+  let next = res.state;
+  while (next.G.pendingDiceRoll) {
+    const gate = next.G.pendingDiceRoll;
+    const roller = gate.rollers.find((id) => !gate.rolled.includes(id))!;
+    const rolled = applyMove(game, next, { playerID: roller, move: 'rollDice', args: [] });
+    if (!rolled.ok) return null;
+    next = rolled.state;
+  }
+  return next;
 }
 const viewOf = (state: S, seat: string): MatchView => viewMatch(game, state, seat).G as MatchView;
 

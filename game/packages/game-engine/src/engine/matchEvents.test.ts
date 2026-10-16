@@ -334,16 +334,31 @@ describe('事件 · 抽牌与阶段', () => {
 // ---------------------------------------------------------------------------
 
 describe('事件 · SHOOT 与死亡', () => {
-  const afterKill = (): Stepped =>
+  const played = (): Stepped =>
     step(load(scene('action')), 'p1', 'playShoot', ['p2', SHOOT], dice(1));
+  // 出牌后开掷骰闸门，目标掷骰那一步才结算
+  const afterKill = (): Stepped => step(played().state, 'p2', 'rollDice', [], dice(1));
 
-  it('card_played 与 shoot_rolled', () => {
-    const { events } = afterKill();
-    expect(one(events, 'card_played')).toMatchObject({
+  it('card_played 在出牌那一步，dice_rolled 在目标掷骰那一步', () => {
+    const first = played();
+    expect(one(first.events, 'card_played')).toMatchObject({
       actor: 'p1',
       data: { player: 'p1', card: SHOOT },
     });
-    expect(one(events, 'shoot_rolled').data).toEqual({ player: 'p1', roll: 1 });
+    expect(all(first.events, 'dice_rolled')).toEqual([]);
+    expect(first.state.G.pendingDiceRoll).toMatchObject({ rollers: ['p2'], rolled: [] });
+
+    const { events } = afterKill();
+    expect(one(events, 'dice_rolled')).toMatchObject({
+      actor: 'p2',
+      data: {
+        id: 1,
+        purpose: 'shoot',
+        by: 'p1',
+        target: 'p2',
+        rolls: [{ player: 'p2', dice: [1] }],
+      },
+    });
   });
 
   it('player_moved 与 player_died：死亡的人移到迷失层，击杀者是发起者', () => {
@@ -366,7 +381,9 @@ describe('事件 · SHOOT 与死亡', () => {
         },
       },
     });
-    const { events } = step(load(G), 'pM', 'masterActivateNightmare', [2, {}], dice(5, 5));
+    const opened = step(load(G), 'pM', 'masterActivateNightmare', [2, {}], dice(5, 5));
+    const half = step(opened.state, 'p1', 'rollDice', [], dice(5, 5));
+    const { events } = step(half.state, 'p2', 'rollDice', [], dice(5, 5));
     const died = all(events, 'player_died');
     expect(died.map((e) => e.data)).toEqual([
       { player: 'p1', layer: 2, cause: null },
@@ -380,14 +397,7 @@ describe('事件 · SHOOT 与死亡', () => {
   });
 
   it('各事件按表里的顺序排列', () => {
-    const order = [
-      'move',
-      'card_played',
-      'cards_discarded',
-      'shoot_rolled',
-      'player_moved',
-      'player_died',
-    ];
+    const order = ['move', 'cards_discarded', 'dice_rolled', 'player_moved', 'player_died'];
     const kinds = kindsOf(afterKill().events).filter((k) => order.includes(k));
     const positions = kinds.map((k) => order.indexOf(k));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));

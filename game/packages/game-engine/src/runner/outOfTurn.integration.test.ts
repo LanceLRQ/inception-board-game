@@ -10,12 +10,12 @@ import type { SetupState } from '../setup.js';
 import { listAwaiting } from '../engine/actionRights.js';
 import { createTestState, makePlayer, withBribes } from '../testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type ApplyMoveOptions,
   type GameDef,
   type MatchState,
 } from './matchRunner.js';
+import { applyMoveSettled } from '../testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -66,7 +66,7 @@ function mustApply(
   args: unknown[] = [],
   options: ApplyMoveOptions = {},
 ): MatchState<SetupState> {
-  const res = applyMove(game, state, { playerID, move, args }, options);
+  const res = applyMoveSettled(game, state, { playerID, move, args }, options);
   if (!res.ok) throw new Error(`move ${move} by ${playerID} 被拒绝：${res.reason}`);
   return res.state;
 }
@@ -78,7 +78,7 @@ function expectNotActive(
   move: string,
   args: unknown[] = [],
 ): void {
-  const res = applyMove(game, state, { playerID, move, args });
+  const res = applyMoveSettled(game, state, { playerID, move, args });
   expect(res.ok, `${playerID} 发 ${move} 应被拒绝`).toBe(false);
   if (!res.ok) expect(res.reason).toBe('not_active');
   expect(res.state).toBe(state);

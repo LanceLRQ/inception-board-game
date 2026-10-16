@@ -284,6 +284,20 @@ function pendingScenarios(
       s: withG({ pendingResonance: { bonderPlayerID: owner, targetPlayerID: other } }),
       actor: owner,
     },
+    {
+      s: withG({
+        pendingDiceRoll: {
+          id: 1,
+          purpose: 'geminiSync',
+          by: other,
+          target: null,
+          rollers: [other, third],
+          rolled: [third],
+          resume: { purpose: 'geminiSync', playerID: other },
+        },
+      }),
+      actor: other,
+    },
   ];
 }
 

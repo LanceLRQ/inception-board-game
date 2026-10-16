@@ -8,12 +8,12 @@ import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { createTestState, makeLayer, withBribes } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 const c = (id: string) => id as CardID;
@@ -70,7 +70,7 @@ function scene(turnOwner: string): SetupState {
 }
 
 function attempt(G: SetupState, playerID: string, move: string, args: unknown[], roll = 4) {
-  return applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
 /** p 打开了第 1 层的金币金库，梦主在三选一里选择派贿赂 */

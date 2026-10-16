@@ -20,33 +20,52 @@ import {
   settleBlackHoleReverse,
 } from '../engine/skills.js';
 import { discardToLimit, drawCards, incrementMoveCounter, setTurnPhase } from '../stateOps.js';
+import type { SetupState } from '../setup.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
+import { openDiceGate } from './diceGate.js';
+
+/**
+ * 抽牌阶段的抽牌：按抽牌数抽完，再接先锋、狮子、白羊、黑洞·倒流，最后结束抽牌阶段。
+ * plutoRoll 是冥王星·地狱的骰子（不是冥王星局为 null），其余加成与总数的计算见 engine/limits.ts
+ */
+export function settleDrawPhase(
+  G: SetupState,
+  ariesExtra: number | null | undefined,
+  plutoRoll: number | null,
+): SetupState {
+  // 抽牌前后对比推出 drawnCards（用于先锋技能触发）
+  const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
+  const totalDraw = getTurnDrawCount(G, G.currentPlayerID, plutoRoll);
+  let s = drawCards(G, G.currentPlayerID, totalDraw);
+  const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
+  const drawn = afterHand.slice(beforeHand.length);
+  // 先锋技能：抽到 action_dream_transit 则额外抽 2 张
+  s = applyPointmanAssault(s, G.currentPlayerID, drawn);
+  // 狮子王道：抽完后从牌库顶额外抽 = 梦主手牌数
+  s = applyLeoKingdom(s, G.currentPlayerID);
+  // 白羊·闪耀：抽牌阶段按白羊自己选的张数额外抽牌
+  s = settleAriesExtraDraw(s, ariesExtra);
+  // 黑洞·倒流：梦主自己的抽牌阶段恢复心锁
+  s = settleBlackHoleReverse(s);
+  return endDrawPhase(s);
+}
 
 export const turnFlowMoves = {
   // ariesExtra：白羊·闪耀多抽的张数（0 到已弃梦魇数），只有存活的白羊可以带；不带则抽满
   doDraw: {
-    move: ({ G, ctx, random }: MoveCtx, ariesExtra?: number | null) => {
+    move: ({ G, ctx }: MoveCtx, ariesExtra?: number | null) => {
       if (!guardTurnPhase(G, ctx, 'draw')) return INVALID_MOVE;
       if (!isValidAriesExtraChoice(G, G.currentPlayerID, ariesExtra)) return INVALID_MOVE;
-      // 抽牌前后对比推出 drawnCards（用于先锋技能触发）
-      const beforeHand = G.players[G.currentPlayerID]?.hand ?? [];
-      // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果；只有这时才掷骰
-      // 其余加成（盛夏、巨蟹·气场）与总数的计算见 engine/limits.ts
-      const plutoRoll = needsPlutoHellRoll(G, G.currentPlayerID) ? random.D6() : null;
-      const totalDraw = getTurnDrawCount(G, G.currentPlayerID, plutoRoll);
-      let s = drawCards(G, G.currentPlayerID, totalDraw);
-      const afterHand = s.players[G.currentPlayerID]?.hand ?? [];
-      const drawn = afterHand.slice(beforeHand.length);
-      // 先锋技能：抽到 action_dream_transit 则额外抽 2 张
-      s = applyPointmanAssault(s, G.currentPlayerID, drawn);
-      // 狮子王道：抽完后从牌库顶额外抽 = 梦主手牌数
-      s = applyLeoKingdom(s, G.currentPlayerID);
-      // 白羊·闪耀：抽牌阶段按白羊自己选的张数额外抽牌
-      s = settleAriesExtraDraw(s, ariesExtra);
-      // 黑洞·倒流：梦主自己的抽牌阶段恢复心锁
-      s = settleBlackHoleReverse(s);
-      s = endDrawPhase(s);
-      return s;
+      // 冥王星地狱世界观：盗梦者抽牌数 = 1 颗骰子结果；只有这时才掷骰，由本人掷（见 settleDrawPhase）
+      if (needsPlutoHellRoll(G, G.currentPlayerID)) {
+        return openDiceGate(G, {
+          by: G.currentPlayerID,
+          target: null,
+          rollers: [G.currentPlayerID],
+          resume: { purpose: 'pluto', playerID: G.currentPlayerID, ariesExtra: ariesExtra ?? null },
+        })!;
+      }
+      return settleDrawPhase(G, ariesExtra, null);
     },
     client: false,
   },

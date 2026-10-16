@@ -167,6 +167,16 @@ const RIGHTS_RULES: readonly RightsRule[] = [
     actors: (G) => (G.pendingDarwinReturn ? [G.pendingDarwinReturn.playerID] : null),
   },
   {
+    // 掷骰闸门：被点名还没掷的人各自报到，不限先后
+    field: 'pendingDiceRoll',
+    blocking: true,
+    moves: ['rollDice'],
+    actors: (G) =>
+      G.pendingDiceRoll
+        ? G.pendingDiceRoll.rollers.filter((id) => !G.pendingDiceRoll!.rolled.includes(id))
+        : null,
+  },
+  {
     // 白羊·星尘：白羊在别人的回合也能发动 / 放弃，但不挡住回合主人
     field: 'pendingAriesChoice',
     blocking: false,

@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('demoEventBatches', () => {
-  it('每批都翻得出一个动作，覆盖抽牌到复活的各种动作', () => {
+  it('每批都翻得出一个动作，覆盖抽牌、掷骰到复活的各种动作', () => {
     const sc = buildFixtureScenario('thief');
     const batches = demoEventBatches(sc.view.G as MatchView, sc.seat);
     const kinds = batches.map((b) => {
@@ -18,7 +18,18 @@ describe('demoEventBatches', () => {
       return cues[0]!.kind;
     });
     expect(new Set(kinds)).toEqual(
-      new Set(['draw', 'play', 'discard', 'transfer', 'move', 'lock', 'vault', 'died', 'revived']),
+      new Set([
+        'draw',
+        'play',
+        'dice',
+        'discard',
+        'transfer',
+        'move',
+        'lock',
+        'vault',
+        'died',
+        'revived',
+      ]),
     );
   });
 });

@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CardID, Layer } from '@icgame/shared';
 import type { SetupState } from './setup.js';
-import { applyMove } from './runner/matchRunner.js';
+
 import { viewFor } from './engine/matchView.js';
 import { matchOutcome } from './engine/outcome.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
@@ -28,6 +28,7 @@ import {
   load,
   scene,
   withPlayer,
+  applyMoveSettled,
 } from './testing/runnerHarness.js';
 import { withBribes } from './testing/fixtures.js';
 
@@ -64,7 +65,7 @@ function table(
 }
 
 function play(G: SetupState, playerID: string, move: string, args: unknown[], roll = 3) {
-  return applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
 function okPlay(G: SetupState, playerID: string, move: string, args: unknown[], roll = 3) {

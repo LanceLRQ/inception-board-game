@@ -8,13 +8,13 @@ import { HALEY_SKILL_ID, SUDGER_SKILL_ID } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
 import { callMove, createTestState, makePlayer } from './testing/fixtures.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const SHOOT = 'action_shoot' as CardID;
 const NIGHTMARE = 'nightmare_despair_storm' as CardID;
@@ -427,7 +427,12 @@ describe('经对局运行器驱动：应答窗口与选层的行动权', () => {
     args: unknown[],
     rolls: number[] = [],
   ): MatchState<SetupState> {
-    const res = applyMove(game, state, { playerID, move, args }, { random: fixedRandom(rolls) });
+    const res = applyMoveSettled(
+      game,
+      state,
+      { playerID, move, args },
+      { random: fixedRandom(rolls) },
+    );
     expect(res.ok, `${move} 被拒绝：${res.ok ? '' : res.reason}`).toBe(true);
     if (!res.ok) throw new Error('unreachable');
     expect(checkStateInvariants(res.state.G)).toEqual([]);
@@ -443,13 +448,17 @@ describe('经对局运行器驱动：应答窗口与选层的行动权', () => {
     expect(m.G.pendingShootResponse?.skill).toBe('haley_impact');
 
     // 射手不能替双鱼答
-    const wrong = applyMove(game, m, { playerID: 'p1', move: 'respondShootPass', args: [] });
+    const wrong = applyMoveSettled(game, m, { playerID: 'p1', move: 'respondShootPass', args: [] });
     expect(wrong.ok).toBe(false);
 
     // 原始 6，-2 后为 4：命中「移动」，双鱼在第 2 层，要选层
     m = step(m, 'p2', 'respondShootPass', [], [6]);
     expect(m.G.pendingShootMove).toMatchObject({ shooterID: 'p1', cardId: null, choices: [1, 3] });
-    const intruder = applyMove(game, m, { playerID: 'p2', move: 'resolveShootMove', args: [3] });
+    const intruder = applyMoveSettled(game, m, {
+      playerID: 'p2',
+      move: 'resolveShootMove',
+      args: [3],
+    });
     expect(intruder.ok).toBe(false);
 
     m = step(m, 'p1', 'resolveShootMove', [3]);

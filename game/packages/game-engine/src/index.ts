@@ -244,7 +244,9 @@ export type {
   DeckView,
   ResponseWindowView,
   PendingVaultDecisionView,
+  PendingDiceRollView,
 } from './engine/matchView.js';
+export type { DicePurpose, LastDiceRoll, DiceRollRecord } from './moves/diceGate.js';
 
 // 联机对局消息协议
 export { MATCH_PROTOCOL_VERSION, parseClientMatchMessage } from './net/matchProtocol.js';

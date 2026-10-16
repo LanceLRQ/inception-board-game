@@ -308,6 +308,24 @@ export function checkInvariants(state: SetupState): InvariantViolation[] {
     }
   }
 
+  // ---------- 18. 掷骰闸门 ----------
+  // 点名的人不重复、至少一个；已掷的人都在名单里且还没掷齐（掷齐时闸门当即结算清空）
+  const dice = state.pendingDiceRoll;
+  if (dice) {
+    if (dice.rollers.length === 0 || new Set(dice.rollers).size !== dice.rollers.length) {
+      push('pending_dice_rollers', '掷骰闸门的点名名单必须非空且不重复');
+    }
+    if (dice.rolled.some((id) => !dice.rollers.includes(id))) {
+      push('pending_dice_rolled', '已掷骰的人必须在点名名单里');
+    }
+    if (
+      new Set(dice.rolled).size !== dice.rolled.length ||
+      dice.rolled.length >= dice.rollers.length
+    ) {
+      push('pending_dice_open', '已掷骰的人不重复，且闸门开着时还有人没掷');
+    }
+  }
+
   return out;
 }
 

@@ -21,7 +21,6 @@ import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
 import { ReviveDialog } from '../ReviveDialog';
 import { BlackSwanTourDialog } from '../BlackSwanTourDialog';
-import { ShootDiceOverlay } from '../ShootDiceOverlay';
 import { AwaitedResponseSheet } from './shared/AwaitedResponseSheet';
 import type { MatchController } from './controllerTypes';
 
@@ -37,12 +36,6 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
 
   return (
     <>
-      {/* SHOOT 骰子动画浮层 */}
-      <ShootDiceOverlay
-        roll={controller.shootDice.roll}
-        onComplete={controller.shootDice.onComplete}
-      />
-
       {/* 本人应答（被 SHOOT 时的响应、天秤、处女、白羊等）里需要选牌 / 分牌 / 选层的弹窗 */}
       <AwaitedResponseSheet controller={controller} />
 

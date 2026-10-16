@@ -10,7 +10,7 @@ import { checkStateInvariants } from './engine/stateInvariants.js';
 import { applyNeptuneStorm } from './engine/skills.js';
 import type { SetupState } from './setup.js';
 import { discardCard, setLayerHeartLock } from './stateOps.js';
-import { applyMove } from './runner/matchRunner.js';
+
 import { withBribes } from './testing/fixtures.js';
 import {
   c,
@@ -22,6 +22,7 @@ import {
   TIME_STORM,
   UNLOCK,
   withPlayer,
+  applyMoveSettled,
 } from './testing/runnerHarness.js';
 
 const NEPTUNE = c('dm_neptune_ocean');
@@ -61,7 +62,7 @@ function soleUnlocker(G: SetupState): SetupState {
 }
 
 function run(G: SetupState, playerID: string, move: string, args: unknown[] = [], roll = 3) {
-  return applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
 function ok(G: SetupState, playerID: string, move: string, args: unknown[] = [], roll = 3) {

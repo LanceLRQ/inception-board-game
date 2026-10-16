@@ -9,7 +9,7 @@ import { checkStateInvariants } from './engine/stateInvariants.js';
 import { viewFor } from './engine/matchView.js';
 import { FORTRESS_SKILL_ID, fortressColdnessChancesLeft } from './engine/skills.js';
 import { InceptionCityGame } from './game.js';
-import { applyMove, type MatchState } from './runner/matchRunner.js';
+import { type MatchState } from './runner/matchRunner.js';
 import type { SetupState } from './setup.js';
 import { beginTurn, FORTRESS_COLDNESS_CHANCES_KEY, movePlayerToLayer } from './stateOps.js';
 import {
@@ -22,6 +22,7 @@ import {
   SHOOT,
   TRANSIT,
   withPlayer,
+  applyMoveSettled,
 } from './testing/runnerHarness.js';
 
 const FORTRESS = c('dm_fortress');
@@ -50,7 +51,7 @@ function step(
   args: unknown[],
   roll = 3,
 ): MatchState<SetupState> {
-  const res = applyMove(game, m, { playerID, move, args }, { random: fixedRandom(roll) });
+  const res = applyMoveSettled(game, m, { playerID, move, args }, { random: fixedRandom(roll) });
   expect(res.ok, `${move} 被拒绝：${res.ok ? '' : res.reason}`).toBe(true);
   if (!res.ok) throw new Error('unreachable');
   expect(checkStateInvariants(res.state.G)).toEqual([]);
@@ -63,7 +64,7 @@ function isRejected(
   move: string,
   args: unknown[],
 ): boolean {
-  return !applyMove(game, m, { playerID, move, args }, { random: fixedRandom(3) }).ok;
+  return !applyMoveSettled(game, m, { playerID, move, args }, { random: fixedRandom(3) }).ok;
 }
 
 /** 梦主移到第 2 层：产生 1 次发动机会 */

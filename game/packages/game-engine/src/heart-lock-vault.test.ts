@@ -9,12 +9,12 @@ import type { SetupState } from './setup.js';
 import { SAGITTARIUS_KILLS_THIS_TURN_KEY } from './engine/death.js';
 import { createTestState, makeLayer, makePlayer, withBribes } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -101,7 +101,7 @@ function scene(
 }
 
 function run(G: SetupState, move: string, args: unknown[] = [], roll = 5, playerID = 'p1') {
-  return applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
 function vaultOf(G: SetupState, layer: number) {
@@ -209,7 +209,7 @@ describe('裁定 R-23 · 技能减心锁算本回合的成功解锁', () => {
     const reduced = run(G, 'useSagittariusHeartLock', [2, -1]);
     expect(reduced.ok).toBe(true);
     if (!reduced.ok) return;
-    const unlock = applyMove(
+    const unlock = applyMoveSettled(
       game,
       reduced.state,
       { playerID: 'p1', move: 'playUnlock', args: [UNLOCK] },
@@ -223,7 +223,7 @@ describe('裁定 R-23 · 技能减心锁算本回合的成功解锁', () => {
     const raised = run(G, 'useSagittariusHeartLock', [2, 1]);
     expect(raised.ok).toBe(true);
     if (!raised.ok) return;
-    const unlock = applyMove(
+    const unlock = applyMoveSettled(
       game,
       raised.state,
       { playerID: 'p1', move: 'playUnlock', args: [UNLOCK] },

@@ -8,7 +8,6 @@ import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { createTestState, makeLayer, makePlayer } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
@@ -19,6 +18,7 @@ import {
   getCharacterFace,
   isCharacterFace,
 } from './engine/abilities/dual-faced.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -86,7 +86,7 @@ function scene(
 }
 
 function run(G: SetupState, playerID: string, move: string, args: unknown[] = [], roll = 5) {
-  return applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
 describe('双面角色工具函数', () => {
@@ -204,7 +204,7 @@ describe('双鱼', () => {
     expect(shot.ok).toBe(true);
     if (!shot.ok) return;
     expect(shot.state.G.pendingShootResponse?.targetPlayerID).toBe('p1');
-    const evade = applyMove(
+    const evade = applyMoveSettled(
       game,
       shot.state,
       { playerID: 'p1', move: 'respondShootEvade', args: [] },

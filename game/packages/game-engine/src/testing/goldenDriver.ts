@@ -640,7 +640,11 @@ export function runGoldenMatch(config: GoldenMatchConfig): GoldenResult {
         const countOf = (hand: readonly string[]): number => hand.filter((c) => c === arg).length;
         // 死亡宣言是展示式使用，牌不离手；被接受就说明展示成立
         const shown = name === 'decreeId' && arg.startsWith('action_death_decree_');
-        if (shown || countOf(handAfter) < countOf(handBefore)) bump(coverage.playedCards, arg);
+        // 出牌后开了掷骰闸门：牌要等掷完结算时才离手
+        const gated = !before.G.pendingDiceRoll && state.G.pendingDiceRoll?.by === req.playerID;
+        if (shown || gated || countOf(handAfter) < countOf(handBefore)) {
+          bump(coverage.playedCards, arg);
+        }
       });
     }
     for (const key of Object.keys(state.G).sort()) {

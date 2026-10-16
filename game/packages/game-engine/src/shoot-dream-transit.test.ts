@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import type { CardID } from '@icgame/shared';
+import { completeDiceGates } from './testing/fixtures.js';
 
 function makePlayer(id: string, hand: string[], layer = 1) {
   return {
@@ -100,17 +101,20 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
 const moves = (InceptionCityGame as any).phases.playing.moves;
 
 function call(G: SetupState, mode: 'shoot' | 'transit', targetOrLayer: string | number, roll = 3) {
-  return moves.playShootDreamTransit.move(
-    {
-      G,
-      ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
-      playerID: '0',
-      random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
-      events: {},
-    },
-    'action_shoot_dream_transit' as CardID,
-    mode,
-    targetOrLayer,
+  return completeDiceGates(
+    moves.playShootDreamTransit.move(
+      {
+        G,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      'action_shoot_dream_transit' as CardID,
+      mode,
+      targetOrLayer,
+    ),
+    { D6: () => roll },
   );
 }
 

@@ -9,12 +9,12 @@ import type { SetupState } from './setup.js';
 import { PLAY_MOVE_CARD_IDS, isCardForPlayMove } from './engine/playCardKinds.js';
 import { createTestState, makePlayer } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -75,7 +75,7 @@ function scene(hand: CardID[], asMaster = false): SetupState {
 
 function attempt(G: SetupState, move: string, args: unknown[], roll = 3) {
   const s = load(G);
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     s,
     { playerID: G.currentPlayerID, move, args },

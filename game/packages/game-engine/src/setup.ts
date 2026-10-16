@@ -3,6 +3,7 @@
 import type { Layer, CardID, Faction } from '@icgame/shared';
 import { ACTION_CARDS } from '@icgame/shared';
 import { CURRENT_SCHEMA_VERSION } from './migrations.js';
+import type { LastDiceRoll, PendingDiceRoll } from './moves/diceGate.js';
 import { seededShuffle } from './prng.js';
 import {
   PLAYER_COUNT_CONFIGS,
@@ -303,6 +304,15 @@ export interface SetupState {
     move: string;
     args: unknown[];
   } | null;
+  /**
+   * 掷骰闸门：规则上由玩家掷的骰子，引擎在掷之前停下，等被点名的人各自发 rollDice 报到；
+   * 全员报到后才用引擎自己的随机源一次掷完，按 resume 续接原来的结算。点数在报到齐之前不存在。
+   * resume 是续接参数，可能含秘密（金星·镜界要弃的手牌），不进视图；其余字段公开。
+   * 结构见 moves/diceGate.ts。
+   */
+  pendingDiceRoll?: PendingDiceRoll | null;
+  /** 最近一次掷完的骰子（公开）：按掷骰人列出原始点数，供界面播放与停留展示 */
+  lastDiceRoll?: LastDiceRoll | null;
   winner: Faction | null;
   winReason: string | null;
   endTurn: number | null;
@@ -533,6 +543,8 @@ export function createInitialState(options: {
     pendingDarwinReturn: null,
     pendingAthenaWit: null,
     pendingSaturnDecree: null,
+    pendingDiceRoll: null,
+    lastDiceRoll: null,
     winner: null,
     winReason: null,
     endTurn: null,

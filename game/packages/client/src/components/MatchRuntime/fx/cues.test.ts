@@ -7,6 +7,31 @@ const ev = (kind: string, data: Record<string, unknown>, secret?: MatchEvent['se
   ({ stateID: 1, index: 0, kind, actor: '1', data, ...(secret ? { secret } : {}) }) as MatchEvent;
 
 describe('cuesFromEvents', () => {
+  it('掷骰：按掷骰人列出点数；点数不是 1-6 的整数、名单为空时跳过', () => {
+    const rolled = (rolls: unknown) =>
+      cuesFromEvents([ev('dice_rolled', { id: 2, purpose: 'shoot', by: '1', target: '2', rolls })]);
+    expect(
+      rolled([
+        { player: '2', dice: [5] },
+        { player: '1', dice: [3] },
+      ]),
+    ).toEqual([
+      {
+        kind: 'dice',
+        purpose: 'shoot',
+        by: '1',
+        target: '2',
+        rolls: [
+          { player: '2', dice: [5] },
+          { player: '1', dice: [3] },
+        ],
+      },
+    ]);
+    expect(rolled([{ player: '2', dice: [7] }])).toEqual([]);
+    expect(rolled([])).toEqual([]);
+    expect(rolled('x')).toEqual([]);
+  });
+
   it('抽牌：别人的只有张数，自己的带牌', () => {
     expect(cuesFromEvents([ev('cards_drawn', { player: '2', count: 2 })])).toEqual([
       { kind: 'draw', player: '2', count: 2, cards: null },

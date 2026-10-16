@@ -31,6 +31,8 @@ export const FIXTURE_SCENARIO_IDS = [
   'thief-pending-levy',
   'thief-pending-darwin',
   'thief-pending-athena',
+  'thief-pending-dice',
+  'thief-pending-dice-wait',
   'master-chess',
   'thief-dead',
   'thief-mate-dead',
@@ -108,6 +110,8 @@ const PENDING_RESPONSE_SCENARIOS = {
   levy: 'thief-pending-levy',
   darwin: 'thief-pending-darwin',
   athena: 'thief-pending-athena',
+  dice: 'thief-pending-dice',
+  'dice-wait': 'thief-pending-dice-wait',
 } as const satisfies Record<string, FixtureScenarioId>;
 
 /** ?skill= 的取值与场景的对应：走查某个角色技能 / 抽牌阶段入口 / 出牌预判的固定局面 */
@@ -152,11 +156,13 @@ export function parseFixturePlayers(raw: string | null): number {
  * 按地址参数选场景：
  *   ?as=master   梦主视角（缺省为盗梦者）
  *   ?pending=1   场景里有一个等待本人应答的【解封】响应窗口（可与 as=master 叠加）
- *   ?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries|aries-plague|levy|darwin|athena
+ *   ?pending=shoot|terrorist|libra-split|libra-pick|sudger|virgo|aries|aries-plague|levy|darwin|athena|dice|dice-wait
  *                盗梦者视角，轮到本人应答对应的待决状态：被 SHOOT 时的双鱼·游离 / 恐怖分子·狂热、
  *                天秤分牌 / 天秤挑一份、意念判官选骰、处女·完美、白羊·星尘（梦魇为回音萦绕；aries-plague 为邪念瘟疫）、
  *                黑洞·吞噬（levy，本人与另一名同层玩家各交 1 张手牌）、达尔文·淘汰（darwin，已抽到 2 张、选 2 张放回）、
- *                雅典娜·急智（athena，同层盗梦者对本人打出 KICK，结算前可从弃牌堆选 1 张）；不与 as=master 叠加
+ *                雅典娜·急智（athena，同层盗梦者对本人打出 KICK，结算前可从弃牌堆选 1 张）、
+ *                掷骰（dice，对方对本人打出 SHOOT，轮到本人掷骰；dice-wait，港口·海啸要全体盗梦者各掷 1 颗，
+ *                本人已掷、等其他人）；不与 as=master 叠加
  *   ?as=master&pending=saturn|saturn-nomatch
  *                梦主视角，本人是土星·领地，一名盗梦者打出 KICK，结算前轮到本人应答【律令】：
  *                saturn 手里有同名的 KICK（可弃牌抵消），saturn-nomatch 手里没有（只能不抵消）；不与其他梦主参数叠加

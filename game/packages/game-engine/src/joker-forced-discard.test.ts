@@ -8,12 +8,12 @@ import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { createTestState } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 const c = (id: string) => id as CardID;
@@ -60,7 +60,7 @@ function jokerScene(): SetupState {
 }
 
 function run(s: MatchState<SetupState>, move: string, args: unknown[] = [], roll = 1) {
-  return applyMove(game, s, { playerID: 'p1', move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, s, { playerID: 'p1', move, args }, { random: fixedRandom(roll) });
 }
 
 /** 发动失控并走到弃牌阶段，返回弃牌阶段的对局 */

@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 17;
+export const CURRENT_SCHEMA_VERSION = 18;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -270,6 +270,16 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
     (state) => ({
       ...state,
       pendingSaturnDecree: state.pendingSaturnDecree ?? null,
+    }),
+  ],
+  // v17 → v18：新增掷骰闸门 pendingDiceRoll 与最近一次掷骰 lastDiceRoll，旧存档补 null。
+  //   旧版本在同一步里掷完骰子，不会留下进行中的闸门，所以只需补字段
+  [
+    18,
+    (state) => ({
+      ...state,
+      pendingDiceRoll: state.pendingDiceRoll ?? null,
+      lastDiceRoll: state.lastDiceRoll ?? null,
     }),
   ],
 ]);

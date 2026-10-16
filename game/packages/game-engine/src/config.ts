@@ -43,6 +43,11 @@ export const RESPONSE_WINDOW_TIMEOUT = 30;
  */
 export const RESPONSE_WINDOW_TIMEOUT_MS = RESPONSE_WINDOW_TIMEOUT * 1000;
 
+/**
+ * 掷骰闸门的时限（毫秒）：从闸门打开起算、被点名的人共用；到时由服务端（本地对局由 Worker）代为掷骰。
+ */
+export const DICE_ROLL_TIMEOUT_MS = 15_000;
+
 // 断线分级（秒）
 export const DISCONNECT_SILENT = 10;
 export const DISCONNECT_OFFLINE = 60;

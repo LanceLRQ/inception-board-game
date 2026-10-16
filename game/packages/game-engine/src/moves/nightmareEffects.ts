@@ -8,6 +8,7 @@ import { dealBribeCard, inPoolBribeIndexes, isOutwardThief } from '../engine/ski
 import type { SetupState } from '../setup.js';
 import { discardCards, movePlayerToLayer, setLayerHeartLock } from '../stateOps.js';
 import type { BGIORandom } from './common.js';
+import { openDiceGate } from './diceGate.js';
 
 // --- 内部 helper：发动梦魇并清理 ---
 // 梦魇效果生效后，该层梦魇离开棋盘、记为已发动并计入已用梦魇；效果非法时整体非法。
@@ -34,6 +35,29 @@ export function activateNightmareOnLayer(
     },
     usedNightmareIds: [...next.usedNightmareIds, nid],
   };
+}
+
+/**
+ * 深空坠落的骰子掷完：每人 5/6 或当前层数 → 迷失层；否则移到结果数字对应层
+ * 按点名顺序一人一颗；掷完时已不在场（进了迷失层）的人不再结算，也不掷。
+ */
+export function settleSpaceFall(
+  G: SetupState,
+  layer: number,
+  rollers: readonly string[],
+  random: BGIORandom,
+): SetupState {
+  let s = G;
+  for (const pid of rollers) {
+    if (!s.players[pid]?.isAlive) continue;
+    const roll = random.D6();
+    if (roll === 5 || roll === 6 || roll === layer) {
+      s = sendToLimbo(s, pid);
+    } else if (roll >= 1 && roll <= 4) {
+      s = movePlayerToLayer(s, pid, roll);
+    }
+  }
+  return s;
 }
 
 /**
@@ -68,21 +92,19 @@ export function applyNightmareEffect(
   }
 
   if (nid === 'nightmare_space_fall') {
-    // 该层所有盗梦者掷 1 骰：5/6 或当前层数 → 迷失层；否则移到结果数字对应层
-    let s = G;
+    // 该层所有盗梦者各掷 1 骰：开掷骰闸门，掷完见 settleSpaceFall；该层没有盗梦者时什么都不发生
     const thieves = [...ls.playersInLayer].filter((pid) => {
-      const p = s.players[pid];
-      return p && isOutwardThief(s, pid) && p.isAlive;
+      const p = G.players[pid];
+      return p && isOutwardThief(G, pid) && p.isAlive;
     });
-    for (const pid of thieves) {
-      const roll = random.D6();
-      if (roll === 5 || roll === 6 || roll === layer) {
-        s = sendToLimbo(s, pid);
-      } else if (roll >= 1 && roll <= 4) {
-        s = movePlayerToLayer(s, pid, roll);
-      }
-    }
-    return s;
+    return (
+      openDiceGate(G, {
+        by: null,
+        target: null,
+        rollers: G.playerOrder.filter((pid) => thieves.includes(pid)),
+        resume: { purpose: 'spaceFall', layer },
+      }) ?? G
+    );
   }
 
   if (nid === 'nightmare_vortex') {

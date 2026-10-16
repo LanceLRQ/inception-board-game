@@ -95,6 +95,7 @@ const PLAYING_MOVE_ARITY: Record<string, number> = {
   respondCancelUnlock: 1,
   respondDarwinReturn: 2,
   respondSaturnDecree: 2,
+  rollDice: 1,
   respondShootEvade: 1,
   respondShootPass: 1,
   respondTerroristAccept: 1,
@@ -163,7 +164,7 @@ describe('对局定义的结构', () => {
     expect(sortedEntries(arityTable(phases.setup!.moves))).toEqual(sortedEntries(SETUP_MOVE_ARITY));
   });
 
-  it('对局阶段的 move 名与参数个数不变（共 90 个）', () => {
+  it('对局阶段的 move 名与参数个数不变（共 91 个）', () => {
     expect(sortedEntries(arityTable(phases.playing!.moves))).toEqual(
       sortedEntries(PLAYING_MOVE_ARITY),
     );

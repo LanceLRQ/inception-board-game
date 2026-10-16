@@ -27,6 +27,10 @@ export function demoEventBatches(G: MatchView, seat: string): EventBatch[] {
     ['cards_drawn', { player: seat, count: 1 }, { to: [seat], data: { cards: ['action_shoot'] } }],
     ['card_played', { player: other, card: 'action_shoot' }],
     [
+      'dice_rolled',
+      { id: 1, purpose: 'shoot', by: other, target: seat, rolls: [{ player: seat, dice: [4] }] },
+    ],
+    [
       'cards_discarded',
       { count: 2, cards: ['action_kick', 'action_unlock'], from: [{ player: other, count: 2 }] },
     ],

@@ -32,6 +32,7 @@ import { matchEndIf } from './endCondition.js';
 import { setupMatch } from './matchSetup.js';
 import { migrateGameState } from './migrations.js';
 import { actionCardMoves } from './moves/actionCards.js';
+import { diceMoves } from './moves/diceMoves.js';
 import { masterMoves } from './moves/master.js';
 import { masterSkillMoves } from './moves/masterSkills.js';
 import { peekMoves } from './moves/peek.js';
@@ -86,6 +87,7 @@ export const InceptionCityGame = {
               ...thiefBoardSkillMoves,
               ...thiefCardSkillMoves,
               ...responseMoves,
+              ...diceMoves,
             }),
           ),
         ),

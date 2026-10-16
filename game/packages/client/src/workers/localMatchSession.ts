@@ -4,7 +4,12 @@
 // 不含 Comlink、定时器与 DOM，Worker 只负责调度与日志。
 // 状态由引擎包的对局运行器驱动；Bot 的决策来自 @icgame/bot。
 
-import { InceptionCityGame, viewMatch, type MatchView } from '@icgame/game-engine';
+import {
+  DICE_ROLL_TIMEOUT_MS,
+  InceptionCityGame,
+  viewMatch,
+  type MatchView,
+} from '@icgame/game-engine';
 import type { EventBatch } from '../match/eventFeed.js';
 import type { SetupState } from '@icgame/game-engine/setup';
 import {
@@ -115,6 +120,8 @@ export class LocalMatchSession {
   private lastAppliedAt: number;
   /** 正在等真人白羊选择：哪一次选择、从什么时候开始等 */
   private ariesWait: { key: string; since: number } | null = null;
+  /** 当前掷骰闸门的编号与开始等真人的时刻 */
+  private diceWait: { id: number; since: number } | null = null;
   /** 最近几步的事件，已按真人座位裁剪（别人的秘密不留在这里） */
   private eventLog: EventBatch[] = [];
 
@@ -192,6 +199,22 @@ export class LocalMatchSession {
     return this.now() - this.ariesWait.since < ARIES_GRACE_MS;
   }
 
+  /**
+   * 掷骰闸门只剩真人没掷：时限内返回 null（先等），到点返回以真人名义代掷的动作。
+   * 时限从开始等真人起算，换了一道闸门重新计时。没有闸门或真人不在名单里时返回 undefined。
+   */
+  private humanDiceTimeout(): AutoAction | null | undefined {
+    const gate = this.state.G.pendingDiceRoll;
+    const human = this.humanPlayerID;
+    if (!gate || !gate.rollers.includes(human) || gate.rolled.includes(human)) {
+      this.diceWait = null;
+      return undefined;
+    }
+    if (this.diceWait?.id !== gate.id) this.diceWait = { id: gate.id, since: this.now() };
+    if (this.now() - this.diceWait.since < DICE_ROLL_TIMEOUT_MS) return null;
+    return { playerID: human, move: 'rollDice', args: [], why: `${human} 超时，代为掷骰` };
+  }
+
   /** 执行一步自动行动 */
   step(): StepResult {
     if (this.waitingForAries()) return { action: null, ok: true, continue: true, waiting: true };
@@ -202,12 +225,23 @@ export class LocalMatchSession {
         ? this.state.ctx.playOrder.filter((id) => id !== this.humanPlayerID)
         : [],
     });
-    if (action === null) return { action: null, ok: true, continue: false };
+    if (action === null) {
+      // 掷骰闸门只等真人：到时限由会话代掷，不受 Bot 的节奏限制
+      const dice = this.humanDiceTimeout();
+      if (dice === undefined) return { action: null, ok: true, continue: false };
+      if (dice === null) return { action: null, ok: true, continue: true, waiting: true };
+      return this.apply(dice);
+    }
     // 节奏：离上一步落地还不到一档，先等（动作留到下次再算，状态可能已被真人改变）
     if (this.now() - this.lastAppliedAt < this.botStepMs) {
       return { action: null, ok: true, continue: true, waiting: true };
     }
 
+    return this.apply(action);
+  }
+
+  /** 落地一个自动动作；同一个动作连续被拒达到上限后不再调度 */
+  private apply(action: AutoAction): StepResult {
     const outcome = applyMove(game, this.state, {
       playerID: action.playerID,
       move: action.move,

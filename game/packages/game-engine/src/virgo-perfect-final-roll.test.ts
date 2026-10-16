@@ -9,12 +9,12 @@ import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import { createTestState, makeLayer, makePlayer } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -96,7 +96,7 @@ function scene(opts: {
 }
 
 function shoot(G: SetupState, shooter: string, ...rolls: number[]) {
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     load(G),
     { playerID: shooter, move: 'playShoot', args: ['p2', SHOOT] },
@@ -127,7 +127,7 @@ describe('处女·完美 · 按最终结算点数判断', () => {
     const initial = shoot(scene({ shooterID: 'p3', shooterCharacter: 'thief_terrorist' }), 'p3', 6);
     // 恐怖分子 SHOOT 先挂起狂热响应窗口，此时还没掷骰
     expect(initial.G.pendingShootResponse?.responseType).toBe('terrorist');
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       initial,
       { playerID: 'p2', move: 'respondTerroristAccept', args: [] },
@@ -141,7 +141,7 @@ describe('处女·完美 · 按最终结算点数判断', () => {
 
   it('恐怖分子·狂热目标弃牌（无罚），6 仍是 6 → 触发', () => {
     const initial = shoot(scene({ shooterID: 'p3', shooterCharacter: 'thief_terrorist' }), 'p3', 6);
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       initial,
       { playerID: 'p2', move: 'respondTerroristDiscard', args: [KICK] },
@@ -173,7 +173,7 @@ describe('处女·完美 · 按最终结算点数判断', () => {
     const G = { ...scene({ shooterID: 'p3', targetCharacter: 'thief_pisces' }), lastShootRoll: 6 };
     const pending = shoot(G, 'p3', 3);
     expect(pending.G.pendingShootResponse?.responseType).toBe('pisces');
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       pending,
       { playerID: 'p2', move: 'respondShootEvade', args: [] },

@@ -11,12 +11,12 @@ import type { SetupState } from './setup.js';
 import { isShootClassCard } from './engine/skills.js';
 import { createTestState, makePlayer } from './testing/fixtures.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -62,6 +62,8 @@ function scene(opts: {
   });
   return {
     ...base,
+    // 牌库留几张：空牌库会在出牌后立即判梦主胜，掷骰闸门来不及掷
+    deck: { ...base.deck, cards: [KICK, KICK, KICK] },
     players: {
       ...base.players,
       p1: makePlayer({
@@ -81,7 +83,7 @@ function scene(opts: {
 }
 
 function play(G: SetupState, move: string, args: unknown[], roll: number) {
-  return applyMove(
+  return applyMoveSettled(
     game,
     load(G),
     { playerID: G.currentPlayerID, move, args },

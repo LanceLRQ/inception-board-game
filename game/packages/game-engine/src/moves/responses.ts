@@ -54,7 +54,7 @@ export const responseMoves = {
   },
 
   respondShootPass: {
-    move: ({ G, ctx, random }: MoveCtx) => {
+    move: ({ G, ctx }: MoveCtx) => {
       if (G.phase !== 'playing') return INVALID_MOVE;
       const pending = G.pendingShootResponse;
       if (!pending) return INVALID_MOVE;
@@ -65,7 +65,7 @@ export const responseMoves = {
       // 重入 applyShootVariant：复用原 SHOOT 参数 + skipPiscesCheck=true
       // Terrorist 检查仍可触发（如 Pisces 同时被 Terrorist SHOOT，pass 后进入 Terrorist 窗）
       const cleared = { ...G, pendingShootResponse: null };
-      return resumeShootAfterResponse(cleared, ctx, random, pending, { skipPiscesCheck: true });
+      return resumeShootAfterResponse(cleared, ctx, pending, { skipPiscesCheck: true });
     },
     client: false,
   },
@@ -76,7 +76,7 @@ export const responseMoves = {
   //   accept 分支：target 拒绝弃牌 → 重入 SHOOT（terroristPenalty=true，骰 -1）
   // 对照：docs/manual/05-dream-thieves.md 恐怖分子 狂热 247 行
   respondTerroristDiscard: {
-    move: ({ G, ctx, random }: MoveCtx, cardId: CardID) => {
+    move: ({ G, ctx }: MoveCtx, cardId: CardID) => {
       if (G.phase !== 'playing') return INVALID_MOVE;
       const pending = G.pendingShootResponse;
       if (!pending) return INVALID_MOVE;
@@ -91,7 +91,7 @@ export const responseMoves = {
       let s = discardCard(G, pending.targetPlayerID, cardId);
       // 2) 清空 pending + 重入 SHOOT（无惩罚）
       s = { ...s, pendingShootResponse: null };
-      return resumeShootAfterResponse(s, ctx, random, pending, {
+      return resumeShootAfterResponse(s, ctx, pending, {
         skipPiscesCheck: true,
         skipTerroristCheck: true,
         terroristPenalty: false,
@@ -101,7 +101,7 @@ export const responseMoves = {
   },
 
   respondTerroristAccept: {
-    move: ({ G, ctx, random }: MoveCtx) => {
+    move: ({ G, ctx }: MoveCtx) => {
       if (G.phase !== 'playing') return INVALID_MOVE;
       const pending = G.pendingShootResponse;
       if (!pending) return INVALID_MOVE;
@@ -110,7 +110,7 @@ export const responseMoves = {
 
       // 清空 pending + 重入 SHOOT（terroristPenalty=true）
       const cleared = { ...G, pendingShootResponse: null };
-      return resumeShootAfterResponse(cleared, ctx, random, pending, {
+      return resumeShootAfterResponse(cleared, ctx, pending, {
         skipPiscesCheck: true,
         skipTerroristCheck: true,
         terroristPenalty: true,

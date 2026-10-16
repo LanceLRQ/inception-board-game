@@ -10,10 +10,19 @@ import { SAGITTARIUS_KILLS_THIS_TURN_KEY } from './engine/death.js';
 import { harborTsunamiTargets, applyHarborTsunami } from './engine/skills.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import type { SetupState } from './setup.js';
-import { applyMove, type RandomSource } from './runner/matchRunner.js';
+import { type RandomSource } from './runner/matchRunner.js';
 import { settleVaultOpened } from './moves/settlement.js';
 import { withBribes } from './testing/fixtures.js';
-import { c, game, KICK, load, scene, UNLOCK, withPlayer } from './testing/runnerHarness.js';
+import {
+  c,
+  game,
+  KICK,
+  load,
+  scene,
+  UNLOCK,
+  withPlayer,
+  applyMoveSettled,
+} from './testing/runnerHarness.js';
 
 const HARBOR = c('dm_harbor');
 const FORTRESS = c('dm_fortress');
@@ -73,7 +82,7 @@ function openVault(G: SetupState, layer: number): SetupState {
 
 /** 打出解封，其余玩家依次放弃响应，直到解封结算 */
 function unlockThroughWindow(G: SetupState, random: RandomSource) {
-  let res = applyMove(
+  let res = applyMoveSettled(
     game,
     load(G),
     { playerID: 'p1', move: 'playUnlock', args: [UNLOCK] },
@@ -85,7 +94,7 @@ function unlockThroughWindow(G: SetupState, random: RandomSource) {
   while (m.G.pendingResponseWindow) {
     const w = m.G.pendingResponseWindow;
     const next = w.responders.find((id) => !w.responded.includes(id))!;
-    res = applyMove(game, m, { playerID: next, move: 'passResponse', args: [] }, { random });
+    res = applyMoveSettled(game, m, { playerID: next, move: 'passResponse', args: [] }, { random });
     if (!res.ok) throw new Error(`passResponse 被拒绝：${res.reason}`);
     m = res.state;
     events.push(...res.events);
@@ -193,9 +202,8 @@ describe('港口·海啸 · 游戏已经结束时不结算', () => {
       deck: { cards: [] as CardID[], discardPile: [] as CardID[] },
     };
     const after = openVault(before, 2);
-    const random = queuedRandom([1, 1, 1, 1]);
-    const settled = settleVaultOpened(before, after, random);
-    expect(random.calls()).toBe(0);
+    const settled = settleVaultOpened(before, after);
+    expect(settled.pendingDiceRoll ?? null).toBeNull();
     expect(aliveOf(settled)).toEqual(['p1', 'p2', 'p3', 'p4']);
   });
 });
@@ -208,7 +216,7 @@ describe('港口·海啸 · 其他能翻开金库的路径', () => {
       skillUsedThisTurn: { [SAGITTARIUS_KILLS_THIS_TURN_KEY]: 1 },
     });
     const random = queuedRandom([6, 1, 6, 6]);
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       load(G),
       { playerID: 'p1', move: 'useSagittariusHeartLock', args: [2, -1] },
@@ -231,7 +239,7 @@ describe('港口·海啸 · 其他能翻开金库的路径', () => {
     };
     // 第一颗是双子自己的骰（5 → 减 2 个心锁），其后四颗是海啸
     const random = queuedRandom([5, 6, 1, 6, 6]);
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       load(G),
       { playerID: 'p1', move: 'playGeminiSync', args: [] },
@@ -254,7 +262,7 @@ describe('港口·海啸 · 与梦主三选一的先后', () => {
     expect(after.players.p1!.isAlive).toBe(false);
     expect(after.pendingVaultDecision).toEqual({ layer: 2, openerID: 'p1' });
     G = { ...after, currentPlayerID: 'pM' };
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       load(G),
       { playerID: 'pM', move: 'masterVaultDecision', args: ['bribe'] },

@@ -15,7 +15,6 @@ import {
   chessAvailable,
   chessDialogOpen,
   unopenedVaultCount,
-  classifyShoot,
   decreeApplicable,
   decreeCardsIn,
   commitPlanFor,
@@ -30,10 +29,8 @@ import {
   handCardMode,
   isShootMove,
   isShootPlay,
-  layersOfPlayers,
   nicknameMap,
   pendingPlayFor,
-  shootToastFor,
   toggleDiscardSelection,
   toggleGravityTargets,
   toggleKeepLastTwo,
@@ -583,56 +580,6 @@ describe('意念判官：打出 SHOOT 类牌改走【定罪】', () => {
     expect(isShootMove(adapted.move)).toBe(true);
     expect(isShootPlay(adapted)).toBe(true);
     expect(decreeApplicable(adapted, ['action_death_decree_a'])).toBe(true);
-  });
-});
-
-describe('SHOOT 结算分级', () => {
-  it('layersOfPlayers 取各玩家所在层', () => {
-    const layers = layersOfPlayers(thiefG.players);
-    expect(Object.keys(layers).sort()).toEqual(Object.keys(thiefG.players).sort());
-    for (const [id, p] of Object.entries(thiefG.players)) expect(layers[id]).toBe(p.currentLayer);
-    expect(layersOfPlayers(undefined)).toEqual({});
-  });
-
-  it('有挂起的位移选择时不提示', () => {
-    expect(classifyShoot({ '1': 2 }, { '1': 1 }, true)).toEqual({ kind: 'pending' });
-    expect(shootToastFor({ kind: 'pending' }, 'SHOOT', (id) => id)).toBeNull();
-  });
-
-  it('所在层变为 0 是击杀', () => {
-    const outcome = classifyShoot({ '1': 2, '2': 3 }, { '1': 0, '2': 3 }, false);
-    expect(outcome).toEqual({ kind: 'kill', playerID: '1', layer: 0 });
-    expect(shootToastFor(outcome, 'SHOOT', (id) => `P${id}`)).toEqual({
-      level: 'error',
-      text: 'SHOOT 击杀 · P1',
-    });
-  });
-
-  it('所在层变化但不是 0 是位移', () => {
-    const outcome = classifyShoot({ '1': 2, '2': 3 }, { '1': 2, '2': 1 }, false);
-    expect(outcome).toEqual({ kind: 'move', playerID: '2', layer: 1 });
-    expect(shootToastFor(outcome, 'SHOOT', (id) => `P${id}`)).toEqual({
-      level: 'info',
-      text: 'SHOOT 命中 · P2 被推至 L1',
-    });
-  });
-
-  it('没有任何人变化是未命中', () => {
-    const outcome = classifyShoot({ '1': 2 }, { '1': 2 }, false);
-    expect(outcome).toEqual({ kind: 'miss' });
-    expect(shootToastFor(outcome, 'SHOOT', (id) => id)).toEqual({
-      level: 'warn',
-      text: 'SHOOT 未命中 · 目标无位移',
-    });
-  });
-
-  it('之前没有记录的玩家不算变化；有变化的取第一个', () => {
-    expect(classifyShoot({}, { '1': 2 }, false)).toEqual({ kind: 'miss' });
-    expect(classifyShoot({ '1': 1, '2': 1 }, { '1': 2, '2': 0 }, false)).toEqual({
-      kind: 'move',
-      playerID: '1',
-      layer: 2,
-    });
   });
 });
 

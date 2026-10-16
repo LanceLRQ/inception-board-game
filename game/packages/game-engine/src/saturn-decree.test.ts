@@ -14,11 +14,18 @@ import type { CardID } from '@icgame/shared';
 import { listAwaiting } from './engine/actionRights.js';
 import { viewFor } from './engine/matchView.js';
 import { checkInvariants } from './invariants.js';
-import { applyMove, eventsFor, type MatchState } from './runner/matchRunner.js';
+import { eventsFor, type MatchState } from './runner/matchRunner.js';
 import type { SetupState } from './setup.js';
 import { SATURN_DECREE_TRIGGER_MOVES } from './engine/saturnDecree.js';
 import { PLAY_MOVE_CARD_IDS } from './engine/playCardKinds.js';
-import { fixedRandom, game, load, scene, withPlayer } from './testing/runnerHarness.js';
+import {
+  fixedRandom,
+  game,
+  load,
+  scene,
+  withPlayer,
+  applyMoveSettled,
+} from './testing/runnerHarness.js';
 
 const c = (id: string) => id as CardID;
 const KICK = c('action_kick');
@@ -68,7 +75,7 @@ function run(
   args: unknown[] = [],
   roll = 3,
 ) {
-  return applyMove(game, state, { playerID, move, args }, { random: fixedRandom(roll) });
+  return applyMoveSettled(game, state, { playerID, move, args }, { random: fixedRandom(roll) });
 }
 
 function mustRun(

@@ -1,4 +1,4 @@
-// 自动行动判定 · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智 / 土星·律令 的待应答状态
+// 自动行动判定 · 黑洞·吞噬 / 达尔文·淘汰 / 雅典娜·急智 / 土星·律令 / 掷骰闸门 的待应答状态
 // 状态在真实对局建出的局面上改写；Bot 座位以应答者本人的名义代答，真人座位等真人，代答的 move 必须被引擎接受。
 
 import { describe, it, expect } from 'vitest';
@@ -212,5 +212,68 @@ describe('自动行动 · 土星·律令', () => {
     const { s, owner, master } = decreeState();
     expect(nextAutoAction(s, { humanPlayerIDs: [master] })).toBeNull();
     expect(nextAutoAction(s, { humanPlayerIDs: [owner] })).toMatchObject({ playerID: master });
+  });
+});
+
+describe('自动行动 · 掷骰闸门', () => {
+  it('本人掷（小丑·赌博）：Bot 以本人的名义掷，掷完抽牌阶段结束', () => {
+    const base = thiefTurn('auto-dice-joker');
+    const owner = base.ctx.currentPlayer;
+    const s = must(patchPlayers(base, { [owner]: { characterId: 'thief_joker' as never } }), {
+      playerID: owner,
+      move: 'playJokerGamble',
+      args: [],
+    });
+    expect(s.G.pendingDiceRoll?.rollers).toEqual([owner]);
+    const action = nextAutoAction(s, NO_HUMAN)!;
+    expect(action).toMatchObject({ playerID: owner, move: 'rollDice', args: [] });
+    const after = must(s, action);
+    expect(after.G.pendingDiceRoll ?? null).toBeNull();
+    expect(after.G.turnPhase).toBe('action');
+  });
+
+  function spaceFallGate(): { s: State; thieves: string[] } {
+    const base = thiefTurn('auto-dice-fall');
+    const thieves = base.G.playerOrder.filter((id) => id !== base.G.dreamMasterID);
+    const s: State = {
+      ...base,
+      G: {
+        ...base.G,
+        pendingDiceRoll: {
+          id: 1,
+          purpose: 'spaceFall',
+          by: null,
+          target: null,
+          rollers: thieves,
+          rolled: [],
+          resume: { purpose: 'spaceFall', layer: 1 },
+        },
+      },
+    };
+    return { s, thieves };
+  }
+
+  it('多人掷：先替 Bot 掷，只剩真人时等待；真人不会被代掷', () => {
+    const { s, thieves } = spaceFallGate();
+    const human = thieves[1]!;
+    const opts = { humanPlayerIDs: [human] };
+    let cursor = s;
+    for (let i = 0; i < thieves.length - 1; i++) {
+      const action = nextAutoAction(cursor, opts)!;
+      expect(action.playerID).not.toBe(human);
+      expect(action.move).toBe('rollDice');
+      cursor = must(cursor, action);
+    }
+    expect(cursor.G.pendingDiceRoll!.rolled).not.toContain(human);
+    expect(nextAutoAction(cursor, opts)).toBeNull();
+  });
+
+  it('超时代掷（全员视为自动）：真人也被代掷，掷齐后闸门结算', () => {
+    const { s, thieves } = spaceFallGate();
+    let cursor = s;
+    for (let i = 0; i < thieves.length; i++)
+      cursor = must(cursor, nextAutoAction(cursor, NO_HUMAN)!);
+    expect(cursor.G.pendingDiceRoll ?? null).toBeNull();
+    expect(cursor.G.lastDiceRoll?.purpose).toBe('spaceFall');
   });
 });

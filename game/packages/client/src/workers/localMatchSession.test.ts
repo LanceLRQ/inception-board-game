@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { AutoAction } from '@icgame/bot';
 import { sendToLimbo } from '@icgame/game-engine';
-import { HAND_LIMIT } from '@icgame/game-engine/config';
+import { DICE_ROLL_TIMEOUT_MS, HAND_LIMIT } from '@icgame/game-engine/config';
 import {
   ARIES_GRACE_MS,
   EVENT_LOG_LIMIT,
@@ -42,12 +42,20 @@ function makeSession(playerCount = 5, seed = 'sess', botPlaysCards = false): Loc
   return new LocalMatchSession({ playerCount, seed, botPlaysCards });
 }
 
-/** 一直 step，直到不再继续调度；返回被拒的步数 */
+/** 掷骰闸门在等真人：模拟及时点击的真人，立刻掷 */
+function rollIfAwaited(session: LocalMatchSession): boolean {
+  const gate = session.view().G.pendingDiceRoll;
+  if (!gate || !gate.rollers.includes(HUMAN) || gate.rolled.includes(HUMAN)) return false;
+  return session.humanMove('rollDice', []).ok;
+}
+
+/** 一直 step，直到不再继续调度；途中轮到真人掷骰就替真人掷；返回被拒的步数 */
 function runUntilIdle(session: LocalMatchSession): number {
   let rejected = 0;
   for (let i = 0; i < MAX_STEPS; i++) {
     const r = session.step();
     if (!r.ok) rejected++;
+    if (r.waiting && rollIfAwaited(session)) continue;
     if (!r.continue) return rejected;
   }
   throw new Error('自动循环没有停下');
@@ -522,6 +530,57 @@ describe('LocalMatchSession · 真人白羊的宽限期', () => {
   });
 });
 
+describe('LocalMatchSession · 掷骰闸门的时限', () => {
+  const gate = (rollers: string[], id = 1) => ({
+    pendingDiceRoll: {
+      id,
+      purpose: 'geminiSync' as const,
+      by: null,
+      target: null,
+      rollers,
+      rolled: [],
+      resume: { purpose: 'geminiSync' as const, playerID: rollers[0]! },
+    },
+  });
+
+  it('只剩真人没掷：时限内先等，到点后以真人的名义代掷', () => {
+    let clock = 1_000;
+    const session = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'dice-grace',
+      botPlaysCards: false,
+      now: () => clock,
+    });
+    intoBotTurn(session);
+    patchState(session, gate([HUMAN]));
+    expect(session.step()).toMatchObject({ action: null, continue: true, waiting: true });
+    clock += DICE_ROLL_TIMEOUT_MS - 1;
+    expect(session.step().waiting).toBe(true);
+    clock += 1;
+    const rolled = session.step();
+    expect(rolled.action).toMatchObject({ playerID: HUMAN, move: 'rollDice' });
+    expect(session.snapshot().G.pendingDiceRoll).toBeNull();
+  });
+
+  it('换了一道闸门就重新计时', () => {
+    let clock = 1_000;
+    const session = new LocalMatchSession({
+      playerCount: 5,
+      seed: 'dice-grace-2',
+      botPlaysCards: false,
+      now: () => clock,
+    });
+    intoBotTurn(session);
+    patchState(session, gate([HUMAN]));
+    session.step();
+    clock += DICE_ROLL_TIMEOUT_MS - 1;
+    patchState(session, gate([HUMAN], 2));
+    expect(session.step().waiting).toBe(true);
+    clock += 1;
+    expect(session.step().waiting).toBe(true);
+  });
+});
+
 describe('LocalMatchSession · Bot 的节奏', () => {
   it('Bot 的每一步至少与上一步落地相隔 botStepMs；没到点时只等不动', () => {
     let clock = 10_000;
@@ -729,6 +788,7 @@ describe('LocalMatchSession · Bot 出牌', () => {
 
   /** 真人对自己面前的待应答事项给一个最简答复；没有待应答返回 false */
   function answerPending(session: LocalMatchSession): boolean {
+    if (rollIfAwaited(session)) return true;
     const G = session.view().G;
     const w = G.pendingResponseWindow;
     if (w && w.responders.includes(HUMAN) && !w.responded.includes(HUMAN)) {
@@ -796,6 +856,7 @@ describe('LocalMatchSession · Bot 出牌', () => {
     for (let i = 0; i < MAX_STEPS && session.view().ctx.gameover === undefined; i++) {
       const r = session.step();
       if (!r.ok) rejected++;
+      if (r.waiting && rollIfAwaited(session)) continue;
       if (r.continue) continue;
       if (answerPending(session)) {
         humanPassed++;

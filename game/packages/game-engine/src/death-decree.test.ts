@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { InceptionCityGame } from './game.js';
 import type { SetupState } from './setup.js';
 import type { CardID } from '@icgame/shared';
+import { completeDiceGates } from './testing/fixtures.js';
 
 function makePlayer(id: string, hand: string[]) {
   return {
@@ -99,32 +100,38 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
 const moves = (InceptionCityGame as any).phases.playing.moves;
 
 function shoot(G: SetupState, roll: number, decreeId?: string) {
-  return moves.playShoot.move(
-    {
-      G,
-      ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
-      playerID: '0',
-      random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
-      events: {},
-    },
-    '1',
-    'action_shoot' as CardID,
-    decreeId as CardID | undefined,
+  return completeDiceGates(
+    moves.playShoot.move(
+      {
+        G,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      '1',
+      'action_shoot' as CardID,
+      decreeId as CardID | undefined,
+    ),
+    { D6: () => roll },
   );
 }
 
 function shootKing(G: SetupState, roll: number, decreeId?: string) {
-  return moves.playShootKing.move(
-    {
-      G,
-      ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
-      playerID: '0',
-      random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
-      events: {},
-    },
-    '1',
-    'action_shoot_assassin' as CardID,
-    decreeId as CardID | undefined,
+  return completeDiceGates(
+    moves.playShootKing.move(
+      {
+        G,
+        ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
+        playerID: '0',
+        random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
+        events: {},
+      },
+      '1',
+      'action_shoot_assassin' as CardID,
+      decreeId as CardID | undefined,
+    ),
+    { D6: () => roll },
   );
 }
 

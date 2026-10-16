@@ -178,6 +178,35 @@ describe('MatchRoom 排程', () => {
     expect(h.room.deadlineAt()).toBe(h.timers.now() + 7_777);
   });
 
+  it('掷骰闸门的时限从闸门打开起算、名单里的人共用：有人先掷不会把截止往后推', async () => {
+    const base = stateAfterSetup(5);
+    const thieves = base.G.playerOrder.filter((id) => id !== base.G.dreamMasterID);
+    const [a, b] = thieves as [string, string];
+    const initial = {
+      ...base,
+      G: {
+        ...base.G,
+        pendingDiceRoll: {
+          id: 1,
+          purpose: 'spaceFall',
+          by: null,
+          target: null,
+          rollers: [a, b],
+          rolled: [],
+          resume: { purpose: 'spaceFall', layer: 1 },
+        },
+      },
+    } as unknown as MatchState<SetupState>;
+    const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, initial);
+    h.room.start();
+    const openedAt = h.timers.now();
+    expect(h.room.deadlineAt()).toBe(openedAt + 15_000);
+    h.timers.t += 9_000;
+    const r = await h.room.submit(a, { move: 'rollDice', args: [], intentId: 'roll-a' });
+    expect(r.ok).toBe(true);
+    expect(h.room.deadlineAt()).toBe(openedAt + 15_000);
+  });
+
   it('onStep 收到的 deadlineAt 是这一步之后的截止时间', async () => {
     const initial = stateAfterSetup(5);
     const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, initial);

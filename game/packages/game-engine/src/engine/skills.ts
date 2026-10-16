@@ -3046,6 +3046,13 @@ function isMirrorableCard(cardId: CardID): boolean {
   return isShootClassCard(cardId) || cardId === MIRRORABLE_KICK;
 }
 
+/** 金星·镜界此刻复制的是不是 SHOOT（复制本回合最后一张可复制的牌；复制 SHOOT 才要掷骰） */
+export function venusMirrorCopiesShoot(state: SetupState): boolean {
+  const mirrorable = (state.playedCardsThisTurn ?? []).filter((c) => isMirrorableCard(c));
+  const last = mirrorable[mirrorable.length - 1];
+  return last !== undefined && last !== MIRRORABLE_KICK;
+}
+
 export function applyVenusMirrorWorld(
   state: SetupState,
   selfID: string,

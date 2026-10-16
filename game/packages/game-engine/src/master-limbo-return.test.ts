@@ -12,12 +12,12 @@ import { fortressColdnessChancesLeft } from './engine/skills.js';
 import { movePlayerToLayer } from './stateOps.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import {
-  applyMove,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 const c = (id: string) => id as CardID;
@@ -89,7 +89,7 @@ function step(
   args: unknown[] = [],
   roll = 1,
 ) {
-  const res = applyMove(game, s, { playerID, move, args }, { random: fixedRandom(roll) });
+  const res = applyMoveSettled(game, s, { playerID, move, args }, { random: fixedRandom(roll) });
   expect(res.ok).toBe(true);
   if (!res.ok) throw new Error(`${move} 被拒绝`);
   return res.state;

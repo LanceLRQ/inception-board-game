@@ -6,6 +6,7 @@ import { InceptionCityGame } from './game.js';
 import { createInitialState } from './setup.js';
 import type { SetupState } from './setup.js';
 import type { CardID } from '@icgame/shared';
+import { completeDiceGates } from './testing/fixtures.js';
 
 function makePlayer(id: string, hand: string[], layer = 1, faction: 'thief' | 'master' = 'thief') {
   return {
@@ -113,20 +114,23 @@ function callWith(
   random: Record<string, unknown>,
   ...args: unknown[]
 ) {
-  return moves[name].move(
-    {
-      G,
-      ctx: {
-        numPlayers: 3,
-        currentPlayer: G.currentPlayerID,
-        playOrder: G.playerOrder,
-        playOrderPos: 0,
+  return completeDiceGates(
+    moves[name].move(
+      {
+        G,
+        ctx: {
+          numPlayers: 3,
+          currentPlayer: G.currentPlayerID,
+          playOrder: G.playerOrder,
+          playOrderPos: 0,
+        },
+        playerID: G.currentPlayerID,
+        random,
+        events: {},
       },
-      playerID: G.currentPlayerID,
-      random,
-      events: {},
-    },
-    ...args,
+      ...args,
+    ),
+    random as { D6: () => number },
   );
 }
 

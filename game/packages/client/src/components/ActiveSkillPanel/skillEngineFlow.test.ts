@@ -161,9 +161,19 @@ function entryOf(state: S, seat: string, skill: ActiveSkillDescriptor) {
   return getSkillEntries(contextOf(state, seat)).find((e) => e.skill === skill);
 }
 
+/** 发一个 move；开了掷骰闸门就按点名顺序让每个人掷完，返回结算后的状态。被拒返回 null */
 function apply(state: S, seat: string, move: string, args: unknown[]): S | null {
   const res = applyMove(game, state, { playerID: seat, move, args });
-  return res.ok ? res.state : null;
+  if (!res.ok) return null;
+  let next = res.state;
+  while (next.G.pendingDiceRoll) {
+    const gate = next.G.pendingDiceRoll;
+    const roller = gate.rollers.find((id) => !gate.rolled.includes(id))!;
+    const rolled = applyMove(game, next, { playerID: roller, move: 'rollDice', args: [] });
+    if (!rolled.ok) return null;
+    next = rolled.state;
+  }
+  return next;
 }
 
 // ---------------------------------------------------------------------------

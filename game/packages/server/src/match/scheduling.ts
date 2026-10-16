@@ -4,7 +4,11 @@
 
 import type { SetupState } from '@icgame/game-engine/setup';
 import type { MatchState } from '@icgame/game-engine/runner';
-import { RESPONSE_WINDOW_TIMEOUT_MS, listAwaiting } from '@icgame/game-engine';
+import {
+  DICE_ROLL_TIMEOUT_MS,
+  RESPONSE_WINDOW_TIMEOUT_MS,
+  listAwaiting,
+} from '@icgame/game-engine';
 import { nextAutoAction, type AutoAction } from '@icgame/bot';
 
 export interface TimingConfig {
@@ -37,11 +41,20 @@ function hasBlockingPending(G: SetupState): boolean {
 
 /**
  * 截止时长：响应窗口用窗口自己的，土星·律令的应答窗口用与解封响应窗口同一档（受同一个上限约束；
- * 土星局里每张牌都要等一次，不能用 45 秒的待结算时限），其次待结算事项，否则回合主人的正常行动
+ * 土星局里每张牌都要等一次，不能用 45 秒的待结算时限）；掷骰闸门单独一档，从闸门打开起算、
+ * 被点名的人共用（diceElapsedMs 是闸门已经开了多久）；其次待结算事项，否则回合主人的正常行动
  */
-function deadlineMs(state: MatchState<SetupState>, timing: TimingConfig): number {
+function deadlineMs(
+  state: MatchState<SetupState>,
+  timing: TimingConfig,
+  diceElapsedMs: number,
+): number {
   const window = state.G.pendingResponseWindow;
   if (window) return Math.min(window.timeoutMs, timing.responseTimeoutCapMs ?? Infinity);
+  if (state.G.pendingDiceRoll) {
+    const limit = Math.min(DICE_ROLL_TIMEOUT_MS, timing.responseTimeoutCapMs ?? Infinity);
+    return Math.max(0, limit - diceElapsedMs);
+  }
   if (state.G.pendingSaturnDecree) {
     return Math.min(RESPONSE_WINDOW_TIMEOUT_MS, timing.responseTimeoutCapMs ?? Infinity);
   }
@@ -52,12 +65,14 @@ function deadlineMs(state: MatchState<SetupState>, timing: TimingConfig): number
 /**
  * policySeats：按 Bot 策略在出牌阶段打行动牌的座位，只应是真正的 Bot 座位。
  * 托管中的真人座位不列入（它们只是代为推进，不替真人出牌）；缺省不列任何座位。
+ * diceElapsedMs：当前掷骰闸门已经开了多久（没有闸门时不用）。
  */
 export function planNext(
   state: MatchState<SetupState>,
   humanSeats: readonly string[],
   timing: TimingConfig,
   policySeats: readonly string[] = [],
+  diceElapsedMs = 0,
 ): NextSchedule {
   if (state.ctx.gameover !== undefined) return { kind: 'none' };
   const action = nextAutoAction(state, {
@@ -65,7 +80,7 @@ export function planNext(
     policySeatIDs: policySeats,
   });
   if (action !== null) return { kind: 'auto', action, delayMs: timing.botStepDelayMs };
-  return { kind: 'deadline', delayMs: deadlineMs(state, timing) };
+  return { kind: 'deadline', delayMs: deadlineMs(state, timing, diceElapsedMs) };
 }
 
 /** 截止时间到了：以所有座位都自动为前提取一步，只推进流程、不替任何座位打行动牌；取不到返回 null */

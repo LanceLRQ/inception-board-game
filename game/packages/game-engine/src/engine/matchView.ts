@@ -26,6 +26,7 @@ import type { ResponseWindowState } from './abilities/response-chain.js';
 import type { ResponseWindowSourceType } from './abilities/types.js';
 import { getDiscardRequired, getEffectiveMaxUnlockPerTurn } from './limits.js';
 import type { MatchOutcome } from './outcome.js';
+import type { DicePurpose, LastDiceRoll } from '../moves/diceGate.js';
 
 /** 观察者：对局里的玩家，或旁观者（null） */
 export type Viewer = string | null;
@@ -254,6 +255,19 @@ export interface PendingSaturnDecreeView {
   cardId: CardID;
 }
 
+/**
+ * 掷骰闸门：谁发起、针对谁、点名了谁、谁已经掷过都公开；续接参数（可能含要弃的手牌）不进视图。
+ * 点数在全员掷完之前不存在，掷完后见 lastDiceRoll。
+ */
+export interface PendingDiceRollView {
+  id: number;
+  purpose: DicePurpose;
+  by: string | null;
+  target: string | null;
+  rollers: string[];
+  rolled: string[];
+}
+
 /** 某个观察者能看到的对局状态。字段是白名单：这里没有的，观察者就看不到 */
 export interface MatchView {
   /** 对局是否已结束（此时 null 只表示「本来就没有」，不再表示「看不到」） */
@@ -313,6 +327,8 @@ export interface MatchView {
   pendingDarwinReturn: PendingDarwinReturnView | null;
   pendingAthenaWit: PendingAthenaWitView | null;
   pendingSaturnDecree: PendingSaturnDecreeView | null;
+  pendingDiceRoll: PendingDiceRollView | null;
+  lastDiceRoll: LastDiceRoll | null;
 
   winner: Faction | null;
   winReason: string | null;
@@ -376,6 +392,8 @@ export const FIELD_DISPOSITION: Record<keyof SetupState, Disposition> = {
   pendingDarwinReturn: 'public',
   pendingAthenaWit: 'conditional',
   pendingSaturnDecree: 'public',
+  pendingDiceRoll: 'public',
+  lastDiceRoll: 'public',
   winner: 'public',
   winReason: 'public',
   endTurn: 'public',
@@ -782,6 +800,22 @@ export function viewFor(G: SetupState, viewer: Viewer, options: MatchViewOptions
           masterID: G.pendingSaturnDecree.masterID,
           userID: G.pendingSaturnDecree.userID,
           cardId: G.pendingSaturnDecree.cardId,
+        }
+      : null,
+    pendingDiceRoll: G.pendingDiceRoll
+      ? {
+          id: G.pendingDiceRoll.id,
+          purpose: G.pendingDiceRoll.purpose,
+          by: G.pendingDiceRoll.by,
+          target: G.pendingDiceRoll.target,
+          rollers: G.pendingDiceRoll.rollers.slice(),
+          rolled: G.pendingDiceRoll.rolled.slice(),
+        }
+      : null,
+    lastDiceRoll: G.lastDiceRoll
+      ? {
+          ...G.lastDiceRoll,
+          rolls: G.lastDiceRoll.rolls.map((r) => ({ player: r.player, dice: r.dice.slice() })),
         }
       : null,
 

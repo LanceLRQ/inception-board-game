@@ -12,7 +12,7 @@ import { applyShootByCard } from './shootResolution.js';
 export const shootMoves = {
   playShoot: {
     move: (
-      { G, ctx, random }: MoveCtx,
+      { G, ctx }: MoveCtx,
       targetPlayerID: string,
       cardId: CardID,
       decreeId?: CardID,
@@ -23,7 +23,7 @@ export const shootMoves = {
       // 射手·禁足：仅射手角色可阻止移动
       const shooter = G.players[ctx.currentPlayer];
       const canPrevent = preventMove && shooter?.characterId === 'thief_sagittarius';
-      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, {
+      return applyShootByCard(G, ctx, targetPlayerID, cardId, {
         decreeId,
         preventMove: canPrevent,
       });
@@ -37,7 +37,7 @@ export const shootMoves = {
   // mode='transit' → 自己移动到相邻层（同 playDreamTransit）
   playShootDreamTransit: {
     move: (
-      { G, ctx, random }: MoveCtx,
+      { G, ctx }: MoveCtx,
       cardId: CardID,
       mode: 'shoot' | 'transit',
       targetOrLayer: string | number,
@@ -52,7 +52,7 @@ export const shootMoves = {
       if (mode === 'shoot') {
         // 目标为玩家 ID
         if (typeof targetOrLayer !== 'string') return INVALID_MOVE;
-        return applyShootByCard(G, ctx, random, targetOrLayer, cardId, { decreeId });
+        return applyShootByCard(G, ctx, targetOrLayer, cardId, { decreeId });
       } else if (mode === 'transit') {
         // 自己移动到相邻层
         if (typeof targetOrLayer !== 'number') return INVALID_MOVE;
@@ -69,45 +69,30 @@ export const shootMoves = {
   // SHOOT·刺客之王：目标任意层；[1/2] 死亡 [3/4/5] 移动相邻层
   // 对照：docs/manual/04-action-cards.md SHOOT·刺客之王
   playShootKing: {
-    move: (
-      { G, ctx, random }: MoveCtx,
-      targetPlayerID: string,
-      cardId: CardID,
-      decreeId?: CardID,
-    ) => {
+    move: ({ G, ctx }: MoveCtx, targetPlayerID: string, cardId: CardID, decreeId?: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playShootKing', cardId)) return INVALID_MOVE;
-      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, { decreeId });
+      return applyShootByCard(G, ctx, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },
 
   // SHOOT·爆甲螺旋：同层；[1/2] 死 [3/4/5] 弃 target 所有解封 + 移动
   playShootArmor: {
-    move: (
-      { G, ctx, random }: MoveCtx,
-      targetPlayerID: string,
-      cardId: CardID,
-      decreeId?: CardID,
-    ) => {
+    move: ({ G, ctx }: MoveCtx, targetPlayerID: string, cardId: CardID, decreeId?: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playShootArmor', cardId)) return INVALID_MOVE;
-      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, { decreeId });
+      return applyShootByCard(G, ctx, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },
 
   // SHOOT·炸裂弹头：同层；[1/2] 死 [3/4/5] 弃 target 所有 SHOOT 类 + 移动
   playShootBurst: {
-    move: (
-      { G, ctx, random }: MoveCtx,
-      targetPlayerID: string,
-      cardId: CardID,
-      decreeId?: CardID,
-    ) => {
+    move: ({ G, ctx }: MoveCtx, targetPlayerID: string, cardId: CardID, decreeId?: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       if (!isCardForPlayMove('playShootBurst', cardId)) return INVALID_MOVE;
-      return applyShootByCard(G, ctx, random, targetPlayerID, cardId, { decreeId });
+      return applyShootByCard(G, ctx, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },

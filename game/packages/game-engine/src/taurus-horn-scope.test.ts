@@ -6,9 +6,17 @@
 import { describe, it, expect } from 'vitest';
 import type { CardID } from '@icgame/shared';
 import type { SetupState } from './setup.js';
-import { applyMove, type RandomSource } from './runner/matchRunner.js';
+import { type RandomSource } from './runner/matchRunner.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
-import { c, game, KICK, load, scene, withPlayer } from './testing/runnerHarness.js';
+import {
+  c,
+  game,
+  KICK,
+  load,
+  scene,
+  withPlayer,
+  applyMoveSettled,
+} from './testing/runnerHarness.js';
 
 /** 按顺序给出骰值：第 1 颗是目标的掷骰，第 2 颗是号角的掷骰 */
 function sequenceRandom(rolls: number[]): RandomSource {
@@ -36,7 +44,7 @@ function taurusScene(hand: CardID[], extra: Partial<SetupState> = {}): SetupStat
 }
 
 function run(G: SetupState, move: string, args: unknown[], rolls: number[]) {
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     load(G),
     { playerID: 'p1', move, args },

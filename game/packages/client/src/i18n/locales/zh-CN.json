@@ -1063,6 +1063,29 @@
   "die": {
     "combat": "战斗骰 {{n}}"
   },
+  "diceGate": {
+    "purpose": {
+      "shoot": "SHOOT 掷骰",
+      "sudger": "定罪：掷 2 颗骰",
+      "imperial": "皇城：视为 SHOOT",
+      "venusMirror": "镜界：复制 SHOOT",
+      "pluto": "地狱：按骰子抽牌",
+      "joker": "赌博：按骰子抽牌",
+      "geminiChoice": "抉择：掷 2 颗骰抽牌",
+      "geminiSync": "协同：掷骰减心锁",
+      "martyr": "牺牲：掷骰改心锁",
+      "spaceFall": "深空坠落：该层盗梦者各掷 1 颗",
+      "tsunami": "海啸：存活的盗梦者各掷 1 颗"
+    },
+    "versus": "{{by}} → {{target}}",
+    "by": "{{by}} 发起",
+    "roll": "掷骰",
+    "rolled": "已掷",
+    "waiting": "正在等待其他玩家 {{done}}/{{total}}",
+    "waitingOne": "等待 {{name}} 掷骰",
+    "auto": "{{n}} 秒后自动掷骰",
+    "aria": "掷骰"
+  },
   "cardArt": {
     "category": {
       "thief": "盗梦者",
@@ -1162,6 +1185,9 @@
     "revived": "{{name}} 复活，回到第 {{layer}} 层",
     "lock": "第 {{layer}} 层心锁 {{from}} → {{to}}",
     "vault": "第 {{layer}} 层金库打开：{{content}}",
-    "lost": "迷失"
+    "lost": "迷失",
+    "dice": "{{name}} 掷出 {{dice}}",
+    "diceMany": "掷骰：{{list}}",
+    "diceJoin": "、"
   }
 }

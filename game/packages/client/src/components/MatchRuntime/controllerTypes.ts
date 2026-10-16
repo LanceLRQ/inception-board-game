@@ -410,10 +410,6 @@ export interface MatchController {
   readonly masterMove: MasterMoveModel;
   readonly tour: TourModel;
   readonly response: ResponseModel;
-  readonly shootDice: {
-    readonly roll: number | null;
-    readonly onComplete: () => void;
-  };
 
   readonly chat: ChatModel;
   readonly report: ReportModel | null;

@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CardID } from '@icgame/shared';
 import type { SetupState } from './setup.js';
-import { applyMove } from './runner/matchRunner.js';
+
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import {
   c,
@@ -16,6 +16,7 @@ import {
   load,
   scene,
   withPlayer,
+  applyMoveSettled,
 } from './testing/runnerHarness.js';
 
 function plutoScene(p1Hand: CardID[], master = 'dm_pluto_hell'): SetupState {
@@ -33,7 +34,7 @@ function plutoScene(p1Hand: CardID[], master = 'dm_pluto_hell'): SetupState {
 }
 
 function step(G: SetupState, move: string, args: unknown[] = [], roll = 2) {
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     load(G),
     { playerID: 'p1', move, args },

@@ -151,6 +151,23 @@ describe('awaitingNotice', () => {
     expect(awaitingNotice(view, null)).toEqual({ mine: false });
   });
 
+  it('掷骰闸门：点名还没掷的人轮到本人（操作界面是骰子弹层），已掷的与名单外的人在等', () => {
+    const view = viewWith({
+      pendingDiceRoll: {
+        id: 1,
+        purpose: 'spaceFall',
+        by: null,
+        target: null,
+        rollers: ['1', '2', '3'],
+        rolled: ['2'],
+      },
+    } as Partial<MatchView>);
+    expect(awaitingNotice(view, '1')).toEqual({ mine: true, hasOwnUi: true });
+    expect(awaitingNotice(view, '2')).toEqual({ mine: false });
+    expect(awaitingNotice(view, '0')).toEqual({ mine: false });
+    expect(awaitingNotice(view, null)).toEqual({ mine: false });
+  });
+
   it('达尔文·淘汰：轮到达尔文本人', () => {
     const view = viewWith({ pendingDarwinReturn: { playerID: '4' } } as Partial<MatchView>);
     expect(awaitingNotice(view, '4')).toEqual({ mine: true });
@@ -199,6 +216,21 @@ describe('awaitedSeatIDs', () => {
     } as Partial<MatchView>);
     expect(awaitedSeatIDs(view, '9')).toEqual(['1', '2']);
     expect(awaitedSeatIDs(view, '2')).toEqual(['1', '2']);
+  });
+
+  it('掷骰闸门：点名还没掷的人都在应答，已掷的不列', () => {
+    const view = viewWith({
+      pendingDiceRoll: {
+        id: 1,
+        purpose: 'spaceFall',
+        by: null,
+        target: null,
+        rollers: ['1', '2', '3'],
+        rolled: ['2'],
+      },
+    } as Partial<MatchView>);
+    expect(awaitedSeatIDs(view, '0')).toEqual(['1', '3']);
+    expect(awaitedSeatIDs(view, '3')).toEqual(['1', '3']);
   });
 
   it('对本人不可见的点名（雅典娜）不列', () => {

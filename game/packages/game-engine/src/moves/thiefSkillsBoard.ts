@@ -21,7 +21,9 @@ import {
   markSkillUsed,
 } from '../engine/skills.js';
 import { discardCard, incrementMoveCounter, setTurnPhase } from '../stateOps.js';
+import type { SetupState } from '../setup.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
+import { openDiceGate } from './diceGate.js';
 import { settleVaultOpened } from './settlement.js';
 
 export const thiefBoardSkillMoves = {
@@ -40,7 +42,7 @@ export const thiefBoardSkillMoves = {
   // 射手·穿心：本回合击杀过玩家时，修改任意一层心锁 ±1（回合限 1 次）
   // 对照：docs/manual/05-dream-thieves.md 射手
   useSagittariusHeartLock: {
-    move: ({ G, ctx, random }: MoveCtx, layer: number, delta: -1 | 1) => {
+    move: ({ G, ctx }: MoveCtx, layer: number, delta: -1 | 1) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const self = G.players[ctx.currentPlayer];
       if (!self || !self.isAlive) return INVALID_MOVE;
@@ -52,7 +54,7 @@ export const thiefBoardSkillMoves = {
       const cap = heartLocksTuple?.[layer - 1] ?? 3;
       const result = applySagittariusHeartLock(G, ctx.currentPlayer, layer, delta, cap);
       if (result === null) return INVALID_MOVE;
-      const settled = settleVaultOpened(G, result, random);
+      const settled = settleVaultOpened(G, result);
       return markSkillUsed(settled, ctx.currentPlayer, SAGITTARIUS_HEART_LOCK_SKILL_ID);
     },
     client: false,
@@ -61,13 +63,17 @@ export const thiefBoardSkillMoves = {
   // 双子·协同：弃牌阶段，梦主在更大层时掷骰 → 3 → 当层 -2 心锁 → 翻面
   // 对照：docs/manual/05-dream-thieves.md 双子
   playGeminiSync: {
-    move: ({ G, ctx, random }: MoveCtx) => {
+    move: ({ G, ctx }: MoveCtx) => {
       if (ctx.currentPlayer !== G.currentPlayerID) return INVALID_MOVE;
       if (G.turnPhase !== 'discard') return INVALID_MOVE;
-      const roll = random.D6();
-      const next = applyGeminiSync(G, ctx.currentPlayer, roll);
-      if (next === null) return INVALID_MOVE;
-      return settleVaultOpened(G, next, random);
+      // 能否发动与点数无关：先按任意点数试一次，能发动才开闸门，掷完见 settleGeminiSync
+      if (applyGeminiSync(G, ctx.currentPlayer, 1) === null) return INVALID_MOVE;
+      return openDiceGate(G, {
+        by: ctx.currentPlayer,
+        target: null,
+        rollers: [ctx.currentPlayer],
+        resume: { purpose: 'geminiSync', playerID: ctx.currentPlayer },
+      })!;
     },
     client: false,
   },
@@ -190,7 +196,7 @@ export const thiefBoardSkillMoves = {
   // 殉道者·牺牲：略过出牌阶段，掷骰 → 改变心锁 ±2 + 自杀
   // 对照：docs/manual/05-dream-thieves.md 殉道者
   playMartyrSacrifice: {
-    move: ({ G, ctx, random }: MoveCtx, direction: 'increase' | 'decrease') => {
+    move: ({ G, ctx }: MoveCtx, direction: 'increase' | 'decrease') => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const player = G.players[ctx.currentPlayer];
       if (!player) return INVALID_MOVE;
@@ -202,11 +208,34 @@ export const thiefBoardSkillMoves = {
         heartLocksTuple && layerNum >= 1 && layerNum <= 4
           ? ((heartLocksTuple as readonly number[])[layerNum - 1] ?? 5)
           : 5;
-      const roll = random.D6();
-      const r = applyMartyrSacrifice(G, ctx.currentPlayer, roll, direction, cap);
-      if (r === null) return INVALID_MOVE;
-      return setTurnPhase(settleVaultOpened(G, r.state, random), 'discard');
+      // 能否发动与点数无关：先按任意点数试一次，能发动才开闸门，掷完见 settleMartyrSacrifice
+      if (applyMartyrSacrifice(G, ctx.currentPlayer, 1, direction, cap) === null) {
+        return INVALID_MOVE;
+      }
+      return openDiceGate(G, {
+        by: ctx.currentPlayer,
+        target: null,
+        rollers: [ctx.currentPlayer],
+        resume: { purpose: 'martyr', playerID: ctx.currentPlayer, direction, cap },
+      })!;
     },
     client: false,
   },
 };
+
+/** 双子·协同的骰子掷完：结算心锁，心锁减到 0 时接金库打开 */
+export function settleGeminiSync(G: SetupState, playerID: string, roll: number): SetupState {
+  const next = applyGeminiSync(G, playerID, roll);
+  return next === null ? G : settleVaultOpened(G, next);
+}
+
+/** 殉道者·牺牲的骰子掷完：自杀并结算心锁，心锁减到 0 时接金库打开，然后略过出牌阶段 */
+export function settleMartyrSacrifice(
+  G: SetupState,
+  resume: { playerID: string; direction: 'increase' | 'decrease'; cap: number },
+  roll: number,
+): SetupState {
+  const r = applyMartyrSacrifice(G, resume.playerID, roll, resume.direction, resume.cap);
+  if (r === null) return G;
+  return setTurnPhase(settleVaultOpened(G, r.state), 'discard');
+}

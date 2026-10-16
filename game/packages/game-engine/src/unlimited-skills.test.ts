@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { SetupState } from './setup.js';
-import { applyMove } from './runner/matchRunner.js';
+
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import { applyInterpreterForeshadow, applyLeoKingdom } from './engine/skills.js';
 import {
@@ -19,10 +19,16 @@ import {
   SHOOT,
   TRANSIT,
   withPlayer,
+  applyMoveSettled,
 } from './testing/runnerHarness.js';
 
 function run(G: SetupState, playerID: string, move: string, args: unknown[], roll = 3) {
-  const res = applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(roll) });
+  const res = applyMoveSettled(
+    game,
+    load(G),
+    { playerID, move, args },
+    { random: fixedRandom(roll) },
+  );
   expect(res.ok).toBe(true);
   if (!res.ok) throw new Error(`${move} 被拒绝`);
   expect(checkStateInvariants(res.state.G)).toEqual([]);
@@ -30,7 +36,7 @@ function run(G: SetupState, playerID: string, move: string, args: unknown[], rol
 }
 
 function rejected(G: SetupState, playerID: string, move: string, args: unknown[]): boolean {
-  const res = applyMove(game, load(G), { playerID, move, args }, { random: fixedRandom(3) });
+  const res = applyMoveSettled(game, load(G), { playerID, move, args }, { random: fixedRandom(3) });
   return !res.ok;
 }
 

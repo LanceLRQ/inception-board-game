@@ -125,6 +125,7 @@ export const MOVE_ARG_SPECS: Readonly<Record<string, readonly ArgCheck[]>> = {
   doDraw: [optional(count)],
   playBlackSwanTour: [recordByPlayer(cardList)],
   respondBlackHoleLevy: [card],
+  rollDice: [],
   useBlackHoleAbsorb: [layer],
   useImperialCityWorldShoot: [player],
   playRevive: [nullable(player), cardList],

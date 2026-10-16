@@ -8,6 +8,9 @@ import type { SetupState, PlayerSetup, LayerSetup, VaultSetup, BribeSetup } from
 import { LAYER_COUNT } from '../config.js';
 import { CURRENT_SCHEMA_VERSION } from '../migrations.js';
 import { InceptionCityGame } from '../game.js';
+import type { MoveCtx } from '../moves/common.js';
+import type { PendingDiceRoll } from '../moves/diceGate.js';
+import { diceMoves } from '../moves/diceMoves.js';
 
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
@@ -156,6 +159,8 @@ export function createTestState(overrides: Partial<SetupState> = {}): SetupState
     pendingDarwinReturn: null,
     pendingAthenaWit: null,
     pendingSaturnDecree: null,
+    pendingDiceRoll: null,
+    lastDiceRoll: null,
     winner: null,
     winReason: null,
     endTurn: null,
@@ -210,6 +215,11 @@ export interface CallMoveOptions {
   rolls?: readonly number[];
   currentPlayer?: string;
   shuffleStrategy?: <T>(arr: T[]) => T[];
+  /**
+   * move 开了掷骰闸门时，是否按点名顺序代每个人掷骰直到闸门全部结算（续接再开的闸门也一并掷完），缺省为是。
+   * 点数接着用同一串 rolls。要停在闸门上检查时传 false。
+   */
+  autoRoll?: boolean;
 }
 
 /**
@@ -227,7 +237,6 @@ export function callMove(
   if (!movesMap || typeof movesMap[moveName]?.move !== 'function') {
     throw new Error(`callMove: 未知 move "${moveName}"`);
   }
-  const currentPlayer = opts.currentPlayer ?? state.currentPlayerID;
   const rolls = [...(opts.rolls ?? [])];
   const D6 = (): number => (rolls.length > 0 ? rolls.shift()! : 4);
   const Die = (max?: number): number => {
@@ -236,19 +245,49 @@ export function callMove(
   };
   const Shuffle = opts.shuffleStrategy ?? (<T>(arr: T[]) => arr);
 
-  const ctxArg = {
-    G: state,
-    ctx: {
-      numPlayers: state.playerOrder.length,
-      currentPlayer,
-      playOrder: state.playerOrder,
-      playOrderPos: state.playerOrder.indexOf(currentPlayer),
-    },
-    playerID: currentPlayer,
-    random: { D6, Die, Shuffle },
-    events: { endTurn: () => {}, endPhase: () => {}, endStage: () => {} },
-  };
-  return movesMap[moveName].move(ctxArg, ...args) as SetupState | 'INVALID_MOVE';
+  const run = (G: SetupState, name: string, actor: string, moveArgs: readonly unknown[]) =>
+    movesMap[name].move(
+      {
+        G,
+        ctx: {
+          numPlayers: G.playerOrder.length,
+          currentPlayer: actor,
+          playOrder: G.playerOrder,
+          playOrderPos: G.playerOrder.indexOf(actor),
+        },
+        playerID: actor,
+        random: { D6, Die, Shuffle },
+        events: { endTurn: () => {}, endPhase: () => {}, endStage: () => {} },
+      },
+      ...moveArgs,
+    ) as SetupState | 'INVALID_MOVE';
+
+  let result = run(state, moveName, opts.currentPlayer ?? state.currentPlayerID, args);
+  if (opts.autoRoll === false || moveName === 'rollDice') return result;
+  while (result !== 'INVALID_MOVE' && result.pendingDiceRoll) {
+    const gate = result.pendingDiceRoll;
+    const next = gate.rollers.find((id) => !gate.rolled.includes(id))!;
+    result = run(result, 'rollDice', next, []);
+  }
+  return result;
+}
+
+/**
+ * 把开着的掷骰闸门掷完（直接调用 move 函数、不经运行器的测试用）：按点名顺序代还没掷的人报到，
+ * 续接再开的闸门也一并掷完，点数取自传入的随机源。非法结果与没有闸门时原样返回。
+ */
+export function completeDiceGates<T>(result: T, random: { D6: () => number }): T {
+  let current = result as unknown as SetupState | 'INVALID_MOVE';
+  while (current !== 'INVALID_MOVE' && current?.pendingDiceRoll) {
+    const gate: PendingDiceRoll = current.pendingDiceRoll;
+    const roller = gate.rollers.find((id) => !gate.rolled.includes(id))!;
+    current = diceMoves.rollDice.move({
+      G: current,
+      ctx: { currentPlayer: roller },
+      random,
+    } as unknown as MoveCtx) as SetupState | 'INVALID_MOVE';
+  }
+  return current as unknown as T;
 }
 
 /** 与玩家相关的快照字段（默认） */

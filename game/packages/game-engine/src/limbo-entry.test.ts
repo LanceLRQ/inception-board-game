@@ -11,13 +11,13 @@ import { createTestState, makeLayer } from './testing/fixtures.js';
 import { checkStateInvariants } from './engine/stateInvariants.js';
 import { makeTestRng, pickLegalMove } from './runner/moveFuzzer.js';
 import {
-  applyMove,
   createMatch,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
   type RandomSource,
 } from './runner/matchRunner.js';
+import { applyMoveSettled } from './testing/runnerHarness.js';
 
 const game: GameDef<SetupState> = InceptionCityGame;
 
@@ -105,7 +105,7 @@ function nightmareScene(nightmareId: string): SetupState {
 }
 
 function activate(G: SetupState, roll = 5): SetupState {
-  const res = applyMove(
+  const res = applyMoveSettled(
     game,
     load(G),
     { playerID: 'pM', move: 'masterActivateNightmare', args: [2, { bribedTargets: [] }] },
@@ -152,7 +152,7 @@ describe.each(NIGHTMARES)('梦魇 $id 送进迷失层', ({ id, roll, victims }) 
 
   it('自己回合可以复活自己', () => {
     const G = asTurn(activate(nightmareScene(id), roll), 'p1');
-    const res = applyMove(game, load(G), {
+    const res = applyMoveSettled(game, load(G), {
       playerID: 'p1',
       move: 'playRevive',
       args: [null, [KICK, KICK]],
@@ -177,7 +177,7 @@ describe.each(NIGHTMARES)('梦魇 $id 送进迷失层', ({ id, roll, victims }) 
       },
       'p3',
     );
-    const res = applyMove(game, load(G), {
+    const res = applyMoveSettled(game, load(G), {
       playerID: 'p3',
       move: 'playRevive',
       args: ['p1', [KICK, KICK]],
@@ -199,7 +199,11 @@ describe('迷失层里的人不再被当作活人', () => {
       { ...after, players: { ...after.players, p3: { ...after.players.p3!, hand: [UNLOCK] } } },
       'p3',
     );
-    const res = applyMove(game, load(G), { playerID: 'p3', move: 'playUnlock', args: [UNLOCK] });
+    const res = applyMoveSettled(game, load(G), {
+      playerID: 'p3',
+      move: 'playUnlock',
+      args: [UNLOCK],
+    });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     const responders = res.state.G.pendingResponseWindow?.responders ?? [];
@@ -214,7 +218,7 @@ describe('迷失层里的人不再被当作活人', () => {
       ...asTurn(base, 'p3'),
       players: { ...base.players, p3: { ...base.players.p3!, hand: [KING] } },
     };
-    const res = applyMove(
+    const res = applyMoveSettled(
       game,
       load(G),
       { playerID: 'p3', move: 'playShootKing', args: ['p1', KING] },
@@ -244,7 +248,7 @@ describe('冥王星·地狱世界观', () => {
     };
     // 掷骰 2：抽完 4 + 2 = 6 张
     const step = (state: SetupState, move: string, args: unknown[] = []) => {
-      const r = applyMove(
+      const r = applyMoveSettled(
         game,
         load(state),
         { playerID: 'p1', move, args },
@@ -263,7 +267,7 @@ describe('冥王星·地狱世界观', () => {
     expect(p.currentLayer).toBe(0);
     expect(p.hand).toHaveLength(5);
 
-    const revive = applyMove(game, load(asTurn(after, 'p1')), {
+    const revive = applyMoveSettled(game, load(asTurn(after, 'p1')), {
       playerID: 'p1',
       move: 'playRevive',
       args: [null, [KICK, KICK]],
@@ -292,7 +296,7 @@ describe('密道·传送', () => {
   }
 
   it('目标进迷失层并视为已死亡，手牌留在原处，梦主不拿牌', () => {
-    const res = applyMove(game, load(passage()), {
+    const res = applyMoveSettled(game, load(passage()), {
       playerID: 'pM',
       move: 'playSecretPassageTeleport',
       args: ['p1', TRANSIT],
@@ -305,7 +309,7 @@ describe('密道·传送', () => {
   });
 
   it('被送走的人在密道世界观下弃 1 张穿梭剂即可复活', () => {
-    const sent = applyMove(game, load(passage()), {
+    const sent = applyMoveSettled(game, load(passage()), {
       playerID: 'pM',
       move: 'playSecretPassageTeleport',
       args: ['p1', TRANSIT],
@@ -316,7 +320,7 @@ describe('密道·传送', () => {
       ...G,
       players: { ...G.players, p3: { ...G.players.p3!, hand: [TRANSIT] } },
     };
-    const res = applyMove(game, load(withTransit), {
+    const res = applyMoveSettled(game, load(withTransit), {
       playerID: 'p3',
       move: 'playRevive',
       args: ['p1', [TRANSIT]],
@@ -340,7 +344,7 @@ describe('SHOOT 击杀交手牌', () => {
     );
   }
   const shoot = (G: SetupState) =>
-    applyMove(
+    applyMoveSettled(
       game,
       load(G),
       { playerID: 'p1', move: 'playShoot', args: ['p2', SHOOT] },
@@ -376,7 +380,7 @@ describe('随机对局', () => {
     for (let n = 4; n <= 10; n++) {
       for (const k of [1, 2, 3]) {
         const seed = `limbo-${n}-${k}`;
-        const start = applyMove(
+        const start = applyMoveSettled(
           game,
           createMatch(game, { numPlayers: n, setupData: { rngSeed: seed }, seed }),
           { playerID: '0', move: 'completeSetup', args: [] },
@@ -389,7 +393,7 @@ describe('随机对局', () => {
           if (Object.values(s.G.players).some((p) => p.currentLayer === 0)) limboSeen++;
           const cand = pickLegalMove(game, s, rnd, { preferSettle: false });
           if (!cand) break;
-          const res = applyMove(game, s, cand);
+          const res = applyMoveSettled(game, s, cand);
           if (!res.ok) break;
           s = res.state;
         }

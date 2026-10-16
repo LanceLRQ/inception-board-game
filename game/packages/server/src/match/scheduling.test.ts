@@ -210,6 +210,42 @@ describe('planNext', () => {
     });
   });
 
+  it('掷骰闸门：真人掷骰用单独一档的 15 秒，从闸门打开起算、名单里的人共用；受响应上限约束；Bot 座位短延迟内自己掷', () => {
+    const s = afterSetup();
+    const thieves = s.G.playerOrder.filter((id) => id !== s.G.dreamMasterID);
+    const [a, b] = thieves as [string, string];
+    const gate = {
+      ...s,
+      G: {
+        ...s.G,
+        pendingDiceRoll: {
+          id: 1,
+          purpose: 'spaceFall',
+          by: null,
+          target: null,
+          rollers: [a, b],
+          rolled: [],
+          resume: { purpose: 'spaceFall', layer: 1 },
+        },
+      },
+    } as unknown as MatchState<SetupState>;
+    expect(planNext(gate, [a, b], { ...timing, pendingTimeoutMs: 45_000 })).toEqual({
+      kind: 'deadline',
+      delayMs: 15_000,
+    });
+    // 闸门已经开了 9 秒：剩下的 6 秒；开过头不会是负数
+    expect(planNext(gate, [a, b], timing, [], 9_000)).toEqual({ kind: 'deadline', delayMs: 6_000 });
+    expect(planNext(gate, [a, b], timing, [], 20_000)).toEqual({ kind: 'deadline', delayMs: 0 });
+    expect(planNext(gate, [a, b], { ...timing, responseTimeoutCapMs: 40 })).toEqual({
+      kind: 'deadline',
+      delayMs: 40,
+    });
+    // b 是 Bot：短延迟内以 b 本人的名义掷；到时限连真人也代掷
+    const plan = planNext(gate, [a], timing);
+    expect(plan).toMatchObject({ kind: 'auto', action: { playerID: b, move: 'rollDice' } });
+    expect(timeoutAction(gate)).toMatchObject({ playerID: a, move: 'rollDice' });
+  });
+
   it('对局已结束返回 none', () => {
     const s = afterSetup();
     const over = {

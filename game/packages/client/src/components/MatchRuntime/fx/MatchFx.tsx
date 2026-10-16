@@ -1,11 +1,12 @@
 // 对局动画层：铺在整个对局界面之上、不接收指针，按事件播放抽牌、出牌、弃牌、转牌、
-// 移层、击杀与复活、心锁变化、金库打开。每个动作配一行说明（读屏也会念）。
+// 移层、击杀与复活、心锁变化、金库打开、掷骰结果。每个动作配一行说明（读屏也会念）。
 // 「减少动效」开启时不播飞行与闪烁，只显示说明。起止点见 anchors.ts。
 
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotionConfig } from 'framer-motion';
 import { Footprints, HeartPulse, Lock, Skull, Vault } from 'lucide-react';
+import { Die3D } from '../../Die/Die3D';
 import { getCardImageUrl } from '../../../lib/cardImages';
 import { getCardName } from '../../../lib/cards';
 import type { MatchSource } from '../../../match/matchSource';
@@ -21,7 +22,7 @@ import {
   viewportCenter,
   type FxRect,
 } from './anchors';
-import type { FxCue } from './cues';
+import type { DiceRow, FxCue } from './cues';
 import type { PlayingCue } from './fxQueue';
 import { useFxPlayer } from './useFxPlayer';
 
@@ -47,7 +48,12 @@ export function MatchFx({ source, nicknameOf }: MatchFxProps) {
       aria-hidden={playing === null ? true : undefined}
     >
       {playing && !reduced && (
-        <CueAnimation key={playing.id} playing={playing} viewer={source.seat} />
+        <CueAnimation
+          key={playing.id}
+          playing={playing}
+          viewer={source.seat}
+          nicknameOf={nicknameOf}
+        />
       )}
       <p
         role="status"
@@ -95,6 +101,15 @@ function useCaption(
         layer: cue.layer,
         content: t(`board.tower.vaultContent.${cue.content}`, { defaultValue: cue.content }),
       });
+    case 'dice': {
+      const dice = (d: readonly number[]) => d.join(t('fx.diceJoin'));
+      const [only] = cue.rolls;
+      if (cue.rolls.length === 1 && only) {
+        return t('fx.dice', { name: name(only.player), dice: dice(only.dice) });
+      }
+      const list = cue.rolls.map((r) => `${name(r.player)} ${dice(r.dice)}`).join(' · ');
+      return t('fx.diceMany', { list });
+    }
   }
 }
 
@@ -234,7 +249,47 @@ function Flash({
 }
 
 /** 起止点在动作开始时量一次（之后视图怎么变都不跟着跳） */
-function CueAnimation({ playing, viewer }: { playing: PlayingCue; viewer: string | null }) {
+/** 掷骰结果：屏幕中央一块，每个掷骰人一行（名字 + 骰子），翻滚后停住，最后淡出 */
+function DiceBox({
+  rolls,
+  seconds,
+  nameOf,
+}: {
+  rolls: readonly DiceRow[];
+  seconds: number;
+  nameOf: (id: string) => string;
+}) {
+  const size = window.innerWidth < 1024 ? 36 : 52;
+  return (
+    <motion.div
+      className="ms-fx-dicebox absolute top-1/2 left-1/2 flex flex-col gap-2 px-4 py-3"
+      style={{ translateX: '-50%', translateY: '-50%' }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: [0, 1, 1, 0], scale: [0.9, 1, 1, 1] }}
+      transition={{ duration: seconds, times: [0, 0.1, 0.88, 1] }}
+      data-testid="fx-dice"
+    >
+      {rolls.map((row, i) => (
+        <div key={row.player} className="flex items-center gap-3">
+          <span className="min-w-16 truncate text-sm font-bold">{nameOf(row.player)}</span>
+          {row.dice.map((v, j) => (
+            <Die3D key={j} value={v} size={size} spin={2 + ((i + j) % 2)} />
+          ))}
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
+function CueAnimation({
+  playing,
+  viewer,
+  nicknameOf,
+}: {
+  playing: PlayingCue;
+  viewer: string | null;
+  nicknameOf: (id: string) => string;
+}) {
   const { t } = useTranslation();
   const { cue, durationMs } = playing;
   const seconds = durationMs / 1000;
@@ -319,6 +374,14 @@ function CueAnimation({ playing, viewer }: { playing: PlayingCue; viewer: string
             text={`${cue.from} → ${cue.to}`}
             seconds={seconds}
             rise
+          />
+        );
+      case 'dice':
+        return (
+          <DiceBox
+            rolls={cue.rolls}
+            seconds={seconds}
+            nameOf={(id) => (id === viewer ? t('fx.you') : nicknameOf(id))}
           />
         );
       case 'vault':

@@ -6,6 +6,7 @@ import { InceptionCityGame } from './game.js';
 import { resolveShootCustom } from './dice.js';
 import type { SetupState } from './setup.js';
 import type { CardID } from '@icgame/shared';
+import { completeDiceGates } from './testing/fixtures.js';
 
 function makePlayer(id: string, hand: string[], layer = 1, alive = true) {
   return {
@@ -113,17 +114,19 @@ function makeState(overrides: Partial<SetupState> = {}): SetupState {
 const moves = (InceptionCityGame as any).phases.playing.moves;
 
 function callMove(name: string, G: SetupState, targetID: string, cardId: string, roll = 4) {
-  return moves[name].move(
+  const random = { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a };
+  const result = moves[name].move(
     {
       G,
       ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
       playerID: '0',
-      random: { D6: () => roll, Die: () => roll, Shuffle: <T>(a: T[]) => a },
+      random,
       events: {},
     },
     targetID,
     cardId as CardID,
   );
+  return completeDiceGates(result, random);
 }
 
 describe('resolveShootCustom 骰面表', () => {
