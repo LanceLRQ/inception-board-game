@@ -159,6 +159,14 @@ export class RoomSocket {
       notifyIdentityRevoked(this.options.token);
       return;
     }
+    if (msg?.code === 'BANNED') {
+      // 连上之后被封禁：重连也过不了握手，不再重连，页面退回轮询（接口同样会拒绝）
+      logger.warn('net/room', 'banned while connected', { code: this.options.code });
+      this.setStatus('down');
+      this.closed = true;
+      this.socket?.disconnect();
+      return;
+    }
     logger.warn('net/room', 'server error', { code: msg?.code });
   }
 }

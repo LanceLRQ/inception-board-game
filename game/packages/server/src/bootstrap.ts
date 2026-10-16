@@ -133,9 +133,10 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     onAborted: (matchID) => gateway.abortMatch(matchID),
     // 大厅在对局服务之后才建好；恢复时才会用到，那时 lobby 已就绪
     lookupRoom: (code): Promise<RoomState | null> => lobby.getRoom(code),
-    // 对局结束的标记已在最后一条 icg:step 的视图里
+    // 对局结束的标记已在最后一条 icg:step 的视图里；这一局的短语冷却记录随之回收
     onGameOver: (matchID) => {
       logger.info({ matchID }, 'match over');
+      chat.disposeMatch(matchID);
     },
   });
   gateway.bindMatches(matches);

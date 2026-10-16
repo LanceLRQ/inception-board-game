@@ -205,6 +205,19 @@ describe('RoomSocket', () => {
     expect(rooms).toHaveLength(1);
   });
 
+  it('连上之后被封禁：断开且不再重连，之后的消息被忽略', () => {
+    rs.connect();
+    socket.fire(ROOM_EVENT, { room: room() });
+    socket.fire('icg:error', { code: 'BANNED' });
+    socket.fire('disconnect', 'io server disconnect');
+    expect(rs.getStatus()).toBe('down');
+    expect(socket.connectCalls).toBe(1);
+    expect(socket.disconnectCalls).toBe(1);
+    socket.fire(ROOM_EVENT, { room: room() });
+    expect(rooms).toHaveLength(1);
+    expect(removed).toBe(0);
+  });
+
   it('其他服务端错误只记日志', () => {
     rs.connect();
     socket.fire('icg:error', { code: 'INTERNAL_ERROR' });
