@@ -7,11 +7,6 @@ import type { SetupState } from '../setup.js';
 import type { MoveCtx } from './common.js';
 
 export const setupPhaseMoves = {
-  pickCharacter: {
-    move: ({ G }: { G: SetupState }) => G,
-    client: false,
-  },
-
   // 完成 setup：随机决定梦主，切到 playing 阶段
   // 回合归属由 playing.turn.order.first 计算（基于 G.dreamMasterID）
   completeSetup: {

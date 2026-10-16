@@ -21,7 +21,6 @@ const phases = InceptionCityGame.phases as unknown as Record<string, PhaseDefLik
 
 const SETUP_MOVE_ARITY: Record<string, number> = {
   completeSetup: 1,
-  pickCharacter: 1,
 };
 
 const PLAYING_MOVE_ARITY: Record<string, number> = {

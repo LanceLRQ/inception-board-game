@@ -28,7 +28,6 @@ const game: GameDef<SetupState> = InceptionCityGame;
 // ---------------------------------------------------------------------------
 
 const MOVE_PARAMS: Readonly<Record<string, readonly string[]>> = {
-  pickCharacter: [],
   completeSetup: [],
   doDraw: [],
   skipDraw: [],

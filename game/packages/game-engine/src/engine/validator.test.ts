@@ -23,7 +23,7 @@ describe('knownMoves', () => {
   it('布置阶段的名单与 move 表的键完全一致', () => {
     const expected = Object.keys(InceptionCityGame.phases.setup.moves).sort();
     expect([...knownMoves('setup')].sort()).toEqual(expected);
-    expect(expected.length).toBe(2);
+    expect(expected.length).toBe(1);
   });
 
   it('未知阶段返回空，包括原型链上的名字', () => {
