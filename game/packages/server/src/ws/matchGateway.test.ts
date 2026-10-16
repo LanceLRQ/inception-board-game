@@ -5,7 +5,11 @@ import {
   parseClientMatchMessage,
   viewMatch,
 } from '@icgame/game-engine';
-import type { ClientMatchMessage, ServerMatchMessage } from '@icgame/game-engine';
+import {
+  MATCH_PROTOCOL_VERSION,
+  type ClientMatchMessage,
+  type ServerMatchMessage,
+} from '@icgame/game-engine';
 import { BotManager } from '../services/BotManager.js';
 import { MoveGateway } from '../services/MoveGateway.js';
 import { InMemoryRateGuard } from '../services/RateGuardService.js';
@@ -255,7 +259,7 @@ describe('state and step messages', () => {
     const seats = seatInfos(room, { isConnected: () => true, isTakenOver: () => false });
     const msg = stateMessage(room, '2', seats);
     expect(msg.type).toBe('icg:state');
-    expect(msg.protocol).toBe(1);
+    expect(msg.protocol).toBe(MATCH_PROTOCOL_VERSION);
     expect(msg.seat).toBe('2');
     expect(msg.matchID).toBe('room-1');
     expect(msg.view).toEqual(viewMatch(InceptionCityGame, room.current(), '2'));
