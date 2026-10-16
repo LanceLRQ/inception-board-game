@@ -58,7 +58,7 @@ export function settleVenusMirror(
 
 export const masterSkillMoves = {
   // 棋局·易位（梦主限定）：交换两个未打开的金库位置，perGame 最多 2 次
-  // 对照：packages/game-engine/src/engine/skills.ts applyChessTranspose
+  // 对照：packages/game-engine/src/engine/skills/masterSkills.ts applyChessTranspose
   useChessTranspose: {
     move: ({ G, ctx }: MoveCtx, vaultIdx1: number, vaultIdx2: number) => {
       if (!Number.isInteger(vaultIdx1) || !Number.isInteger(vaultIdx2)) return INVALID_MOVE;

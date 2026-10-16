@@ -219,7 +219,7 @@ export function movePlayerToLayer(
 // === 要塞·冷酷的发动机会 ===
 // 对照：docs/manual/06-dream-master.md 要塞 121 行「你的出牌阶段，当你移动到另一层梦境里」
 // 梦主在自己的出牌阶段每换一次层，就在自己的 skillUsedThisTurn 里记一次机会（回合开始随之清零）；
-// 已发动的次数记在技能标识下，可发动次数 = 机会数 - 已发动数（见 engine/skills.ts 的 fortressColdnessChancesLeft）。
+// 已发动的次数记在技能标识下，可发动次数 = 机会数 - 已发动数（见 engine/skills/masterSkills.ts 的 fortressColdnessChancesLeft）。
 // 梦主在自己回合里的换层都经 movePlayerToLayer：梦主自己的移动、行动牌、各类技能与世界观造成的换层。
 // 唯一绕开它直接改层的是黑洞·吸纳，那是盗梦者在自己的回合发动，轮不到梦主自己的出牌阶段。
 // 回合开始从迷失层复活不在出牌阶段（turnPhase 为 draw），层没变、进迷失层也不算。
@@ -285,7 +285,7 @@ export function incrementMoveCounter(state: SetupState): SetupState {
 //
 // actorID：减少心锁的发动者，翻开的金库记在他名下。
 // bySkill：发动者靠技能减少心锁。裁定 R-23：这也算本回合的成功解锁，
-//   占用解锁次数（见 skills.ts 的 canMakeSuccessfulUnlock）；心锁实际没减少则不计。
+//   占用解锁次数（见 engine/skills/masterSkills.ts 的 canMakeSuccessfulUnlock）；心锁实际没减少则不计。
 //   对照：docs/manual/03-game-flow.md:26-28 一旦本回合心锁减少后，盗梦者不能再以技能或行动的方式解锁
 export const HEART_LOCK_REDUCED_BY_SKILL_KEY = 'heartLockReducedBySkill';
 

@@ -14,7 +14,7 @@ import {
   isPlutoHellWorldActive,
 } from './skills.js';
 
-// 黑洞世界观下的解封次数上限只有这一处定义，在 skills.ts；这里再导出，方便与其他上限放在一起取用
+// 黑洞世界观下的解封次数上限只有这一处定义，在 skills/masterSkills.ts；这里再导出，方便与其他上限放在一起取用
 export { getEffectiveMaxUnlockPerTurn } from './skills.js';
 
 /**
