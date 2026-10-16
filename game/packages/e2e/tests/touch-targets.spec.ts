@@ -29,13 +29,23 @@ test.beforeEach(({}, testInfo) => {
 });
 
 async function expectTouchClean(page: Page, what: string): Promise<void> {
-  // 过渡动画（弹窗淡入、坞展开）结束后再量
-  await page.waitForTimeout(500);
-  const bad = await auditTouchTargets(page);
-  expect(
-    bad,
-    `${what}：命中区不足 44×44 或被相邻目标盖住的元素\n${JSON.stringify(bad, null, 2)}`,
-  ).toEqual([]);
+  // 过渡动画（弹窗淡入、坞展开）进行中量到的尺寸不准（整套并行、机器繁忙时动画更慢，见过 0×0）：
+  // 反复量到干净为止，超时仍不干净才算失败，报出最后一次量到的结果
+  let bad: Awaited<ReturnType<typeof auditTouchTargets>> = [];
+  await expect
+    .poll(
+      async () => {
+        bad = await auditTouchTargets(page);
+        return bad.length;
+      },
+      { timeout: 5_000, intervals: [300, 500, 1_000] },
+    )
+    .toBe(0)
+    .catch(() => {
+      throw new Error(
+        `${what}：命中区不足 44×44 或被相邻目标盖住的元素\n${JSON.stringify(bad, null, 2)}`,
+      );
+    });
 }
 
 async function openPage(page: Page, url: string): Promise<void> {
