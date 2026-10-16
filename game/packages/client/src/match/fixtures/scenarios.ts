@@ -84,6 +84,8 @@ export interface FixtureExtras {
   readonly chat?: boolean;
   /** 对局已结束（盗梦者胜），所有对手按真人对待，可走查局后举报；值是举报接口的结果 */
   readonly outcome?: FixtureReportResult;
+  /** 循环推送一组示例事件，走查动画层 */
+  readonly fx?: boolean;
 }
 
 /** 一个固定场景：视角与局面（id）加上人数，以及可选的功能走查开关 */
@@ -183,6 +185,7 @@ export function parseFixturePlayers(raw: string | null): number {
  *   ?chat=1      打开预设短语通道，并注入几条示例消息（固定场景本没有连接，发出的短语只在本机回显）
  *   ?outcome=1   对局已结束，所有对手按真人对待，可走查局后举报；
  *                ?outcome=duplicate / failed 让举报接口返回「已举报过」/ 网络失败
+ *   ?fx=1        循环推送一组示例事件（抽牌、出牌、弃牌、转牌、移层、心锁、金库、击杀与复活），走查动画层
  */
 export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureScenarioSpec {
   const master = searchParams.get('as') === 'master';
@@ -261,6 +264,11 @@ function resolveFixtureExtras(searchParams: URLSearchParams): FixtureExtras | nu
     outcomeParam === '1'
       ? 'ok'
       : (FIXTURE_REPORT_RESULTS.find((r) => r === outcomeParam && r !== 'ok') ?? null);
-  if (!chat && outcome === null) return null;
-  return { ...(chat ? { chat } : {}), ...(outcome !== null ? { outcome } : {}) };
+  const fx = searchParams.get('fx') === '1';
+  if (!chat && outcome === null && !fx) return null;
+  return {
+    ...(chat ? { chat } : {}),
+    ...(outcome !== null ? { outcome } : {}),
+    ...(fx ? { fx } : {}),
+  };
 }

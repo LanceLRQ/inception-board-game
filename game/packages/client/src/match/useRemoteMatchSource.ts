@@ -5,6 +5,7 @@ import { submitMatchReport, type ReportChannel } from '../lib/reportApi';
 import { createIoSocket } from './createIoSocket';
 import { MatchSocket, type MatchSocketSnapshot } from './matchSocket';
 import { isSelfTakenOver, type MatchSource, type MoveOutcome } from './matchSource';
+import { NO_EVENTS, type EventFeed } from './eventFeed';
 
 export interface RemoteMatchParams {
   url: string;
@@ -19,6 +20,7 @@ export function toMatchSource(
   resume: () => void,
   sendChat: (presetId: string) => boolean = () => false,
   report: ReportChannel | null = null,
+  events: EventFeed = NO_EVENTS,
 ): MatchSource {
   return {
     kind: 'remote',
@@ -36,8 +38,17 @@ export function toMatchSource(
       send: sendChat,
     },
     report,
+    events,
     makeMove: sendMove,
     resume,
+  };
+}
+
+/** 连接上的逐步事件 → 事件通道；还没连上时没有事件 */
+export function eventFeedOf(socket: Pick<MatchSocket, 'onEvents'> | null): EventFeed {
+  if (socket === null) return NO_EVENTS;
+  return {
+    subscribe: (listener) => socket.onEvents((events, stateID) => listener({ stateID, events })),
   };
 }
 
@@ -101,8 +112,10 @@ export function useRemoteMatchSource({ url, token, matchID }: RemoteMatchParams)
     [matchID],
   );
 
+  const events = useMemo(() => eventFeedOf(socket), [socket]);
+
   return useMemo(
-    () => toMatchSource(snapshot, sendMove, resume, sendChat, report),
-    [snapshot, sendMove, resume, sendChat, report],
+    () => toMatchSource(snapshot, sendMove, resume, sendChat, report, events),
+    [snapshot, sendMove, resume, sendChat, report, events],
   );
 }

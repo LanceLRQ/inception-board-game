@@ -5,10 +5,12 @@
 // 状态由引擎包的对局运行器驱动；Bot 的决策来自 @icgame/bot。
 
 import { InceptionCityGame, viewMatch, type MatchView } from '@icgame/game-engine';
+import type { EventBatch } from '../match/eventFeed.js';
 import type { SetupState } from '@icgame/game-engine/setup';
 import {
   applyMove,
   createMatch,
+  eventsFor,
   matchFromSnapshot,
   type GameDef,
   type MatchState,
@@ -97,6 +99,9 @@ export function buildMatchSeed(matchID: string | undefined, now: number): string
   return `${matchID ?? 'local'}-${now}`;
 }
 
+/** 事件记录只留最近这么多步：界面每半秒取一次，落后太多的旧事件也不再播放 */
+export const EVENT_LOG_LIMIT = 64;
+
 export class LocalMatchSession {
   private state: MatchState<SetupState>;
   private readonly humanPlayerID: string;
@@ -110,6 +115,8 @@ export class LocalMatchSession {
   private lastAppliedAt: number;
   /** 正在等真人白羊选择：哪一次选择、从什么时候开始等 */
   private ariesWait: { key: string; since: number } | null = null;
+  /** 最近几步的事件，已按真人座位裁剪（别人的秘密不留在这里） */
+  private eventLog: EventBatch[] = [];
 
   constructor(options: LocalMatchSessionOptions) {
     this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
@@ -166,9 +173,7 @@ export class LocalMatchSession {
     if (!outcome.ok) {
       return { ok: false, reason: outcome.reason, detail: describeReject(outcome) };
     }
-    this.state = outcome.state;
-    this.lastAppliedAt = this.now();
-    this.clearRejects();
+    this.accept(outcome);
     return { ok: true };
   }
 
@@ -209,9 +214,7 @@ export class LocalMatchSession {
       args: action.args,
     });
     if (outcome.ok) {
-      this.state = outcome.state;
-      this.lastAppliedAt = this.now();
-      this.clearRejects();
+      this.accept(outcome);
       return { action, ok: true, continue: true };
     }
 
@@ -224,6 +227,22 @@ export class LocalMatchSession {
       reason: describeReject(outcome),
       continue: this.rejectedCount < MAX_CONSECUTIVE_REJECTS,
     };
+  }
+
+  /** stateID 之后各步的事件（按真人座位裁剪），旧的在前 */
+  eventsSince(stateID: number): EventBatch[] {
+    return this.eventLog.filter((b) => b.stateID > stateID);
+  }
+
+  /** move 落地：换上新状态，记下这一步的事件 */
+  private accept(outcome: Extract<MoveOutcome<SetupState>, { ok: true }>): void {
+    this.state = outcome.state;
+    this.lastAppliedAt = this.now();
+    this.clearRejects();
+    const events = eventsFor(outcome.events, this.humanPlayerID);
+    if (events.length === 0) return;
+    this.eventLog.push({ stateID: outcome.state.stateID, events });
+    if (this.eventLog.length > EVENT_LOG_LIMIT) this.eventLog.shift();
   }
 
   private clearRejects(): void {

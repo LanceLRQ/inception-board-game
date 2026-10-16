@@ -4,7 +4,7 @@
 // 场景构造按需动态加载。
 
 import { useEffect, useMemo, useState } from 'react';
-import type { MatchViewState } from '@icgame/game-engine';
+import type { MatchView, MatchViewState } from '@icgame/game-engine';
 import { monotonicNow } from '../lib/deadlineClock';
 import { logger } from '../lib/logger';
 import type { ReportChannel, ReportOutcome } from '../lib/reportApi';
@@ -12,6 +12,8 @@ import { appendChatEntry, NO_CHAT, type ChatChannel, type ChatEntry } from './ch
 import type { FixtureExtras, FixtureScenarioSpec } from './fixtures/scenarios';
 import type { FixtureScenario } from './fixtures/buildScenario';
 import type { MatchSource } from './matchSource';
+import { NO_EVENTS, type EventFeed } from './eventFeed';
+import { demoEventBatches, loopingFeed } from './fixtures/demoEvents';
 
 /** 示例消息：别的座位发的几条预设短语 */
 const SEED_PHRASES = ['greet_hi', 'emotion_wow', 'tactic_wait', 'feedback_nicemove'] as const;
@@ -46,6 +48,7 @@ export function createFixtureSource(
   scenario: FixtureScenario,
   extras: FixtureExtras = {},
   chat: ChatChannel = NO_CHAT,
+  events: EventFeed = NO_EVENTS,
 ): MatchSource {
   const { outcome } = extras;
   const report: ReportChannel | null =
@@ -64,6 +67,7 @@ export function createFixtureSource(
     selfTakenOver: false,
     chat,
     report,
+    events,
     makeMove: async (move, args = []) => {
       logger.flow('game/fixture', 'move dispatched (state not advanced)', {
         scenario: scenario.id,
@@ -90,6 +94,7 @@ export const FIXTURE_LOADING_SOURCE: MatchSource = {
   selfTakenOver: false,
   chat: NO_CHAT,
   report: null,
+  events: NO_EVENTS,
   makeMove: async () => ({ ok: false, code: 'not_ready' }),
   resume: () => {},
 };
@@ -99,6 +104,7 @@ export function useFixtureMatchSource(spec: FixtureScenarioSpec): MatchSource {
   const { id, players, extras } = spec;
   const wantChat = extras?.chat === true;
   const outcome = extras?.outcome;
+  const wantFx = extras?.fx === true;
   const key = `${id}:${players}`;
   const [loaded, setLoaded] = useState<{
     key: string;
@@ -106,6 +112,14 @@ export function useFixtureMatchSource(spec: FixtureScenarioSpec): MatchSource {
     error?: string;
   } | null>(null);
   const [chatMessages, setChatMessages] = useState<readonly ChatEntry[]>([]);
+  // 示例事件：每个场景建一次，场景不变时来源换了也沿用同一个通道（不打断正在循环的推送）
+  const fxFeed = useMemo(
+    () =>
+      wantFx && loaded?.scenario
+        ? loopingFeed(demoEventBatches(loaded.scenario.view.G as MatchView, loaded.scenario.seat))
+        : NO_EVENTS,
+    [wantFx, loaded],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +169,7 @@ export function useFixtureMatchSource(spec: FixtureScenarioSpec): MatchSource {
       loaded.scenario,
       { ...(wantChat ? { chat: true } : {}), ...(outcome ? { outcome } : {}) },
       chat,
+      fxFeed,
     );
-  }, [loaded, key, wantChat, outcome, chatMessages]);
+  }, [loaded, key, wantChat, outcome, chatMessages, fxFeed]);
 }

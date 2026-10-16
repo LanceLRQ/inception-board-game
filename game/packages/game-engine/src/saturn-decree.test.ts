@@ -539,7 +539,7 @@ describe('土星·律令 · 信息隔离', () => {
       expect(JSON.stringify(seen), String(viewer)).not.toContain(PEEK);
     }
     const discarded = res.events.find((e) => e.kind === 'cards_discarded')!;
-    expect(discarded.data).toEqual({ count: 1, cards: [KICK] });
+    expect(discarded.data).toEqual({ count: 1, cards: [KICK], from: [{ player: 'pM', count: 1 }] });
   });
 
   it('梦主弃掉的牌与抽到的牌同种时，抽牌事件也不丢', () => {

@@ -130,6 +130,8 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   }
   const leftDeck = addedCards(after.deck.cards, before.deck.cards);
   const reshuffled = addedCards(before.deck.cards, after.deck.cards).length > 0;
+  /** 每名玩家本步抽到的牌，后面推导转牌时要扣掉 */
+  const drawnBy = new Map<string, CardID[]>();
   let pool = reshuffled
     ? addedCards(after.deck.cards, [...before.deck.cards, ...before.deck.discardPile])
     : leftDeck;
@@ -165,6 +167,7 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     }
     pool = rest;
     if (drawn.length === 0) continue;
+    drawnBy.set(id, drawn);
     events.push({
       kind: 'cards_drawn',
       actor: mover,
@@ -179,12 +182,75 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     events.push({ kind: 'card_played', actor: playedBy, data: { player: playedBy, card } });
   }
 
-  // cards_discarded：见上，弃牌堆里新增的牌去掉本步打出的牌（打出的牌由 card_played 表达）
+  // 每名玩家本步离开手牌、且不是打出的牌（弃掉、交给别人、放回牌库等），用于推导弃牌来源与转牌
+  const leftHand = new Map<string, CardID[]>();
+  for (const id of order) {
+    const was = before.players[id];
+    const now = after.players[id];
+    if (!was || !now) continue;
+    const left = addedCards(now.hand, was.hand);
+    if (id === playedBy) {
+      for (const card of playedNow) {
+        const at = left.indexOf(card);
+        if (at >= 0) left.splice(at, 1);
+      }
+    }
+    leftHand.set(id, left);
+  }
+
+  // cards_discarded：见上，弃牌堆里新增的牌去掉本步打出的牌（打出的牌由 card_played 表达）；
+  // from 按 playerOrder 写明每张牌来自谁的手牌，不是从手牌弃掉的（翻开的牌库顶等）不计
   if (discarded.length > 0) {
+    const from: { player: string; count: number }[] = [];
+    const rest = [...discarded];
+    for (const id of order) {
+      const left = leftHand.get(id) ?? [];
+      let count = 0;
+      for (let i = left.length - 1; i >= 0; i--) {
+        const at = rest.indexOf(left[i]!);
+        if (at < 0) continue;
+        rest.splice(at, 1);
+        left.splice(i, 1);
+        count += 1;
+      }
+      if (count > 0) from.push({ player: id, count });
+    }
     events.push({
       kind: 'cards_discarded',
       actor: mover,
-      data: { count: discarded.length, cards: discarded },
+      data: { count: discarded.length, cards: discarded, from },
+    });
+  }
+
+  // cards_transferred：一名玩家手里多出来的牌（不是从牌库抽的）恰是另一名玩家手里离开的牌，
+  // 视为交给了他。张数公开，是哪几张只给交出与收到的两个人（与手牌的可见范围一致）
+  const transfers = new Map<string, { from: string; to: string; cards: CardID[] }>();
+  for (const to of order) {
+    const was = before.players[to];
+    const now = after.players[to];
+    if (!was || !now) continue;
+    const gained = addedCards(was.hand, now.hand);
+    for (const card of drawnBy.get(to) ?? []) {
+      const at = gained.indexOf(card);
+      if (at >= 0) gained.splice(at, 1);
+    }
+    for (const card of gained) {
+      const from = order.find((id) => id !== to && (leftHand.get(id) ?? []).includes(card));
+      if (from === undefined) continue;
+      const left = leftHand.get(from)!;
+      left.splice(left.indexOf(card), 1);
+      const key = `${from}>${to}`;
+      const entry = transfers.get(key) ?? { from, to, cards: [] };
+      entry.cards.push(card);
+      transfers.set(key, entry);
+    }
+  }
+  for (const { from, to, cards } of transfers.values()) {
+    events.push({
+      kind: 'cards_transferred',
+      actor: mover,
+      data: { from, to, count: cards.length },
+      secret: { to: [from, to], data: { cards } },
     });
   }
 

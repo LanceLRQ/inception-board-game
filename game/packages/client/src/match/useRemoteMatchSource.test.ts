@@ -1,10 +1,10 @@
 // 远程来源：连接快照到对局来源的转换
 
 import { describe, it, expect, vi } from 'vitest';
-import type { MatchViewState, SeatInfo } from '@icgame/game-engine';
+import type { MatchEvent, MatchViewState, SeatInfo } from '@icgame/game-engine';
 import zhCN from '../i18n/locales/zh-CN.json';
 import en from '../i18n/locales/en.json';
-import { toMatchSource } from './useRemoteMatchSource';
+import { eventFeedOf, toMatchSource } from './useRemoteMatchSource';
 import type { MatchSocketSnapshot } from './matchSocket';
 
 const view = { stateID: 4 } as unknown as MatchViewState;
@@ -122,5 +122,32 @@ describe('toMatchSource', () => {
       toMatchSource(snap(), vi.fn(), resume).resume();
       expect(resume).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('eventFeedOf', () => {
+  it('没有连接时不推事件', () => {
+    const off = eventFeedOf(null).subscribe(() => {
+      throw new Error('不该推送');
+    });
+    off();
+  });
+
+  it('把连接的逐步事件包成批次，退订时一并退订连接', () => {
+    let deliver: ((events: MatchEvent[], stateID: number) => void) | null = null;
+    const unsubscribe = vi.fn();
+    const socket = {
+      onEvents: (l: (events: MatchEvent[], stateID: number) => void) => {
+        deliver = l;
+        return unsubscribe;
+      },
+    };
+    const heard = vi.fn();
+    const off = eventFeedOf(socket).subscribe(heard);
+    const ev: MatchEvent = { stateID: 7, index: 0, kind: 'card_played', actor: '1', data: {} };
+    deliver!([ev], 7);
+    expect(heard).toHaveBeenCalledWith({ stateID: 7, events: [ev] });
+    off();
+    expect(unsubscribe).toHaveBeenCalled();
   });
 });

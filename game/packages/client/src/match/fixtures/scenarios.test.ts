@@ -166,6 +166,7 @@ describe('resolveFixtureScenario', () => {
   it('chat=1 与 outcome 参数只加走查开关，不改变局面', () => {
     expect(resolveFixtureScenario(q('chat=1')).extras).toEqual({ chat: true });
     expect(resolveFixtureScenario(q('outcome=1')).extras).toEqual({ outcome: 'ok' });
+    expect(resolveFixtureScenario(q('fx=1')).extras).toEqual({ fx: true });
     expect(resolveFixtureScenario(q('outcome=duplicate')).extras).toEqual({ outcome: 'duplicate' });
     expect(resolveFixtureScenario(q('outcome=failed&chat=1')).extras).toEqual({
       chat: true,

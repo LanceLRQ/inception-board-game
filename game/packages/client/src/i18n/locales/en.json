@@ -1149,5 +1149,19 @@
     "confirm": "Confirm and draw 4",
     "noRecipients": "There is no thief to give cards to.",
     "cardAria": "{{name}}, {{state}}"
+  },
+  "fx": {
+    "you": "You",
+    "draw": "{{name}} drew {{n}} card(s)",
+    "play": "{{name}} played {{card}}",
+    "discard": "{{name}} discarded {{n}} card(s)",
+    "discardLoose": "{{n}} card(s) went to the discard pile",
+    "transfer": "{{from}} gave {{to}} {{n}} card(s)",
+    "move": "{{name}} moved from layer {{from}} to layer {{to}}",
+    "died": "{{name}} fell into Limbo",
+    "revived": "{{name}} revived on layer {{layer}}",
+    "lock": "Layer {{layer}} heart lock {{from}} → {{to}}",
+    "vault": "Layer {{layer}} vault opened: {{content}}",
+    "lost": "LIMBO"
   }
 }

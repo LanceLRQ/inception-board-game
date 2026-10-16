@@ -6,6 +6,7 @@ import * as Comlink from 'comlink';
 import { CURRENT_SCHEMA_VERSION } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
 import { BOT_STEP_MS } from '../lib/botCardPlay';
+import type { EventBatch } from '../match/eventFeed.js';
 import { LOCAL_HUMAN_SEAT } from './localSeat.js';
 import { LocalMatchSession, MAX_CONSECUTIVE_REJECTS } from './localMatchSession.js';
 import {
@@ -51,6 +52,8 @@ export interface LocalMatchWorker {
     options?: CreateLocalMatchOptions,
   ) => Promise<CreateLocalMatchResult>;
   getState: () => Promise<unknown>;
+  /** stateID 之后各步的事件（已按真人座位裁剪）；会话尚未建立时为空 */
+  getEvents: (sinceStateID: number) => Promise<EventBatch[]>;
   /** 会话尚未建立时返回 null；被拒时 reason 是运行器的拒绝码 */
   makeMove: (move: string, args: unknown[]) => Promise<LocalMoveResult | null>;
   getPlayerId: () => Promise<string>;
@@ -263,6 +266,10 @@ const workerApi: LocalMatchWorker = {
 
   async getState() {
     return session?.view() ?? null;
+  },
+
+  async getEvents(sinceStateID: number) {
+    return session?.eventsSince(sinceStateID) ?? [];
   },
 
   async makeMove(move: string, args: unknown[]) {

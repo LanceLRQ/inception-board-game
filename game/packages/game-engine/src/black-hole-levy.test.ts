@@ -268,13 +268,14 @@ describe('黑洞·吞噬 · 信息隔离', () => {
     expect(viewFor(res.state.G, 'p3', options).players.p1!.hand).toBeNull();
   });
 
-  it('事件：交出的牌号不出现在任何其他座位能看到的事件里（只有交牌人的 move 参数里有）', () => {
+  it('事件：交出的牌号只有交牌人与黑洞看得到（黑洞的视图里本来就有这张牌），其他座位与旁观者看不到', () => {
     const res = afterSecretGive();
-    for (const viewer of ['p3', 'p4', 'p5', 'pM', null, 'p1']) {
+    for (const viewer of ['p3', 'p4', 'p5', 'pM', null]) {
       const seen = JSON.stringify(eventsFor(res.events, viewer));
       expect(seen, String(viewer)).not.toContain(SECRET);
     }
     expect(JSON.stringify(eventsFor(res.events, 'p2'))).toContain(SECRET);
+    expect(JSON.stringify(eventsFor(res.events, 'p1'))).toContain(SECRET);
   });
 
   it('等待清单的变化是公开的（名单本身是同层有手牌的人，手牌张数本来公开）', () => {
@@ -291,5 +292,16 @@ describe('黑洞·吞噬 · 信息隔离', () => {
       ],
     });
     expect(ev).not.toHaveProperty('secret');
+  });
+});
+
+describe('黑洞·吞噬 · 事件', () => {
+  it('交牌产生 cards_transferred：张数公开，交的是哪张只给交牌人与黑洞', () => {
+    const res = mustRun(started(), 'p2', 'respondBlackHoleLevy', [PEEK]);
+    const ev = res.events.find((e) => e.kind === 'cards_transferred')!;
+    expect(ev.data).toEqual({ from: 'p2', to: 'p1', count: 1 });
+    expect(ev.secret).toEqual({ to: ['p2', 'p1'], data: { cards: [PEEK] } });
+    expect(eventsFor([ev], 'p3')[0]!.secret).toBeUndefined();
+    expect(res.events.some((e) => e.kind === 'cards_drawn')).toBe(false);
   });
 });

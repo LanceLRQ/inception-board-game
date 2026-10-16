@@ -141,6 +141,7 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   'thief_sagittarius.kills': '技能使用记录里的内部计数键：射手本回合击杀过几名玩家，不是技能标识',
   thief_char: '卡牌类别名',
   master_char: '卡牌类别名',
+  vault_opened: '对局事件的类型名（金库被打开），不是牌 id',
 };
 
 const ID_LITERAL =

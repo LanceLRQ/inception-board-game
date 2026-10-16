@@ -18,6 +18,7 @@
  *   ms-dreamcard（含 -veil / -tag / -occ / -flag）  牌桌上的梦境层卡片；data-layer / data-focus / data-unlocking / data-lost
  *   ms-pile（含 -card / -label / -bar / -empty）     牌堆（抽牌堆、弃牌堆、本回合出牌区）
  *   ms-turn-glow / ms-await-ring        移动行动轴上当前行动者 / 正在应答者的头像
+ *   ms-fx-card / ms-fx-ring / ms-fx-badge / ms-fx-caption  动画层的飞行卡牌、区域闪框、闪现徽标、说明；data-tone = blood | lock | acc
  *
  * 状态用数据属性表达：data-current / data-awaited / data-lost / data-master / data-revealed /
  * data-selected / data-blocked / data-category。
@@ -291,6 +292,39 @@ button.ms-pile:not(:disabled):hover {
 }
 .ms-pile-bar {
   background: var(--ms-line);
+}
+
+/* ---------- 动画层 ---------- */
+.ms-fx-card {
+  border: 1px solid var(--ms-line2);
+  background: var(--ms-panel);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ms-bg) 70%, transparent);
+}
+.ms-fx-ring {
+  --fx-tone: var(--ms-acc);
+  border: 2px solid var(--fx-tone);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--fx-tone) 35%, transparent),
+    0 0 26px color-mix(in srgb, var(--fx-tone) 55%, transparent);
+}
+.ms-fx-badge {
+  --fx-tone: var(--ms-acc);
+  color: var(--fx-tone);
+  border: 1px solid var(--fx-tone);
+  background: color-mix(in srgb, var(--ms-bg) 88%, transparent);
+}
+.ms-fx-ring[data-tone='blood'],
+.ms-fx-badge[data-tone='blood'] {
+  --fx-tone: var(--ms-blood);
+}
+.ms-fx-ring[data-tone='lock'],
+.ms-fx-badge[data-tone='lock'] {
+  --fx-tone: var(--ms-lock);
+}
+.ms-fx-caption {
+  color: var(--ms-ink);
+  border: 1px solid var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-bg) 88%, transparent);
 }
 
 /* ---------- 底部坞 / 按钮 / 响应窗口 ---------- */

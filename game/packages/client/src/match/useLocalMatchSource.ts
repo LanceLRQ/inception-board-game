@@ -11,6 +11,7 @@ import { withSelfAvatar } from '../lib/avatarSeed';
 import { effectiveAvatarSeed } from '../hooks/useAvatar';
 import { useIdentityStore } from '../stores/useIdentityStore';
 import { NO_CHAT } from './chat';
+import { createEventEmitter, NO_EVENTS, type EventBatch } from './eventFeed';
 import type { ConnectionState, MatchSource, MoveOutcome } from './matchSource';
 
 /** 取状态的间隔（毫秒） */
@@ -23,6 +24,8 @@ export interface LocalMatchApi {
     move: string,
     args: unknown[],
   ): Promise<{ ok: true } | { ok: false; reason: RejectReason } | null>;
+  /** stateID 之后各步的事件（已按本人座位裁剪）；没有这个接口就不推事件 */
+  getEvents?(sinceStateID: number): Promise<EventBatch[]>;
 }
 
 export interface LocalSourceController {
@@ -60,13 +63,34 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
   let connection: ConnectionState = 'connecting';
   let error: string | null = null;
   let snapshot: MatchSource;
+  const events = createEventEmitter();
+  /** 已推过事件的版本号；第一次取到状态时才定下来（之前的事件不补播） */
+  let eventCursor: number | null = null;
+  /** 轮询与出牌后的刷新排队执行，同一批事件不会推两次 */
+  let pending: Promise<void> = Promise.resolve();
 
   const notify = (): void => {
     snapshot = build();
     listeners.forEach((l) => l());
   };
 
-  const refresh = async (): Promise<void> => {
+  const pullEvents = async (state: MatchViewState): Promise<void> => {
+    // 重开了一局，版本号从头算：游标跟着回退
+    if (eventCursor === null || state.stateID < eventCursor) {
+      eventCursor = state.stateID;
+      return;
+    }
+    const batches = api.getEvents ? await api.getEvents(eventCursor) : [];
+    let cursor = Math.max(eventCursor, state.stateID);
+    for (const batch of batches) {
+      if (batch.stateID <= eventCursor) continue;
+      events.emit(batch);
+      cursor = Math.max(cursor, batch.stateID);
+    }
+    eventCursor = cursor;
+  };
+
+  const pull = async (): Promise<void> => {
     try {
       const state = (await api.getState()) as MatchViewState | null;
       if (state === null) return;
@@ -74,9 +98,15 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       seats = buildSeats(state);
       connection = 'connected';
       notify();
+      await pullEvents(state);
     } catch {
       /* worker 可能已关闭 */
     }
+  };
+
+  const refresh = (): Promise<void> => {
+    pending = pending.then(pull);
+    return pending;
   };
 
   const makeMove = async (move: string, args: unknown[] = []): Promise<MoveOutcome> => {
@@ -99,6 +129,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       selfTakenOver: false,
       chat: NO_CHAT,
       report: null,
+      events,
       makeMove,
       resume: () => {},
     };
@@ -213,6 +244,7 @@ const IDLE_SOURCE: MatchSource = {
   selfTakenOver: false,
   chat: NO_CHAT,
   report: null,
+  events: NO_EVENTS,
   makeMove: async () => ({ ok: false, code: 'not_ready' }),
   resume: () => {},
 };

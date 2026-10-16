@@ -280,6 +280,23 @@ describe('事件 · 抽牌与阶段', () => {
     expect(ev.secret).toBeUndefined();
   });
 
+  it('cards_discarded：from 写明每张弃牌来自谁的手牌（界面据此从座位飞向弃牌堆）', () => {
+    const { events } = step(load(scene('discard')), 'p1', 'doDiscard', [[KICK]], {});
+    expect(one(events, 'cards_discarded').data.from).toEqual([{ player: 'p1', count: 1 }]);
+  });
+
+  it('cards_discarded：不是从手牌弃掉的牌（时间风暴翻开的牌）不算在任何人头上', () => {
+    const STORM = 'action_time_storm' as CardID;
+    const flipped: CardID[] = [STORM, KICK, KICK, SHOOT, KICK, KICK, SHOOT, KICK, KICK, SHOOT];
+    const G = scene(
+      'action',
+      { deck: { cards: [...flipped, KICK, KICK], discardPile: [] } },
+      { p1: { hand: [STORM, KICK] } },
+    );
+    const { events } = step(load(G), 'p1', 'playTimeStorm', [STORM]);
+    expect(one(events, 'cards_discarded').data.from).toEqual([]);
+  });
+
   it('打出时间风暴：风暴自己移出游戏，翻开的 10 张牌（含另一张风暴）都在 cards_discarded 里', () => {
     const STORM = 'action_time_storm' as CardID;
     const flipped: CardID[] = [STORM, KICK, KICK, SHOOT, KICK, KICK, SHOOT, KICK, KICK, SHOOT];

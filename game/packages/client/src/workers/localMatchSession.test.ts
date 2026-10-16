@@ -6,6 +6,7 @@ import { sendToLimbo } from '@icgame/game-engine';
 import { HAND_LIMIT } from '@icgame/game-engine/config';
 import {
   ARIES_GRACE_MS,
+  EVENT_LOG_LIMIT,
   LocalMatchSession,
   MAX_CONSECUTIVE_REJECTS,
   buildMatchSeed,
@@ -812,5 +813,47 @@ describe('LocalMatchSession · Bot 出牌', () => {
     expect(session.view().ctx.gameover).toBeDefined();
     // 真人确实收到过 Bot 出牌引来的应答
     expect(humanPassed).toBeGreaterThan(0);
+  });
+});
+
+describe('LocalMatchSession · 事件', () => {
+  it('每一步的事件按真人座位裁剪后记下，eventsSince 只给更新的批次', () => {
+    const session = makeSession();
+    const start = session.view().stateID;
+    expect(session.eventsSince(start)).toEqual([]);
+    session.step();
+    session.step();
+    const batches = session.eventsSince(start);
+    expect(batches.length).toBeGreaterThan(0);
+    for (const b of batches) {
+      expect(b.stateID).toBeGreaterThan(start);
+      for (const ev of b.events) {
+        // 别人抽到哪几张牌是秘密：真人只看得到张数
+        if (ev.secret) expect(ev.secret.to).toContain(HUMAN);
+      }
+    }
+    const last = batches.at(-1)!.stateID;
+    expect(session.eventsSince(last)).toEqual([]);
+  });
+
+  it('真人的 move 也记事件', () => {
+    const session = makeSession();
+    runUntilIdle(session);
+    const before = session.view().stateID;
+    const { move, args } = humanPolicy(session);
+    expect(session.humanMove(move, args).ok).toBe(true);
+    expect(session.eventsSince(before).length).toBe(1);
+  });
+
+  it('只留最近一段，旧的丢掉', () => {
+    const session = makeSession(5, 'log-cap');
+    for (let i = 0; i < EVENT_LOG_LIMIT + 20; i++) {
+      const r = session.step();
+      if (!r.continue) {
+        const { move, args } = humanPolicy(session);
+        session.humanMove(move, args);
+      }
+    }
+    expect(session.eventsSince(-1).length).toBeLessThanOrEqual(EVENT_LOG_LIMIT);
   });
 });

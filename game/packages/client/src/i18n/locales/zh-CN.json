@@ -1149,5 +1149,19 @@
     "confirm": "确认并抽 4 张",
     "noRecipients": "没有可分给的盗梦者。",
     "cardAria": "{{name}}，{{state}}"
+  },
+  "fx": {
+    "you": "你",
+    "draw": "{{name}} 抽了 {{n}} 张牌",
+    "play": "{{name}} 打出【{{card}}】",
+    "discard": "{{name}} 弃掉 {{n}} 张牌",
+    "discardLoose": "{{n}} 张牌进入弃牌堆",
+    "transfer": "{{from}} 交给 {{to}} {{n}} 张牌",
+    "move": "{{name}} 从第 {{from}} 层移动到第 {{to}} 层",
+    "died": "{{name}} 坠入迷失层",
+    "revived": "{{name}} 复活，回到第 {{layer}} 层",
+    "lock": "第 {{layer}} 层心锁 {{from}} → {{to}}",
+    "vault": "第 {{layer}} 层金库打开：{{content}}",
+    "lost": "迷失"
   }
 }

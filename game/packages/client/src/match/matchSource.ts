@@ -3,6 +3,7 @@
 import type { MatchViewState, MoveRejectCode, SeatInfo } from '@icgame/game-engine';
 import type { ReportChannel } from '../lib/reportApi';
 import type { ChatChannel } from './chat';
+import type { EventFeed } from './eventFeed';
 
 export type ConnectionState =
   | 'idle'
@@ -41,6 +42,8 @@ export interface MatchSource {
   readonly chat: ChatChannel;
   /** 局后举报通道；只有联机来源有（本地人机局没有真人对手），固定场景按地址参数注入 */
   readonly report: ReportChannel | null;
+  /** 每一步产生的事件（已按本人座位裁剪），供界面播放动画；固定场景缺省没有 */
+  readonly events: EventFeed;
   makeMove(move: string, args?: unknown[]): Promise<MoveOutcome>;
   /** 取消本人座位的托管；本地来源是无操作 */
   resume(): void;

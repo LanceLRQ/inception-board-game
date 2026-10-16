@@ -117,3 +117,63 @@ describe('createLocalSourceController', () => {
     expect(ctl.getSnapshot().view).not.toBeNull();
   });
 });
+
+describe('createLocalSourceController · 事件', () => {
+  const batch = (stateID: number, kind = 'card_played') => ({
+    stateID,
+    events: [{ stateID, index: 0, kind, actor: '1', data: {} }],
+  });
+
+  it('第一次取状态时把游标放到当前版本，不补播之前的事件', async () => {
+    const getEvents = vi.fn(async () => [batch(2)]);
+    const ctl = createLocalSourceController(fakeApi({ getEvents }));
+    const heard = vi.fn();
+    ctl.getSnapshot().events.subscribe(heard);
+    await ctl.refresh();
+    expect(heard).not.toHaveBeenCalled();
+  });
+
+  it('之后每次刷新推出游标之后的批次，并把游标推到最新', async () => {
+    let stateID = 3;
+    const getState = vi.fn(async () => ({ ...viewOf(['0', '1']), stateID }));
+    const getEvents = vi.fn(async (since: number) =>
+      [batch(4), batch(5)].filter((b) => b.stateID > since),
+    );
+    const ctl = createLocalSourceController(fakeApi({ getState, getEvents }));
+    const heard: number[] = [];
+    ctl.getSnapshot().events.subscribe((b) => heard.push(b.stateID));
+    await ctl.refresh();
+    stateID = 5;
+    await ctl.refresh();
+    await ctl.refresh();
+    expect(heard).toEqual([4, 5]);
+    expect(getEvents).toHaveBeenLastCalledWith(5);
+  });
+
+  it('并发的刷新排队执行，同一批次不会推两次', async () => {
+    let stateID = 3;
+    const getState = vi.fn(async () => ({ ...viewOf(['0', '1']), stateID }));
+    const getEvents = vi.fn(async (since: number) => [batch(4)].filter((b) => b.stateID > since));
+    const ctl = createLocalSourceController(fakeApi({ getState, getEvents }));
+    const heard = vi.fn();
+    ctl.getSnapshot().events.subscribe(heard);
+    await ctl.refresh();
+    stateID = 4;
+    await Promise.all([ctl.refresh(), ctl.refresh(), ctl.refresh()]);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it('版本号变小（重开了一局）时游标跟着回退，不推旧局的事件', async () => {
+    let stateID = 30;
+    const getState = vi.fn(async () => ({ ...viewOf(['0', '1']), stateID }));
+    const getEvents = vi.fn(async (since: number) => [batch(31)].filter((b) => b.stateID > since));
+    const ctl = createLocalSourceController(fakeApi({ getState, getEvents }));
+    const heard = vi.fn();
+    ctl.getSnapshot().events.subscribe(heard);
+    await ctl.refresh();
+    stateID = 2;
+    getEvents.mockResolvedValue([]);
+    await ctl.refresh();
+    expect(heard).not.toHaveBeenCalled();
+  });
+});
