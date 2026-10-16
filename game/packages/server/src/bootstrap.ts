@@ -70,8 +70,8 @@ export interface RealtimeDeps {
   ws?: { corsOrigin?: string | string[]; path?: string };
   /** 全局 HTTP 限流中间件；默认基于 Redis 的 IP 限流 */
   httpRateLimit?: Middleware;
-  /** 位于反向代理之后：HTTP 来源地址取 X-Forwarded-For；默认关闭 */
-  trustProxy?: boolean;
+  /** 后端前面可信反向代理的层数：HTTP 来源地址据此取 X-Forwarded-For；默认 0（不信任） */
+  trustProxy?: number;
   /** 邀请链接与分享卡片的配置；默认取环境变量 */
   invite?: InviteConfig;
 }

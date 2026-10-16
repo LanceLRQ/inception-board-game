@@ -1,3 +1,4 @@
+import { trustProxyFromEnv } from './app.js';
 import { purgeExpiredShortLinks } from './api/shortLink.js';
 import { buildRealtime, timingFromEnv } from './bootstrap.js';
 import { logger } from './infra/logger.js';
@@ -65,7 +66,7 @@ const realtime = buildRealtime({
     corsOrigin: corsOrigins,
     path: process.env.WS_PATH ?? '/ws',
   },
-  trustProxy: process.env.TRUST_PROXY === '1',
+  trustProxy: trustProxyFromEnv(process.env.TRUST_PROXY),
 });
 
 /** 过期短链的清理间隔 */

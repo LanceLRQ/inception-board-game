@@ -49,16 +49,25 @@ export interface AppDeps {
   corsOrigin?: string | string[];
   /** 邀请链接与分享卡片的配置；不给时读环境变量 PUBLIC_BASE_URL / INVITE_IMAGE_PATH */
   invite?: InviteConfig;
-  /** 位于反向代理之后时开启：来源地址取 X-Forwarded-For。后端端口直接暴露公网时不要开启 */
-  trustProxy?: boolean;
+  /**
+   * 后端前面有几层可信的反向代理（缺省 0 = 不信任转发头）：来源地址取 X-Forwarded-For 里
+   * 由这几层代理追加的最靠前一个。后端端口直接暴露公网时保持 0
+   */
+  trustProxy?: number;
+}
+
+/** 解析 TRUST_PROXY：正整数是可信代理层数，未设置与其他取值都按 0（不信任） */
+export function trustProxyFromEnv(value: string | undefined): number {
+  return value !== undefined && /^[1-9]\d*$/.test(value) ? Number(value) : 0;
 }
 
 export function createApp(deps: AppDeps = {}): Koa {
   const app = new Koa();
-  if (deps.trustProxy) {
+  const hops = deps.trustProxy ?? 0;
+  if (hops > 0) {
     app.proxy = true;
-    // 只认最近一层反代追加的地址；客户端自己带来的转发头排在前面，不能当作来源
-    app.maxIpsCount = 1;
+    // 每层代理各追加一个地址，只认最后这几个；客户端自己带来的转发头排在前面，不能当作来源
+    app.maxIpsCount = hops;
   }
 
   // 全局中间件；跨域在最外层，预检不计入限流，出错的响应也带跨域头
