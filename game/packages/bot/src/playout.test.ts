@@ -109,7 +109,8 @@ describe('runBotPlayout · 打开出牌策略', () => {
       decrees += r.responseMoves['respondSaturnDecree'] ?? 0;
     }
     expect(decrees).toBeGreaterThan(0);
-  });
+    // 要连打几局才扫到，CI 开覆盖率统计、各包并行时会超过缺省的 5 秒
+  }, 60_000);
 
   it('关闭时没有任何出牌类 move', () => {
     const r = runBotPlayout({ numPlayers: 6, seed: 'cp-off', maxSteps: MAX_STEPS });
