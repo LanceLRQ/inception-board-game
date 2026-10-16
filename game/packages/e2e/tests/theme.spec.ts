@@ -221,11 +221,9 @@ for (const theme of SWITCHABLE_THEMES) {
       expect(m.sw).toBeLessThanOrEqual(m.cw);
     });
 
-    test(`移动：${theme.label}下对局界面照常显示，没有横向滚动`, async ({ page }, testInfo) => {
-      test.skip(
-        !(isMobileProject(testInfo.project.name) || isNarrowViewport(page)),
-        '只在移动布局下运行',
-      );
+    test(`移动：${theme.label}下对局界面照常显示，没有横向滚动`, async ({ page }) => {
+      // 布局只按视口宽度分派：iPad Pro 竖屏宽 1024，走的是桌面布局
+      test.skip(!isNarrowViewport(page), '只在移动布局（视口宽度 < 1024）下运行');
       await preselectTheme(page, theme.id);
       await page.goto('/game/debug');
       await waitForAppReady(page);
