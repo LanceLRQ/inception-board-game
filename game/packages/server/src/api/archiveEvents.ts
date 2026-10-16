@@ -18,18 +18,19 @@ export interface StepView {
 
 /**
  * 可选地识别身份：令牌有效返回账号 id，没有或无效都返回 null，不报错。
- * 传了账号状态查询器时，版本已作废的令牌（账号在别处找回过）同样按未登录处理，
- * 否则旧设备还能靠它看到只属于本人座位的私密内容。
+ * 传了账号状态查询器时，版本已作废的令牌（账号在别处找回过）与被封禁的账号同样按未登录处理，
+ * 否则旧设备或被封的账号还能靠它看到只属于本人座位的私密内容。
  */
 export async function optionalAccountId(
   authorization: string | undefined,
-  bans?: Pick<BanChecker, 'isTokenCurrent'>,
+  bans?: Pick<BanChecker, 'isTokenCurrent' | 'isBanned'>,
 ): Promise<string | null> {
   const token = extractBearerToken(authorization);
   if (!token) return null;
   try {
     const { playerId, tokenVersion } = verifyToken(token);
     if (bans && !(await bans.isTokenCurrent(playerId, tokenVersion))) return null;
+    if (bans && (await bans.isBanned(playerId))) return null;
     return playerId;
   } catch {
     return null;

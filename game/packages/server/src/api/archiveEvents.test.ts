@@ -33,6 +33,15 @@ describe('optionalAccountId', () => {
     expect(await optionalAccountId(`Bearer ${stale}`, bans)).toBeNull();
     expect(await optionalAccountId(`Bearer ${fresh}`, bans)).toBe('p1');
   });
+
+  it('账号已被封禁：按未登录处理，回放里拿不到本人的私密部分', async () => {
+    const bans = new InMemoryBanChecker();
+    const t = signToken({ playerId: 'p1', nickname: 'x', tokenVersion: 0 });
+    bans.ban('p1');
+    expect(await optionalAccountId(`Bearer ${t}`, bans)).toBeNull();
+    bans.unban('p1');
+    expect(await optionalAccountId(`Bearer ${t}`, bans)).toBe('p1');
+  });
 });
 
 describe('loadFinishedMatch', () => {
