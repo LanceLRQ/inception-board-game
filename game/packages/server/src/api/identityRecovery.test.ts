@@ -304,6 +304,42 @@ describe('恢复码作废与新建在同一事务内', () => {
     expect(row?.revokedAt).toBeNull();
   });
 
+  it('轮换先锁住玩家行再作废旧码：并发轮换排队执行，不会留下两个有效码', async () => {
+    await start();
+    const c = await init();
+    const ops: string[] = [];
+    const tx = db.$transaction.bind(db);
+    db.$transaction = (fn) =>
+      tx((t) =>
+        fn({
+          player: {
+            ...t.player,
+            update: (args) => {
+              ops.push('player.update');
+              return t.player.update(args);
+            },
+          },
+          recoveryCode: {
+            ...t.recoveryCode,
+            updateMany: (args) => {
+              ops.push('recoveryCode.updateMany');
+              return t.recoveryCode.updateMany(args);
+            },
+            create: (args) => {
+              ops.push('recoveryCode.create');
+              return t.recoveryCode.create(args);
+            },
+          },
+        }),
+      );
+    const res = await fetch(`${base}/identity/rotate-recovery-code`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${c.token}` },
+    });
+    expect(res.status).toBe(200);
+    expect(ops).toEqual(['player.update', 'recoveryCode.updateMany', 'recoveryCode.create']);
+  });
+
   it('恢复时新码写入失败，用过的码仍然有效', async () => {
     await start();
     const c = await init();

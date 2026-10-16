@@ -292,10 +292,13 @@ export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
   router.post('/identity/rotate-recovery-code', authMiddleware, async (ctx) => {
     const { playerId } = ctx.state.player;
 
-    // 作废旧码与建新码在同一事务内，建新码失败时旧码不会丢
+    // 作废旧码与建新码在同一事务内，建新码失败时旧码不会丢。
+    // 先更新玩家行拿到行锁：同一账号的并发轮换在这里排队，后一个的作废语句能看到
+    // 前一个刚建的新码并一起作废，不会留下两个同时有效的码
     const newCode = generateRecoveryCode();
     const codeHash = hashRecoveryCode(newCode);
     await prisma.$transaction(async (tx) => {
+      await tx.player.update({ where: { id: playerId }, data: { lastSeenAt: new Date() } });
       await tx.recoveryCode.updateMany({
         where: { playerId, revokedAt: null },
         data: { revokedAt: new Date() },
