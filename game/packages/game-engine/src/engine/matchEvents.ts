@@ -38,6 +38,32 @@ function addedCards(before: readonly CardID[], after: readonly CardID[]): CardID
   return added;
 }
 
+/**
+ * 按 playerOrder 把一组牌认到离开各人手牌的牌上，返回每人认到几张；认到的牌从 leftHand 里扣掉，
+ * 后面的推导（转牌、放回牌库）不会重复认领。认不到的（翻开的牌库顶等）不算在任何人头上
+ */
+function takeFromHands(
+  order: readonly string[],
+  leftHand: Map<string, CardID[]>,
+  cards: readonly CardID[],
+): { player: string; count: number }[] {
+  const from: { player: string; count: number }[] = [];
+  const rest = [...cards];
+  for (const id of order) {
+    const left = leftHand.get(id) ?? [];
+    let count = 0;
+    for (let i = left.length - 1; i >= 0; i--) {
+      const at = rest.indexOf(left[i]!);
+      if (at < 0) continue;
+      rest.splice(at, 1);
+      left.splice(i, 1);
+      count += 1;
+    }
+    if (count > 0) from.push({ player: id, count });
+  }
+  return from;
+}
+
 /** 层号按数值升序 */
 function layerKeys(G: SetupState): number[] {
   return Object.keys(G.layers)
@@ -201,25 +227,63 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
   // cards_discarded：见上，弃牌堆里新增的牌去掉本步打出的牌（打出的牌由 card_played 表达）；
   // from 按 playerOrder 写明每张牌来自谁的手牌，不是从手牌弃掉的（翻开的牌库顶等）不计
   if (discarded.length > 0) {
-    const from: { player: string; count: number }[] = [];
-    const rest = [...discarded];
-    for (const id of order) {
-      const left = leftHand.get(id) ?? [];
-      let count = 0;
-      for (let i = left.length - 1; i >= 0; i--) {
-        const at = rest.indexOf(left[i]!);
-        if (at < 0) continue;
-        rest.splice(at, 1);
-        left.splice(i, 1);
-        count += 1;
-      }
-      if (count > 0) from.push({ player: id, count });
-    }
     events.push({
       kind: 'cards_discarded',
       actor: mover,
-      data: { count: discarded.length, cards: discarded, from },
+      data: {
+        count: discarded.length,
+        cards: discarded,
+        from: takeFromHands(order, leftHand, discarded),
+      },
     });
+  }
+
+  // cards_removed：本步移出游戏的牌（弃掉时间风暴时风暴本身），不含打出的那张（由 card_played 表达）；
+  // 移出游戏的牌公开，from 写明来自谁的手牌
+  if (removedNow.length > 0) {
+    events.push({
+      kind: 'cards_removed',
+      actor: mover,
+      data: { cards: removedNow.slice(), from: takeFromHands(order, leftHand, removedNow) },
+    });
+  }
+
+  // cards_returned：本步从手牌放回牌库的牌（嫁接、达尔文·淘汰、空间女王）。
+  // 牌库里新增的牌恰是某人离开手牌的牌；张数公开，是哪几张只给本人（与手牌的可见范围一致）
+  // 牌库多了牌而弃牌堆变少，是弃牌堆洗回牌库，不是放回
+  const refilled = reshuffled && after.deck.discardPile.length < before.deck.discardPile.length;
+  if (!refilled) {
+    // 放回的牌都在牌库顶：按从顶往下的顺序列出（同名牌取靠上的那张）
+    const counts = new Map<CardID, number>();
+    for (const c of addedCards(before.deck.cards, after.deck.cards)) {
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    const toDeck: CardID[] = [];
+    for (const c of after.deck.cards) {
+      const n = counts.get(c) ?? 0;
+      if (n === 0) continue;
+      counts.set(c, n - 1);
+      toDeck.push(c);
+    }
+    for (const id of order) {
+      if (toDeck.length === 0) break;
+      const left = leftHand.get(id) ?? [];
+      const cards: CardID[] = [];
+      for (const card of [...toDeck]) {
+        const at = left.indexOf(card);
+        if (at < 0) continue;
+        left.splice(at, 1);
+        toDeck.splice(toDeck.indexOf(card), 1);
+        cards.push(card);
+      }
+      if (cards.length === 0) continue;
+      events.push({
+        kind: 'cards_returned',
+        actor: mover,
+        data: { player: id, count: cards.length },
+        secret: { to: [id], data: { cards } },
+      });
+    }
   }
 
   // cards_transferred：一名玩家手里多出来的牌（不是从牌库抽的）恰是另一名玩家手里离开的牌，

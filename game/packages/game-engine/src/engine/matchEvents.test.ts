@@ -311,6 +311,43 @@ describe('事件 · 抽牌与阶段', () => {
     expect(one(events, 'cards_discarded').data).toMatchObject({ count: 10, cards: flipped });
   });
 
+  it('cards_removed：弃牌阶段弃掉时间风暴，风暴移出游戏，来自谁公开', () => {
+    const STORM = 'action_time_storm' as CardID;
+    // 牌库够深、翻开的牌与手牌不同名，避开「翻开的牌与手牌同名时可能被算成抽牌」的已知局限
+    const G = scene(
+      'discard',
+      { deck: { cards: Array<CardID>(12).fill(SHOOT), discardPile: [] } },
+      { p1: { hand: [STORM, KICK, KICK, KICK, KICK, KICK, KICK] } },
+    );
+    const { events, state } = step(load(G), 'p1', 'doDiscard', [[STORM, KICK]]);
+    expect(state.G.removedFromGame).toEqual([STORM]);
+    const ev = one(events, 'cards_removed');
+    expect(ev.data).toEqual({ cards: [STORM], from: [{ player: 'p1', count: 1 }] });
+    expect(ev.secret).toBeUndefined();
+  });
+
+  it('cards_removed：打出的时间风暴由 card_played 表达，不再重复写移出游戏', () => {
+    const STORM = 'action_time_storm' as CardID;
+    const G = scene(
+      'action',
+      { deck: { cards: Array<CardID>(12).fill(KICK), discardPile: [] } },
+      { p1: { hand: [STORM, KICK] } },
+    );
+    const { events } = step(load(G), 'p1', 'playTimeStorm', [STORM]);
+    expect(all(events, 'cards_removed')).toEqual([]);
+  });
+
+  it('cards_returned：嫁接把 2 张手牌放回牌库顶，张数公开，是哪几张只给本人', () => {
+    const G = scene('action', { pendingGraft: { playerID: 'p1' } });
+    const { events, state } = step(load(G), 'p1', 'resolveGraft', [[KICK, SHOOT]]);
+    expect(state.G.deck.cards.slice(0, 2)).toEqual([KICK, SHOOT]);
+    const ev = one(events, 'cards_returned');
+    expect(ev.data).toEqual({ player: 'p1', count: 2 });
+    expect(ev.secret).toEqual({ to: ['p1'], data: { cards: [KICK, SHOOT] } });
+    expect(all(events, 'cards_drawn')).toEqual([]);
+    expect(all(events, 'cards_discarded')).toEqual([]);
+  });
+
   it('turn_started：回合主人与回合数', () => {
     const { events, state } = step(load(scene('discard')), 'p1', 'skipDiscard');
     const ev = one(events, 'turn_started');
