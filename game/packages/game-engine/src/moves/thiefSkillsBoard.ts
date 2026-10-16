@@ -1,7 +1,6 @@
 // 盗梦者改变盘面的主动技能：移动与换层、复活、心锁增减、迷宫。
 
 import type { CardID, Layer } from '@icgame/shared';
-import { PLAYER_COUNT_CONFIGS } from '../config.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import {
   SAGITTARIUS_HEART_LOCK_SKILL_ID,
@@ -20,7 +19,7 @@ import {
   isShootClassCard,
   markSkillUsed,
 } from '../engine/skills.js';
-import { discardCard, incrementMoveCounter, setTurnPhase } from '../stateOps.js';
+import { discardCard, incrementMoveCounter, initialHeartLock, setTurnPhase } from '../stateOps.js';
 import type { SetupState } from '../setup.js';
 import { type MoveCtx, guardTurnPhase } from './common.js';
 import { openDiceGate } from './diceGate.js';
@@ -49,9 +48,9 @@ export const thiefBoardSkillMoves = {
       if (self.characterId !== 'thief_sagittarius') return INVALID_MOVE;
       if (!canUseSagittariusHeartLock(G, ctx.currentPlayer)) return INVALID_MOVE;
       if (!G.layers[layer]) return INVALID_MOVE;
-      // cap = 该层初始心锁数（对照 config）
-      const heartLocksTuple = PLAYER_COUNT_CONFIGS[G.playerOrder.length]?.heartLocks;
-      const cap = heartLocksTuple?.[layer - 1] ?? 3;
+      // 上限是该层开局时的心锁数；迷失层没有心锁
+      const cap = initialHeartLock(G, layer);
+      if (cap === null) return INVALID_MOVE;
       const result = applySagittariusHeartLock(G, ctx.currentPlayer, layer, delta, cap);
       if (result === null) return INVALID_MOVE;
       const settled = settleVaultOpened(G, result);
@@ -200,14 +199,9 @@ export const thiefBoardSkillMoves = {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
       const player = G.players[ctx.currentPlayer];
       if (!player) return INVALID_MOVE;
-      // 取本人当前层"原始"心锁数为 cap：使用 PLAYER_COUNT_CONFIGS 的初始值
-      const layerNum = player.currentLayer;
-      // heartLocks 是长度 4 的元组，layer 1-4 对应索引 0-3
-      const heartLocksTuple = PLAYER_COUNT_CONFIGS[G.playerOrder.length]?.heartLocks;
-      const cap =
-        heartLocksTuple && layerNum >= 1 && layerNum <= 4
-          ? ((heartLocksTuple as readonly number[])[layerNum - 1] ?? 5)
-          : 5;
+      // 上限是本人所在层开局时的心锁数；在迷失层发动不了
+      const cap = initialHeartLock(G, player.currentLayer);
+      if (cap === null) return INVALID_MOVE;
       // 能否发动与点数无关：先按任意点数试一次，能发动才开闸门，掷完见 settleMartyrSacrifice
       if (applyMartyrSacrifice(G, ctx.currentPlayer, 1, direction, cap) === null) {
         return INVALID_MOVE;

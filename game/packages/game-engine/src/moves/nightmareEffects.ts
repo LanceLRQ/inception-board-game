@@ -1,12 +1,16 @@
 // 梦魇牌的发动：效果分发，以及发动后该层梦魇的清理。
 
 import type { CardID } from '@icgame/shared';
-import { PLAYER_COUNT_CONFIGS } from '../config.js';
 import { sendToLimbo } from '../engine/death.js';
 import { INVALID_MOVE } from '../engine/invalidMove.js';
 import { dealBribeCard, inPoolBribeIndexes, isOutwardThief } from '../engine/skills.js';
 import type { SetupState } from '../setup.js';
-import { discardCards, movePlayerToLayer, setLayerHeartLock } from '../stateOps.js';
+import {
+  discardCards,
+  initialHeartLock,
+  movePlayerToLayer,
+  setLayerHeartLock,
+} from '../stateOps.js';
 import type { BGIORandom } from './common.js';
 import { openDiceGate } from './diceGate.js';
 
@@ -140,8 +144,7 @@ export function applyNightmareEffect(
     if (action === 'add') {
       newValue = tls.heartLockValue + 1;
     } else {
-      const cfg = PLAYER_COUNT_CONFIGS[G.playerOrder.length];
-      const original = cfg?.heartLocks[targetLayer - 1] ?? tls.heartLockValue;
+      const original = initialHeartLock(G, targetLayer) ?? tls.heartLockValue;
       newValue = Math.max(tls.heartLockValue, original);
     }
     return setLayerHeartLock(G, targetLayer, newValue);

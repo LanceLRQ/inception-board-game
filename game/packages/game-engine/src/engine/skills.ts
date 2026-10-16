@@ -4,11 +4,11 @@
 
 import type { SetupState, PlayerSetup, BribeSetup } from '../setup.js';
 import { seededShuffle } from '../prng.js';
-import { PLAYER_COUNT_CONFIGS } from '../config.js';
 import {
   drawCards,
   movePlayerToLayer,
   incrementMoveCounter,
+  initialHeartLock,
   discardCard,
   discardCards,
   recordCardPlayed,
@@ -2094,12 +2094,8 @@ export function applyBlackHoleReverse(
  * 对照：docs/manual/06-dream-master.md 黑洞 137 行「心锁数的原有数量，指的是游戏开始时心锁的配置数量」
  */
 export function getOriginalHeartLocks(state: SetupState): Record<number, number> {
-  const tuple = PLAYER_COUNT_CONFIGS[state.playerOrder.length]?.heartLocks;
   const caps: Record<number, number> = {};
-  if (!tuple) return caps;
-  tuple.forEach((n, i) => {
-    caps[i + 1] = n;
-  });
+  for (const layer of [1, 2, 3, 4]) caps[layer] = initialHeartLock(state, layer)!;
   return caps;
 }
 

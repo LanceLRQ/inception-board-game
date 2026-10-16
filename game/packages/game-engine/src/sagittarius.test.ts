@@ -94,7 +94,7 @@ describe('射手·禁足（preventMove）', () => {
 });
 
 describe('射手·穿心（useSagittariusHeartLock）', () => {
-  it('+1 心锁 → heartLockValue 增加（3 人局 cap=3 默认）', () => {
+  it('+1 心锁 → heartLockValue 增加', () => {
     let s = setupSagittarius();
     s = {
       ...s,
@@ -118,16 +118,16 @@ describe('射手·穿心（useSagittariusHeartLock）', () => {
     expect(r.layers[1]!.heartLockValue).toBe(2);
   });
 
-  it('已达上限 → 不变', () => {
+  it('已达上限（该层开局时的心锁数）→ 不变', () => {
     let s = setupSagittarius();
-    // 3 人局 cap 默认 3
+    // 上限取开局心锁数：3 人局不在配置表里，取最接近的 4 人档，第 1 层是 4
     s = {
       ...s,
-      layers: { ...s.layers, 1: { ...s.layers[1]!, heartLockValue: 3 } },
+      layers: { ...s.layers, 1: { ...s.layers[1]!, heartLockValue: 4 } },
     };
     const r = callMove(s, 'useSagittariusHeartLock', [1, 1], { currentPlayer: 'p1' });
     expectMoveOk(r);
-    expect(r.layers[1]!.heartLockValue).toBe(3);
+    expect(r.layers[1]!.heartLockValue).toBe(4);
   });
 
   it('已达下限 0 → 不变', () => {
@@ -173,6 +173,12 @@ describe('射手·穿心（useSagittariusHeartLock）', () => {
   it('非法层号 → INVALID_MOVE', () => {
     const s = setupSagittarius();
     const r = callMove(s, 'useSagittariusHeartLock', [5, 1], { currentPlayer: 'p1' });
+    expect(r).toBe('INVALID_MOVE');
+  });
+
+  it('迷失层没有心锁 → INVALID_MOVE', () => {
+    const s = setupSagittarius();
+    const r = callMove(s, 'useSagittariusHeartLock', [0, 1], { currentPlayer: 'p1' });
     expect(r).toBe('INVALID_MOVE');
   });
 });

@@ -1,6 +1,6 @@
 // 对局状态的底层操作：抽牌 / 弃牌 / 回合推进 / 移层 / 解封与心锁等纯函数（不 mutate 入参），供 move、回合钩子与技能执行器复用
 
-import { BASE_DRAW_COUNT } from './config.js';
+import { BASE_DRAW_COUNT, PLAYER_COUNT_CONFIGS } from './config.js';
 import type { SetupState } from './setup.js';
 import { LOST_LAYER, placePlayerInLayer, sendToLimbo } from './engine/death.js';
 
@@ -257,9 +257,17 @@ function grantFortressColdnessChance(
 // 键不是牌 / 技能标识，客户端从自己的视图读它来判断「移动」入口是否可用。
 export const MASTER_FREE_MOVE_KEY = 'master.freeMove';
 
-// === 判断相邻层 ===
-export function isAdjacentLayer(from: number, to: number): boolean {
-  return Math.abs(from - to) === 1;
+// === 某层开局时的心锁数 ===
+// 对照：docs/manual/02-game-setup.md:22 按配置表设置心锁的数量；只有 1-4 层有心锁。
+// 人数不在配置表里（目前只有测试用的 3 人局）时取最接近的一档。
+const CONFIGURED_COUNTS = Object.keys(PLAYER_COUNT_CONFIGS).map(Number);
+const MIN_CONFIGURED = Math.min(...CONFIGURED_COUNTS);
+const MAX_CONFIGURED = Math.max(...CONFIGURED_COUNTS);
+
+export function initialHeartLock(state: SetupState, layer: number): number | null {
+  if (layer < 1 || layer > 4) return null;
+  const n = Math.min(MAX_CONFIGURED, Math.max(MIN_CONFIGURED, state.playerOrder.length));
+  return PLAYER_COUNT_CONFIGS[n]!.heartLocks[layer - 1]!;
 }
 
 // === Move counter 递增 ===

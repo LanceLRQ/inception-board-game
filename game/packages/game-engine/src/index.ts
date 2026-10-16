@@ -14,7 +14,6 @@ export {
   endTurn,
   setTurnPhase,
   movePlayerToLayer,
-  isAdjacentLayer,
   recordCardPlayed,
   FORTRESS_COLDNESS_CHANCES_KEY,
   HEART_LOCK_REDUCED_BY_SKILL_KEY,

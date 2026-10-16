@@ -11,11 +11,12 @@ import {
   endTurn,
   setTurnPhase,
   movePlayerToLayer,
-  isAdjacentLayer,
+  initialHeartLock,
   incrementMoveCounter,
   applyUnlockSuccess,
   applyUnlockCancel,
 } from './stateOps.js';
+import { isAdjacent } from './moves/common.js';
 
 // 共享测试 fixture
 function makeState(overrides?: Partial<SetupState>): SetupState {
@@ -232,21 +233,37 @@ describe('moves', () => {
     });
   });
 
-  // === isAdjacentLayer ===
-  describe('isAdjacentLayer', () => {
-    it('returns true for adjacent layers', () => {
-      expect(isAdjacentLayer(1, 2)).toBe(true);
-      expect(isAdjacentLayer(3, 2)).toBe(true);
-      expect(isAdjacentLayer(3, 4)).toBe(true);
+  // === isAdjacent ===
+  describe('isAdjacent', () => {
+    it('returns true for adjacent dream layers', () => {
+      expect(isAdjacent(1, 2)).toBe(true);
+      expect(isAdjacent(3, 2)).toBe(true);
+      expect(isAdjacent(3, 4)).toBe(true);
     });
 
-    it('returns false for non-adjacent layers', () => {
-      expect(isAdjacentLayer(1, 3)).toBe(false);
-      expect(isAdjacentLayer(1, 4)).toBe(false);
+    it('returns false for non-adjacent or same layers', () => {
+      expect(isAdjacent(1, 3)).toBe(false);
+      expect(isAdjacent(1, 4)).toBe(false);
+      expect(isAdjacent(2, 2)).toBe(false);
     });
 
-    it('returns false for same layer', () => {
-      expect(isAdjacentLayer(2, 2)).toBe(false);
+    it('the lost layer is adjacent to nothing', () => {
+      expect(isAdjacent(0, 1)).toBe(false);
+      expect(isAdjacent(1, 0)).toBe(false);
+    });
+  });
+
+  // === initialHeartLock ===
+  describe('initialHeartLock', () => {
+    it('reads the setup heart lock count for the player count', () => {
+      const s = makeState();
+      expect([1, 2, 3, 4].map((l) => initialHeartLock(s, l))).toEqual([4, 3, 2, 1]);
+    });
+
+    it('is null outside layers 1-4', () => {
+      const s = makeState();
+      expect(initialHeartLock(s, 0)).toBeNull();
+      expect(initialHeartLock(s, 5)).toBeNull();
     });
   });
 
