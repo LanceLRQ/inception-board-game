@@ -45,6 +45,14 @@ describe('buildRealtime', () => {
     expect(await res.json()).toMatchObject({ status: 'ok' });
     expect(passThrough).toHaveBeenCalled();
 
+    // 运行指标：这次请求已计入，进行中的对局与实时连接都是 0
+    const text = rt.metrics.render();
+    expect(text).toContain('ico_http_requests_total{method="GET",status="2xx"} 1');
+    expect(text).toContain('ico_matches_active 0');
+    expect(text).toContain('ico_ws_connections 0');
+    await fetch(`http://127.0.0.1:${port}/no-such-route`);
+    expect(rt.metrics.render()).toContain('ico_http_requests_total{method="GET",status="4xx"} 1');
+
     await rt.stop();
     expect(rt.httpServer.listening).toBe(false);
     expect(timers.pending()).toEqual([]);

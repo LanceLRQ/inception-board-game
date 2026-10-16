@@ -621,7 +621,9 @@ describe('MatchService 对局结束', () => {
     const recordFinish = vi.spyOn(h.archive, 'recordFinish');
     const finish = vi.spyOn(h.store, 'finish');
     const dispose = vi.spyOn(h.bot, 'disposeMatch');
+    expect(h.svc.activeCount()).toBe(0);
     const id = await h.svc.createFromRoom(makeRoom(5));
+    expect(h.svc.activeCount()).toBe(1);
     const room = h.svc.get(id)!;
     const close = vi.spyOn(room, 'close');
 
@@ -642,6 +644,7 @@ describe('MatchService 对局结束', () => {
     h.timers.t += FINISHED_ROOM_LINGER_MS;
     await drain(h, id);
     expect(h.svc.get(id)).toBeNull();
+    expect(h.svc.activeCount()).toBe(0);
     expect(close).toHaveBeenCalled();
     expect(recordFinish).toHaveBeenCalledTimes(1);
   });

@@ -5,6 +5,7 @@ import { corsMiddleware, parseOrigins } from './middleware/cors.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { healthRouter } from './api/health.js';
+import type { MetricsRegistry } from './infra/metrics.js';
 import { createIdentityRouter, type IdentityPrisma } from './api/identity.js';
 import { createRoomsRouter } from './api/rooms.js';
 import { createInviteRouter, inviteConfigFromEnv, type InviteConfig } from './api/invite.js';
@@ -54,6 +55,8 @@ export interface AppDeps {
    * 由这几层代理追加的最靠前一个。后端端口直接暴露公网时保持 0
    */
   trustProxy?: number;
+  /** 运行指标；给了就记录每个 HTTP 请求的方法、状态码类别与耗时 */
+  metrics?: Pick<MetricsRegistry, 'observeHttp'>;
 }
 
 /** 解析 TRUST_PROXY：正整数是可信代理层数，未设置与其他取值都按 0（不信任） */
@@ -73,6 +76,18 @@ export function createApp(deps: AppDeps = {}): Koa {
   // 全局中间件；跨域在最外层，预检不计入限流，出错的响应也带跨域头
   if (deps.corsOrigin && parseOrigins(deps.corsOrigin).length > 0) {
     app.use(corsMiddleware(deps.corsOrigin));
+  }
+  // 指标在错误处理之外：出错的请求也按最终状态码计入
+  const metrics = deps.metrics;
+  if (metrics) {
+    app.use(async (ctx, next) => {
+      const start = performance.now();
+      try {
+        await next();
+      } finally {
+        metrics.observeHttp(ctx.method, ctx.status, (performance.now() - start) / 1000);
+      }
+    });
   }
   app.use(errorHandler);
   app.use(bodyParser());

@@ -94,6 +94,7 @@ cd inception-board-game/game
 | `PUBLIC_BASE_URL` | 建议填 | 站点对外地址（协议 + 域名，如 `https://ico.example.com`，不带路径）。房间邀请链接 `/invite/房间码` 对聊天软件的预览抓取器返回分享卡片，卡片里的链接与缩略图地址按它拼；留空则取请求里的 Host（经 nginx 时取 `X-Forwarded-Host`） |
 | `INVITE_IMAGE_PATH` | 可选 | 分享卡片的缩略图：站点根下的路径或完整地址，默认 `/pwa-512x512.png`（前端自带的应用图标） |
 | `REDIS_COMMAND_TIMEOUT_MS` | 可选 | Redis 单条命令的超时（毫秒），默认 5000；留空即默认，非法值也回落默认。连接半开时命令超时后按失败处理，不会一直挂住 |
+| `METRICS_PORT` | 可选 | 运行指标的单独端口，留空不开。开启后 `GET http://api:<端口>/metrics` 输出 Prometheus 文本格式：HTTP 请求数（按方法与状态码类别）与耗时分布、进程内存与 CPU、进行中的对局数、实时连接数。它不经 nginx，也不要映射到宿主机公网端口；Prometheus 放在同一个 Docker 网络里抓取 |
 | `CLIENT_PORT` | 可选 | 前端对外端口，默认 80（对所有网卡开放）；如被占用改为 8080 |
 | `API_PORT` | 可选 | 后端在宿主机上的端口，默认 3001；只绑定本机（`127.0.0.1`），用于本机探活与排查。局域网和公网用户通过前端端口访问，由 nginx 转发到后端。Postgres 与 Redis 不映射宿主机端口 |
 | `LOG_LEVEL` | 可选 | 生产建议 `info`，调试用 `debug` |

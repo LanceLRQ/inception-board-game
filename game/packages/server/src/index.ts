@@ -2,6 +2,7 @@ import { trustProxyFromEnv } from './app.js';
 import { purgeExpiredShortLinks } from './api/shortLink.js';
 import { buildRealtime, timingFromEnv } from './bootstrap.js';
 import { logger } from './infra/logger.js';
+import { metricsPortFromEnv, startMetricsServer } from './infra/metrics.js';
 import { startPeriodic } from './infra/periodic.js';
 import { prisma } from './infra/postgres.js';
 import { createRedisClient } from './infra/redis.js';
@@ -72,6 +73,9 @@ const realtime = buildRealtime({
 /** 过期短链的清理间隔 */
 const SHORT_LINK_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 let stopShortLinkCleanup: () => void = () => {};
+/** 运行指标的单独端口；不设 METRICS_PORT 就不开 */
+const METRICS_PORT = metricsPortFromEnv(process.env.METRICS_PORT);
+let metricsServer: { close(): void } | null = null;
 
 async function main(): Promise<void> {
   try {
@@ -90,11 +94,21 @@ async function main(): Promise<void> {
     },
   );
   logger.info({ port }, 'Server started (HTTP + WS)');
+  if (METRICS_PORT !== null) {
+    try {
+      metricsServer = await startMetricsServer(realtime.metrics, METRICS_PORT);
+      logger.info({ port: METRICS_PORT }, 'metrics server started');
+    } catch (err) {
+      // 指标不可用不影响对局服务
+      logger.error({ err, port: METRICS_PORT }, 'metrics server failed to start');
+    }
+  }
 }
 
 const shutdown = (signal: string, exitCode = 0) => {
   logger.info({ signal }, 'Shutting down');
   stopShortLinkCleanup();
+  metricsServer?.close();
   realtime
     .stop()
     .catch((err: unknown) => logger.error({ err }, 'shutdown failed'))

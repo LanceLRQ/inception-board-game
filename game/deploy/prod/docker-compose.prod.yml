@@ -65,8 +65,10 @@ services:
       # 邀请链接分享卡片：站点对外地址（留空则取请求里的 Host）与缩略图路径
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       INVITE_IMAGE_PATH: ${INVITE_IMAGE_PATH:-/pwa-512x512.png}
-      # api 前面是 nginx，限流按 X-Forwarded-For 的真实来源地址计数；后端端口直接暴露公网时不要开启
+      # api 前面可信反向代理的层数：自带 nginx 是 1，nginx 前再加一层 CDN / 负载均衡时为 2；后端端口直接暴露公网时设 0
       TRUST_PROXY: ${TRUST_PROXY:-1}
+      # 运行指标的单独端口（Prometheus 文本格式，GET /metrics）；留空不开。不映射到宿主机，同一网络里的 Prometheus 抓 api:<端口>
+      METRICS_PORT: ${METRICS_PORT:-}
       HTTP_RATE_LIMIT_PER_MINUTE: ${HTTP_RATE_LIMIT_PER_MINUTE:-300}
       REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}

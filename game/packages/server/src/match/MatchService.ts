@@ -162,6 +162,11 @@ export class MatchService {
     return this.rooms.get(matchID) ?? null;
   }
 
+  /** 本进程里正在运行的对局数（含刚结束、还在延迟移除的） */
+  activeCount(): number {
+    return this.rooms.size;
+  }
+
   /** 账号在这局里的座位；只认真人座位，不在返回 null */
   seatOf(matchID: string, playerId: string): string | null {
     if (playerId === '') return null;

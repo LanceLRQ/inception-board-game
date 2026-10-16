@@ -9,6 +9,7 @@ import type { Middleware } from 'koa';
 import { createApp } from './app.js';
 import type { InviteConfig } from './api/invite.js';
 import type { IdentityPrisma } from './api/identity.js';
+import { MetricsRegistry } from './infra/metrics.js';
 import type { ReportsRouterDeps } from './api/reports.js';
 import { logger } from './infra/logger.js';
 import type { MatchArchive } from './match/MatchArchive.js';
@@ -85,6 +86,8 @@ export interface Realtime {
   matches: MatchService;
   lobby: LobbyService;
   bot: BotManager;
+  /** 运行指标；由入口按 METRICS_PORT 决定是否在单独端口上提供 */
+  metrics: MetricsRegistry;
   /** 开始监听，返回实际端口（传 0 时由系统分配） */
   start(port: number): Promise<number>;
   /** 停 Bot 定时器、关房间、断开网关、关 HTTP */
@@ -152,8 +155,15 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     matches,
     onRoomChange: (room) => rooms.publish(room),
   });
+  const metrics = new MetricsRegistry({
+    gauges: {
+      ico_matches_active: () => matches.activeCount(),
+      ico_ws_connections: () => registry.size(),
+    },
+  });
   const app = createApp({
     lobby,
+    metrics,
     rateLimit: deps.httpRateLimit,
     archive: deps.archive,
     identityPrisma: deps.identityPrisma,
@@ -179,6 +189,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     matches,
     lobby,
     bot,
+    metrics,
     start(port) {
       bot.start();
       return new Promise<number>((resolve, reject) => {
