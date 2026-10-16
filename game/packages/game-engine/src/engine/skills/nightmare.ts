@@ -18,22 +18,6 @@ import { isMarsBattlefieldWorldActive } from './masterWorldviews.js';
 //   2. 翻开该层梦魇并发动效果，不派发贿赂牌
 //   3. 弃掉该层梦魇，不派发贿赂牌
 
-/** 找出所有「金币金库已开 + 同层有未翻开梦魇」的层（待梦主决策） */
-export function findCoinVaultsWithHiddenNightmare(state: SetupState): number[] {
-  const result: number[] = [];
-  for (const v of state.vaults) {
-    if (!v.isOpened) continue;
-    if (v.contentType !== 'coin') continue;
-    const ls = state.layers[v.layer];
-    if (!ls) continue;
-    if (!ls.nightmareId) continue;
-    if (ls.nightmareRevealed) continue;
-    if (ls.nightmareTriggered) continue;
-    result.push(v.layer);
-  }
-  return result;
-}
-
 /** 弃掉指定层的梦魇（不发动）：离开棋盘、记为已发动并计入已用梦魇；该层没有梦魇时原样返回 */
 export function discardNightmareOnLayer(state: SetupState, layer: number): SetupState {
   const ls = state.layers[layer];

@@ -4,12 +4,23 @@ import type { Faction } from '@icgame/shared';
 import { checkHarborWin, checkNeptuneWin } from './engine/skills.js';
 import type { SetupState } from './setup.js';
 
+/** 引擎可能给出的胜负原因（客户端按它们取文案，测试对账） */
+export const WIN_REASONS = [
+  'secret_vault_opened',
+  'harbor_two_vaults',
+  'neptune_coin_opened',
+  'deck_exhausted',
+] as const;
+export type WinReason = (typeof WIN_REASONS)[number];
+
+const end = (winner: Faction, reason: WinReason) => ({ winner, reason });
+
 export function matchEndIf({ G }: { G: SetupState }) {
   if (!G?.vaults) return undefined;
 
   const secretVault = G.vaults.find((v) => v.contentType === 'secret');
   if (secretVault?.isOpened) {
-    return { winner: 'thief' as Faction, reason: 'secret_vault_opened' };
+    return end('thief', 'secret_vault_opened');
   }
 
   // 盗梦者全部在迷失层不是终局：迷失层的玩家仍可在自己回合的出牌阶段弃 2 张牌复活自己
@@ -18,19 +29,19 @@ export function matchEndIf({ G }: { G: SetupState }) {
   // 港口世界观：≥2 金库打开且秘密未开 → 梦主胜
   // 对照：docs/manual/06-dream-master.md 港口 世界观
   if (checkHarborWin(G)) {
-    return { winner: 'master' as Faction, reason: 'harbor_two_vaults' };
+    return end('master', 'harbor_two_vaults');
   }
 
   // 海王星·泓洋世界观：金币金库被打开 → 梦主胜
   // 对照：docs/manual/06-dream-master.md 海王星·泓洋 世界观
   if (checkNeptuneWin(G)) {
-    return { winner: 'master' as Faction, reason: 'neptune_coin_opened' };
+    return end('master', 'neptune_coin_opened');
   }
 
   // 牌库耗尽 + 秘密金库未开 → 梦主胜
   // 对照：docs/manual/03-game-flow.md 第 20 行
   if (G.deck && G.deck.cards.length === 0 && G.phase === 'playing') {
-    return { winner: 'master' as Faction, reason: 'deck_exhausted' };
+    return end('master', 'deck_exhausted');
   }
 
   return undefined;

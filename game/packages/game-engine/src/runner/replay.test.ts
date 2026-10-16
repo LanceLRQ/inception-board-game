@@ -217,21 +217,13 @@ describe('事件流', () => {
         // 死亡次数减复活次数：为 0 就是活着，为 1 就是死着
         expect(deaths - revives).toBe(G.players[id]!.isAlive ? 0 : 1);
 
-        // 解封计数：心锁下降的解封都算。迷失层没有心锁，那里的解封照常走完待解封流程，
-        // 引擎照样给解封者记一次 unlockCount，但心锁不变，事件里表现为 success 为否。
-        // 被【解封】取消的解封（respondCancelUnlock）在事件里同样是 success 为否，
-        // 单看事件分不出两者，所以按产生这条事件的 move 区分：取消的不计数，其余迷失层的照计。
+        // 解封计数：只算成功的解封（被【解封】效果②抵消的在事件里 success 为否，不计）。
+        // 迷失层里只有不在场的玩家，引擎拒绝他们解封，所以不会出现第 0 层的解封事件
         const unlockEvents = events.filter(
           (e) => e.kind === 'unlock_resolved' && e.data.player === id,
         );
-        const lostLayerUnlocks = unlockEvents.filter(
-          (e) =>
-            e.data.success === false &&
-            e.data.layer === 0 &&
-            p.record.moves[e.stateID - 1]!.move !== 'respondCancelUnlock',
-        ).length;
-        const unlocks =
-          unlockEvents.filter((e) => e.data.success === true).length + lostLayerUnlocks;
+        expect(unlockEvents.filter((e) => e.data.layer === 0)).toEqual([]);
+        const unlocks = unlockEvents.filter((e) => e.data.success === true).length;
         expect(unlocks, `${p.record.seed} ${id}`).toBe(G.players[id]!.unlockCount);
 
         const vaults = count('vault_opened', (e) => e.data.openedBy, id);

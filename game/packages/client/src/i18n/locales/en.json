@@ -122,7 +122,8 @@
     "decreeClear": "Clear Decree",
     "winReason": {
       "secret_vault_opened": "Thieves opened the secret vault",
-      "all_thieves_dead": "All thieves eliminated",
+      "harbor_two_vaults": "Two vaults opened while the secret vault stays shut (Harbor world view)",
+      "neptune_coin_opened": "A coin vault was opened (Ocean world view)",
       "deck_exhausted": "Deck exhausted, secret vault unopened"
     },
     "bribeTitle": "Deal Bribe Cards",
@@ -347,31 +348,18 @@
     "chooseMultiCards": "Multi-select hand cards:",
     "chooseLayer": "Choose layer:",
     "chooseDiscardCard": "Pick 1 from discard pile:",
-    "chooseBribe": "Choose bribe:",
     "chooseTwoNonShoot": "Discard 2 non-SHOOT cards:",
     "chooseDiscardShoot": "Pick 1 SHOOT from discard pile:",
     "choiceIncrease": "+",
     "choiceDecrease": "-",
     "master": {
-      "reveal_nightmare": {
-        "name": "Reveal Nightmare",
-        "desc": "Reveal a face-down nightmare on the target layer"
-      },
       "discard_nightmare": {
         "name": "Discard Nightmare",
         "desc": "Discard a face-up nightmare on the target layer"
       },
-      "discard_hidden_nightmare": {
-        "name": "Discard Hidden Nightmare",
-        "desc": "Discard a face-down nightmare on the target layer"
-      },
       "activate_nightmare": {
         "name": "Activate Nightmare",
         "desc": "Activate a face-up nightmare on the target layer"
-      },
-      "deal_bribe": {
-        "name": "Deal Bribe",
-        "desc": "Randomly deal 1 bribe from the pool to a chosen thief"
       }
     },
     "thief_shade": {

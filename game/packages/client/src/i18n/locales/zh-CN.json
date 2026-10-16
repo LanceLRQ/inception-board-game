@@ -122,7 +122,8 @@
     "decreeClear": "取消宣言",
     "winReason": {
       "secret_vault_opened": "盗梦者打开了秘密金库",
-      "all_thieves_dead": "所有盗梦者阵亡",
+      "harbor_two_vaults": "两个金库已被打开，秘密金库仍未打开（港口世界观）",
+      "neptune_coin_opened": "金币金库被打开（泓洋世界观）",
       "deck_exhausted": "牌库耗尽，秘密金库未被打开"
     },
     "bribeTitle": "派发贿赂牌",
@@ -347,31 +348,18 @@
     "chooseMultiCards": "多选手牌：",
     "chooseLayer": "选择层：",
     "chooseDiscardCard": "从弃牌堆选 1 张：",
-    "chooseBribe": "选择贿赂：",
     "chooseTwoNonShoot": "选 2 张非 SHOOT 手牌弃掉：",
     "chooseDiscardShoot": "从弃牌堆选 1 张 SHOOT：",
     "choiceIncrease": "+",
     "choiceDecrease": "-",
     "master": {
-      "reveal_nightmare": {
-        "name": "显现梦魇",
-        "desc": "翻开目标层的一张暗置梦魇牌"
-      },
       "discard_nightmare": {
         "name": "弃置梦魇",
         "desc": "弃掉目标层的一张明置梦魇"
       },
-      "discard_hidden_nightmare": {
-        "name": "弃置暗置梦魇",
-        "desc": "弃掉目标层的一张暗置梦魇"
-      },
       "activate_nightmare": {
         "name": "激活梦魇",
         "desc": "激活目标层的一张明置梦魇"
-      },
-      "deal_bribe": {
-        "name": "派发贿赂",
-        "desc": "从贿赂池随机派 1 张贿赂给指定盗梦者"
       }
     },
     "thief_shade": {

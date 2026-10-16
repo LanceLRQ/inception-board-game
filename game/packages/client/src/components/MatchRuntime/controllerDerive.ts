@@ -419,9 +419,6 @@ export function buildActiveSkillContext(input: SkillContextInput): ActiveSkillCo
       typeof humanPlayer?.successfulUnlocksThisTurn === 'number'
         ? (humanPlayer.successfulUnlocksThisTurn as number)
         : 0,
-    bribePoolAvailable: Array.isArray(G.bribePool)
-      ? G.bribePool.some((b) => b.status === 'inPool')
-      : false,
     lostPlayerIds: activeSkillLostTargetIds(players, seat),
     sameLayerPlayerIds: players
       ? Object.entries(players)

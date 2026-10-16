@@ -310,7 +310,6 @@ describe('getAvailableActiveSkills · 梦主梦魇操作（通用）', () => {
       baseCtx({
         faction: 'master',
         characterId: 'dm_imperial_city',
-        bribePoolAvailable: true,
         bribePoolItems: [{ index: 0, id: 'bribe-0' }],
       }),
     );

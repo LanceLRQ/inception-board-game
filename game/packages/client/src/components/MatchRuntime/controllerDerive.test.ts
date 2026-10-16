@@ -628,7 +628,6 @@ describe('buildActiveSkillContext', () => {
       .filter((b) => b.status === 'inPool')
       .map(({ index, id }) => ({ index, id }));
     expect(c.bribePoolItems).toEqual(expected);
-    expect(c.bribePoolAvailable).toBe(expected.length > 0);
   });
 
   it('待决状态存在时 hasPending 为真', () => {

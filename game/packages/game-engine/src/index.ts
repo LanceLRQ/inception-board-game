@@ -2,6 +2,7 @@
 
 // 导出游戏核心
 export { InceptionCityGame } from './game.js';
+export { WIN_REASONS, type WinReason } from './endCondition.js';
 export { INVALID_MOVE } from './engine/invalidMove.js';
 export type { SetupState } from './game.js';
 export { createInitialState } from './setup.js';
@@ -166,7 +167,6 @@ export {
   BLACK_SWAN_SKILL_ID,
   SPACE_QUEEN_OBSERVE_SKILL_ID,
   SPACE_QUEEN_TOP_SKILL_ID,
-  findCoinVaultsWithHiddenNightmare,
   findMasterID,
   applyDiscardHiddenNightmare,
 } from './engine/skills.js';

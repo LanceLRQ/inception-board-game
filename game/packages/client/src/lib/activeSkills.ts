@@ -25,7 +25,6 @@ export type ActiveSkillArgKind =
   | 'multiCard'
   | 'multiCardAndPlayer'
   | 'multiCardAndDiscardCard'
-  | 'playerAndBribeIndex'
   | 'twoCardsAndShoot'
   // 以下几种由 skillSteps.ts 的分步表单处理：按参数形态命名，步骤顺序见 STEP_FORMS
   | 'multiCardAndPlayers'
@@ -208,15 +207,13 @@ export interface ActiveSkillContext {
   readonly hasBribe?: boolean;
   /** 本回合成功解封次数（哈雷·冲击触发前提） */
   readonly successfulUnlocksThisTurn?: number;
-  /** 贿赂池是否仍有可派发项（梦主派贿赂前提） */
-  readonly bribePoolAvailable?: boolean;
   /** 在迷失层的其他玩家 id 列表（灵魂牧师·拯救用） */
   readonly lostPlayerIds?: readonly string[];
   /** 与人类玩家同层的其他存活玩家 id 列表（盖亚·撼动等同层技能用） */
   readonly sameLayerPlayerIds?: readonly string[];
   /** 弃牌堆（战争之王·黑市等选弃牌堆技能用） */
   readonly discardPile?: readonly string[];
-  /** 贿赂池中仍 inPool 的项（皇城·重金用）：{ index, id } 对；id 是不透明的标识，看不出成败 */
+  /** 贿赂池中仍 inPool 的项（天王星·权力的次数上限与分步表单用）：{ index, id } 对；id 是不透明的标识，看不出成败 */
   readonly bribePoolItems?: readonly { readonly index: number; readonly id: string }[];
   /** 火星·战场世界观是否激活（= 当前梦主 = dm_mars_battlefield） */
   readonly marsBattlefieldActive?: boolean;
@@ -1119,7 +1116,6 @@ const NEEDS_TARGET: readonly ActiveSkillArgKind[] = [
   'playerAndLayer',
   'playerAndCard',
   'multiCardAndPlayer',
-  'playerAndBribeIndex',
 ];
 
 /** 推导当前人类玩家可见的主动技能项：该显示的都显示，此刻用不了的带原因 */
