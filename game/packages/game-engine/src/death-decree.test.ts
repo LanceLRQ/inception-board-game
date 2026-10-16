@@ -119,7 +119,7 @@ function shoot(G: SetupState, roll: number, decreeId?: string) {
 
 function shootKing(G: SetupState, roll: number, decreeId?: string) {
   return completeDiceGates(
-    moves.playShootKing.move(
+    moves.playShootAssassin.move(
       {
         G,
         ctx: { numPlayers: 2, currentPlayer: '0', playOrder: G.playerOrder, playOrderPos: 0 },
@@ -178,7 +178,7 @@ describe('死亡宣言 · playShoot', () => {
   });
 });
 
-describe('死亡宣言 · 变体 playShootKing', () => {
+describe('死亡宣言 · 变体 playShootAssassin', () => {
   it('骰 4 无宣言 → 移动（king 死面 [1,2]）', () => {
     const s = makeState();
     s.players['0']!.hand = ['action_shoot_assassin'] as CardID[];

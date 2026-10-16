@@ -279,8 +279,8 @@ export function effectivePendingPlay(
 
 const SHOOT_MOVES: readonly string[] = [
   'playShoot',
-  'playShootKing',
-  'playShootArmor',
+  'playShootAssassin',
+  'playShootDrill',
   'playShootBurst',
   'playShootSudger',
 ];

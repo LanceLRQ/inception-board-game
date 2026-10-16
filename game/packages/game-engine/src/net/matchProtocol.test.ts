@@ -341,6 +341,6 @@ describe('parseClientMatchMessage', () => {
   // === 协议版本常量 ===
 
   it('should export MATCH_PROTOCOL_VERSION constant', () => {
-    expect(MATCH_PROTOCOL_VERSION).toBe(1);
+    expect(MATCH_PROTOCOL_VERSION).toBe(2);
   });
 });

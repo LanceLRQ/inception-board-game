@@ -417,7 +417,7 @@ describe('出牌意图', () => {
 
 describe('死亡宣言', () => {
   it('SHOOT 系 move 才算 SHOOT', () => {
-    for (const move of ['playShoot', 'playShootKing', 'playShootArmor', 'playShootBurst']) {
+    for (const move of ['playShoot', 'playShootAssassin', 'playShootDrill', 'playShootBurst']) {
       expect(isShootMove(move)).toBe(true);
     }
     expect(isShootMove('playKick')).toBe(false);
@@ -486,7 +486,7 @@ describe('buildPlayArgs', () => {
   });
 
   it('目标玩家 · target_first 的 SHOOT 系带宣言：宣言附在末位', () => {
-    for (const move of ['playShoot', 'playShootKing', 'playShootArmor', 'playShootBurst']) {
+    for (const move of ['playShoot', 'playShootAssassin', 'playShootDrill', 'playShootBurst']) {
       const p = play({ move, argOrder: 'target_first' });
       expect(buildPlayArgs(p, '4', 'decree_a')).toEqual(['4', 'card_x', 'decree_a']);
     }
@@ -530,8 +530,8 @@ describe('意念判官：打出 SHOOT 类牌改走【定罪】', () => {
   it.each([
     ['action_shoot', 'playShoot'],
     ['action_shoot_burst', 'playShootBurst'],
-    ['action_shoot_assassin', 'playShootKing'],
-    ['action_shoot_drill', 'playShootArmor'],
+    ['action_shoot_assassin', 'playShootAssassin'],
+    ['action_shoot_drill', 'playShootDrill'],
   ])('%s：move 由 %s 换成 playShootSudger，参数顺序与宣言不变', (card, move) => {
     const base = pendingPlayFor(card)!;
     expect(base.move).toBe(move);

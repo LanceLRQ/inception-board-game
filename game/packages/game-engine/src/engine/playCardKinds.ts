@@ -12,8 +12,8 @@ import type { CardID } from '@icgame/shared';
  */
 export const PLAY_MOVE_CARD_IDS: Readonly<Record<string, readonly string[]>> = {
   playShoot: ['action_shoot'],
-  playShootKing: ['action_shoot_assassin'],
-  playShootArmor: ['action_shoot_drill'],
+  playShootAssassin: ['action_shoot_assassin'],
+  playShootDrill: ['action_shoot_drill'],
   playShootBurst: ['action_shoot_burst'],
   playShootDreamTransit: ['action_shoot_dream_transit'],
   playUnlock: ['action_unlock'],

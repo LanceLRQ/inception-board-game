@@ -5,8 +5,8 @@ import { actionMoveFor, getCharacterSkillSummary } from './cards';
 
 describe('actionMoveFor', () => {
   it('routes the assassin and the drill to their own moves', () => {
-    expect(actionMoveFor('action_shoot_assassin')?.move).toBe('playShootKing');
-    expect(actionMoveFor('action_shoot_drill')?.move).toBe('playShootArmor');
+    expect(actionMoveFor('action_shoot_assassin')?.move).toBe('playShootAssassin');
+    expect(actionMoveFor('action_shoot_drill')?.move).toBe('playShootDrill');
   });
 
   it('only returns a move that the engine accepts for that card', () => {

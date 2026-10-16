@@ -101,10 +101,10 @@ describe('行动牌快照回归 · 21 卡', () => {
   // -------------------------------------------------------------------------
   // 4. SHOOT · 刺客之王（任意层 · 1/2 死 · 3-5 移）
   // -------------------------------------------------------------------------
-  it('4. playShootKing · 跨层 · 骰 1 → target 死亡', () => {
+  it('4. playShootAssassin · 跨层 · 骰 1 → target 死亡', () => {
     let s = withHand(baseline(), 'p1', ['action_shoot_assassin' as CardID]);
     s = placePlayer(s, 'p2', 3 as Layer);
-    const r = callMove(s, 'playShootKing', ['p2', 'action_shoot_assassin' as CardID], {
+    const r = callMove(s, 'playShootAssassin', ['p2', 'action_shoot_assassin' as CardID], {
       rolls: [1],
     });
     expectMoveOk(r);
@@ -114,10 +114,10 @@ describe('行动牌快照回归 · 21 卡', () => {
   // -------------------------------------------------------------------------
   // 5. SHOOT · 爆甲螺旋（同层 · 3-5 移 + 弃 target 解封）
   // -------------------------------------------------------------------------
-  it('5. playShootArmor · 骰 4 → target 移层 + 弃所有解封', () => {
+  it('5. playShootDrill · 骰 4 → target 移层 + 弃所有解封', () => {
     let s = withHand(baseline(), 'p1', ['action_shoot_drill' as CardID]);
     s = withHand(s, 'p2', ['action_unlock', 'action_unlock', 'action_kick'] as CardID[]);
-    const r = callMove(s, 'playShootArmor', ['p2', 'action_shoot_drill' as CardID], { rolls: [4] });
+    const r = callMove(s, 'playShootDrill', ['p2', 'action_shoot_drill' as CardID], { rolls: [4] });
     expectMoveOk(r);
     expect(pickRelevantState(r)).toMatchSnapshot();
   });

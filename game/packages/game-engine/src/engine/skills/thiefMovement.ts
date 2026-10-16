@@ -137,8 +137,8 @@ export function isShootClassCard(cardId: CardID): boolean {
 // 迷宫允许的行动牌（对照：docs/manual/05-dream-thieves.md 筑梦师）
 const MAZE_ALLOWED_MOVES = new Set([
   'playShoot',
-  'playShootKing',
-  'playShootArmor',
+  'playShootAssassin',
+  'playShootDrill',
   'playShootBurst',
   'playShootDreamTransit',
   'playUnlock',

@@ -79,8 +79,8 @@ describe('SHOOT 参数表', () => {
     it('should have a profile for every card a SHOOT play move accepts', () => {
       for (const move of [
         'playShoot',
-        'playShootKing',
-        'playShootArmor',
+        'playShootAssassin',
+        'playShootDrill',
         'playShootBurst',
         'playShootDreamTransit',
       ]) {

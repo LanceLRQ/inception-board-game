@@ -52,7 +52,7 @@ describe('planActionPlays · 盗梦者', () => {
     });
     const { thieves, master } = seatIds(s.G);
     const out = plan(s, thieves[0]!);
-    expect(out.map((p) => p.move)).toEqual(['playShootArmor', 'playShoot']);
+    expect(out.map((p) => p.move)).toEqual(['playShootDrill', 'playShoot']);
     expect(out[0]!.args).toEqual([master, 'action_shoot_drill']);
   });
 

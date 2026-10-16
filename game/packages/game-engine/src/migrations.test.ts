@@ -513,8 +513,8 @@ describe('migrations', () => {
       return { ...older, schemaVersion: version };
     }
 
-    it('版本号升到 18', () => {
-      expect(CURRENT_SCHEMA_VERSION).toBe(18);
+    it('版本号升到 19', () => {
+      expect(CURRENT_SCHEMA_VERSION).toBe(19);
     });
 
     it('旧存档补齐四个等待字段为 null，并升到当前版本', () => {
@@ -570,10 +570,38 @@ describe('migrations', () => {
       delete at17.pendingDiceRoll;
       delete at17.lastDiceRoll;
       const migrated = migrateGameState(at17);
-      expect(migrated.schemaVersion).toBe(18);
+      expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(migrated.pendingDiceRoll).toBeNull();
       expect(migrated.lastDiceRoll).toBeNull();
       expect(migrated.pendingSaturnDecree).toEqual(decree);
+    });
+
+    it('v18 → v19：挂起出牌里存的旧 move 名换成与牌 id 一致的新名，其他 move 不动', () => {
+      const wit = {
+        athenaID: '1',
+        userID: '0',
+        cardId: 'action_shoot_assassin',
+        move: 'playShootKing',
+        args: ['1', 'action_shoot_assassin'],
+      };
+      const decree = {
+        masterID: '4',
+        userID: '2',
+        cardId: 'action_shoot_drill',
+        move: 'playShootArmor',
+        args: ['3', 'action_shoot_drill'],
+      };
+      const migrated = migrateGameState({
+        ...stateAt(18),
+        pendingAthenaWit: wit,
+        pendingSaturnDecree: decree,
+      });
+      expect(migrated.pendingAthenaWit).toEqual({ ...wit, move: 'playShootAssassin' });
+      expect(migrated.pendingSaturnDecree).toEqual({ ...decree, move: 'playShootDrill' });
+
+      const kick = { ...wit, cardId: 'action_kick', move: 'playKick' };
+      const other = migrateGameState({ ...stateAt(18), pendingAthenaWit: kick });
+      expect(other.pendingAthenaWit).toEqual(kick);
     });
   });
 });

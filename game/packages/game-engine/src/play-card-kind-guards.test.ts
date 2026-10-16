@@ -87,8 +87,8 @@ function attempt(G: SetupState, move: string, args: unknown[], roll = 3) {
 // move 名 → 用「该牌」打出时的参数（冒充时把 card 换成别的牌）
 const CALLS: Array<{ move: string; right: string; args: (card: CardID) => unknown[] }> = [
   { move: 'playShoot', right: 'action_shoot', args: (cd) => ['p2', cd] },
-  { move: 'playShootKing', right: 'action_shoot_assassin', args: (cd) => ['p2', cd] },
-  { move: 'playShootArmor', right: 'action_shoot_drill', args: (cd) => ['p2', cd] },
+  { move: 'playShootAssassin', right: 'action_shoot_assassin', args: (cd) => ['p2', cd] },
+  { move: 'playShootDrill', right: 'action_shoot_drill', args: (cd) => ['p2', cd] },
   { move: 'playShootBurst', right: 'action_shoot_burst', args: (cd) => ['p2', cd] },
   {
     move: 'playShootDreamTransit',

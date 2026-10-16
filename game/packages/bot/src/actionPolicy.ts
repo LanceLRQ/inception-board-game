@@ -34,9 +34,9 @@ const CARD = {
  * 对照：docs/manual/04-action-cards.md SHOOT 各变体
  */
 const SAME_LAYER_SHOOTS: readonly { move: string; card: string; label: string }[] = [
-  { move: 'playShootArmor', card: 'action_shoot_drill', label: 'SHOOT·爆甲螺旋' },
+  { move: 'playShootDrill', card: 'action_shoot_drill', label: 'SHOOT·爆甲螺旋' },
   { move: 'playShootBurst', card: 'action_shoot_burst', label: 'SHOOT·炸裂弹头' },
-  { move: 'playShootKing', card: 'action_shoot_assassin', label: 'SHOOT·刺客之王' },
+  { move: 'playShootAssassin', card: 'action_shoot_assassin', label: 'SHOOT·刺客之王' },
   { move: 'playShoot', card: 'action_shoot', label: 'SHOOT' },
 ];
 

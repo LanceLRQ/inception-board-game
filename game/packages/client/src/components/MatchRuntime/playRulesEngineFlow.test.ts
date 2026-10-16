@@ -358,7 +358,9 @@ describe('SHOOT 跨层目标：界面与引擎一致', () => {
     const s = shootScene('thief_aries', cards('action_shoot_assassin'));
     const options = optionsOf(s.state, s.me, 'action_shoot_assassin');
     expect(options.every((o) => !o.disabled && !o.crossLayerAllowed)).toBe(true);
-    expect(apply(s.state, s.me, 'playShootKing', [s.far, 'action_shoot_assassin'])).not.toBeNull();
+    expect(
+      apply(s.state, s.me, 'playShootAssassin', [s.far, 'action_shoot_assassin']),
+    ).not.toBeNull();
   });
 });
 
@@ -402,7 +404,7 @@ describe('射手·禁足', () => {
   it('只有普通 SHOOT 带禁足参数：刺客之王等不附加', () => {
     const king = {
       card: 'action_shoot_assassin',
-      move: 'playShootKing',
+      move: 'playShootAssassin',
       needsTarget: 'player' as const,
     };
     expect(buildPlayArgs(king, '3', null, true)).toEqual(['3', 'action_shoot_assassin']);

@@ -165,12 +165,12 @@ describe('lastShootRoll 记录', () => {
   });
 });
 
-describe('SHOOT·刺客之王（playShootKing）', () => {
+describe('SHOOT·刺客之王（playShootAssassin）', () => {
   it('任意层均可使用（L2 目标命中 move → 挂起 pendingShootMove.choices=[1,3]）', () => {
     const s = makeState();
     // target 处于不同层
     s.players['1']!.currentLayer = 2;
-    const r = callMove('playShootKing', s, '1', 'action_shoot_assassin', 4);
+    const r = callMove('playShootAssassin', s, '1', 'action_shoot_assassin', 4);
     expect(r).not.toBe('INVALID_MOVE');
     // 规则：由发动方选移动方向（docs/manual/04-action-cards.md）
     // L2 → 两相邻层 [1,3]，必须挂起
@@ -196,31 +196,31 @@ describe('SHOOT·刺客之王（playShootKing）', () => {
   });
 
   it('骰 1 杀死目标 + 目标入迷失层', () => {
-    const r = callMove('playShootKing', makeState(), '1', 'action_shoot_assassin', 1);
+    const r = callMove('playShootAssassin', makeState(), '1', 'action_shoot_assassin', 1);
     expect(r.players['1']!.isAlive).toBe(false);
     expect(r.players['1']!.currentLayer).toBe(0);
   });
 
   it('骰 6 miss → target 无变化', () => {
-    const r = callMove('playShootKing', makeState(), '1', 'action_shoot_assassin', 6);
+    const r = callMove('playShootAssassin', makeState(), '1', 'action_shoot_assassin', 6);
     expect(r.players['1']!.currentLayer).toBe(1);
     expect(r.players['1']!.isAlive).toBe(true);
   });
 
   it('cardId 校验', () => {
-    expect(callMove('playShootKing', makeState(), '1', 'action_shoot', 4)).toBe('INVALID_MOVE');
+    expect(callMove('playShootAssassin', makeState(), '1', 'action_shoot', 4)).toBe('INVALID_MOVE');
   });
 });
 
-describe('SHOOT·爆甲螺旋（playShootArmor）', () => {
+describe('SHOOT·爆甲螺旋（playShootDrill）', () => {
   it('必须同层', () => {
     const s = makeState();
     s.players['1']!.currentLayer = 2;
-    expect(callMove('playShootArmor', s, '1', 'action_shoot_drill', 4)).toBe('INVALID_MOVE');
+    expect(callMove('playShootDrill', s, '1', 'action_shoot_drill', 4)).toBe('INVALID_MOVE');
   });
 
   it('骰 3-5 移动 + 目标所有解封被弃', () => {
-    const r = callMove('playShootArmor', makeState(), '1', 'action_shoot_drill', 4);
+    const r = callMove('playShootDrill', makeState(), '1', 'action_shoot_drill', 4);
     expect(r.players['1']!.hand).not.toContain('action_unlock');
     expect(r.players['1']!.hand).toContain('action_shoot');
     expect(r.players['1']!.hand).toContain('action_creation');
@@ -229,7 +229,7 @@ describe('SHOOT·爆甲螺旋（playShootArmor）', () => {
   });
 
   it('骰 1-2 死亡（无弃牌副作用）', () => {
-    const r = callMove('playShootArmor', makeState(), '1', 'action_shoot_drill', 2);
+    const r = callMove('playShootDrill', makeState(), '1', 'action_shoot_drill', 2);
     expect(r.players['1']!.isAlive).toBe(false);
   });
 });
@@ -258,13 +258,13 @@ describe('SHOOT·炸裂弹头（playShootBurst）', () => {
 describe('通用守卫', () => {
   it('pendingGraft 存在 → 全部变体拒绝', () => {
     const s = makeState({ pendingGraft: { playerID: '0' } });
-    expect(callMove('playShootKing', s, '1', 'action_shoot_assassin', 4)).toBe('INVALID_MOVE');
-    expect(callMove('playShootArmor', s, '1', 'action_shoot_drill', 4)).toBe('INVALID_MOVE');
+    expect(callMove('playShootAssassin', s, '1', 'action_shoot_assassin', 4)).toBe('INVALID_MOVE');
+    expect(callMove('playShootDrill', s, '1', 'action_shoot_drill', 4)).toBe('INVALID_MOVE');
     expect(callMove('playShootBurst', s, '1', 'action_shoot_burst', 4)).toBe('INVALID_MOVE');
   });
 
   it('不能对自己使用', () => {
-    expect(callMove('playShootKing', makeState(), '0', 'action_shoot_assassin', 4)).toBe(
+    expect(callMove('playShootAssassin', makeState(), '0', 'action_shoot_assassin', 4)).toBe(
       'INVALID_MOVE',
     );
   });
@@ -272,13 +272,13 @@ describe('通用守卫', () => {
   it('目标已死亡 → 拒绝', () => {
     const s = makeState();
     s.players['1']!.isAlive = false;
-    expect(callMove('playShootKing', s, '1', 'action_shoot_assassin', 4)).toBe('INVALID_MOVE');
+    expect(callMove('playShootAssassin', s, '1', 'action_shoot_assassin', 4)).toBe('INVALID_MOVE');
   });
 
   it('手牌不含该牌 → 拒绝', () => {
     const s = makeState();
     s.players['0']!.hand = ['action_unlock'] as CardID[];
-    expect(callMove('playShootKing', s, '1', 'action_shoot_assassin', 4)).toBe('INVALID_MOVE');
+    expect(callMove('playShootAssassin', s, '1', 'action_shoot_assassin', 4)).toBe('INVALID_MOVE');
   });
 });
 
@@ -369,7 +369,7 @@ describe('SHOOT 发动方选层响应窗口', () => {
     s.players['0']!.currentLayer = 3;
     s.players['1']!.currentLayer = 3;
     s.players['0']!.hand = ['action_shoot_assassin'] as CardID[];
-    const r = callMove('playShootKing', s, '1', 'action_shoot_assassin', 4);
+    const r = callMove('playShootAssassin', s, '1', 'action_shoot_assassin', 4);
     expect(r.pendingShootMove.choices).toEqual([2, 4]);
     expect(r.players['1']!.currentLayer).toBe(3);
   });
@@ -379,7 +379,7 @@ describe('SHOOT 发动方选层响应窗口', () => {
     s.players['0']!.currentLayer = 4;
     s.players['1']!.currentLayer = 4;
     s.players['0']!.hand = ['action_shoot_assassin'] as CardID[];
-    const r = callMove('playShootKing', s, '1', 'action_shoot_assassin', 4);
+    const r = callMove('playShootAssassin', s, '1', 'action_shoot_assassin', 4);
     expect(r.pendingShootMove ?? null).toBeNull();
     expect(r.players['1']!.currentLayer).toBe(3);
   });

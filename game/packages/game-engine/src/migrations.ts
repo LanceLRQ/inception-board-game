@@ -4,7 +4,7 @@
 import { seededShuffle } from './prng.js';
 import type { SetupState } from './setup.js';
 
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -282,7 +282,30 @@ const MIGRATIONS: Map<number, Migration> = new Map<number, Migration>([
       lastDiceRoll: state.lastDiceRoll ?? null,
     }),
   ],
+  // v18 → v19：move 名 playShootKing / playShootArmor 改为与牌 id 一致的 playShootAssassin / playShootDrill。
+  //   雅典娜·急智与土星·律令挂起出牌时把 move 名存在状态里、应答后据此重放，旧名要换成新名
+  [
+    19,
+    (state) => ({
+      ...state,
+      pendingAthenaWit: renameSuspendedMove(state.pendingAthenaWit),
+      pendingSaturnDecree: renameSuspendedMove(state.pendingSaturnDecree),
+    }),
+  ],
 ]);
+
+const RENAMED_MOVES: Readonly<Record<string, string>> = {
+  playShootKing: 'playShootAssassin',
+  playShootArmor: 'playShootDrill',
+};
+
+/** 挂起的出牌里存的 move 名换成新名；没有挂起或不是改名的 move 原样返回 */
+function renameSuspendedMove(pending: unknown): unknown {
+  if (typeof pending !== 'object' || pending === null) return pending ?? null;
+  const move = (pending as { move?: unknown }).move;
+  const renamed = typeof move === 'string' ? RENAMED_MOVES[move] : undefined;
+  return renamed === undefined ? pending : { ...pending, move: renamed };
+}
 
 // 错误信息里展示收到的值：字符串带引号以区分 '3' 与 3，数组、null 等用 JSON 表示
 function describeValue(value: unknown): string {

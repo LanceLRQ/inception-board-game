@@ -221,7 +221,7 @@ describe('迷失层里的人不再被当作活人', () => {
     const res = applyMoveSettled(
       game,
       load(G),
-      { playerID: 'p3', move: 'playShootKing', args: ['p1', KING] },
+      { playerID: 'p3', move: 'playShootAssassin', args: ['p1', KING] },
       { random: fixedRandom(1) },
     );
     expect(res.ok).toBe(false);

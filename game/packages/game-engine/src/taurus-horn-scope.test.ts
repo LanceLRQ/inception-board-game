@@ -79,13 +79,13 @@ describe('金牛·号角：只对【SHOOT】生效', () => {
   });
 
   it('刺客之王：目标掷 3（移动）→ 按原规则移动，号角不触发（不消耗第 2 颗骰）', () => {
-    const after = run(taurusScene([ASSASSIN]), 'playShootKing', ['p2', ASSASSIN], [3]);
+    const after = run(taurusScene([ASSASSIN]), 'playShootAssassin', ['p2', ASSASSIN], [3]);
     expect(after.players.p2!.isAlive).toBe(true);
     expect(after.players.p2!.currentLayer).toBe(2);
   });
 
   it('爆甲螺旋：目标掷 3（移动）→ 按原规则移动，号角不触发', () => {
-    const after = run(taurusScene([DRILL]), 'playShootArmor', ['p2', DRILL], [3]);
+    const after = run(taurusScene([DRILL]), 'playShootDrill', ['p2', DRILL], [3]);
     expect(after.players.p2!.isAlive).toBe(true);
     expect(after.players.p2!.currentLayer).toBe(2);
   });
@@ -97,7 +97,7 @@ describe('金牛·号角：只对【SHOOT】生效', () => {
   });
 
   it('刺客之王：目标掷 6（落空）→ 仍然落空，不会被号角改成击杀', () => {
-    const after = run(taurusScene([ASSASSIN]), 'playShootKing', ['p2', ASSASSIN], [6]);
+    const after = run(taurusScene([ASSASSIN]), 'playShootAssassin', ['p2', ASSASSIN], [6]);
     expect(after.players.p2!.isAlive).toBe(true);
     expect(after.players.p2!.currentLayer).toBe(1);
   });

@@ -96,10 +96,10 @@ export function actionMoveFor(id: string, role: PlayRole = 'thief'): ActionMoveS
     return { move: 'playNightmareUnlock', needsTarget: 'layer', argOrder: 'card_first' };
   }
   if (action.id === 'action_shoot_assassin') {
-    return { move: 'playShootKing', needsTarget: 'player', argOrder: 'target_first' };
+    return { move: 'playShootAssassin', needsTarget: 'player', argOrder: 'target_first' };
   }
   if (action.id === 'action_shoot_drill') {
-    return { move: 'playShootArmor', needsTarget: 'player', argOrder: 'target_first' };
+    return { move: 'playShootDrill', needsTarget: 'player', argOrder: 'target_first' };
   }
   if (action.id === 'action_shoot_burst') {
     return { move: 'playShootBurst', needsTarget: 'player', argOrder: 'target_first' };

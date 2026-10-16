@@ -107,10 +107,10 @@ describe('牌库里的刺客之王与爆甲螺旋', () => {
   });
 });
 
-describe('刺客之王经 playShootKing 结算', () => {
+describe('刺客之王经 playShootAssassin 结算', () => {
   it('hits a player on another layer and kills on a 2', () => {
     const G = scene({ shooterHand: [ASSASSIN], targetHand: [], shooterLayer: 1, targetLayer: 4 });
-    const res = play(G, 'playShootKing', ['p2', ASSASSIN], 2);
+    const res = play(G, 'playShootAssassin', ['p2', ASSASSIN], 2);
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.state.G.players['p2']!.isAlive).toBe(false);
@@ -120,7 +120,7 @@ describe('刺客之王经 playShootKing 结算', () => {
 
   it('moves the target to the adjacent layer on a 5', () => {
     const G = scene({ shooterHand: [ASSASSIN], targetHand: [], shooterLayer: 1, targetLayer: 4 });
-    const res = play(G, 'playShootKing', ['p2', ASSASSIN], 5);
+    const res = play(G, 'playShootAssassin', ['p2', ASSASSIN], 5);
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.state.G.players['p2']!.isAlive).toBe(true);
@@ -129,10 +129,10 @@ describe('刺客之王经 playShootKing 结算', () => {
   });
 });
 
-describe('爆甲螺旋经 playShootArmor 结算', () => {
+describe('爆甲螺旋经 playShootDrill 结算', () => {
   it('kills on a 2', () => {
     const G = scene({ shooterHand: [DRILL], targetHand: [], shooterLayer: 1, targetLayer: 1 });
-    const res = play(G, 'playShootArmor', ['p2', DRILL], 2);
+    const res = play(G, 'playShootDrill', ['p2', DRILL], 2);
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.state.G.players['p2']!.isAlive).toBe(false);
   });
@@ -144,7 +144,7 @@ describe('爆甲螺旋经 playShootArmor 结算', () => {
       shooterLayer: 1,
       targetLayer: 1,
     });
-    const res = play(G, 'playShootArmor', ['p2', DRILL], 4);
+    const res = play(G, 'playShootDrill', ['p2', DRILL], 4);
     expect(res.ok).toBe(true);
     if (res.ok) {
       const p2 = res.state.G.players['p2']!;
@@ -155,7 +155,7 @@ describe('爆甲螺旋经 playShootArmor 结算', () => {
 
   it('rejects a target on another layer', () => {
     const G = scene({ shooterHand: [DRILL], targetHand: [], shooterLayer: 1, targetLayer: 3 });
-    const res = play(G, 'playShootArmor', ['p2', DRILL], 4);
+    const res = play(G, 'playShootDrill', ['p2', DRILL], 4);
     expect(res.ok).toBe(false);
   });
 });

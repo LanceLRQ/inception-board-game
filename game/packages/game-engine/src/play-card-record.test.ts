@@ -61,8 +61,12 @@ interface Case {
 
 const CASES: Case[] = [
   { move: 'playShoot', card: 'action_shoot', args: ['p2', 'action_shoot'] },
-  { move: 'playShootKing', card: 'action_shoot_assassin', args: ['p2', 'action_shoot_assassin'] },
-  { move: 'playShootArmor', card: 'action_shoot_drill', args: ['p2', 'action_shoot_drill'] },
+  {
+    move: 'playShootAssassin',
+    card: 'action_shoot_assassin',
+    args: ['p2', 'action_shoot_assassin'],
+  },
+  { move: 'playShootDrill', card: 'action_shoot_drill', args: ['p2', 'action_shoot_drill'] },
   { move: 'playShootBurst', card: 'action_shoot_burst', args: ['p2', 'action_shoot_burst'] },
   {
     move: 'playShootDreamTransit',

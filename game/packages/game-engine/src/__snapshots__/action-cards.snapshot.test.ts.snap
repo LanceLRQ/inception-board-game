@@ -277,7 +277,7 @@ exports[`行动牌快照回归 · 21 卡 > 3. playShootDreamTransit · mode=tran
 }
 `;
 
-exports[`行动牌快照回归 · 21 卡 > 4. playShootKing · 跨层 · 骰 1 → target 死亡 1`] = `
+exports[`行动牌快照回归 · 21 卡 > 4. playShootAssassin · 跨层 · 骰 1 → target 死亡 1`] = `
 {
   "currentPlayerID": "p1",
   "deckSize": 20,
@@ -374,7 +374,7 @@ exports[`行动牌快照回归 · 21 卡 > 4. playShootKing · 跨层 · 骰 1 �
 }
 `;
 
-exports[`行动牌快照回归 · 21 卡 > 5. playShootArmor · 骰 4 → target 移层 + 弃所有解封 1`] = `
+exports[`行动牌快照回归 · 21 卡 > 5. playShootDrill · 骰 4 → target 移层 + 弃所有解封 1`] = `
 {
   "currentPlayerID": "p1",
   "deckSize": 20,

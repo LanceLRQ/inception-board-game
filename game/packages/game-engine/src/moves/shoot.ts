@@ -68,20 +68,20 @@ export const shootMoves = {
 
   // SHOOT·刺客之王：目标任意层；[1/2] 死亡 [3/4/5] 移动相邻层
   // 对照：docs/manual/04-action-cards.md SHOOT·刺客之王
-  playShootKing: {
+  playShootAssassin: {
     move: ({ G, ctx }: MoveCtx, targetPlayerID: string, cardId: CardID, decreeId?: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-      if (!isCardForPlayMove('playShootKing', cardId)) return INVALID_MOVE;
+      if (!isCardForPlayMove('playShootAssassin', cardId)) return INVALID_MOVE;
       return applyShootByCard(G, ctx, targetPlayerID, cardId, { decreeId });
     },
     client: false,
   },
 
   // SHOOT·爆甲螺旋：同层；[1/2] 死 [3/4/5] 弃 target 所有解封 + 移动
-  playShootArmor: {
+  playShootDrill: {
     move: ({ G, ctx }: MoveCtx, targetPlayerID: string, cardId: CardID, decreeId?: CardID) => {
       if (!guardTurnPhase(G, ctx, 'action')) return INVALID_MOVE;
-      if (!isCardForPlayMove('playShootArmor', cardId)) return INVALID_MOVE;
+      if (!isCardForPlayMove('playShootDrill', cardId)) return INVALID_MOVE;
       return applyShootByCard(G, ctx, targetPlayerID, cardId, { decreeId });
     },
     client: false,

@@ -11,7 +11,7 @@
 // 与土星·律令同时在场时，律令窗口在前（土星·律令的包装层套在这一层之外）：梦主抵消了这张牌，就不再问雅典娜。
 //
 // 覆盖的出牌 move（都要打出一张真实的行动牌，并且目标是一名玩家）：
-//   SHOOT 类：playShoot、playShootKing、playShootArmor、playShootBurst、playShootDreamTransit（选 SHOOT 方式时）、
+//   SHOOT 类：playShoot、playShootAssassin、playShootDrill、playShootBurst、playShootDreamTransit（选 SHOOT 方式时）、
 //             playShootSudger（意念判官·定罪，打出的是一张真实的 SHOOT 类牌）
 //   其他：    playKick、playTelekinesis、playShift、playResonance、playGravity（目标名单里有她）
 // 不覆盖：不打出牌的「视为 SHOOT」（哈雷·冲击、要塞·冷酷、皇城世界观）、格林射线·缉捕（把牌当代价弃掉再执行效果）、
@@ -43,8 +43,8 @@ const one =
 /** 以玩家为目标的出牌 move → 牌与目标在实参里的位置（与 engine/moveArgs.ts 的形状表一致） */
 const TARGETED_PLAY_MOVES: Readonly<Record<string, TargetSpec>> = {
   playShoot: { card: 1, targets: one(0) },
-  playShootKing: { card: 1, targets: one(0) },
-  playShootArmor: { card: 1, targets: one(0) },
+  playShootAssassin: { card: 1, targets: one(0) },
+  playShootDrill: { card: 1, targets: one(0) },
   playShootBurst: { card: 1, targets: one(0) },
   // 梦境穿梭剂 / SHOOT 二选一：选 SHOOT 方式时第三个实参是目标玩家，选穿梭方式时是目标层
   playShootDreamTransit: {

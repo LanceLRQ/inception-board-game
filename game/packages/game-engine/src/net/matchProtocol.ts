@@ -3,7 +3,11 @@
 import type { MatchViewState, MatchEvent, RejectReason } from '../runner/matchRunner.js';
 import type { RequestShapeCode } from '../engine/validator.js';
 
-export const MATCH_PROTOCOL_VERSION = 1;
+/**
+ * 协议版本：客户端与服务端不一致时客户端报 PROTOCOL_MISMATCH 并停止重连（提示刷新页面）。
+ * move 名或消息形状有不兼容的改动时加一（2：playShootKing / playShootArmor 改名为 playShootAssassin / playShootDrill）
+ */
+export const MATCH_PROTOCOL_VERSION = 2;
 
 /** 客户端 → 服务端 */
 export type ClientMatchMessage =
