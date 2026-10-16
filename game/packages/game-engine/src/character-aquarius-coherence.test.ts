@@ -11,6 +11,7 @@ import {
 } from './engine/skills.js';
 import { scenarioActionPhase } from './testing/scenarios.js';
 import { callMove } from './testing/fixtures.js';
+import { applyMoveSettled, fixedRandom, game, load } from './testing/runnerHarness.js';
 
 function setCharacter(state: SetupState, playerID: string, characterId: CardID): SetupState {
   const p = state.players[playerID];
@@ -141,6 +142,21 @@ describe('水瓶 · 凝聚 · 取牌', () => {
 // ============================================================================
 
 describe('水瓶 · 凝聚 · BGIO move 集成', () => {
+  it('经对局运行器（含行动权检查）发出也被接受：入口走得通', () => {
+    let s = scenarioActionPhase();
+    s = setCharacter(s, 'p1', 'thief_aquarius');
+    s = withPlayed(s, ['action_unlock', 'action_unlock'] as CardID[]);
+    s = withDiscard(s, ['action_kick'] as CardID[]);
+    const res = applyMoveSettled(
+      game,
+      load(s),
+      { playerID: 'p1', move: 'playAquariusCoherence', args: ['action_kick'] },
+      { random: fixedRandom(3) },
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.state.G.players.p1!.hand).toContain('action_kick');
+  });
+
   it('正确路径：调用 playAquariusCoherence 后弃牌堆 -1 + 手牌 +1', () => {
     let s = scenarioActionPhase();
     s = setCharacter(s, 'p1', 'thief_aquarius');
