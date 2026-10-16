@@ -4,6 +4,7 @@
 //   - Bearer 令牌来自 `OPERATOR_TOKEN` 环境变量（未配置或短于 16 个字符时拒绝所有请求，避免裸奔）
 //   - 校验通过后把 `operatorId` 注入 ctx.state.operator（用于审计）
 //   - 支持 `OPERATOR_ID` 环境变量覆盖操作员标识；缺省或为空时用 'operator'
+//   - 鉴权失败按来源地址单独限速：窗口内失败次数到上限后一律 429，不再比较令牌
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Middleware } from 'koa';
@@ -13,7 +14,16 @@ import { extractBearerToken } from '../infra/jwt.js';
 export interface OperatorAuthOptions {
   readonly token?: string;
   readonly operatorId?: string;
+  /** 取当前时间（毫秒）；测试注入 */
+  readonly now?: () => number;
 }
+
+/** 同一来源地址在一个窗口内允许的鉴权失败次数 */
+export const OPERATOR_FAIL_LIMIT = 10;
+/** 失败计数的窗口：从第一次失败起算 */
+export const OPERATOR_FAIL_WINDOW_MS = 15 * 60 * 1000;
+/** 计数表超过这么多条时顺手清掉过期的，防止被大量来源地址撑大 */
+const FAIL_PRUNE_THRESHOLD = 1000;
 
 /** 运营令牌最短长度：接口经反代对公网可达，唯一的保护就是这个静态令牌 */
 export const MIN_OPERATOR_TOKEN_LENGTH = 16;
@@ -38,6 +48,19 @@ function tokensEqual(a: string, b: string): boolean {
 }
 
 export function createOperatorAuthMiddleware(opts: OperatorAuthOptions = {}): Middleware {
+  const now = opts.now ?? Date.now;
+  const failures = new Map<string, { count: number; resetAt: number }>();
+  const fail = (ip: string, message: string): never => {
+    const t = now();
+    if (failures.size > FAIL_PRUNE_THRESHOLD) {
+      for (const [key, f] of failures) if (t >= f.resetAt) failures.delete(key);
+    }
+    const f = failures.get(ip);
+    if (f && t < f.resetAt) f.count += 1;
+    else failures.set(ip, { count: 1, resetAt: t + OPERATOR_FAIL_WINDOW_MS });
+    throw new AppError('UNAUTHORIZED', message);
+  };
+
   return async (ctx, next) => {
     const expected = opts.token ?? process.env.OPERATOR_TOKEN;
     if (!expected || expected.length < MIN_OPERATOR_TOKEN_LENGTH) {
@@ -47,14 +70,16 @@ export function createOperatorAuthMiddleware(opts: OperatorAuthOptions = {}): Mi
       );
     }
 
-    const token = extractBearerToken(ctx.headers.authorization);
-    if (!token) {
-      throw new AppError('UNAUTHORIZED', 'Missing or invalid Authorization header');
+    const ip = ctx.ip;
+    const f = failures.get(ip);
+    if (f && now() >= f.resetAt) failures.delete(ip);
+    else if (f && f.count >= OPERATOR_FAIL_LIMIT) {
+      throw new AppError('RATE_LIMITED', 'Too many failed operator logins');
     }
 
-    if (!tokensEqual(token, expected)) {
-      throw new AppError('UNAUTHORIZED', 'Invalid operator token');
-    }
+    const token = extractBearerToken(ctx.headers.authorization);
+    if (!token) return fail(ip, 'Missing or invalid Authorization header');
+    if (!tokensEqual(token, expected)) return fail(ip, 'Invalid operator token');
 
     const operatorId = opts.operatorId || process.env.OPERATOR_ID || 'operator';
     ctx.state.operator = { operatorId };

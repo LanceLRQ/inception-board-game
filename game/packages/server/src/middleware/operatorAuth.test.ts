@@ -2,6 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  OPERATOR_FAIL_LIMIT,
+  OPERATOR_FAIL_WINDOW_MS,
   createOperatorAuthMiddleware,
   hasOperatorToken,
   isOperatorTokenTooShort,
@@ -147,5 +149,43 @@ describe('createOperatorAuthMiddleware', () => {
       'UNAUTHORIZED',
     );
     expect((await runMiddleware(mw, makeCtx('Bearer abcdef0123456789'))).called).toBe(true);
+  });
+});
+
+describe('createOperatorAuthMiddleware · 失败限速', () => {
+  const TOKEN = 'abcdef0123456789';
+  const ctxFrom = (ip: string, auth: string): Context => {
+    const c = makeCtx(auth);
+    (c as unknown as { ip: string }).ip = ip;
+    return c;
+  };
+
+  it('同一来源连续失败达到上限后，连正确令牌也先拒绝；窗口过后恢复', async () => {
+    let now = 1_000;
+    const mw = createOperatorAuthMiddleware({ token: TOKEN, now: () => now });
+    for (let i = 0; i < OPERATOR_FAIL_LIMIT; i++) {
+      const r = await runMiddleware(mw, ctxFrom('1.2.3.4', 'Bearer wrong-token-000000'));
+      expect(r.error?.code).toBe('UNAUTHORIZED');
+    }
+    const blocked = await runMiddleware(mw, ctxFrom('1.2.3.4', `Bearer ${TOKEN}`));
+    expect(blocked.called).toBe(false);
+    expect(blocked.error?.code).toBe('RATE_LIMITED');
+
+    // 别的来源不受影响
+    expect((await runMiddleware(mw, ctxFrom('5.6.7.8', `Bearer ${TOKEN}`))).called).toBe(true);
+
+    now += OPERATOR_FAIL_WINDOW_MS;
+    expect((await runMiddleware(mw, ctxFrom('1.2.3.4', `Bearer ${TOKEN}`))).called).toBe(true);
+  });
+
+  it('缺少令牌也算一次失败；鉴权成功不计数', async () => {
+    const mw = createOperatorAuthMiddleware({ token: TOKEN, now: () => 0 });
+    for (let i = 0; i < OPERATOR_FAIL_LIMIT * 2; i++) {
+      expect((await runMiddleware(mw, ctxFrom('9.9.9.9', `Bearer ${TOKEN}`))).called).toBe(true);
+    }
+    for (let i = 0; i < OPERATOR_FAIL_LIMIT; i++) await runMiddleware(mw, ctxFrom('9.9.9.9', ''));
+    expect((await runMiddleware(mw, ctxFrom('9.9.9.9', `Bearer ${TOKEN}`))).error?.code).toBe(
+      'RATE_LIMITED',
+    );
   });
 });
