@@ -1,6 +1,7 @@
 // 远程对局来源：把 MatchSocket 的快照包成对局来源
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { usePageVisibility } from '../hooks/usePageVisibility';
 import { submitMatchReport, type ReportChannel } from '../lib/reportApi';
 import { createIoSocket } from './createIoSocket';
 import { MatchSocket, type MatchSocketSnapshot } from './matchSocket';
@@ -96,6 +97,10 @@ export function useRemoteMatchSource({ url, token, matchID }: RemoteMatchParams)
       socket ? socket.sendMove(move, args) : Promise.resolve(NOT_READY),
     [socket],
   );
+
+  // 页面从后台回到前台：还连着就补一份最新状态，断线中就立即重连
+  const visibility = useMemo(() => ({ onReturn: () => socket?.returnToForeground() }), [socket]);
+  usePageVisibility(visibility);
 
   const resume = useCallback(() => socket?.resume(), [socket]);
   const sendChat = useCallback(

@@ -482,6 +482,34 @@ describe('MatchSocket', () => {
     });
   });
 
+  describe('页面回到前台（returnToForeground）', () => {
+    it('还连着：要一份最新状态，补上后台期间可能漏掉的推送', () => {
+      ready(1);
+      ms.returnToForeground();
+      expect(socket.sent('icg:sync')).toHaveLength(1);
+      expect(socket.connectCalls).toBe(1);
+    });
+
+    it('断线中：立即重连，不等退避间隔', () => {
+      ready(1);
+      socket.connected = false;
+      socket.fire('disconnect', 'transport close');
+      ms.returnToForeground();
+      expect(socket.connectCalls).toBe(2);
+      expect(socket.sent('icg:sync')).toHaveLength(0);
+    });
+
+    it('已关闭或已致命失败：什么都不做', () => {
+      ready(1);
+      socket.fire('icg:error', { code: 'MATCH_ABORTED' });
+      ms.returnToForeground();
+      ms.close();
+      ms.returnToForeground();
+      expect(socket.sent('icg:sync')).toHaveLength(0);
+      expect(socket.connectCalls).toBe(1);
+    });
+  });
+
   it('requestSync 只发一次 icg:sync', () => {
     ready(1);
     ms.requestSync();

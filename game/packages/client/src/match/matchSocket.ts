@@ -230,6 +230,20 @@ export class MatchSocket {
     this.socket.emit('icg:sync', { type: 'icg:sync' });
   }
 
+  /**
+   * 页面从后台回到前台：手机切走时浏览器可能冻结页面、连接看似还在却已漏掉推送。
+   * 还连着就要一份最新状态；断线中就立即重连，不等底层的退避间隔。已关闭或已致命失败时不做事。
+   */
+  returnToForeground(): void {
+    if (this.closed || this.socket === null || this.snapshot.fatal !== null) return;
+    logger.flow('net/ws', 'page returned to foreground', {
+      matchID: this.options.matchID,
+      connection: this.snapshot.connection,
+    });
+    if (this.snapshot.connection === 'connected') this.requestSync();
+    else this.socket.connect();
+  }
+
   private onConnect(): void {
     if (this.snapshot.fatal !== null) return;
     // 真正可用要等服务端发来 icg:state
