@@ -51,6 +51,39 @@ test.describe('对局动画层', () => {
     expect(errors).toEqual([]);
   });
 
+  test('说明条在视口内，不压住座位、回合信息与层级标签', async ({ page }) => {
+    await page.goto('/game/debug?fx=1');
+    await waitForAppReady(page);
+    await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
+    const caption = page.getByTestId('fx-caption');
+    await expect(caption).toBeVisible({ timeout: 10_000 });
+
+    const overlaps = await page.evaluate(() => {
+      const box = document.querySelector('[data-testid="fx-caption"]')!.getBoundingClientRect();
+      const hit = (r: DOMRect) =>
+        r.width > 0 &&
+        r.left < box.right &&
+        box.left < r.right &&
+        r.top < box.bottom &&
+        box.top < r.bottom;
+      const inView =
+        box.left >= 0 &&
+        box.top >= 0 &&
+        box.right <= window.innerWidth &&
+        box.bottom <= window.innerHeight;
+      const blocked = [
+        ...document.querySelectorAll(
+          '.ms-seat, [data-testid="layer-chips"], [data-testid="turn-indicator"]',
+        ),
+      ]
+        .filter((el) => hit(el.getBoundingClientRect()))
+        .map((el) => el.getAttribute('data-testid') ?? el.className.split(' ')[0]);
+      return { inView, blocked };
+    });
+    expect(overlaps.inView, '说明条在视口内').toBe(true);
+    expect(overlaps.blocked).toEqual([]);
+  });
+
   test('减少动效：只显示说明，不播飞行与闪烁', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/game/debug?fx=1');

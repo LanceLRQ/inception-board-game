@@ -33,7 +33,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
         <MobileLayout controller={controller} topRight={topRight} onRestart={onRestart} />
       )}
       <DiceGatePanel controller={controller} />
-      <MatchFx source={source} nicknameOf={controller.nicknameOf} />
+      <MatchFx source={source} nicknameOf={controller.nicknameOf} straddle={isDesktop} />
       <MatchDialogs controller={controller} />
       <MatchAssetGate entry={controller.entryAssets} />
     </>

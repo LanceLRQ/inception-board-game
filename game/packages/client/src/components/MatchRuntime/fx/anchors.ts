@@ -49,3 +49,22 @@ export function locate(selectors: readonly string[], root: ParentNode = document
 export function centerOf(r: FxRect): { x: number; y: number } {
   return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
 }
+
+export const STAGE_SELECTORS = [testid('runtime-stage')];
+
+/** 说明条与舞台区下沿的距离（移动布局，像素） */
+const CAPTION_INSET = 8;
+
+/**
+ * 说明条的位置：贴着舞台区下沿、水平居中，避开顶部的座位、回合信息与层级标签。
+ * 桌面骑在舞台与底部坞的分界线上（那里只有牌堆一行的下边距和手牌的上边距）；
+ * 移动在舞台区内侧、紧挨手牌坞。返回说明条的锚点与纵向的对齐比例（0 顶、0.5 中、1 底）。
+ */
+export function captionPlace(
+  stage: FxRect,
+  straddle: boolean,
+): { x: number; y: number; alignY: 0.5 | 1 } {
+  const x = stage.x + stage.w / 2;
+  const bottom = stage.y + stage.h;
+  return straddle ? { x, y: bottom, alignY: 0.5 } : { x, y: bottom - CAPTION_INSET, alignY: 1 };
+}

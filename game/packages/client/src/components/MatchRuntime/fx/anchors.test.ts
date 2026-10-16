@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { centerOf, layerSelectors, seatSelectors } from './anchors';
+import { captionPlace, centerOf, layerSelectors, seatSelectors } from './anchors';
 
 describe('anchors', () => {
   it('本人的牌落在手牌坞，别人的落在座位牌或行动轴', () => {
@@ -15,6 +15,12 @@ describe('anchors', () => {
       '[data-testid="center-stage"] [data-testid="layer-row-3"]',
       '[data-testid="layer-row-3"]',
     ]);
+  });
+
+  it('说明条贴着舞台区下沿居中：桌面骑在分界线上，移动收在舞台内侧', () => {
+    const stage = { x: 100, y: 40, w: 600, h: 500 };
+    expect(captionPlace(stage, true)).toEqual({ x: 400, y: 540, alignY: 0.5 });
+    expect(captionPlace(stage, false)).toEqual({ x: 400, y: 532, alignY: 1 });
   });
 
   it('矩形中心', () => {

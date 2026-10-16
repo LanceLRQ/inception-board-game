@@ -2,7 +2,7 @@
 // 移层、击杀与复活、心锁变化、金库打开、掷骰结果。每个动作配一行说明（读屏也会念）。
 // 「减少动效」开启时不播飞行与闪烁，只显示说明。起止点见 anchors.ts。
 
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotionConfig } from 'framer-motion';
 import { Footprints, HeartPulse, Lock, Skull, Vault } from 'lucide-react';
@@ -15,6 +15,8 @@ import {
   DECK_SELECTORS,
   DISCARD_SELECTORS,
   PLAYED_SELECTORS,
+  STAGE_SELECTORS,
+  captionPlace,
   centerOf,
   layerSelectors,
   locate,
@@ -33,12 +35,15 @@ const CARD_BACK = 'action_back';
 interface MatchFxProps {
   readonly source: MatchSource;
   readonly nicknameOf: (playerID: string) => string;
+  /** 桌面布局：说明条骑在舞台与底部坞的分界线上；否则收在舞台区下沿内侧 */
+  readonly straddle: boolean;
 }
 
-export function MatchFx({ source, nicknameOf }: MatchFxProps) {
+export function MatchFx({ source, nicknameOf, straddle }: MatchFxProps) {
   const playing = useFxPlayer(source.events);
   const reduced = useReducedMotionConfig() === true;
   const caption = useCaption(playing?.cue ?? null, source.seat, nicknameOf);
+  const captionStyle = useCaptionStyle(caption, straddle);
 
   return (
     <div
@@ -58,7 +63,8 @@ export function MatchFx({ source, nicknameOf }: MatchFxProps) {
       <p
         role="status"
         aria-live="polite"
-        className="ms-fx-caption absolute top-[calc(env(safe-area-inset-top,0px)+3.25rem)] left-1/2 max-w-[90vw] -translate-x-1/2 truncate px-3 py-1 text-xs"
+        className="ms-fx-caption absolute max-w-[90vw] truncate px-3 py-1 text-xs"
+        style={captionStyle}
         data-testid="fx-caption"
         hidden={caption === null}
       >
@@ -66,6 +72,22 @@ export function MatchFx({ source, nicknameOf }: MatchFxProps) {
       </p>
     </div>
   );
+}
+
+/** 说明条的位置：每出一条说明、视口变化时量一次舞台区 */
+function useCaptionStyle(caption: string | null, straddle: boolean): CSSProperties {
+  const [style, setStyle] = useState<CSSProperties>({});
+  useLayoutEffect(() => {
+    if (caption === null) return;
+    const place = () => {
+      const { x, y, alignY } = captionPlace(locate(STAGE_SELECTORS), straddle);
+      setStyle({ left: x, top: y, transform: `translate(-50%, -${alignY * 100}%)` });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [caption, straddle]);
+  return style;
 }
 
 /** 说明文字：谁做了什么 */
