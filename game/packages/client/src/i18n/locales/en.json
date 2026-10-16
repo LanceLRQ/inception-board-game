@@ -773,6 +773,18 @@
       "mine": "Your turn",
       "other": "{{actor}}'s turn",
       "full": "{{turn}} — {{phase}}"
+    },
+    "piles": {
+      "draw": "Deck",
+      "drawAria": "{{n}} cards left in the deck",
+      "discard": "Discard",
+      "discardOpen": "View discard pile ({{n}} cards)",
+      "discardTitle": "Discard pile",
+      "discardHint": "{{n}} cards, most recent first; tap one for details",
+      "count": "{{n}} cards",
+      "empty": "Empty",
+      "played": "Played this turn",
+      "playedEmpty": "Nothing played yet"
     }
   },
   "handInfo": {
@@ -986,7 +998,8 @@
     "me": "Me",
     "layerAria": "On layer {{layer}}",
     "handAria": "{{n}} cards in hand",
-    "seeDetail": "View {{name}}'s character"
+    "seeDetail": "View {{name}}'s character",
+    "awaited": "Responding"
   },
   "desktop": {
     "seat": {
@@ -1032,16 +1045,9 @@
       "deck": "Deck {{remaining}} / {{total}}",
       "deckAria": "Cards left in deck",
       "focusLayer": "Focus layer {{layer}} · {{name}}",
-      "focusLayerTag": "FOCUS",
-      "vaultKnown": "Vault · {{content}}",
       "blueprint": {
         "title": "DREAM SECTION DRAWING",
-        "section": "SECTION A-A · TURN {{n}}",
-        "sheetFocus": "FOCUS",
-        "sheetRound": "TURN",
-        "deckValue": "{{remaining}} / {{total}}",
-        "sheetDeck": "DECK",
-        "focusValue": "L{{layer}} · Lock {{n}}"
+        "section": "SECTION A-A · TURN {{n}}"
       },
       "totem": {
         "gyro": "TOTEM",
@@ -1050,27 +1056,7 @@
         "left": "{{percent}}% LEFT"
       },
       "matrix": {
-        "window": "dreammon · dream process table",
-        "tableAria": "Dream process table",
-        "cols": {
-          "layer": "LAYER",
-          "vault": "VAULT",
-          "lock": "LOCK",
-          "nodes": "NODES",
-          "state": "STATE"
-        },
-        "vault": {
-          "sealed": "SEALED",
-          "sealedKnown": "SEALED · {{content}}",
-          "opened": "OPEN · {{content}}"
-        },
-        "nightmare": {
-          "ready": "ARMED",
-          "revealed": "REVEALED"
-        },
-        "marker": {
-          "focus": "FOCUS"
-        }
+        "window": "dreammon · dream process table"
       }
     }
   },

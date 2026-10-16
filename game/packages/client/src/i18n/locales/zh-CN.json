@@ -773,6 +773,18 @@
       "mine": "你的回合",
       "other": "{{actor}} 的回合",
       "full": "{{turn}} — {{phase}}"
+    },
+    "piles": {
+      "draw": "牌库",
+      "drawAria": "牌库剩余 {{n}} 张",
+      "discard": "弃牌堆",
+      "discardOpen": "查看弃牌堆（{{n}} 张）",
+      "discardTitle": "弃牌堆",
+      "discardHint": "共 {{n}} 张，最近弃掉的排在最前；点一张看详情",
+      "count": "{{n}} 张",
+      "empty": "空",
+      "played": "本回合出牌",
+      "playedEmpty": "尚未出牌"
     }
   },
   "handInfo": {
@@ -986,7 +998,8 @@
     "me": "我",
     "layerAria": "在第 {{layer}} 层",
     "handAria": "手牌 {{n}} 张",
-    "seeDetail": "查看 {{name}} 的角色"
+    "seeDetail": "查看 {{name}} 的角色",
+    "awaited": "应答中"
   },
   "desktop": {
     "seat": {
@@ -1032,16 +1045,9 @@
       "deck": "牌库 {{remaining}} / {{total}}",
       "deckAria": "牌库剩余",
       "focusLayer": "聚焦第 {{layer}} 层 · {{name}}",
-      "focusLayerTag": "焦点层",
-      "vaultKnown": "金库 · {{content}}",
       "blueprint": {
         "title": "梦 境 剖 面 图",
-        "section": "剖视 A-A · 第 {{n}} 回合",
-        "sheetFocus": "焦点层",
-        "sheetRound": "回合",
-        "deckValue": "{{remaining}} / {{total}}",
-        "sheetDeck": "牌库",
-        "focusValue": "L{{layer}} · 心锁 {{n}}"
+        "section": "剖视 A-A · 第 {{n}} 回合"
       },
       "totem": {
         "gyro": "陀 螺 仪",
@@ -1050,27 +1056,7 @@
         "left": "剩余 {{percent}}%"
       },
       "matrix": {
-        "window": "dreammon · 梦境进程表",
-        "tableAria": "梦境进程表",
-        "cols": {
-          "layer": "层",
-          "vault": "金库",
-          "lock": "心锁",
-          "nodes": "占位",
-          "state": "状态"
-        },
-        "vault": {
-          "sealed": "封存",
-          "sealedKnown": "封存 · {{content}}",
-          "opened": "已开 · {{content}}"
-        },
-        "nightmare": {
-          "ready": "待命",
-          "revealed": "已揭示"
-        },
-        "marker": {
-          "focus": "焦点"
-        }
+        "window": "dreammon · 梦境进程表"
       }
     }
   },

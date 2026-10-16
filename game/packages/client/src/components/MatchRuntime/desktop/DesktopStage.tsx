@@ -11,6 +11,7 @@ import type { BoardModel } from '../model/boardModel';
 import { buildSeatViews, worldViewNames } from '../model/seatModel';
 import type { StageState } from '../model/stageState';
 import { markersBySeat } from '../seatMarkers';
+import { awaitedSeatIDs } from '../awaitingNotice';
 import { NoticeStack } from './NoticeStack';
 import { SeatRing } from './SeatRing';
 import { planSeats } from './seatPlan';
@@ -31,8 +32,9 @@ export function DesktopStage({ controller, state, board, onFocusLayer }: Desktop
 
   const seatMap = useMemo(() => {
     const markers = stage ? markersBySeat(stage.seats) : undefined;
-    return new Map(buildSeatViews(state, markers).map((s) => [s.id, s]));
-  }, [state, stage]);
+    const awaited = view ? awaitedSeatIDs(view, state.viewerID) : [];
+    return new Map(buildSeatViews(state, markers, awaited).map((s) => [s.id, s]));
+  }, [state, stage, view]);
 
   const viewer = state.viewerID;
   const master = state.dreamMasterID;

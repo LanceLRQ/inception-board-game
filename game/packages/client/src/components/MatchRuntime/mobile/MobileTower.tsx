@@ -1,7 +1,7 @@
 // 层塔：第 4 层在上、第 1 层在下，最下是迷失层（L0）
 // 非焦点层压成单行；焦点层展开（多一行说明、金库缩略图可点开详情）；手牌坞展开时只留焦点层。
 // 平板（≥768px）上字号与骰子放大，占位者不再截短，非焦点层也带出金库状态；内容区限宽居中。
-// 底部一行最新动态。梦主视角下，视图里多给的信息（未翻开的梦魇、未开金库的内容）如实显示。
+// 层下面是牌堆一行（抽牌堆、弃牌堆、本回合出牌），最下一行最新动态。梦主视角下，视图里多给的信息（未翻开的梦魇、未开金库的内容）如实显示。
 
 import { useTranslation } from 'react-i18next';
 import { CardArt } from '../../CardArt';
@@ -21,6 +21,7 @@ import type {
 } from '../model/boardModel';
 import { visibleBoardLayers } from '../model/boardModel';
 import type { MobileMode } from '../viewportMode';
+import { PileRow } from '../shared/PileRow';
 
 /** 心锁骰的边长（像素）：[非焦点层, 焦点层]，平板放大 */
 export function heartLockDieSizes(mode: MobileMode): readonly [number, number] {
@@ -31,7 +32,7 @@ interface MobileTowerProps {
   readonly board: BoardModel;
   readonly dockOpen: boolean;
   readonly mode: MobileMode;
-  /** 打开金库详情（金库牌卡面编号） */
+  /** 打开卡牌详情（金库牌卡面编号、牌堆里的牌） */
   readonly onOpenVault: (face: string) => void;
 }
 
@@ -291,6 +292,16 @@ export function MobileTower({ board, dockOpen, mode, onOpenVault }: MobileTowerP
             onOpenVault={onOpenVault}
           />
         ),
+      )}
+      {!dockOpen && (
+        // 手机横屏放不下：牌库张数顶栏已有，牌堆一行收起
+        <PileRow
+          deck={board.deck}
+          piles={board.piles}
+          onOpenCard={onOpenVault}
+          small
+          className="short-land:hidden"
+        />
       )}
       {!dockOpen && activity && (
         <p

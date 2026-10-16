@@ -12,6 +12,8 @@ import {
   deriveBanner,
   deriveDeck,
   deriveLayerNote,
+  derivePiles,
+  dreamCardOf,
   resolveFocusLayer,
   visibleBoardLayers,
 } from './boardModel';
@@ -81,6 +83,36 @@ describe('buildBoardLayers', () => {
         if (!v.opened) expect(v.face).toBe('vault_back');
       }
     }
+  });
+});
+
+describe('dreamCardOf', () => {
+  it('每一层取对应的原版梦境牌，迷失层是灰色那张', () => {
+    expect(dreamCardOf(0)).toBe('dream_limbo');
+    expect([1, 2, 3, 4].map(dreamCardOf)).toEqual(['dream_1', 'dream_2', 'dream_3', 'dream_4']);
+  });
+
+  it('每一行带着自己的梦境牌', () => {
+    const { state, G } = stageOf('thief');
+    const rows = buildBoardLayers(state, G.layers, G.pendingUnlock, nameOf);
+    for (const r of rows) expect(r.dreamCardId).toBe(dreamCardOf(r.layer));
+  });
+});
+
+describe('derivePiles', () => {
+  it('弃牌堆整堆公开、堆顶在最后；本回合出牌照视图给出', () => {
+    const { state, G } = stageOf('thief');
+    const piles = derivePiles(
+      { ...state, discardPile: ['action_kick', 'action_shoot'] },
+      { ...G, playedCardsThisTurn: ['action_unlock'] },
+    );
+    expect(piles.discard).toEqual(['action_kick', 'action_shoot']);
+    expect(piles.played).toEqual(['action_unlock']);
+  });
+
+  it('没有视图时本回合出牌为空', () => {
+    const { state } = stageOf('thief');
+    expect(derivePiles(state, undefined).played).toEqual([]);
   });
 });
 
@@ -185,6 +217,7 @@ describe('deriveBanner', () => {
       phase: 'draw',
     });
     expect(mine.key).toBe('board.banner.mine');
+    expect(mine.mine).toBe(true);
     expect(mine.phaseKey).toBe('localMatch.phase.draw');
     const other = deriveBanner({
       isMine: false,
@@ -193,6 +226,7 @@ describe('deriveBanner', () => {
       phase: 'action',
     });
     expect(other.key).toBe('board.banner.other');
+    expect(other.mine).toBe(false);
     expect(other.params).toEqual({ actor: '白鸦 · 小丑' });
   });
 
@@ -248,6 +282,7 @@ describe('buildBoardModel', () => {
       nicknameOf: nameOf,
     });
     expect(board.deck.remaining).toBe(state.deckCount);
+    expect(board.piles.discard).toEqual(state.discardPile);
   });
 });
 

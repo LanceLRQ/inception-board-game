@@ -12,6 +12,7 @@ import { tintLayerAttr } from '../../../theme/layerTints';
 import { useThemeSkin } from '../../../theme/skins/useThemeSkin';
 import { useBoardModel } from '../model/useBoardModel';
 import { buildSeatViews } from '../model/seatModel';
+import { awaitedSeatIDs } from '../awaitingNotice';
 import { markersBySeat } from '../seatMarkers';
 import type { MatchController } from '../controllerTypes';
 import { MatchOutcome } from '../shared/MatchOutcome';
@@ -44,9 +45,13 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
 
   const { state, board, focusLayer, focusOn } = useBoardModel(controller);
   const seatMarkers = useMemo(() => (stage ? markersBySeat(stage.seats) : undefined), [stage]);
+  const { view } = controller;
   const slots = useMemo(
-    () => (state ? buildSeatViews(state, seatMarkers) : []),
-    [state, seatMarkers],
+    () =>
+      state
+        ? buildSeatViews(state, seatMarkers, view ? awaitedSeatIDs(view, state.viewerID) : [])
+        : [],
+    [state, seatMarkers, view],
   );
 
   return (

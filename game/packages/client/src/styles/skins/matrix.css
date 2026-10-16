@@ -226,154 +226,12 @@
   animation: ms-blink 1s steps(1) infinite;
 }
 
-/* 进程表：表头与各行共用同一套列宽 */
-[data-theme='matrix'] .matrix-table {
-  --matrix-cols: 98px minmax(0, 1.05fr) 42px minmax(0, 1fr) minmax(116px, 0.9fr);
-}
-[data-theme='matrix'] .matrix-colhead,
-[data-theme='matrix'] .matrix-row {
-  grid-template-columns: var(--matrix-cols);
-  column-gap: 6px;
-  padding-inline: 12px;
-}
-[data-theme='matrix'] .matrix-colhead {
-  padding-block: 4px;
-  font-family: var(--ms-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.18em;
-  white-space: nowrap;
-  color: var(--ms-faint);
-  border-bottom: 1px solid var(--ms-line);
-}
-[data-theme='matrix'] .matrix-row {
-  min-height: 24px;
-  max-height: clamp(30px, 11cqh, 64px);
-  color: var(--ms-ink);
-  border-bottom: 1px solid color-mix(in srgb, var(--ms-acc) 8%, transparent);
-  transition: background-color 0.2s;
-}
-[data-theme='matrix'] .matrix-row:hover {
-  background: color-mix(in srgb, var(--ms-acc) 5%, transparent);
-}
-[data-theme='matrix'] .matrix-row[data-focus] {
-  background: color-mix(in srgb, var(--ms-acc) 9%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--ms-acc) 28%, transparent);
-  box-shadow: inset 2px 0 0 var(--ms-acc);
-}
-[data-theme='matrix'] .matrix-row[data-lost] {
-  border-bottom-style: dashed;
-}
-[data-theme='matrix'] .matrix-layername {
-  color: var(--ms-dim);
-}
-[data-theme='matrix'] .matrix-layername > span:nth-of-type(1) {
-  color: var(--ms-acc);
-}
-[data-theme='matrix'] .matrix-layername:focus-visible {
-  outline-offset: -2px;
-}
-[data-theme='matrix'] .matrix-pointer {
-  opacity: 0;
-  color: var(--ms-acc);
-}
-[data-theme='matrix'] .matrix-row[data-focus] .matrix-pointer {
-  opacity: 1;
-}
-[data-theme='matrix'] .matrix-row[data-focus] .matrix-layername {
-  color: var(--ms-accb);
-}
-[data-theme='matrix'] .matrix-row[data-viewer-layer]:not([data-focus]) .matrix-layername {
-  color: var(--ms-ink);
-}
-[data-theme='matrix'] .matrix-row[data-lost]:not([data-focus]) .matrix-layername,
-[data-theme='matrix']
-  .matrix-row[data-lost]:not([data-focus])
-  .matrix-layername
-  > span:nth-of-type(1) {
-  color: var(--ms-faint);
-}
-[data-theme='matrix'] .matrix-dim {
-  color: var(--ms-faint);
-}
-[data-theme='matrix'] .matrix-vault-text {
-  font-family: var(--ms-mono);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  color: var(--ms-dim);
-}
-[data-theme='matrix'] .matrix-vault-text[data-opened] {
-  color: var(--ms-accb);
-}
-[data-theme='matrix'] .matrix-vault[data-opened] {
-  border-color: color-mix(in srgb, var(--ms-acc) 60%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 25%, transparent);
-}
-[data-theme='matrix'] .matrix-nodes {
-  color: var(--ms-ink);
-}
-[data-theme='matrix'] .matrix-marker {
-  padding: 1px 5px;
-  color: var(--ms-accb);
-  border: 1px solid color-mix(in srgb, var(--ms-acc) 55%, transparent);
-}
-[data-theme='matrix'] .matrix-row[data-marker='unlocking'] .matrix-marker {
-  animation: ms-blink 1.2s steps(1) infinite;
-}
-[data-theme='matrix'] .matrix-nightmare {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 5px;
-  font-family: var(--ms-mono);
-  font-size: 9px;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  color: var(--ms-blood);
-  border: 1px dashed color-mix(in srgb, var(--ms-blood) 60%, transparent);
-  background: transparent;
-}
-[data-theme='matrix'] .matrix-nightmare[data-revealed] {
-  border-style: solid;
-}
-
-/* 焦点层详情 */
-[data-theme='matrix'] .matrix-detail {
-  border-top: 1px solid var(--ms-line2);
-  background: color-mix(in srgb, var(--ms-acc) 4%, transparent);
-}
-[data-theme='matrix'] .matrix-occ {
-  padding: 2px 8px;
-  color: var(--ms-dim);
-  background: var(--ms-panel2);
-  border: 1px solid var(--ms-line2);
-}
-[data-theme='matrix'] .matrix-occ[data-self] {
-  color: var(--ms-accb);
-  border-color: var(--ms-acc);
-}
 [data-theme='matrix'] .matrix-activity {
   color: var(--ms-faint);
   border-top: 1px solid var(--ms-line);
 }
 [data-theme='matrix'] .matrix-activity svg {
   color: var(--ms-dim);
-}
-[data-theme='matrix'] .matrix-deck {
-  color: var(--ms-dim);
-  border-top: 1px solid var(--ms-line);
-}
-[data-theme='matrix'] .matrix-seg {
-  background: color-mix(in srgb, var(--ms-acc) 12%, transparent);
-}
-[data-theme='matrix'] .matrix-seg[data-on] {
-  background: var(--ms-acc);
-}
-/* 中央区高度不够时收起焦点层说明，保证五行都放得下 */
-@container (max-height: 400px) {
-  [data-theme='matrix'] .matrix-detail-note {
-    display: none;
-  }
 }
 
 /* ---------- 移动端：只换令牌与皮肤样式，没有专属舞台 ---------- */
@@ -383,24 +241,20 @@
 
 /* ---------- 动效开关 ---------- */
 [data-theme='matrix']:root[data-fx-off~='blink'] .matrix-cursor,
-[data-theme='matrix']:root[data-fx-off~='blink'] .ms-seat-flag,
-[data-theme='matrix']:root[data-fx-off~='blink'] .matrix-marker {
+[data-theme='matrix']:root[data-fx-off~='blink'] .ms-seat-flag {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
   [data-theme='matrix']:root:not([data-motion='full']) .matrix-cursor,
-  [data-theme='matrix']:root:not([data-motion='full']) .ms-seat-flag,
-  [data-theme='matrix']:root:not([data-motion='full']) .matrix-marker {
+  [data-theme='matrix']:root:not([data-motion='full']) .ms-seat-flag {
     animation: none;
   }
 }
 [data-theme='matrix']:root[data-motion='reduced'] .matrix-cursor,
-[data-theme='matrix']:root[data-motion='reduced'] .ms-seat-flag,
-[data-theme='matrix']:root[data-motion='reduced'] .matrix-marker {
+[data-theme='matrix']:root[data-motion='reduced'] .ms-seat-flag {
   animation: none;
 }
 [data-theme='matrix']:root[data-motion='reduced'] .ms-handcard,
-[data-theme='matrix']:root[data-motion='reduced'] .ms-btn,
-[data-theme='matrix']:root[data-motion='reduced'] .matrix-row {
+[data-theme='matrix']:root[data-motion='reduced'] .ms-btn {
   transition: none;
 }

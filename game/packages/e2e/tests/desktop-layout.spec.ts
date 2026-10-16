@@ -116,11 +116,13 @@ test.describe('桌面布局 · 固定场景', () => {
     await expectNoScroll(page);
   });
 
-  test('中央舞台：自上而下 L4 → L0 五行，金库缩略图点开详情且不能翻面', async ({ page }) => {
+  test('中央舞台：一层到四层从左到右、迷失层在后，金库缩略图点开详情且不能翻面', async ({
+    page,
+  }) => {
     await openScene(page, '/game/debug');
     const rows = page.getByTestId('center-stage').locator('[data-testid^="layer-row-"]');
     await expect(rows).toHaveCount(5);
-    await expect(rows.first()).toHaveAttribute('data-testid', 'layer-row-4');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'layer-row-1');
     await expect(rows.last()).toHaveAttribute('data-testid', 'layer-row-0');
 
     // 点另一层把它设为焦点层

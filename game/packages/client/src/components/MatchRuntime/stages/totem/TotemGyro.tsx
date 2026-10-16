@@ -22,11 +22,8 @@ export function TotemGyro({ deck }: { deck: BoardDeck }) {
   const percent = deckPercent(deck.remaining, deck.total);
 
   return (
-    <div
-      className="totem-gyro grid shrink-0 grid-cols-[auto_1fr] items-center gap-x-3 @min-[520px]:flex @min-[520px]:w-[clamp(150px,36cqw,212px)] @min-[520px]:flex-col @min-[520px]:gap-0"
-      data-testid="deck-meter"
-    >
-      <h2 className="totem-gyro-title col-start-2 row-start-1 self-end font-heading text-[13px] font-bold tracking-[.24em] whitespace-nowrap @min-[520px]:w-full">
+    <div className="totem-gyro grid shrink-0 grid-cols-[auto_1fr] items-center gap-x-3 @min-[620px]:flex @min-[620px]:w-[clamp(150px,36cqw,212px)] @min-[620px]:flex-col @min-[620px]:gap-0">
+      <h2 className="totem-gyro-title col-start-2 row-start-1 self-end font-heading text-[13px] font-bold tracking-[.24em] whitespace-nowrap @min-[620px]:w-full">
         {t('desktop.board.totem.gyro')}
       </h2>
       <div
@@ -110,7 +107,7 @@ export function TotemGyro({ deck }: { deck: BoardDeck }) {
         </svg>
         <i className="totem-glow absolute" aria-hidden />
       </div>
-      <p className="totem-read col-start-2 row-start-2 flex min-w-0 flex-col gap-0.5 self-start font-mono text-[10px] tracking-[.14em] @min-[520px]:items-center @min-[520px]:self-center @min-[520px]:text-center">
+      <p className="totem-read col-start-2 row-start-2 flex min-w-0 flex-col gap-0.5 self-start font-mono text-[10px] tracking-[.14em] @min-[620px]:items-center @min-[620px]:self-center @min-[620px]:text-center">
         <span className="tabular-nums whitespace-nowrap">
           {t('desktop.board.deck', { remaining: deck.remaining, total: deck.total })}
         </span>

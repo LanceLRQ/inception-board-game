@@ -16,6 +16,8 @@ export interface SeatView {
   readonly isViewer: boolean;
   readonly isMaster: boolean;
   readonly isCurrent: boolean;
+  /** 对局正在等这个座位应答 */
+  readonly isAwaited: boolean;
   /** 已迷失（所在层 0 或已阵亡） */
   readonly isLost: boolean;
   readonly layer: number;
@@ -34,6 +36,7 @@ export interface SeatView {
 export function buildSeatViews(
   state: StageState,
   markersBySeat: Readonly<Record<string, readonly SeatMarker[]>> | undefined,
+  awaitedSeats: readonly string[] = [],
 ): SeatView[] {
   const slots = computeRailSlots({
     playerOrder: state.playerOrder,
@@ -56,6 +59,7 @@ export function buildSeatViews(
         isViewer: slot.isViewer,
         isMaster: slot.isMaster,
         isCurrent: slot.isCurrent,
+        isAwaited: awaitedSeats.includes(slot.id),
         isLost: p.currentLayer === 0 || !p.isAlive,
         layer: p.currentLayer,
         handCount: p.handCount,

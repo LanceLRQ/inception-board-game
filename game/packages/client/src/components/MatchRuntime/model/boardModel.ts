@@ -49,6 +49,8 @@ export interface BoardText {
 
 export interface BoardLayer {
   readonly layer: number;
+  /** 这一层对应的原版梦境牌（卡图用作层卡的底图） */
+  readonly dreamCardId: string;
   readonly heartLock: number;
   readonly vaults: readonly BoardVault[];
   /** 这一层有梦魇信息可显示才有值 */
@@ -65,6 +67,8 @@ export interface BoardLayer {
 /** 回合横幅：谁的回合 + 当前阶段（阶段文案键另给，由舞台自行拼接） */
 export interface BoardBanner extends BoardText {
   readonly phaseKey: string;
+  /** 轮到本人行动 */
+  readonly mine: boolean;
 }
 
 export interface BoardDeck {
@@ -73,12 +77,19 @@ export interface BoardDeck {
   readonly total: number;
 }
 
+/** 牌堆：弃牌堆整堆公开（堆底在前、堆顶在最后），本回合出牌区是当前行动者本回合打出的牌 */
+export interface BoardPiles {
+  readonly discard: readonly string[];
+  readonly played: readonly string[];
+}
+
 export interface BoardModel {
   /** 第 4 层 → 迷失层 */
   readonly layers: readonly BoardLayer[];
   readonly focusLayer: number;
   readonly viewerLayer: number;
   readonly deck: BoardDeck;
+  readonly piles: BoardPiles;
   readonly turn: { readonly number: number; readonly phase: string };
   readonly banner: BoardBanner;
   /** 最新动态；没有可显示的内容为 null */
@@ -98,6 +109,11 @@ export function boardVaultOf(vault: StageVault): BoardVault {
       ? OPENED_FACE[vault.contentType]
       : 'vault_back';
   return { id: vault.id, opened: vault.isOpened, contentType: vault.contentType, face };
+}
+
+/** 某一层的原版梦境牌：迷失层是灰色的 dream_limbo，其余是 dream_<层号> */
+export function dreamCardOf(layer: number): string {
+  return layer === 0 ? 'dream_limbo' : `dream_${layer}`;
 }
 
 type PendingUnlock = { playerID: string; layer: number } | null | undefined;
@@ -166,6 +182,7 @@ export function buildBoardLayers(
 
     return {
       layer,
+      dreamCardId: dreamCardOf(layer),
       heartLock: stageLayer?.heartLockValue ?? 0,
       vaults: state.vaults.filter((v) => v.layer === layer).map(boardVaultOf),
       nightmare,
@@ -192,6 +209,7 @@ export function deriveBanner(input: {
     key: input.isMine ? 'board.banner.mine' : 'board.banner.other',
     params: { actor },
     phaseKey: `localMatch.phase.${input.phase}`,
+    mine: input.isMine,
   };
 }
 
@@ -201,6 +219,11 @@ export function deriveDeck(state: StageState, view: MatchView | undefined): Boar
   const total =
     state.deckCount + state.discardPile.length + hands + (view?.removedFromGame?.length ?? 0);
   return { remaining: state.deckCount, total: Math.max(total, state.deckCount) };
+}
+
+/** 弃牌堆与本回合出牌区；没有视图时本回合出牌为空 */
+export function derivePiles(state: StageState, view: MatchView | undefined): BoardPiles {
+  return { discard: state.discardPile, played: view?.playedCardsThisTurn ?? [] };
 }
 
 export interface BoardInput {
@@ -227,6 +250,7 @@ export function buildBoardModel(input: BoardInput): BoardModel {
     focusLayer,
     viewerLayer: viewer?.currentLayer ?? 1,
     deck: deriveDeck(state, view),
+    piles: derivePiles(state, view),
     turn: { number: state.turnNumber, phase: state.turnPhase },
     banner: deriveBanner({
       isMine: state.currentPlayerID === state.viewerID,

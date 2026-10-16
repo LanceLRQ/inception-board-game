@@ -44,7 +44,7 @@ function define(
 
 /**
  * 开关表：
- * - ambient 背景动画：rain 数字雨（矩阵）、totem 陀螺自旋与微晃（蓝图、陀螺）、flow 穿层虚线流动（蓝图、陀螺）、
+ * - ambient 背景动画：rain 数字雨（矩阵）、totem 陀螺自旋与微晃（蓝图、陀螺）、
  *   blink 光标与状态灯明灭（矩阵）、drift 蝶的漂移扇动与墨点呼吸（蝶）
  * - texture 背景底纹（静态）：grid 制图网格（蓝图）、maze 迷宫（陀螺）、paper 纸纹（蝶）
  * - scan 扫描线（矩阵）· desat 卡图降饱和（矩阵）· tint 层级调色（陀螺）
@@ -52,7 +52,7 @@ function define(
 export const EFFECTS: readonly EffectDefinition[] = [
   define(
     'ambient',
-    ['rain', 'totem', 'flow', 'blink', 'drift'],
+    ['rain', 'totem', 'blink', 'drift'],
     ['blueprint', 'totem', 'matrix', 'butterfly'],
   ),
   define('texture', ['grid', 'maze', 'paper'], ['blueprint', 'totem', 'butterfly']),

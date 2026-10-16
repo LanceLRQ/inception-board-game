@@ -27,7 +27,7 @@ const SWITCHABLE_THEMES = [
     label: '筑梦蓝图',
     name: /筑梦蓝图|Architect's Blueprint/,
     stage: 'blueprint-stage',
-    desc: '轴测楼板剖面',
+    desc: '蓝图图框里的牌桌',
     scheme: 'dark',
   },
   {
@@ -35,7 +35,7 @@ const SWITCHABLE_THEMES = [
     label: '陀螺未停',
     name: /陀螺未停|The Top Still Spins/,
     stage: 'totem-stage',
-    desc: '陀螺仪加梦层塔',
+    desc: '陀螺仪加牌桌',
     scheme: 'dark',
   },
   {
@@ -43,7 +43,7 @@ const SWITCHABLE_THEMES = [
     label: '梦境矩阵',
     name: /梦境矩阵|DreamMatrix/,
     stage: 'matrix-stage',
-    desc: '终端进程表',
+    desc: '终端窗口里的牌桌',
     scheme: 'dark',
   },
   {
@@ -51,7 +51,7 @@ const SWITCHABLE_THEMES = [
     label: '庄周梦蝶',
     name: /庄周梦蝶|The Butterfly Dream/,
     stage: 'butterfly-stage',
-    desc: '山水长卷',
+    desc: '长卷里的牌桌',
     scheme: 'light',
   },
 ] as const;
@@ -156,10 +156,10 @@ for (const theme of SWITCHABLE_THEMES) {
         await expect(page.getByTestId(other)).toHaveCount(0);
       }
 
-      // 自上而下 L4 → L0，焦点层只有一层
+      // 一层到四层从左到右，迷失层在最后，焦点层只有一层
       const rows = page.getByTestId('center-stage').locator('[data-testid^="layer-row-"]');
       await expect(rows).toHaveCount(5);
-      await expect(rows.first()).toHaveAttribute('data-testid', 'layer-row-4');
+      await expect(rows.first()).toHaveAttribute('data-testid', 'layer-row-1');
       await expect(rows.last()).toHaveAttribute('data-testid', 'layer-row-0');
       await expect(page.locator('[data-testid^="layer-row-"][data-focus]')).toHaveCount(1);
 
@@ -546,25 +546,6 @@ test.describe('主题 Theme · 庄周梦蝶的亮色与按需字体', () => {
     const flyer = page.locator('.butterfly-flyer').first();
     expect(await flyer.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
   });
-
-  test('中文界面的层签竖排，放不下竖排的矮舞台与英文界面改横排', async ({ page }, testInfo) => {
-    test.skip(
-      isMobileProject(testInfo.project.name) || isNarrowViewport(page),
-      '中央舞台只在桌面视口出现',
-    );
-    await page.setViewportSize({ width: 1920, height: 1080 });
-    await preselectTheme(page, 'butterfly');
-    await page.goto('/game/debug');
-    await waitForAppReady(page);
-    const tag = page.getByTestId('layer-focus-2');
-    await expect(tag).toBeVisible({ timeout: 10_000 });
-    const mode = () => tag.evaluate((el) => getComputedStyle(el).writingMode);
-    expect(await mode()).toBe('vertical-rl');
-
-    // 英文界面：舞台根元素的 lang 不是 zh，层签保持横排
-    await page.getByTestId('butterfly-stage').evaluate((el) => el.setAttribute('lang', 'en'));
-    expect(await mode()).toBe('horizontal-tb');
-  });
 });
 
 /** 在页面里放一个声明了 3 秒过渡的元素，读出它实际生效的过渡时长（全局减少动效规则生效时是 0.001s） */
@@ -714,7 +695,7 @@ test.describe('主题 Theme · 效果开关', () => {
     );
     await page.goto('/settings');
     const html = page.locator('html');
-    await expect(html).toHaveAttribute('data-fx-off', 'rain totem flow blink drift scan');
+    await expect(html).toHaveAttribute('data-fx-off', 'rain totem blink drift scan');
     await expect(html).toHaveAttribute('data-motion', 'reduced');
     await expect(page.locator('#root > *')).toHaveCount(0);
   });
@@ -757,84 +738,76 @@ test.describe('主题 Theme · 效果开关', () => {
   });
 });
 
-/** 筑梦蓝图：每块斜切楼板里的文字与控件都要落在该楼板的顶面平行四边形之内 */
-const SLAB_BOUNDS = () => {
+/** 牌桌：每张梦境层卡片里的文字与控件都要落在卡片之内（卡片裁掉溢出，溢出了就是被悄悄截掉） */
+const CARD_BOUNDS = () => {
   const violations: string[] = [];
-  for (const plane of document.querySelectorAll('[data-testid^="layer-row-"]')) {
-    const svg = plane.querySelector('svg.blueprint-slab')!;
-    const poly = svg.querySelector('.blueprint-slab-top')!;
-    const vb = (svg as SVGSVGElement).viewBox.baseVal;
-    const sr = svg.getBoundingClientRect();
-    const [tl, tr, br, bl] = poly
-      .getAttribute('points')!
-      .split(' ')
-      .map((s) => s.split(',').map(Number))
-      .map(([x, y]) => [
-        sr.left + (x! / vb.width) * sr.width,
-        sr.top + (y! / vb.height) * sr.height,
-      ]);
-    const xAt = (y: number, a: number[], c: number[]) =>
-      a[0]! + ((y - a[1]!) / (c[1]! - a[1]!)) * (c[0]! - a[0]!);
-    const inside = (x: number, y: number) =>
-      y >= tl![1]! - 0.5 &&
-      y <= bl![1]! + 0.5 &&
-      x >= xAt(y, tl!, bl!) - 0.5 &&
-      x <= xAt(y, tr!, br!) + 0.5;
-    const corners = (r: DOMRect) =>
-      [
-        [r.left, r.top],
-        [r.right, r.top],
-        [r.left, r.bottom],
-        [r.right, r.bottom],
-      ] as const;
-    const walker = document.createTreeWalker(plane, NodeFilter.SHOW_TEXT);
+  for (const card of document.querySelectorAll(
+    '[data-testid="center-stage"] [data-testid^="layer-row-"]',
+  )) {
+    const box = card.getBoundingClientRect();
+    const inside = (r: DOMRect) =>
+      r.left >= box.left - 0.5 &&
+      r.right <= box.right + 0.5 &&
+      r.top >= box.top - 0.5 &&
+      r.bottom <= box.bottom + 0.5;
+    const name = (card as HTMLElement).dataset['testid'];
+    const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      if (!n.textContent?.trim() || n.parentElement!.closest('svg')) continue;
+      if (
+        !n.textContent?.trim() ||
+        n.parentElement!.closest('.sr-only, [data-testid="card-art-fallback"]')
+      ) {
+        continue;
+      }
+      // 截短（overflow 隐藏 + 省略号）的文字按截短它的那个元素的框量，那是有意的裁切
+      let clip: Element | null = n.parentElement;
+      while (clip && clip !== card && getComputedStyle(clip).overflowX === 'visible') {
+        clip = clip.parentElement;
+      }
       const range = document.createRange();
       range.selectNodeContents(n);
-      for (const r of range.getClientRects()) {
+      const rects =
+        clip && clip !== card ? [clip.getBoundingClientRect()] : [...range.getClientRects()];
+      for (const r of rects) {
         if (r.width === 0 || r.height === 0) continue;
-        if (!corners(r).every(([x, y]) => inside(x, y))) {
-          violations.push(`${(plane as HTMLElement).dataset['testid']}: "${n.textContent.trim()}"`);
-        }
+        if (!inside(r)) violations.push(`${name}: "${n.textContent.trim()}"`);
       }
     }
-    for (const el of plane.querySelectorAll('button')) {
-      const r = el.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) continue;
-      if (!corners(r).every(([x, y]) => inside(x, y))) {
-        violations.push(
-          `${(plane as HTMLElement).dataset['testid']}: button ${el.getAttribute('data-testid')}`,
-        );
-      }
+    for (const el of card.querySelectorAll('button')) {
+      if (!inside(el.getBoundingClientRect()))
+        violations.push(`${name}: <button ${el.dataset['testid'] ?? ''}>`);
     }
   }
   return violations;
 };
 
-test.describe('主题 Theme · 筑梦蓝图的楼板', () => {
+test.describe('主题 Theme · 牌桌的梦境层卡片', () => {
   const CASES = [
     { w: 1024, h: 768, players: 10 },
-    { w: 1024, h: 768, players: 4 },
     { w: 1280, h: 800, players: 6 },
-    { w: 1920, h: 1080, players: 10 },
   ] as const;
-  for (const c of CASES) {
-    test(`${c.w}×${c.h}、${c.players} 人：各层文字与按钮都在各自楼板的顶面之内（含逐层设为焦点层）`, async ({
-      page,
-    }, testInfo) => {
-      test.skip(isMobileProject(testInfo.project.name), '中央舞台只在桌面视口出现');
-      await page.setViewportSize({ width: c.w, height: c.h });
-      await preselectTheme(page, 'blueprint');
-      await page.goto(`/game/debug?players=${c.players}`);
-      await waitForAppReady(page);
-      await expect(page.getByTestId('blueprint-stage')).toBeVisible({ timeout: 10_000 });
-      expect(await page.evaluate(SLAB_BOUNDS), '默认焦点层').toEqual([]);
-      for (const layer of [0, 1, 2, 3, 4]) {
-        await page.getByTestId(`layer-focus-${layer}`).click();
-        await expect(page.getByTestId(`layer-row-${layer}`)).toHaveAttribute('data-focus', 'true');
-        expect(await page.evaluate(SLAB_BOUNDS), `焦点层 ${layer}`).toEqual([]);
-      }
-    });
+  const ALL = [{ id: 'noir', label: '深眠影院', stage: 'noir-stage' }, ...SWITCHABLE_THEMES];
+  for (const theme of ALL) {
+    for (const c of CASES) {
+      test(`${theme.label} ${c.w}×${c.h}、${c.players} 人：各层文字与按钮都在各自卡片之内（含逐层设为焦点层）`, async ({
+        page,
+      }, testInfo) => {
+        test.skip(isMobileProject(testInfo.project.name), '中央舞台只在桌面视口出现');
+        await page.setViewportSize({ width: c.w, height: c.h });
+        await preselectTheme(page, theme.id);
+        await page.goto(`/game/debug?players=${c.players}`);
+        await waitForAppReady(page);
+        await expect(page.getByTestId(theme.stage)).toBeVisible({ timeout: 10_000 });
+        expect(await page.evaluate(CARD_BOUNDS), '默认焦点层').toEqual([]);
+        for (const layer of [0, 1, 2, 3, 4]) {
+          await page.getByTestId(`layer-focus-${layer}`).click();
+          await expect(page.getByTestId(`layer-row-${layer}`)).toHaveAttribute(
+            'data-focus',
+            'true',
+          );
+          expect(await page.evaluate(CARD_BOUNDS), `焦点层 ${layer}`).toEqual([]);
+        }
+      });
+    }
   }
 });

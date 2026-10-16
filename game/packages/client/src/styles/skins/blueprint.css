@@ -1,7 +1,7 @@
 /*
  * 「筑梦蓝图」皮肤：深普鲁士蓝图纸、制图白线、网格底、轴测楼板与图签。
  * 全部限定在 [data-theme='blueprint'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
- * 动效：陀螺旋转、穿层虚线流动可由 data-fx-off 单独关闭（totem / flow），网格底可关闭（grid）；
+ * 动效：陀螺旋转可由 data-fx-off 单独关闭（totem），网格底可关闭（grid）；
  * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下全部停掉。
  */
 
@@ -227,175 +227,6 @@
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--ms-bg) 55%, transparent);
 }
-/* 穿层虚线：自上而下贯穿各层 */
-[data-theme='blueprint'] .blueprint-kick {
-  position: absolute;
-  left: 3px;
-  top: 4px;
-  bottom: 12px;
-  width: 1px;
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ms-ink) 38%, transparent) 55%,
-    transparent 45%
-  );
-  background-size: 1px 9px;
-  animation: ms-flow 1.8s linear infinite;
-}
-[data-theme='blueprint'] .blueprint-kick-head {
-  color: color-mix(in srgb, var(--ms-ink) 42%, transparent);
-  left: -3px;
-}
-
-/* 楼板：顶面 + 前面 + 右侧面，线宽不随拉伸变化 */
-[data-theme='blueprint'] .blueprint-plane {
-  padding-block: 3px 5px;
-}
-[data-theme='blueprint'] .blueprint-slab polygon {
-  vector-effect: non-scaling-stroke;
-  stroke-width: 1;
-  stroke-linejoin: miter;
-}
-[data-theme='blueprint'] .blueprint-slab-top {
-  fill: color-mix(in srgb, var(--ms-ink) 5%, transparent);
-  stroke: color-mix(in srgb, var(--ms-ink) 38%, transparent);
-}
-[data-theme='blueprint'] .blueprint-slab-front {
-  fill: color-mix(in srgb, var(--ms-ink) 9%, var(--ms-bg));
-  stroke: color-mix(in srgb, var(--ms-ink) 30%, transparent);
-}
-[data-theme='blueprint'] .blueprint-slab-side {
-  fill: color-mix(in srgb, var(--ms-bg) 86%, transparent);
-  stroke: color-mix(in srgb, var(--ms-ink) 30%, transparent);
-}
-[data-theme='blueprint'] .blueprint-plane[data-viewer-layer]:not([data-focus]) .blueprint-slab-top {
-  stroke: color-mix(in srgb, var(--ms-ink) 58%, transparent);
-}
-[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-slab-top {
-  fill: color-mix(in srgb, var(--ms-acc) 8%, transparent);
-  stroke: var(--ms-acc);
-  stroke-width: 1.4;
-}
-[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-slab-front {
-  fill: color-mix(in srgb, var(--ms-acc) 26%, var(--ms-bg));
-  stroke: color-mix(in srgb, var(--ms-acc) 70%, transparent);
-}
-[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-slab-side {
-  fill: color-mix(in srgb, var(--ms-acc) 12%, var(--ms-bg));
-  stroke: color-mix(in srgb, var(--ms-acc) 70%, transparent);
-}
-/* 迷失层：图面之外的虚线基础 */
-[data-theme='blueprint'] .blueprint-plane[data-lost] .blueprint-slab-top {
-  fill: none;
-  stroke: color-mix(in srgb, var(--ms-ink) 24%, transparent);
-  stroke-dasharray: 5 5;
-}
-[data-theme='blueprint'] .blueprint-plane[data-lost][data-focus] .blueprint-slab-top {
-  fill: color-mix(in srgb, var(--ms-acc) 5%, transparent);
-  stroke: var(--ms-acc);
-}
-[data-theme='blueprint'] .blueprint-planename {
-  color: var(--ms-dim);
-}
-[data-theme='blueprint'] .blueprint-planename:focus-visible {
-  outline-offset: -2px;
-}
-[data-theme='blueprint'] .blueprint-plane[data-focus] .blueprint-planename {
-  color: var(--ms-accb);
-}
-[data-theme='blueprint'] .blueprint-plane[data-lost]:not([data-focus]) .blueprint-planename {
-  color: var(--ms-faint);
-}
-[data-theme='blueprint'] .blueprint-chip {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  font-family: var(--ms-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-  color: var(--ms-dim);
-  border: 1px solid var(--ms-line);
-  background: color-mix(in srgb, var(--ms-bg) 55%, transparent);
-}
-[data-theme='blueprint'] .blueprint-chip[data-opened] {
-  color: var(--ms-acc);
-  border-color: color-mix(in srgb, var(--ms-acc) 50%, transparent);
-}
-[data-theme='blueprint'] .blueprint-vault[data-opened] {
-  border-color: var(--ms-acc);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 22%, transparent);
-}
-[data-theme='blueprint'] .blueprint-nightmare {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 6px;
-  font-family: var(--ms-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-  color: var(--ms-blood);
-  border: 1px dashed color-mix(in srgb, var(--ms-blood) 55%, transparent);
-  background: transparent;
-}
-[data-theme='blueprint'] .blueprint-nightmare[data-revealed] {
-  border-style: solid;
-}
-[data-theme='blueprint'] .blueprint-tag {
-  padding: 1px 6px;
-  color: var(--ms-accb);
-  border: 1px solid var(--ms-acc);
-}
-[data-theme='blueprint'] .blueprint-occ {
-  padding: 2px 8px;
-  color: var(--ms-dim);
-  background: color-mix(in srgb, var(--ms-bg) 60%, var(--ms-panel));
-  border: 1px solid var(--ms-line2);
-}
-[data-theme='blueprint'] .blueprint-occ[data-self] {
-  color: var(--ms-ink);
-  border-color: var(--ms-acc);
-}
-/* 图签：工程图右下角的标题栏 */
-[data-theme='blueprint'] .blueprint-sheet {
-  font-family: var(--ms-mono);
-  border: 1px solid var(--ms-line2);
-  background: color-mix(in srgb, var(--ms-bg) 80%, transparent);
-}
-[data-theme='blueprint'] .blueprint-sheet-cell {
-  min-width: 0;
-  padding: 3px 9px;
-  border-right: 1px solid var(--ms-line);
-}
-[data-theme='blueprint'] .blueprint-sheet-cell:last-child {
-  border-right: none;
-}
-[data-theme='blueprint'] .blueprint-sheet dt {
-  font-size: 8.5px;
-  letter-spacing: 0.2em;
-  color: var(--ms-faint);
-}
-[data-theme='blueprint'] .blueprint-sheet dd {
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  color: var(--ms-ink);
-}
-/* 牌库刻度尺 */
-[data-theme='blueprint'] .blueprint-ruler {
-  background: repeating-linear-gradient(90deg, var(--ms-line2) 0 1px, transparent 1px 9px);
-}
-[data-theme='blueprint'] .blueprint-ruler > i {
-  opacity: 0.75;
-}
-/* 中央区高度不够时收起占位者那一行，保证各层楼板都放得下 */
-@container (max-height: 400px) {
-  [data-theme='blueprint'] .blueprint-occline {
-    display: none;
-  }
-}
 
 /* ---------- 动效开关 ---------- */
 [data-theme='blueprint']:root[data-fx-off~='grid'] .blueprint-grid {
@@ -407,18 +238,14 @@
 [data-theme='blueprint']:root[data-fx-off~='totem'] .blueprint-totem {
   animation: none;
 }
-[data-theme='blueprint']:root[data-fx-off~='flow'] .blueprint-kick {
-  animation: none;
-}
+
 @media (prefers-reduced-motion: reduce) {
   [data-theme='blueprint']:root:not([data-motion='full']) .blueprint-totem,
-  [data-theme='blueprint']:root:not([data-motion='full']) .blueprint-kick,
   [data-theme='blueprint']:root:not([data-motion='full']) .ms-seat-flag {
     animation: none;
   }
 }
 [data-theme='blueprint']:root[data-motion='reduced'] .blueprint-totem,
-[data-theme='blueprint']:root[data-motion='reduced'] .blueprint-kick,
 [data-theme='blueprint']:root[data-motion='reduced'] .ms-seat-flag {
   animation: none;
 }

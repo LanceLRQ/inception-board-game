@@ -47,7 +47,7 @@ describe('效果开关表', () => {
   it('归类固定：背景动画 / 背景底纹 / 扫描线 / 卡图降饱和 / 层级调色', () => {
     const byKey = Object.fromEntries(EFFECTS.map((e) => [e.key, [...e.fxNames].sort()]));
     expect(byKey).toEqual({
-      ambient: ['blink', 'drift', 'flow', 'rain', 'totem'],
+      ambient: ['blink', 'drift', 'rain', 'totem'],
       texture: ['grid', 'maze', 'paper'],
       scan: ['scan'],
       desat: ['desat'],
@@ -177,9 +177,7 @@ describe('写到根元素的属性', () => {
   });
 
   it('data-fx-off：关闭一个开关就写出它包含的全部内部名字，空格分隔', () => {
-    expect(fxOffAttribute({ off: ['ambient'], motion: 'system' })).toBe(
-      'rain totem flow blink drift',
-    );
+    expect(fxOffAttribute({ off: ['ambient'], motion: 'system' })).toBe('rain totem blink drift');
     expect(fxOffAttribute({ off: ['texture', 'scan'], motion: 'system' })).toBe(
       'grid maze paper scan',
     );

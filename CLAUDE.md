@@ -57,7 +57,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **可用**
 
 - 本地人机对局（引擎与 Bot 都运行在浏览器内）：回合流程、4–10 人、20 种行动牌、6 张梦魇牌，以及 38 名盗梦者与 15 名梦主的大部分技能；`/local` 的进度每步存进本机 IndexedDB，刷新后可「继续上一局」（引擎完整状态只在 Worker 里读写，界面线程只读人数、回合数等摘要；版本不匹配或损坏时丢弃并开新局）
-- 对局界面：桌面（座位环 + 按主题加载的中央舞台 + 底部坞）与移动（行动轴 + 层塔 + 一体式手牌坞）双布局，主题换肤（对局内片头条 / 顶栏的调色板按钮可直接换主题）；角色牌开局全员翻开（说明书「游戏开始」一节），座位、层里的占位者都显示角色卡面，阵营仍按座位裁剪（贿赂转阵营是秘密）；手牌按整张牌的比例显示，卡图扫描件的黑边由 `CardArt` 统一裁掉（`CardArt/scanBorder.ts`，卡牌详情显示原件）
+- 对局界面：桌面（座位环 + 按主题加载的中央舞台 + 底部坞）与移动（行动轴 + 层塔 + 一体式手牌坞）双布局，主题换肤（对局内片头条 / 顶栏的调色板按钮可直接换主题）；角色牌开局全员翻开（说明书「游戏开始」一节），座位、层里的占位者都显示角色卡面，阵营仍按座位裁剪（贿赂转阵营是秘密）；桌面中央是牌桌：一层到四层按原版梦境牌的卡图横排成卡片（迷失层是下方一条），下面一排抽牌堆、弃牌堆（显示堆顶，可点开看整堆）与本回合出牌区，移动层塔保持竖排并补上同样的牌堆一行（手机横屏收起）；当前行动者的座位带呼吸光圈、正在应答的座位带虚线框与「应答中」，轮到本人时回合横幅高亮；手牌按整张牌的比例显示，卡图扫描件的黑边由 `CardArt` 统一裁掉（`CardArt/scanBorder.ts`，卡牌详情显示原件）
 - Bot 行动策略：Bot 座位在自己回合的出牌阶段按策略打行动牌，回合外按策略应答两类窗口（`bot/src/actionPolicy.ts`，只读按该座位裁剪的视图，不接触完整状态）。出牌：盗梦者优先解封，其次复活迷失层里的同伴（只弃不重要的牌）、抽牌、同层射梦主、心锁清空后用梦境穿梭剂去还有心锁的相邻层；在迷失层时只做一件事——弃价值最低的 2 张牌（密道世界观 1 张梦境穿梭剂）复活自己；梦主先用免费移动朝盗梦者走一步（同层已有盗梦者就不动），再对同层盗梦者出 SHOOT 类，不复活盗梦者；应答：手里有【解封】且打出解封的人在该座位看得到的信息里是对立阵营就用效果②抵消（梦主抵消盗梦者的解封），土星·领地的 Bot 梦主手里有与被打出的牌同名的牌就弃 1 张抵消律令（完全相同的 id 优先），其余应答一律放弃 / 放过。`nextAutoAction` 把策略候选依次交运行器试跑、取第一个被接受的，都被拒就回到原来的动作，一个 Bot 一回合最多出 4 张。开关是 `policySeatIDs`，缺省关闭：服务端只列真正的 Bot 座位，超时代发与挂机托管的真人座位不出牌也不抵消；本地对局除真人座位外都按策略行动，地址参数 `/local?botplay=off` 关闭（端到端需要安静 Bot 时用）。节奏：本地 Bot 每一步与上一步（含真人的）落地至少相隔 0.8 秒（`lib/botCardPlay.ts` 的 `BOT_STEP_MS`，`/local?botpace=fast` 不等，端到端用），联机 Bot 每步间隔缺省同为 800 毫秒（`MATCH_BOT_STEP_DELAY_MS`）
 - 好友房联机对局：房主建房、其他人凭房间码加入、空位可补 Bot，开始后全体进入同一局服务端权威对局；刷新或断线后回到同一局
 - 房间等待页：成员变化、补 Bot、开始游戏由服务端经 `/rooms` 命名空间推送（只发给房间成员），推送不可用时退回每 15 秒轮询（页面不可见时暂停）；房间码一键复制、邀请链接 `/invite/房间码`（带二维码与系统分享），聊天软件抓取该链接时得到不含成员信息的分享卡片；联机倒计时按服务端给的剩余毫秒用单调时钟倒数，不受本机时钟影响；数据请求统一走 TanStack Query（`lib/queryClient.ts`）
@@ -85,7 +85,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 部分角色技能与世界观未接入对局，另有若干规则细节与原版有出入
 - 尚不支持 3 人局
 - 旁观、公开匹配、自由输入的聊天（目前只有预设短语）、回放播放器、多实例部署
-- 联机对局没有事件驱动的动画，状态变化直接刷新
+- 对局没有事件驱动的动画（抽牌、出牌、掷骰等），状态变化直接刷新
 - Bot 只会按简单启发式打行动牌（解封、凭空造物、SHOOT 类、梦境穿梭剂）、复活、梦主移动，并应答解封窗口与土星·律令，角色主动技能、世界观技能、其余应答与需要复杂参数的牌都不用；渗透测试、动画音效、完整的无障碍支持与英文本地化
 
 ## 仓库结构
@@ -195,7 +195,7 @@ pnpm --filter @icgame/client cards:manifest   # 只按 public/cards 的内容重
 | 层 | 位置 | 职责 |
 |----|------|------|
 | 控制层 | `useMatchController.ts` + `controllerDerive.ts`（纯推导）+ `controllerTypes.ts`（`MatchController`） | 从来源视图推导界面状态，持有出牌 / 弃牌 / 选目标的本地状态与回调；不含 JSX。布局与弹窗群只消费 `MatchController` |
-| 共享模型 | `model/` | 与布局、主题无关的纯函数模型：`boardModel.ts`（盘面：各层心锁 / 金库 / 梦魇 / 占位者、牌库进度、回合横幅、焦点层）、`seatModel.ts`（座位展示数据）、`handDerive.ts`（读牌、能否打出、主操作）、`activity.ts`（最新动态）、`viewAdapter.ts` + `stageState.ts`（视图 → `StageState`）、`useBoardModel.ts`（把控制层接到盘面模型） |
+| 共享模型 | `model/` | 与布局、主题无关的纯函数模型：`boardModel.ts`（盘面：各层心锁 / 金库 / 梦魇 / 占位者与梦境牌、牌库进度、弃牌堆与本回合出牌、回合横幅、焦点层）、`seatModel.ts`（座位展示数据）、`handDerive.ts`（读牌、能否打出、主操作）、`activity.ts`（最新动态）、`viewAdapter.ts` + `stageState.ts`（视图 → `StageState`）、`useBoardModel.ts`（把控制层接到盘面模型） |
 | 布局 | `desktop/`（≥1024px）、`mobile/`（<1024px）；`index.tsx` 按 `(min-width: 1024px)` 分派 | 桌面：片头条 + 舞台（背景氛围 + 座位环 + 中央舞台 + 右上提示栈）+ 底部坞；移动：顶栏 + 层级标签 + 行动轴 + 层塔 + 一体式手牌坞。两个布局都用内联的解封响应窗口 / 响应条，不弹窗 |
 | 弹窗群 | `MatchDialogs.tsx` | 选目标 / 选模式 / 多步选择等响应类弹窗，与布局无关 |
 | 共用小件 | `shared/`（`PreloadLine` / `MatchOutcome` / `AwaitingNotice`）、`components/CardArt`、`components/Die`、`components/SeatStatusBadges` 等 | 两个布局共用 |
@@ -219,7 +219,7 @@ pnpm --filter @icgame/client cards:manifest   # 只按 public/cards 的内容重
 |----|------|------|
 | 令牌 | 颜色、字体（18 个语义令牌，对应 CSS 变量 `--ms-*`） | `theme/themes.ts`（主表）与 `styles/index.css` 里的 `[data-theme='<id>']` 块，逐字一致，由 `theme/themeCss.test.ts` 保证 |
 | 皮肤件 | 少量按主题切换的样式：卡牌画框、骰子、层徽、座位框、背景氛围 | 共用组件只带稳定的钩子类名，基础样式在 `styles/skins/base.css`，每个主题的差异在 `styles/skins/<id>.css`，全部限定在 `[data-theme='<id>']` 之下（关键帧放 `base.css`）；皮肤样式里**不许有颜色字面量**（装饰性取值用 `color-mix()` 基于令牌推导），由 `theme/skins/skins.test.ts` 保证 |
-| 中央舞台 | 桌面端中央区，每个主题一个结构不同的组件，吃同一份盘面数据 | `components/MatchRuntime/stages/<id>/`，经 `React.lazy` 加载成独立 chunk，不进首屏包 |
+| 中央舞台 | 桌面端中央区，每个主题一个组件（标题、横幅与装饰各不相同），中间都摆共用的牌桌 `stages/table/TableBoard.tsx`（梦境层卡片 + 牌堆一行 `shared/PileRow.tsx`），吃同一份盘面数据 | `components/MatchRuntime/stages/<id>/`，经 `React.lazy` 加载成独立 chunk，不进首屏包 |
 
 移动端布局所有主题共用一套结构、只靠令牌换肤，没有按主题分叉的中央舞台（背景可以有：皮肤的 `MobileAmbient` 由 `MobileLayout` 铺在最底层）。
 
@@ -231,7 +231,7 @@ pnpm --filter @icgame/client cards:manifest   # 只按 public/cards 的内容重
 |------|------|----------|
 | `ms-stage` / `ms-ambient` / `ms-center` | 桌面舞台、背景氛围层、中央舞台区域 | `data-density`（座位牌档位） |
 | `ms-topbar` | 片头条 | - |
-| `ms-seat`（`-flag` / `-revtag` / `-name`）、`ms-faction-dot` | 座位牌与其中的文字、阵营点 | `data-current` / `data-lost` / `data-master` / `data-revealed` / `data-faction` |
+| `ms-seat`（`-flag` / `-revtag` / `-name`）、`ms-faction-dot` | 座位牌与其中的文字、阵营点 | `data-current` / `data-awaited` / `data-lost` / `data-master` / `data-revealed` / `data-faction` |
 | `ms-card` | 卡牌画框（座位卡面、身份卡、金库缩略图） | `data-opened`（金库） |
 | `ms-layerbadge` | 层徽 | - |
 | `ms-die`（`-pip`） | 骰子（`components/Die`，心锁骰用 `lock`、战斗骰用 `blood`） | `data-kind` = `lock` / `combat`，`data-empty` |
@@ -239,10 +239,14 @@ pnpm --filter @icgame/client cards:manifest   # 只按 public/cards 的内容重
 | `ms-dock`（`-self` / `-ops`） | 底部坞 | - |
 | `ms-btn` | 坞与响应窗口里的按钮 | `data-variant="primary"` |
 | `ms-response` | 响应窗口 / 提示卡 | - |
+| `ms-turnbanner` | 回合横幅 | `data-mine` |
+| `ms-dreamcard`（`-veil` / `-tag` / `-occ` / `-flag`） | 牌桌上的梦境层卡片 | `data-layer` / `data-focus` / `data-unlocking` / `data-lost` |
+| `ms-pile`（`-card` / `-label` / `-bar` / `-empty`） | 牌堆（抽牌堆、弃牌堆、本回合出牌区） | - |
+| `ms-turn-glow` / `ms-await-ring` | 移动行动轴上当前行动者 / 正在应答者的头像 | - |
 
-**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`flow`、`maze`（迷宫底纹）、`tint`（层级调色）、`rain`（梦境矩阵的数字雨）、`scan`（扫描线）、`desat`（卡图降饱和）、`blink`（光标与状态灯明灭）、`paper`（庄周梦蝶的纸纹）、`drift`（庄周梦蝶的蝶漂移扇动与墨点呼吸）。「减少动效」由根元素的 `data-motion` 表达：`reduced` 总是减少，`full` 即使系统要求减少也照常播放，不写属性则跟随系统；皮肤样式里的 `@media (prefers-reduced-motion: reduce)` 规则必须写成 `:root:not([data-motion='full'])` 之下的选择器（`skins.test.ts` 会查），总是减少另写 `:root[data-motion='reduced']` 一份。运行中会变化的开关（`data-fx-off`、`data-motion`，以及系统「减少动效」）要靠监听即时响应，数字雨的控制器（`stages/matrix/rainController.ts`）就是这么做的：监听根元素属性变化与媒体查询变化，页面不可见时暂停。
+**层级调色的钩子**（所有主题都输出，不用的主题不理它）：桌面与移动两个布局的根容器带 `data-tint-layer="0..4"`（取当前焦点层，缺省即本人所在层）；层徽、座位层徽、行动轴层徽、层标签、层塔里的层行带 `data-layer="0..4"`。「陀螺未停」据此在皮肤样式里重定义强调色与 `--ms-grade`；各层色值在 `theme/layerTints.ts`，并以 `--ms-totem-l1..4` 写进 `styles/index.css` 的令牌块（`themeCss.test.ts` 校验一致）。可单独关闭的装饰效果写成 `:root[data-fx-off~='<名字>']`，已用名字：`grid`、`totem`（陀螺旋转）、`maze`（迷宫底纹）、`tint`（层级调色）、`rain`（梦境矩阵的数字雨）、`scan`（扫描线）、`desat`（卡图降饱和）、`blink`（光标与状态灯明灭）、`paper`（庄周梦蝶的纸纹）、`drift`（庄周梦蝶的蝶漂移扇动与墨点呼吸）。「减少动效」由根元素的 `data-motion` 表达：`reduced` 总是减少，`full` 即使系统要求减少也照常播放，不写属性则跟随系统；皮肤样式里的 `@media (prefers-reduced-motion: reduce)` 规则必须写成 `:root:not([data-motion='full'])` 之下的选择器（`skins.test.ts` 会查），总是减少另写 `:root[data-motion='reduced']` 一份。运行中会变化的开关（`data-fx-off`、`data-motion`，以及系统「减少动效」）要靠监听即时响应，数字雨的控制器（`stages/matrix/rainController.ts`）就是这么做的：监听根元素属性变化与媒体查询变化，页面不可见时暂停。
 
-**效果开关表**（`theme/effects.ts`）：设置页面向用户的开关按效果类别，不是按内部名字。现有五项：`ambient` 背景动画（`rain`、`totem`、`flow`、`blink`、`drift`）、`texture` 背景底纹（`grid`、`maze`、`paper`）、`scan` 扫描线、`desat` 卡图降饱和、`tint` 层级调色；另有「减少动效」三态（跟随系统 / 总是减少 / 不减少），始终显示。每个开关登记了用得到它的主题，设置页只显示当前主题用得到的开关。偏好存 `icgame-effects`（`stores/useEffectsStore.ts`），由 `useThemeEffect` 写到 `<html>` 的 `data-fx-off`（空格分隔）与 `data-motion`，首屏内联脚本（`theme/bootScript.ts`）也会写，刷新不会先播一帧再停；无效值回落到缺省。**新增一个效果名**：① 皮肤样式里写 `:root[data-fx-off~='<名字>']` 的关闭规则；② 把名字归入 `EFFECTS` 里某个开关的 `fxNames`（都不合适再新增开关并补 `effects.items.<键>` 两份 i18n 文案；设置页要保持精简，含「减少动效」现为六项）；③ 把用到它的主题加进该开关的 `themes`；④ 跑 `pnpm --filter @icgame/client test`：`effects.test.ts` 会拿开关表与各皮肤样式里实际出现的 `data-fx-off` 名字对账，漏登记、主题登记错都会失败。新增一个主题时也要回头检查它用到的名字是否都有开关能关。
+**效果开关表**（`theme/effects.ts`）：设置页面向用户的开关按效果类别，不是按内部名字。现有五项：`ambient` 背景动画（`rain`、`totem`、`blink`、`drift`）、`texture` 背景底纹（`grid`、`maze`、`paper`）、`scan` 扫描线、`desat` 卡图降饱和、`tint` 层级调色；另有「减少动效」三态（跟随系统 / 总是减少 / 不减少），始终显示。每个开关登记了用得到它的主题，设置页只显示当前主题用得到的开关。偏好存 `icgame-effects`（`stores/useEffectsStore.ts`），由 `useThemeEffect` 写到 `<html>` 的 `data-fx-off`（空格分隔）与 `data-motion`，首屏内联脚本（`theme/bootScript.ts`）也会写，刷新不会先播一帧再停；无效值回落到缺省。**新增一个效果名**：① 皮肤样式里写 `:root[data-fx-off~='<名字>']` 的关闭规则；② 把名字归入 `EFFECTS` 里某个开关的 `fxNames`（都不合适再新增开关并补 `effects.items.<键>` 两份 i18n 文案；设置页要保持精简，含「减少动效」现为六项）；③ 把用到它的主题加进该开关的 `themes`；④ 跑 `pnpm --filter @icgame/client test`：`effects.test.ts` 会拿开关表与各皮肤样式里实际出现的 `data-fx-off` 名字对账，漏登记、主题登记错都会失败。新增一个主题时也要回头检查它用到的名字是否都有开关能关。
 
 **亮色主题与按需字体：**主题表里 `scheme` 为 `'light'` 的主题（目前只有「庄周梦蝶」）整站都是亮色：`dark:` 变体绑定在 `data-scheme=dark` 上，亮色下自然不生效；首屏脚本除 `data-theme` / `data-scheme` 外还把 `bg` 令牌与 `color-scheme` 写到根元素行内样式，样式表到位前不闪深色。压在 blood 底上的文字用 `text-destructive-foreground`（暗色取墨色、亮色取纸色），不要写 `text-foreground`。主题自带的字体（「庄周梦蝶」的霞鹜文楷，SIL OFL）写成皮肤上可选的 `loadFonts`（动态 `import()` 字体样式），由 `theme/fonts.ts` 的 `loadThemeFonts` 在应用该主题时触发：只有切到这个主题才请求，字体样式声明 `font-display: swap`，字体文件与样式表都不进 PWA 预缓存（`vite.config.ts` 的 `globIgnores` 与运行时缓存）。竖排文字（`writing-mode`）只用在 `:lang(zh)` 下，英文界面改横排。
 

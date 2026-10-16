@@ -14,8 +14,12 @@
  *   ms-btn                              按钮；data-variant = primary
  *   ms-bubble                           座位旁的预设短语气泡；data-side = bottom（尖角朝下）| top（朝上）| left（朝左）| right（朝右）
  *   ms-response                         响应窗口 / 提示卡
+ *   ms-turnbanner                       回合横幅；data-mine = 轮到本人
+ *   ms-dreamcard（含 -veil / -tag / -occ / -flag）  牌桌上的梦境层卡片；data-layer / data-focus / data-unlocking / data-lost
+ *   ms-pile（含 -card / -label / -bar / -empty）     牌堆（抽牌堆、弃牌堆、本回合出牌区）
+ *   ms-turn-glow / ms-await-ring        移动行动轴上当前行动者 / 正在应答者的头像
  *
- * 状态用数据属性表达：data-current / data-lost / data-master / data-revealed /
+ * 状态用数据属性表达：data-current / data-awaited / data-lost / data-master / data-revealed /
  * data-selected / data-blocked / data-category。
  */
 
@@ -46,6 +50,18 @@
 .ms-seat[data-current] .ms-seat-flag {
   color: var(--ms-acc);
   animation: ms-pulse 2.2s ease-in-out infinite;
+}
+.ms-seat[data-current] {
+  outline: 2px solid var(--ms-acc);
+  outline-offset: 2px;
+  animation: ms-turn-ring 1.8s ease-in-out infinite;
+}
+.ms-seat[data-awaited]:not([data-current]) {
+  outline: 2px dashed var(--ms-lock);
+  outline-offset: 3px;
+}
+.ms-seat[data-awaited]:not([data-current]) .ms-seat-flag {
+  color: var(--ms-lock);
 }
 .ms-seat[data-lost] {
   opacity: 0.45;
@@ -177,6 +193,106 @@ button.ms-card:not(:disabled):hover {
   color: var(--ms-dim);
 }
 
+/* ---------- 回合横幅与移动行动轴的高亮 ---------- */
+.ms-turnbanner[data-mine] {
+  color: var(--ms-accb);
+  box-shadow: inset 0 0 0 1px var(--ms-acc);
+  background: color-mix(in srgb, var(--ms-acc) 14%, transparent);
+}
+.ms-turn-glow {
+  animation: ms-turn-shadow 1.8s ease-in-out infinite;
+}
+.ms-await-ring {
+  border-style: dashed;
+  box-shadow: 0 0 0 1px var(--ms-lock);
+}
+
+/* ---------- 牌桌：梦境层卡片（底图是原版梦境牌，罩一层渐变保证文字可读） ---------- */
+.ms-dreamcard {
+  border: 1px solid var(--ms-line2);
+  color: var(--ms-ink);
+  transition:
+    flex-grow 0.3s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.ms-dreamcard:hover {
+  border-color: var(--ms-dim);
+}
+.ms-dreamcard-veil {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ms-bg) 72%, transparent) 0%,
+    color-mix(in srgb, var(--ms-bg) 18%, transparent) 42%,
+    color-mix(in srgb, var(--ms-bg) 82%, transparent) 100%
+  );
+}
+.ms-dreamcard[data-lost] {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--ms-faint) 12%, var(--ms-panel));
+}
+.ms-dreamcard[data-focus] {
+  border-color: var(--ms-acc);
+  box-shadow:
+    0 0 0 1px var(--ms-acc),
+    0 0 18px -4px var(--ms-acc);
+}
+.ms-dreamcard[data-unlocking] {
+  border-color: var(--ms-lock);
+  animation: ms-pulse 1.6s ease-in-out infinite;
+}
+.ms-dreamcard-tag {
+  font-size: 10px;
+  line-height: 1.3;
+  padding: 1px 5px;
+  color: var(--ms-ink);
+  border: 1px solid var(--ms-line2);
+  background: color-mix(in srgb, var(--ms-bg) 78%, transparent);
+}
+.ms-dreamcard-occ {
+  padding: 1px 4px 1px 1px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--ms-bg) 74%, transparent);
+}
+.ms-dreamcard-occ[data-current] {
+  border-color: var(--ms-acc);
+}
+.ms-dreamcard-occ[data-self] {
+  border-color: var(--ms-dim);
+  border-style: dashed;
+}
+.ms-dreamcard-flag {
+  padding: 1px 4px;
+  color: var(--ms-accb);
+  background: color-mix(in srgb, var(--ms-bg) 80%, transparent);
+}
+
+/* ---------- 牌堆 ---------- */
+.ms-pile {
+  background: var(--ms-panel2);
+  border: 1px solid var(--ms-line);
+}
+button.ms-pile:not(:disabled):hover {
+  border-color: var(--ms-acc);
+}
+.ms-pile-label {
+  font-family: var(--ms-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--ms-faint);
+}
+.ms-pile-card {
+  background: var(--ms-panel);
+  border: 1px solid var(--ms-line2);
+}
+.ms-pile-empty {
+  border-style: dashed;
+  background: transparent;
+}
+.ms-pile-bar {
+  background: var(--ms-line);
+}
+
 /* ---------- 底部坞 / 按钮 / 响应窗口 ---------- */
 .ms-dock {
   border-top: 1px solid var(--ms-line2);
@@ -268,6 +384,30 @@ button.ms-card:not(:disabled):hover {
   background: color-mix(in srgb, var(--ms-bg) 94%, var(--ms-panel));
 }
 
+@keyframes ms-turn-ring {
+  0%,
+  100% {
+    outline-color: var(--ms-acc);
+    outline-offset: 2px;
+  }
+  50% {
+    outline-color: color-mix(in srgb, var(--ms-acc) 30%, transparent);
+    outline-offset: 5px;
+  }
+}
+@keyframes ms-turn-shadow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px var(--ms-acc),
+      0 0 10px -3px var(--ms-acc);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--ms-acc),
+      0 0 20px 0 var(--ms-acc);
+  }
+}
 @keyframes ms-pulse {
   0%,
   100% {
@@ -282,11 +422,6 @@ button.ms-card:not(:disabled):hover {
 @keyframes ms-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-@keyframes ms-flow {
-  to {
-    background-position: 0 9px;
   }
 }
 /* 虚线描边沿路径流动：偏移量等于一个虚线周期（25 = 10 + 15 = 6 + 19），循环衔接无跳变 */

@@ -167,14 +167,14 @@ describe('「筑梦蓝图」皮肤样式', () => {
   });
 
   it('装饰效果各有独立的 data-fx-off 开关', () => {
-    for (const fx of ['grid', 'totem', 'flow']) {
+    for (const fx of ['grid', 'totem']) {
       expect(css, fx).toContain(`:root[data-fx-off~='${fx}']`);
     }
   });
 
   it('关键帧由基础样式提供（皮肤样式里的规则必须限定在主题之下，放不了关键帧）', () => {
     expect(css).not.toContain('@keyframes');
-    for (const name of ['ms-spin', 'ms-flow']) {
+    for (const name of ['ms-spin']) {
       expect(baseCss).toContain(`@keyframes ${name}`);
       expect(css).toContain(name);
     }
@@ -201,7 +201,7 @@ describe('「陀螺未停」皮肤样式', () => {
   });
 
   it('装饰效果各有独立的 data-fx-off 开关；同类效果沿用 blueprint 的名字', () => {
-    for (const fx of ['maze', 'totem', 'flow']) {
+    for (const fx of ['maze', 'totem']) {
       expect(css, fx).toContain(`:root[data-fx-off~='${fx}']`);
     }
   });
@@ -227,10 +227,10 @@ describe('「陀螺未停」皮肤样式', () => {
 
   it('关键帧由基础样式提供，皮肤只引用', () => {
     expect(css).not.toContain('@keyframes');
-    for (const name of ['ms-spin', 'ms-flow', 'ms-dash', 'ms-wobble']) {
+    for (const name of ['ms-spin', 'ms-dash', 'ms-wobble']) {
       expect(baseCss).toContain(`@keyframes ${name}`);
     }
-    for (const name of ['ms-flow', 'ms-dash', 'ms-wobble']) expect(css).toContain(name);
+    for (const name of ['ms-dash', 'ms-wobble']) expect(css).toContain(name);
   });
 });
 
@@ -327,11 +327,6 @@ describe('「庄周梦蝶」皮肤样式', () => {
     for (const fx of ['rain', 'scan', 'desat', 'grid', 'maze']) {
       expect(css, fx).not.toContain(`data-fx-off~='${fx}'`);
     }
-  });
-
-  it('竖排只在中文界面用：唯一的 writing-mode 规则带 :lang(zh)，英文下层签保持横排', () => {
-    expect(css.match(/writing-mode/g)).toHaveLength(1);
-    expect(css).toMatch(/:lang\(zh\)[^{]*\{[^}]*writing-mode:\s*vertical-rl/);
   });
 
   it('关键帧由基础样式提供，皮肤只引用', () => {

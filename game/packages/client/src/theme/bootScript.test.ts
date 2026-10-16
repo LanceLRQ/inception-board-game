@@ -143,7 +143,7 @@ describe('buildThemeBootScript · 效果偏好', () => {
     const raw = JSON.stringify({ off: ['tint', 'ambient', 'scan'], motion: 'system' });
     run(doc, { getItem: withPrefs(raw) });
     expect(doc.attrs['data-fx-off']).toBe(fxOffAttribute(parseEffectPrefs(raw)));
-    expect(doc.attrs['data-fx-off']).toBe('rain totem flow blink drift scan tint');
+    expect(doc.attrs['data-fx-off']).toBe('rain totem blink drift scan tint');
     expect(doc.attrs['data-motion']).toBeUndefined();
   });
 

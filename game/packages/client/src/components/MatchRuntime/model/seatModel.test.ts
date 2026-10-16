@@ -39,6 +39,14 @@ describe('buildSeatViews', () => {
     expect(slots.find((s) => s.isViewer)!.id).toBe(state.viewerID);
   });
 
+  it('正在应答的座位标 isAwaited，缺省都不标', () => {
+    const state = stageOf('thief');
+    expect(buildSeatViews(state, undefined).some((s) => s.isAwaited)).toBe(false);
+    const target = state.playerOrder.find((p) => p !== state.viewerID)!;
+    const slots = buildSeatViews(state, undefined, [target]);
+    expect(slots.filter((s) => s.isAwaited).map((s) => s.id)).toEqual([target]);
+  });
+
   it('角色牌开局全员翻开：未翻开阵营的他人也显示角色卡面，可看详情', () => {
     const state = stageOf('thief');
     const slots = buildSeatViews(state, undefined);

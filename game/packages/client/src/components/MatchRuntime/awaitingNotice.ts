@@ -62,3 +62,12 @@ export function awaitingNotice(view: MatchView, seat: string | null): AwaitingNo
   const masterFlag = awaited.master ? ({ master: true } as const) : {};
   return mine && awaited.hasOwnUi ? { mine, hasOwnUi: true } : { mine, ...masterFlag };
 }
+
+/** 正在等其应答的座位（座位高亮用）：黑洞·吞噬列出名单里的全部座位；对本人不可见的点名不列 */
+export function awaitedSeatIDs(view: MatchView, mySeat: string | null): string[] {
+  const awaited = awaitedSeat(view, mySeat);
+  if (!awaited || awaited.seat === null) return [];
+  const levy = view.pendingBlackHoleLevy;
+  if (levy && levy.waiting.includes(awaited.seat)) return [...levy.waiting];
+  return [awaited.seat];
+}

@@ -1,10 +1,10 @@
 // 座位牌：阵营点、角色卡面、角色名 / 昵称、所在层徽、手牌数、状态标识
 // 座位只看不选目标：点角色卡打开卡牌详情（角色牌开局全员翻开）。
-// 当前行动者、已迷失、尚无角色各有自己的状态样式，且都不只靠颜色表达（文字标签 + 形状）。
+// 当前行动者、正在应答、已迷失、尚无角色各有自己的状态样式，且都不只靠颜色表达（文字标签 + 形状）。
 // 样式钩子类名：ms-seat / ms-card / ms-layerbadge（具体样式见 styles/skins）。
 
 import { useTranslation } from 'react-i18next';
-import { Layers, Play, Skull } from 'lucide-react';
+import { Hourglass, Layers, Play, Skull } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { CardArt } from '../../CardArt';
 import { PixelAvatar } from '../../PixelAvatar';
@@ -42,11 +42,13 @@ export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: 
   const name = seat.characterName ?? t('desktop.seat.hiddenName');
   const flag = seat.isCurrent
     ? { icon: Play, text: t('desktop.seat.current') }
-    : seat.isLost
-      ? { icon: Skull, text: t('desktop.seat.lost') }
-      : seat.isMaster
-        ? { icon: null, text: t('desktop.seat.master') }
-        : null;
+    : seat.isAwaited
+      ? { icon: Hourglass, text: t('seat.awaited') }
+      : seat.isLost
+        ? { icon: Skull, text: t('desktop.seat.lost') }
+        : seat.isMaster
+          ? { icon: null, text: t('desktop.seat.master') }
+          : null;
   const label = [seat.nickname, seat.characterName, flag?.text].filter(Boolean).join(' · ');
   const FlagIcon = flag?.icon ?? null;
 
@@ -135,6 +137,7 @@ export function SeatPlate({ seat, planned, density, worldViews, onOpenDetail }: 
       data-density={density}
       data-master={seat.isMaster || undefined}
       data-current={seat.isCurrent || undefined}
+      data-awaited={seat.isAwaited || undefined}
       data-lost={seat.isLost || undefined}
       data-revealed={seat.characterId ? true : undefined}
       className={cn(

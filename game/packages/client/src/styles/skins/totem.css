@@ -8,7 +8,7 @@
  * 两者都可由 data-fx-off="tint" 关闭，回退为统一的黄铜色。
  *
  * 装饰效果的开关（:root[data-fx-off~='<名字>']）：
- *   tint  层级调色    maze  迷宫底纹    totem  陀螺自旋与微晃    flow  穿层虚线流动
+ *   tint  层级调色    maze  迷宫底纹    totem  陀螺自旋与微晃
  * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下全部动画停掉。
  */
 
@@ -347,143 +347,9 @@
   background: var(--ms-accsoft);
   border: 1px solid var(--ms-accsoft);
 }
-/* 穿层虚线：右缘自上而下，往下永远走得通 */
-[data-theme='totem'] .totem-kick {
-  position: absolute;
-  right: 5px;
-  top: 4px;
-  bottom: 12px;
-  width: 1px;
-  background-image: linear-gradient(180deg, var(--ms-line2) 55%, transparent 45%);
-  background-size: 1px 9px;
-  animation: ms-flow 1.8s linear infinite;
-}
-[data-theme='totem'] .totem-kick-head {
-  color: var(--ms-acc);
-}
-
-/* 石板：左缘层色竖条，底色从层色渐隐 */
-[data-theme='totem'] .totem-slab {
-  border: 1px solid var(--ms-line);
-  border-left: 3px solid var(--ms-grade);
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--ms-grade) 11%, transparent), transparent 72%),
-    var(--ms-panel);
-}
-[data-theme='totem'] .totem-slab[data-viewer-layer]:not([data-focus]) {
-  border-color: var(--ms-line2);
-  border-left-color: var(--ms-grade);
-}
-[data-theme='totem'] .totem-slab[data-focus] {
-  border-color: var(--ms-grade);
-  box-shadow:
-    0 10px 36px -8px color-mix(in srgb, var(--ms-bg) 70%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--ms-grade) 18%, transparent);
-}
-/* 迷失层：虚线框，没有层色 */
-[data-theme='totem'] .totem-slab[data-lost] {
-  border-style: dashed;
-  border-left-color: var(--ms-grade);
-  background: transparent;
-}
-[data-theme='totem'] .totem-slab[data-lost][data-focus] {
-  background: color-mix(in srgb, var(--ms-grade) 6%, transparent);
-}
-[data-theme='totem'] .totem-slabname {
-  color: var(--ms-dim);
-}
-[data-theme='totem'] .totem-slabname > span:first-child {
-  color: var(--ms-grade);
-}
-[data-theme='totem'] .totem-slabname:focus-visible {
-  outline-offset: -2px;
-}
-[data-theme='totem'] .totem-slab[data-focus] .totem-slabname {
-  color: var(--ms-ink);
-}
-[data-theme='totem'] .totem-slab[data-lost]:not([data-focus]) .totem-slabname {
-  color: var(--ms-faint);
-}
-/* 彭罗斯阶梯 */
-[data-theme='totem'] .totem-penrose {
-  opacity: 0.8;
-}
-[data-theme='totem'] .totem-penrose-base {
-  stroke: var(--ms-faint);
-  stroke-width: 1.2;
-  fill: color-mix(in srgb, var(--ms-faint) 8%, transparent);
-}
-[data-theme='totem'] .totem-penrose-hot {
-  stroke: var(--ms-acc);
-  stroke-width: 1.2;
-  fill: color-mix(in srgb, var(--ms-acc) 10%, transparent);
-}
-[data-theme='totem'] .totem-penrose-hot-line {
-  stroke: var(--ms-acc);
-  stroke-width: 1.2;
-  fill: none;
-}
-[data-theme='totem'] .totem-chip {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  font-family: var(--ms-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  color: var(--ms-dim);
-  border: 1px solid var(--ms-line);
-}
-[data-theme='totem'] .totem-chip[data-opened] {
-  color: var(--ms-acc);
-  border-color: color-mix(in srgb, var(--ms-acc) 50%, transparent);
-}
-[data-theme='totem'] .totem-vault[data-opened] {
-  border-color: color-mix(in srgb, var(--ms-acc) 55%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--ms-acc) 22%, transparent);
-}
-[data-theme='totem'] .totem-nightmare {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 6px;
-  font-family: var(--ms-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-  color: var(--ms-blood);
-  border: 1px dashed color-mix(in srgb, var(--ms-blood) 55%, transparent);
-  background: transparent;
-}
-[data-theme='totem'] .totem-nightmare[data-revealed] {
-  border-style: solid;
-}
-[data-theme='totem'] .totem-tag {
-  padding: 1px 6px;
-  color: var(--ms-accb);
-  border: 1px solid var(--ms-acc);
-}
-[data-theme='totem'] .totem-occ {
-  padding: 2px 9px 2px 5px;
-  color: var(--ms-dim);
-  background: var(--ms-panel2);
-  border: 1px solid var(--ms-line2);
-}
-[data-theme='totem'] .totem-occ[data-self] {
-  color: var(--ms-ink);
-  border-color: color-mix(in srgb, var(--ms-lock) 55%, transparent);
-}
-/* 中央区高度不够时收起占位者那一行，保证各层石板都放得下 */
-@container (max-height: 368px) {
-  [data-theme='totem'] .totem-occline {
-    display: none;
-  }
-}
 
 /* 宽的时候陀螺仪是左侧一列：陀螺放大、读数居中 */
-@container (min-width: 520px) {
+@container (min-width: 620px) {
   [data-theme='totem'] .totem-gyro {
     justify-content: center;
     padding: 14px 12px;
@@ -544,20 +410,16 @@
 [data-theme='totem']:root[data-fx-off~='totem'] .totem-spin {
   animation: none;
 }
-[data-theme='totem']:root[data-fx-off~='flow'] .totem-kick {
-  animation: none;
-}
+
 @media (prefers-reduced-motion: reduce) {
   [data-theme='totem']:root:not([data-motion='full']) .totem-top,
   [data-theme='totem']:root:not([data-motion='full']) .totem-spin,
-  [data-theme='totem']:root:not([data-motion='full']) .totem-kick,
   [data-theme='totem']:root:not([data-motion='full']) .ms-seat-flag {
     animation: none;
   }
 }
 [data-theme='totem']:root[data-motion='reduced'] .totem-top,
 [data-theme='totem']:root[data-motion='reduced'] .totem-spin,
-[data-theme='totem']:root[data-motion='reduced'] .totem-kick,
 [data-theme='totem']:root[data-motion='reduced'] .ms-seat-flag {
   animation: none;
 }

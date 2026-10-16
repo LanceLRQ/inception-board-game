@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { MatchView } from '@icgame/game-engine';
-import { awaitingNotice } from './awaitingNotice';
+import { awaitedSeatIDs, awaitingNotice } from './awaitingNotice';
 
 function viewWith(patch: Partial<MatchView>): MatchView {
   return {
@@ -178,5 +178,33 @@ describe('awaitingNotice', () => {
     expect(awaitingNotice(view, '0')).toEqual({ mine: false, master: true });
     expect(awaitingNotice(view, '2')).toEqual({ mine: false, master: true });
     expect(awaitingNotice(view, null)).toEqual({ mine: false, master: true });
+  });
+});
+
+describe('awaitedSeatIDs', () => {
+  it('没有待决状态时为空', () => {
+    expect(awaitedSeatIDs(viewWith({}), '1')).toEqual([]);
+  });
+
+  it('单人应答：点名的那个座位', () => {
+    const view = viewWith({
+      pendingLibra: { bonderPlayerID: '0', targetPlayerID: '2', split: null },
+    } as Partial<MatchView>);
+    expect(awaitedSeatIDs(view, '1')).toEqual(['2']);
+  });
+
+  it('黑洞·吞噬：名单里的人都在应答', () => {
+    const view = viewWith({
+      pendingBlackHoleLevy: { blackHoleID: '0', waiting: ['1', '2'] },
+    } as Partial<MatchView>);
+    expect(awaitedSeatIDs(view, '9')).toEqual(['1', '2']);
+    expect(awaitedSeatIDs(view, '2')).toEqual(['1', '2']);
+  });
+
+  it('对本人不可见的点名（雅典娜）不列', () => {
+    const view = viewWith({
+      pendingAthenaWit: { athenaID: null },
+    } as unknown as Partial<MatchView>);
+    expect(awaitedSeatIDs(view, '1')).toEqual([]);
   });
 });

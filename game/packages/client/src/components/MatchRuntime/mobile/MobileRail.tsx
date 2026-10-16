@@ -26,7 +26,7 @@ function RailSlot({
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement | null>(null);
-  const { isCurrent } = slot;
+  const { isCurrent, isAwaited } = slot;
   useEffect(() => {
     if (isCurrent) ref.current?.scrollIntoView({ block: 'nearest' });
   }, [isCurrent]);
@@ -35,6 +35,7 @@ function RailSlot({
     slot.isMaster ? t('mobile.rail.master') : null,
     slot.isViewer ? t('seat.me') : null,
     isCurrent ? t('mobile.rail.current') : null,
+    isAwaited ? t('seat.awaited') : null,
     slot.isLost ? t('mobile.rail.lost') : null,
   ]
     .filter(Boolean)
@@ -52,6 +53,7 @@ function RailSlot({
       )}
       data-testid={`rail-slot-${slot.id}`}
       data-current={isCurrent || undefined}
+      data-awaited={isAwaited || undefined}
       data-viewer={slot.isViewer || undefined}
       aria-current={isCurrent ? 'true' : undefined}
     >
@@ -64,8 +66,10 @@ function RailSlot({
         className={cn(
           'relative size-11 shrink-0 touch-manipulation overflow-hidden rounded-[10px] border bg-panel disabled:cursor-default tablet:size-14',
           isCurrent
-            ? 'border-acc shadow-[0_0_0_1px_var(--ms-acc),0_0_16px_-3px_var(--ms-acc)]'
-            : 'border-line-strong',
+            ? 'ms-turn-glow border-acc shadow-[0_0_0_1px_var(--ms-acc),0_0_16px_-3px_var(--ms-acc)]'
+            : isAwaited
+              ? 'ms-await-ring border-lock'
+              : 'border-line-strong',
           slot.isViewer && 'outline outline-1 outline-offset-2 outline-acc [outline-style:dashed]',
         )}
       >
