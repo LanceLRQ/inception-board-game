@@ -10,7 +10,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { tintLayerAttr } from '../../../theme/layerTints';
 import { useThemeSkin } from '../../../theme/skins/useThemeSkin';
-import { useBoardModel } from '../model/useBoardModel';
+import type { BoardModelHandle } from '../model/useBoardModel';
 import { buildSeatViews } from '../model/seatModel';
 import { awaitedSeatIDs } from '../awaitingNotice';
 import { markersBySeat } from '../seatMarkers';
@@ -28,13 +28,14 @@ import { GameGuide } from '../../GameGuide';
 
 interface MobileLayoutProps {
   readonly controller: MatchController;
+  readonly boardHandle: BoardModelHandle;
   /** 顶栏右侧补充内容（好友房显示房间码） */
   readonly topRight?: ReactNode;
   /** 点「再来一局 / 返回大厅」时的回调 */
   readonly onRestart?: () => void;
 }
 
-export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutProps) {
+export function MobileLayout({ controller, boardHandle, topRight, onRestart }: MobileLayoutProps) {
   const { t } = useTranslation();
   const { stage, winner } = controller;
   const [dockOpen, setDockOpen] = useState(true);
@@ -42,7 +43,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
   const compact = mode === 'compact-landscape';
   const MobileAmbient = useThemeSkin().MobileAmbient;
 
-  const { state, board, focusLayer, focusOn } = useBoardModel(controller);
+  const { state, board, focusLayer, focusOn } = boardHandle;
   const seatMarkers = useMemo(() => (stage ? markersBySeat(stage.seats) : undefined), [stage]);
   const { view } = controller;
   const slots = useMemo(

@@ -36,16 +36,19 @@ export function useBoardModel(controller: MatchController): BoardModelHandle {
         : null,
     [stage],
   );
-  const [memory, setMemory] = useState<{ incoming: StageState | null; known: VaultMemory | null }>({
-    incoming: null,
+  const [memory, setMemory] = useState<{ stamp: string; known: VaultMemory | null }>({
+    stamp: '',
     known: null,
   });
+  const stamp = JSON.stringify(
+    incoming ? [incoming.matchId, incoming.viewerID, incoming.vaults] : null,
+  );
   let known = memory.known;
-  if (incoming !== memory.incoming) {
+  if (stamp !== memory.stamp) {
     known = incoming
       ? rememberVaults(memory.known, `${incoming.matchId}:${incoming.viewerID}`, incoming.vaults)
       : null;
-    setMemory({ incoming, known });
+    setMemory({ stamp, known });
   }
   const state = incoming && known ? { ...incoming, vaults: [...known.vaults] } : incoming;
   const viewerLayer = controller.self?.layer ?? controller.viewerLayer;

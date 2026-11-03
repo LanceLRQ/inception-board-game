@@ -1,33 +1,32 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MatchController } from '../controllerTypes';
 import { tintLayerAttr } from '../../../theme/layerTints';
-import { useBoardModel } from '../model/useBoardModel';
+import type { BoardModelHandle } from '../model/useBoardModel';
 import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
-import { DesktopDock, type HandReading } from './DesktopDock';
+import { DesktopDock } from './DesktopDock';
 import { DesktopStage } from './DesktopStage';
 import { DesktopTopBar } from './DesktopTopBar';
 
 interface DesktopLayoutProps {
   readonly controller: MatchController;
+  readonly boardHandle: BoardModelHandle;
   /** 片头条右侧补充内容（好友房显示房间码） */
   readonly topRight?: ReactNode;
   /** 点「再来一局 / 返回大厅」时的回调 */
   readonly onRestart?: () => void;
 }
 
-export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayoutProps) {
+export function DesktopLayout({
+  controller,
+  boardHandle,
+  topRight,
+  onRestart,
+}: DesktopLayoutProps) {
   const { t } = useTranslation();
   const { winner } = controller;
-  const [reading, setReading] = useState<HandReading>(null);
-  const readingCard =
-    reading &&
-    reading.stamp === `${controller.turn.number}:${controller.turn.phase}` &&
-    controller.hand.items[reading.index]?.card === reading.card
-      ? reading.card
-      : null;
-  const { state, board, focusLayer, focusOn } = useBoardModel(controller);
+  const { state, board, focusLayer, focusOn } = boardHandle;
 
   return (
     <div className="tabletop-desktop">
@@ -54,14 +53,8 @@ export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayout
         )}
 
         {state && board && (
-          <DesktopStage
-            controller={controller}
-            readingCard={readingCard}
-            state={state}
-            board={board}
-            onFocusLayer={focusOn}
-          >
-            <DesktopDock controller={controller} reading={reading} setReading={setReading} />
+          <DesktopStage controller={controller} state={state} board={board} onFocusLayer={focusOn}>
+            <DesktopDock controller={controller} />
           </DesktopStage>
         )}
 

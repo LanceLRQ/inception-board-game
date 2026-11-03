@@ -7,6 +7,7 @@
 // 坞占满右栏，从上到下是信息条、可滚动的手牌网格、本人身份 + 操作区，没有把手。
 
 import { useRef, useState } from 'react';
+import { useHandSelection } from '../shared/HandSelection';
 import { cn } from '../../../lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useDrag } from '@use-gesture/react';
@@ -69,21 +70,12 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
   const open = compact || openState;
   const { t } = useTranslation();
   const { hand, self, turn, winner, skillPanel, preview, play } = controller;
-  const [reading, setReading] = useState<{ index: number; card: string; stamp: string } | null>(
-    null,
-  );
-  // 读牌记录跟着回合与阶段走：换了阶段（抽牌后、进入弃牌等）自然失效
-  const stamp = `${turn.number}:${turn.phase}`;
+  const { readingItem, select } = useHandSelection();
   const [skillOpen, setSkillOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const openChat = controller.chat.available ? () => setChatOpen(true) : undefined;
   const suppressClick = useRef(false);
 
-  // 读牌记录只在那一格仍是同一张牌时有效，手牌变化后自然失效
-  const readingItem =
-    reading && reading.stamp === stamp && hand.items[reading.index]?.card === reading.card
-      ? hand.items[reading.index]!
-      : null;
   const verdictCtx = { isMyTurn: turn.isMine, turnPhase: turn.phase, winner };
   const inDiscard = turn.phase === 'discard' && hand.mustDiscard;
 
@@ -98,17 +90,16 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
     if (item.mode === 'discard') {
       // 弃牌：切换选中，不展开
       hand.tap(index);
-      setReading({ index, card: item.card, stamp });
+      select(index);
       return;
     }
-    setReading(readingItem?.index === index ? null : { index, card: item.card, stamp });
+    select(readingItem?.index === index ? null : index);
     if (!open) onOpenChange(true);
   };
 
   const handleCommit = () => {
     if (!readingItem) return;
     play.commit(readingItem.card);
-    setReading(null);
     onOpenChange(true);
   };
 

@@ -4,6 +4,8 @@
 //   ≥1024px 用占满视口的 DesktopLayout，<1024px 用占满视口的 MobileLayout；
 //   两个布局都用内联的响应窗口 / 响应条承载解封响应，不再弹窗
 
+import { HandSelectionProvider } from './shared/HandSelection';
+import { useBoardModel } from './model/useBoardModel';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { MatchAssetGate } from '../AssetLoadingScreen';
 import type { MatchSource } from '../../match/matchSource';
@@ -24,18 +26,31 @@ interface MatchRuntimeProps {
 
 export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps) {
   const controller = useMatchController(source);
+  const boardHandle = useBoardModel(controller);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   return (
-    <div className="ms-tabletop-runtime">
-      {isDesktop ? (
-        <DesktopLayout controller={controller} topRight={topRight} onRestart={onRestart} />
-      ) : (
-        <MobileLayout controller={controller} topRight={topRight} onRestart={onRestart} />
-      )}
-      <DiceGatePanel controller={controller} />
-      <MatchFx source={source} nicknameOf={controller.nicknameOf} straddle={isDesktop} />
-      <MatchDialogs controller={controller} />
-      <MatchAssetGate entry={controller.entryAssets} />
-    </div>
+    <HandSelectionProvider controller={controller}>
+      <div className="ms-tabletop-runtime">
+        {isDesktop ? (
+          <DesktopLayout
+            boardHandle={boardHandle}
+            controller={controller}
+            topRight={topRight}
+            onRestart={onRestart}
+          />
+        ) : (
+          <MobileLayout
+            boardHandle={boardHandle}
+            controller={controller}
+            topRight={topRight}
+            onRestart={onRestart}
+          />
+        )}
+        <DiceGatePanel controller={controller} />
+        <MatchFx source={source} nicknameOf={controller.nicknameOf} straddle={isDesktop} />
+        <MatchDialogs controller={controller} />
+        <MatchAssetGate entry={controller.entryAssets} />
+      </div>
+    </HandSelectionProvider>
   );
 }

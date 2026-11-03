@@ -5,22 +5,31 @@ import { useEffectsStore } from '../../../stores/useEffectsStore';
 import type { MatchController } from '../controllerTypes';
 import type { BoardModel } from '../model/boardModel';
 import type { StageState } from '../model/stageState';
-import { buildSeatViews, worldViewNames } from '../model/seatModel';
+import { buildSeatViews } from '../model/seatModel';
 import { markersBySeat } from '../seatMarkers';
 import { awaitedSeatIDs } from '../awaitingNotice';
 import { TableBoard } from '../stages/table/TableBoard';
 import { NoticeStack } from './NoticeStack';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
 import { GameGuide } from '../../GameGuide';
-import guide from '../../GameGuide/content.json';
+import { useHandSelection } from '../shared/HandSelection';
+import { useTranslation } from 'react-i18next';
+import { cardTargetKind } from '../model/handDerive';
 import { getCardImageUrl } from '../../../lib/cardImages';
 import { ChatBubble } from '../shared/ChatBubble';
 import { CardArt } from '../../CardArt';
-import { getCharacterSkillSummary } from '../../../lib/cards';
+import { getCharacterSkillSummary, getCardMeta } from '../../../lib/cards';
+
+const CARD_SUMMARIES: Record<string, string> = {
+  action_shoot: '向同层的另一位玩家发起攻击，由目标玩家掷骰决定结果。',
+  action_unlock: '解开所在层的一道心锁，或抵消另一张用于解锁的解封。',
+  action_dream_transit: '穿过梦境的边界，移动到相邻的另一层。',
+  action_kick: '与另一位玩家交换所在的梦境层。',
+  action_dream_peek: '窥视金库或贿赂牌，具体效果取决于你的角色。查看结果仅对使用者可见。',
+};
 
 interface DesktopStageProps {
   readonly children: ReactNode;
-  readonly readingCard: string | null;
   readonly controller: MatchController;
   readonly state: StageState;
   readonly board: BoardModel;
@@ -31,7 +40,6 @@ export function DesktopStage({
   state,
   board,
   onFocusLayer,
-  readingCard,
   children,
 }: DesktopStageProps) {
   const systemReduced = useReducedMotion();
@@ -81,11 +89,10 @@ export function DesktopStage({
     id,
     info: getCharacterSkillSummary(id),
   }));
-  const self = seats.find((s) => s.isViewer);
-  const info = self?.characterId ? getCharacterSkillSummary(self.characterId) : undefined;
-  const card = readingCard
-    ? Object.values(guide.cards).find((c) => c.id === readingCard)
-    : undefined;
+  const { t } = useTranslation();
+  const { readingItem } = useHandSelection();
+  const card = readingItem ? getCardMeta(readingItem.card) : undefined;
+  const target = readingItem ? cardTargetKind(readingItem.card, controller.playRole) : null;
   return (
     <div className="tabletop-stage" data-testid="runtime-stage">
       <aside className="tabletop-players">
@@ -166,43 +173,38 @@ export function DesktopStage({
         <NoticeStack controller={controller} onReserve={() => {}} />
       </section>
       <aside className="tabletop-reference">
+        <div className="tabletop-section-heading">
+          <h2>卡牌介绍</h2>
+          <span>{card ? '行动牌' : '尚未选择'}</span>
+        </div>
         <div className="tabletop-reference-body">
-          <h2>{card?.name ?? info?.name ?? '你的角色'}</h2>
-          {card && (
+          {card && readingItem ? (
             <>
               <button
                 type="button"
                 className="tabletop-reference-art"
-                onClick={() => controller.preview.open(card.id)}
+                onClick={() => controller.preview.open(readingItem.card)}
                 aria-label="阅读完整卡牌解析"
               >
-                <CardArt src={getCardImageUrl(card.id)} />
+                <CardArt src={getCardImageUrl(readingItem.card)} trimBorder={false} />
+                <span>点击查看解析</span>
               </button>
-              <p className="whitespace-pre-line">{card.fullText}</p>
+              <h3>{readingItem.name}</h3>
+              <p>
+                {CARD_SUMMARIES[readingItem.card] ??
+                  ('description' in card ? card.description.split(/[。；\n]/)[0] : '')}
+              </p>
+              <small>使用目标</small>
+              <p>{target ? t(`desktop.hand.target.${target}`) : '无需目标'}</p>
+              <small>关键效果</small>
+              <p>{card.category === 'action' ? card.description : ''}</p>
+            </>
+          ) : (
+            <>
+              <h3>选一张手牌</h3>
+              <p>这里显示卡牌介绍与完整解析。游戏流程和全部卡牌可在下方说明书中查看。</p>
             </>
           )}
-          {!card && self?.characterId && (
-            <button
-              type="button"
-              className="tabletop-reference-art"
-              onClick={() => controller.preview.open(self.characterId!)}
-              aria-label="阅读角色完整解析"
-            >
-              <CardArt src={self.imageUrl} />
-            </button>
-          )}
-          {!card &&
-            info?.skills.map((skill) => (
-              <p key={skill.name}>
-                <b>{skill.name}</b>
-                <br />
-                {skill.description}
-              </p>
-            ))}
-          <h3>本局世界观</h3>
-          {worldViewNames(controller.view).map((name) => (
-            <p key={name}>{name}</p>
-          ))}
         </div>
         <GameGuide />
       </aside>

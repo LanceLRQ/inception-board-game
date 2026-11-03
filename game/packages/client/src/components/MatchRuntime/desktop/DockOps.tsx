@@ -13,14 +13,11 @@ import { DockEntries } from '../shared/DockEntries';
 
 interface DockOpsProps {
   readonly controller: MatchController;
-  /** 选中且此刻可打的牌名；没有则不显示「打出」 */
-  readonly commitName: string | null;
-  readonly onCommit: () => void;
   /** 有主动技能可用 */
   readonly skillReady: boolean;
 }
 
-export function DockOps({ controller, commitName, onCommit, skillReady }: DockOpsProps) {
+export function DockOps({ controller, skillReady }: DockOpsProps) {
   const { t } = useTranslation();
   const { turn, actions, hand, winner, skillPanel } = controller;
   const [skillOpen, setSkillOpen] = useState(false);
@@ -40,24 +37,9 @@ export function DockOps({ controller, commitName, onCommit, skillReady }: DockOp
   };
 
   return (
-    <div
-      className="ms-dock-ops flex shrink-0 flex-col justify-end gap-1.5 pl-4"
-      style={{ width: 'clamp(150px, calc(13vw / var(--ms-scale, 1)), 210px)' }}
-      data-testid="dock-ops"
-    >
-      {commitName && (
-        <button
-          type="button"
-          onClick={onCommit}
-          data-testid="hand-commit-play"
-          data-variant="primary"
-          className="ms-btn min-h-8 truncate px-3 text-[12px] tracking-[.14em]"
-        >
-          {t('desktop.dock.commit', { card: commitName })}
-        </button>
-      )}
+    <div className="tabletop-hand-tools" data-testid="dock-ops">
       <DockEntries entries={controller.entries} variant="desktop" />
-      {(main.kind !== 'confirmDiscard' || actions.discardSelected > 0) && (
+      {main.kind !== 'confirmDiscard' && main.kind !== 'wait' && (
         <button
           type="button"
           disabled={!main.enabled}
