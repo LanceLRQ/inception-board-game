@@ -553,7 +553,7 @@ export function buildFixtureMatch(
     const names = ['你', '暮雨', '林间', '北辰', '南山', '星河'];
     const positions: Layer[] = [2, 2, 2, 1, 3, 4];
     const counts = [5, 3, 3, 4, 3, 2];
-    let G: SetupState = { ...base.G, playerOrder: order };
+    let G: SetupState = { ...base.G, playerOrder: order, activeWorldViews: cards('dm_midsummer') };
     G = dealSpecific(
       G,
       viewer,

@@ -1,5 +1,7 @@
-import { useMemo, type ReactNode } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useMemo, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useReducedMotion } from 'framer-motion';
+import { resolveReducedMotion } from '../../../theme/effects';
+import { useEffectsStore } from '../../../stores/useEffectsStore';
 import type { MatchController } from '../controllerTypes';
 import type { BoardModel } from '../model/boardModel';
 import type { StageState } from '../model/stageState';
@@ -32,7 +34,11 @@ export function DesktopStage({
   readingCard,
   children,
 }: DesktopStageProps) {
-  const reduced = useReducedMotion();
+  const systemReduced = useReducedMotion();
+  const motionPref = useEffectsStore((s) => s.prefs.motion);
+  const reduced = resolveReducedMotion(motionPref, !!systemReduced);
+  const listRef = useRef<HTMLDivElement>(null);
+  const previous = useRef<{ current: string; order: string[] }>({ current: '', order: [] });
 
   const seats = useMemo(() => {
     const entries = buildSeatViews(
@@ -40,9 +46,41 @@ export function DesktopStage({
       controller.stage ? markersBySeat(controller.stage.seats) : undefined,
       controller.view ? awaitedSeatIDs(controller.view, state.viewerID) : [],
     );
+    entries.sort((a, b) => state.playerOrder.indexOf(a.id) - state.playerOrder.indexOf(b.id));
     const index = entries.findIndex((s) => s.isCurrent);
     return index > 0 ? [...entries.slice(index), ...entries.slice(0, index)] : entries;
   }, [state, controller.stage, controller.view]);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const prior = previous.current;
+    previous.current = { current: state.currentPlayerID, order: seats.map((s) => s.id) };
+    if (!list || prior.current === state.currentPlayerID || !prior.current) return;
+    list.scrollTop = 0;
+    if (reduced) return;
+    const offset = prior.order.indexOf(state.currentPlayerID);
+    if (offset < 1) return;
+    const elements = [...list.children] as HTMLElement[];
+    const stride = elements[1] ? elements[1].offsetTop - elements[0]!.offsetTop : 0;
+    const animations = elements.map((element, index) => {
+      const oldIndex = prior.order.indexOf(seats[index]!.id);
+      const wrapped = oldIndex < offset;
+      return element.animate(
+        [
+          {
+            transform: `translateY(${wrapped ? stride : (oldIndex - index) * stride}px)`,
+            opacity: wrapped ? 0 : 1,
+          },
+          { transform: 'translateY(0)', opacity: 1 },
+        ],
+        { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' },
+      );
+    });
+    return () => animations.forEach((a) => a.cancel());
+  }, [state.currentPlayerID, seats, reduced]);
+  const worlds = (controller.view?.activeWorldViews ?? []).map((id) => ({
+    id,
+    info: getCharacterSkillSummary(id),
+  }));
   const self = seats.find((s) => s.isViewer);
   const info = self?.characterId ? getCharacterSkillSummary(self.characterId) : undefined;
   const card = readingCard
@@ -54,14 +92,14 @@ export function DesktopStage({
         <h2>
           同桌玩家 <small>{seats.length} 人</small>
         </h2>
-        <div className="tabletop-player-list">
+        <div className="tabletop-player-list" ref={listRef}>
           {seats.map((seat) => (
-            <motion.div
-              layout={!reduced}
-              transition={{ duration: 0.35 }}
+            <div
               key={seat.id}
               className="tabletop-player"
               data-testid={`player-seat-${seat.id}`}
+              data-master={seat.isMaster}
+              data-self={seat.isViewer}
               data-current={seat.isCurrent}
               data-awaited={seat.isAwaited}
             >
@@ -72,17 +110,21 @@ export function DesktopStage({
                 aria-label={`查看${seat.nickname}角色`}
                 data-testid={`player-avatar-${seat.id}`}
               >
-                <CardArt src={seat.imageUrl} />
+                <CardArt src={seat.imageUrl} trimBorder={false} />
               </button>
               <div>
                 <b>
                   {seat.nickname}
-                  {seat.isViewer ? ' · 你' : ''}
+                  {seat.isMaster
+                    ? ' · 梦主'
+                    : seat.isViewer && seat.nickname !== '你'
+                      ? ' · 你'
+                      : ''}
+                  {seat.isCurrent && <em className="tabletop-turn-label">行动中</em>}
                 </b>
                 <p>{seat.characterName}</p>
                 <small>
                   {seat.isLost ? '迷失层' : `${seat.layer} 层`} · 手牌 {seat.handCount}
-                  {seat.isCurrent ? ' · 行动中' : ''}
                   {seat.isAwaited ? ' · 应答中' : ''}
                 </small>
                 <SeatStatusBadges markers={seat.markers} seatId={seat.id} size="sm" />
@@ -92,7 +134,19 @@ export function DesktopStage({
                   side="left"
                 />
               </div>
-            </motion.div>
+            </div>
+          ))}
+        </div>
+        <div className="tabletop-world">
+          <span>本局世界观</span>
+          {worlds.map(({ id, info }) => (
+            <div key={id}>
+              <strong>{info?.worldView?.name ?? info?.name}</strong>
+              <p>{info?.worldView?.description}</p>
+              <button type="button" onClick={() => controller.preview.open(id)}>
+                查看梦主完整说明 ↗
+              </button>
+            </div>
           ))}
         </div>
       </aside>

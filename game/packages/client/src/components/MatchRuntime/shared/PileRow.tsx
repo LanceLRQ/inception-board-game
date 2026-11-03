@@ -44,7 +44,7 @@ export function PileRow({ deck, piles, onOpenCard, small = false, className }: P
   );
 
   return (
-    <div className={cn('flex shrink-0 items-stretch gap-1.5', small && 'flex-wrap', className)}>
+    <div className={cn('tabletop-piles', small && 'tabletop-piles-small', className)}>
       <div
         className="ms-pile flex min-w-0 items-center gap-2 px-2 py-1"
         data-testid="deck-meter"

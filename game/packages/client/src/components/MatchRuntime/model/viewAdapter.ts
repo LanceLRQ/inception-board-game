@@ -29,7 +29,7 @@ export function adaptViewToStage(opts: AdaptViewToStageOpts): StageState | null 
   if (!rawPlayers) return null;
 
   const dreamMasterID = G.dreamMasterID ?? '';
-  const playerOrder = Object.keys(rawPlayers).sort();
+  const playerOrder = G.playerOrder ?? Object.keys(rawPlayers).sort();
   const currentPlayerID = ctx.currentPlayer ?? playerOrder[0] ?? '';
 
   const players: Record<string, StagePlayer> = {};

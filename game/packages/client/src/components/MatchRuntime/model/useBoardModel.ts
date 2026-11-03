@@ -8,6 +8,7 @@ import { deriveActivity } from './activity';
 import { buildBoardModel, resolveFocusLayer, type BoardModel, type FocusPick } from './boardModel';
 import type { StageState } from './stageState';
 import { adaptViewToStage } from './viewAdapter';
+import { rememberVaults, type VaultMemory } from './vaultMemory';
 
 export interface BoardModelHandle {
   /** 舞台状态；视图未就绪为 null */
@@ -22,11 +23,12 @@ export function useBoardModel(controller: MatchController): BoardModelHandle {
   const { stage, view, turn, nicknameOf } = controller;
   const [pick, setPick] = useState<FocusPick | null>(null);
 
-  const state = useMemo(
+  const incoming = useMemo(
     () =>
       stage
         ? adaptViewToStage({
             G: stage.G,
+            matchId: stage.G.matchId,
             ctx: stage.ctx,
             humanPlayerID: stage.humanPlayerID,
             seats: stage.seats,
@@ -34,6 +36,18 @@ export function useBoardModel(controller: MatchController): BoardModelHandle {
         : null,
     [stage],
   );
+  const [memory, setMemory] = useState<{ incoming: StageState | null; known: VaultMemory | null }>({
+    incoming: null,
+    known: null,
+  });
+  let known = memory.known;
+  if (incoming !== memory.incoming) {
+    known = incoming
+      ? rememberVaults(memory.known, `${incoming.matchId}:${incoming.viewerID}`, incoming.vaults)
+      : null;
+    setMemory({ incoming, known });
+  }
+  const state = incoming && known ? { ...incoming, vaults: [...known.vaults] } : incoming;
   const viewerLayer = controller.self?.layer ?? controller.viewerLayer;
   const focusLayer = resolveFocusLayer(pick, viewerLayer);
   const focusOn = useCallback((layer: number) => setPick({ layer, viewerLayer }), [viewerLayer]);

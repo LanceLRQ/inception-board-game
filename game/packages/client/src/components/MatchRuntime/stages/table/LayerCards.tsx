@@ -31,10 +31,12 @@ function LostStrip({
   row,
   focus,
   onFocus,
+  onOpenCard,
 }: {
   row: BoardLayer;
   focus: boolean;
   onFocus: (layer: number) => void;
+  onOpenCard: (id: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -69,7 +71,9 @@ function LostStrip({
             {t('board.tower.lostEmpty')}
           </span>
         ) : (
-          row.occupants.map((o) => <OccupantChip key={o.id} occupant={o} named />)
+          row.occupants.map((o) => (
+            <OccupantChip key={o.id} occupant={o} named onOpenCard={onOpenCard} />
+          ))
         )}
       </div>
     </div>
@@ -91,7 +95,7 @@ export function LayerCards({
       aria-label={t('board.tower.aria')}
       data-testid="layer-tower"
     >
-      <div className="flex min-h-0 flex-1 gap-1.5">
+      <div className="tabletop-layers">
         {dreams.map((row) => (
           <DreamLayerCard
             key={row.layer}
@@ -103,7 +107,7 @@ export function LayerCards({
         ))}
       </div>
       {lost && (lost.occupants.length > 0 || lost.hasViewer) && (
-        <LostStrip row={lost} focus={focusLayer === 0} onFocus={onFocus} />
+        <LostStrip row={lost} focus={focusLayer === 0} onFocus={onFocus} onOpenCard={onOpenCard} />
       )}
     </div>
   );

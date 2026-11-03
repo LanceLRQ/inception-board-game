@@ -115,7 +115,7 @@ describe('adaptViewToStage', () => {
     expect(s.currentPlayerID).toBe('0');
   });
 
-  it('playerOrder 按 id 排序', () => {
+  it('缺少回合顺序的旧场景按 id 排序', () => {
     const s = adaptViewToStage({ G: sampleG, ctx: sampleCtx, humanPlayerID: '0' })!;
     expect(s.playerOrder).toEqual(['0', '1', '4']);
   });
@@ -177,4 +177,13 @@ describe('adaptViewToStage', () => {
     expect(s.players['1']!.handCount).toBe(6);
     expect(s.players['4']!.handCount).toBe(3);
   });
+});
+
+it('真实回合顺序不能被座位编号排序覆盖', () => {
+  const s = adaptViewToStage({
+    G: asView({ ...sampleRaw, playerOrder: ['0', '4', '1'] }),
+    ctx: { currentPlayer: '0' },
+    humanPlayerID: '0',
+  });
+  expect(s?.playerOrder).toEqual(['0', '4', '1']);
 });
