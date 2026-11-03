@@ -4,7 +4,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Timer } from 'lucide-react';
-import { cn } from '../../../lib/utils';
 import { ThemeMenu } from '../shared/ThemeMenu';
 import type { MatchController } from '../controllerTypes';
 
@@ -16,50 +15,32 @@ interface MobileTopBarProps {
 
 export function MobileTopBar({ controller, topRight }: MobileTopBarProps) {
   const { t } = useTranslation();
-  const { turn, view } = controller;
-  const deckCount = view?.deck?.cardCount ?? 0;
+  const { turn } = controller;
   const actor = turn.isMine
     ? t('localMatch.yourTurn')
     : t(turn.otherTurn.key, turn.otherTurn.params);
 
   return (
-    <div className="shrink-0 border-b border-line pt-safe">
-      <header className="flex h-11 items-center gap-2.5 px-3.5 tablet:h-14 tablet:px-6">
-        <div className="flex shrink-0 flex-col font-mono text-[9.5px] leading-tight tracking-[.08em] text-dim tablet:text-xs">
+    <header className="tabletop-phone-topbar">
+      <div>
+        <h1>盗梦都市</h1>
+        <p>
           <span>
-            {t('localMatch.turn')} {turn.number}
+            回合 {turn.number} · {t(`localMatch.phase.${turn.phase}`, { defaultValue: turn.phase })}
           </span>
-          <span>{t(`localMatch.phase.${turn.phase}`, { defaultValue: turn.phase })}</span>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col items-center leading-tight">
-          <span
-            className={cn(
-              'max-w-full truncate font-heading text-[13px] font-bold tracking-[.08em] tablet:text-base',
-              turn.isMine ? 'text-acc-bright' : 'text-foreground',
-            )}
-            data-testid="turn-indicator"
-            data-mine={turn.isMine || undefined}
-          >
+          <strong data-testid="turn-indicator" data-mine={turn.isMine || undefined}>
             {actor}
-          </span>
+          </strong>
           {turn.deadlineSeconds !== null && (
-            <span
-              className="flex items-center gap-1 font-mono text-[9px] tabular-nums text-dim tablet:text-[11px]"
-              data-testid="deadline"
-            >
-              <Timer className="size-2.5" aria-hidden />
-              {t('match.deadline', { seconds: turn.deadlineSeconds })}
+            <span data-testid="deadline">
+              <Timer size={12} />
+              {turn.deadlineSeconds}s
             </span>
           )}
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-0.5 font-mono text-[9.5px] leading-tight tracking-[.05em] text-dim tablet:text-xs">
-          <span aria-label={t('mobile.top.deckAria', { n: deckCount })}>
-            {t('mobile.top.deck', { n: deckCount })}
-          </span>
-          {topRight && <span className="max-[359px]:hidden">{topRight}</span>}
-        </div>
-        <ThemeMenu className="-mr-2 size-11 tablet:size-12" />
-      </header>
-    </div>
+        </p>
+      </div>
+      {topRight}
+      <ThemeMenu className="size-11" />
+    </header>
   );
 }

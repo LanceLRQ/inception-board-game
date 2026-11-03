@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSkillEntries } from '../../../lib/activeSkills';
 import type { MatchController } from '../controllerTypes';
@@ -11,7 +12,13 @@ import { useHandSelection } from '../shared/HandSelection';
 import { DockHandCard } from './DockHandCard';
 import { DockOps } from './DockOps';
 
-export function DesktopDock({ controller }: { controller: MatchController }) {
+export function DesktopDock({
+  controller,
+  tools,
+}: {
+  controller: MatchController;
+  tools?: ReactNode;
+}) {
   const { t } = useTranslation();
   const { hand, turn, winner, skillPanel, preview, play, actions } = controller;
   const { readingItem, select } = useHandSelection();
@@ -34,6 +41,7 @@ export function DesktopDock({ controller }: { controller: MatchController }) {
         <div className="tabletop-hand-title">
           <h2>我的手牌</h2>
           <span>{hand.items.length} 张</span>
+          {tools}
         </div>
         <DockOps controller={controller} skillReady={skillEntries.length > 0} />
       </div>
