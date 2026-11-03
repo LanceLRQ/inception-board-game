@@ -7,6 +7,7 @@ describe('anchors', () => {
     expect(seatSelectors('2', '0')).toEqual([
       '[data-testid="player-seat-2"]',
       '[data-testid="rail-slot-2"]',
+      '[data-testid="occupant-2"]',
     ]);
   });
 

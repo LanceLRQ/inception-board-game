@@ -632,9 +632,10 @@ export function buildFixtureMatch(
         ctx: { ...state.ctx, gameover: { winner: 'thief', reason: 'secret_vault_opened' } },
       };
     }
-    if (id === 'tabletop-dice') {
+    if (id === 'tabletop-dice' || id === 'tabletop-dice-result') {
       state = giveTurn(state, dealSpecific(state.G, master, cards('action_shoot')), master);
       state = mustApply(state, master, 'playShoot', [viewer, 'action_shoot']);
+      if (id === 'tabletop-dice-result') state = mustApply(state, viewer, 'rollDice', []);
     }
     return { state, viewer };
   }

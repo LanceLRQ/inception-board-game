@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import type { MatchController } from '../controllerTypes';
 import { tintLayerAttr } from '../../../theme/layerTints';
 import type { BoardModelHandle } from '../model/useBoardModel';
-import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
 import { DesktopDock } from './DesktopDock';
 import { DesktopStage } from './DesktopStage';
@@ -25,7 +24,6 @@ export function DesktopLayout({
   onRestart,
 }: DesktopLayoutProps) {
   const { t } = useTranslation();
-  const { winner } = controller;
   const { state, board, focusLayer, focusOn } = boardHandle;
 
   return (
@@ -53,7 +51,13 @@ export function DesktopLayout({
         )}
 
         {state && board && (
-          <DesktopStage controller={controller} state={state} board={board} onFocusLayer={focusOn}>
+          <DesktopStage
+            controller={controller}
+            state={state}
+            board={board}
+            onFocusLayer={focusOn}
+            onRestart={onRestart}
+          >
             <DesktopDock controller={controller} />
           </DesktopStage>
         )}
@@ -62,15 +66,6 @@ export function DesktopLayout({
           <span>原版卡片 · 盗梦都市</span>
           <span>原版版权归发行商所有</span>
         </footer>
-        {winner && (
-          <MatchOutcome
-            winner={winner}
-            winReason={controller.winReason}
-            isRemote={controller.isRemote}
-            onRestart={onRestart}
-            report={controller.report}
-          />
-        )}
       </div>
     </div>
   );

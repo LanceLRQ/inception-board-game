@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Dices, Hourglass } from 'lucide-react';
 import { DICE_ROLL_TIMEOUT_MS } from '@icgame/game-engine';
-import { cn } from '../../../lib/utils';
+import { Dialog } from '../../ui/dialog';
+import { Die3D } from '../../Die/Die3D';
 import type { MatchController } from '../controllerTypes';
 import { monotonicNow, useSecondClock } from '../deadline';
 import { diceGateModel, diceSecondsLeft } from '../model/diceGate';
@@ -25,98 +26,136 @@ function useDiceSeconds(controller: MatchController, gateId: number | null): num
 }
 
 export function DiceGatePanel({ controller }: { controller: MatchController }) {
+  if (!controller.view) return null;
+  return (
+    <DicePresentation
+      key={`${controller.view.matchId}:${controller.viewerSeat}`}
+      controller={controller}
+    />
+  );
+}
+
+function DicePresentation({ controller }: { controller: MatchController }) {
   const { t } = useTranslation();
   const gate = diceGateModel(controller.view, controller.viewerSeat || null);
+  const result = controller.view?.lastDiceRoll;
   const seconds = useDiceSeconds(controller, gate?.id ?? null);
+  const key = gate ? `gate:${gate.id}` : result ? `result:${result.id}` : null;
+  const [closed, setClosed] = useState<string | null>(gate ? null : key);
   const [sentFor, setSentFor] = useState<number | null>(null);
-  if (!gate) return null;
-
+  if (!key) return null;
   const name = (id: string) =>
     id === controller.viewerSeat ? t('fx.you') : controller.nicknameOf(id);
-  const sent = sentFor === gate.id;
-  const many = gate.rollers.length > 1;
-  const waitingOn = gate.rollers.find((r) => !r.rolled);
-  const fraction = seconds === null ? null : Math.min(1, (seconds * 1000) / DICE_ROLL_TIMEOUT_MS);
-  const roll = () => {
+  const sent = gate && sentFor === gate.id;
+  const current = gate ?? result!;
+  const roll = async () => {
+    if (!gate?.canRoll || sent) return;
     setSentFor(gate.id);
-    void controller.makeMove('rollDice', []);
+    const outcome = await controller.makeMove('rollDice', []);
+    if (!outcome.ok) setSentFor(null);
   };
-
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[28%] z-30 flex justify-center px-4">
-      <div
-        role="dialog"
-        aria-label={t('diceGate.aria')}
-        aria-live="polite"
+    <>
+      {closed === key && (
+        <button type="button" className="tabletop-dice-resume" onClick={() => setClosed(null)}>
+          {gate ? '继续掷骰' : '查看上次掷骰'}
+        </button>
+      )}
+      <Dialog
+        open={closed !== key}
+        onOpenChange={(open) => {
+          if (!open) setClosed(key);
+        }}
+        blocking={false}
+        showClose={false}
+        className="tabletop-dice-dialog"
         data-testid="dice-gate"
-        data-can-roll={gate.canRoll || undefined}
-        className="ms-response pointer-events-auto relative w-full max-w-sm overflow-hidden px-4 py-3.5"
+        aria-label={t('diceGate.aria')}
       >
-        {fraction !== null && (
-          <i
-            className="absolute top-0 left-0 h-0.5 bg-acc transition-[width] duration-1000 ease-linear"
-            style={{ width: `${Math.round(fraction * 100)}%` }}
-          />
-        )}
-        <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-[.2em] text-acc">
-          <Dices className="size-3.5 shrink-0" aria-hidden />
-          {t(`diceGate.purpose.${gate.purpose}`)}
-        </p>
-        {gate.by !== null && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {gate.target !== null
-              ? t('diceGate.versus', { by: name(gate.by), target: name(gate.target) })
-              : t('diceGate.by', { by: name(gate.by) })}
+        <header className="tabletop-dialog-header">
+          <span>掷骰 · {t(`diceGate.purpose.${current.purpose}`)}</span>
+          <button type="button" onClick={() => setClosed(key)}>
+            收起
+          </button>
+        </header>
+        <h2>
+          {gate ? (sent ? '等待结果' : gate.canRoll ? '准备掷骰' : '等待其他玩家') : '掷骰结果'}
+        </h2>
+        {current.by && (
+          <p className="tabletop-dice-description">
+            {current.target
+              ? t('diceGate.versus', { by: name(current.by), target: name(current.target) })
+              : t('diceGate.by', { by: name(current.by) })}
           </p>
         )}
-        {many && (
-          <ul className="mt-2 flex flex-wrap gap-1.5" data-testid="dice-gate-rollers">
+        <div className="tabletop-dice-stage" data-rolling={sent || undefined}>
+          <div className="tabletop-dice-floor" />
+          {gate ? (
+            <div className="tabletop-dice-preview" aria-hidden>
+              <Die3D value={1} size={64} seconds={0} spin={0} />
+            </div>
+          ) : (
+            <div className="tabletop-dice-results">
+              {result!.rolls.map((row) => (
+                <div key={row.player}>
+                  <span>{name(row.player)}</span>
+                  <div>
+                    {row.dice.map((value, i) => (
+                      <Die3D
+                        key={`${result!.id}:${row.player}:${i}`}
+                        value={value}
+                        size={64}
+                        seconds={0.85}
+                      />
+                    ))}
+                  </div>
+                  <strong>{row.dice.join('、')} 点</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {gate && gate.rollers.length > 1 && (
+          <ul className="tabletop-dice-rollers" data-testid="dice-gate-rollers">
             {gate.rollers.map((r) => (
-              <li
-                key={r.id}
-                data-rolled={r.rolled || undefined}
-                className={cn(
-                  'flex items-center gap-1 border px-1.5 py-0.5 text-[11px]',
-                  r.rolled ? 'border-acc text-acc' : 'border-border text-muted-foreground',
-                )}
-              >
-                {r.rolled ? (
-                  <Check className="size-3" aria-label={t('diceGate.rolled')} />
-                ) : (
-                  <Hourglass className="size-3" aria-hidden />
-                )}
+              <li key={r.id} data-rolled={r.rolled || undefined}>
+                {r.rolled ? <Check size={14} /> : <Hourglass size={14} />}
                 {name(r.id)}
               </li>
             ))}
           </ul>
         )}
-        <div className="mt-3 flex items-center gap-3">
-          {gate.canRoll ? (
-            <button
-              type="button"
-              disabled={sent}
-              onClick={roll}
-              data-testid="dice-roll-button"
-              data-variant="primary"
-              className="ms-btn flex min-h-10 items-center gap-2 px-5 text-sm tracking-[.14em] coarse:min-h-11"
-            >
-              <Dices className="size-4" aria-hidden />
-              {t('diceGate.roll')}
+        <p className="tabletop-dice-status" role="status">
+          {gate
+            ? sent
+              ? '已请求掷骰，等待引擎结算。'
+              : gate.canRoll
+                ? '准备好后点击掷骰'
+                : t('diceGate.waiting', { done: gate.rolledCount, total: gate.rollers.length })
+            : '点数由本局规则引擎产生，按角色与世界观继续结算。'}
+        </p>
+        {seconds !== null && (
+          <p className="tabletop-dice-description">{t('diceGate.auto', { n: seconds })}</p>
+        )}
+        {gate?.canRoll ? (
+          <button
+            type="button"
+            className="tabletop-primary"
+            data-testid="dice-roll-button"
+            disabled={!!sent}
+            onClick={() => void roll()}
+          >
+            <Dices size={18} />
+            {sent ? '等待结果…' : t('diceGate.roll')}
+          </button>
+        ) : (
+          !gate && (
+            <button type="button" className="tabletop-primary" onClick={() => setClosed(key)}>
+              继续结算
             </button>
-          ) : (
-            <p className="text-xs text-foreground" data-testid="dice-gate-waiting">
-              {many || !waitingOn
-                ? t('diceGate.waiting', { done: gate.rolledCount, total: gate.rollers.length })
-                : t('diceGate.waitingOne', { name: name(waitingOn.id) })}
-            </p>
-          )}
-          {seconds !== null && (
-            <span className="ml-auto font-mono text-[10px] text-faint">
-              {t('diceGate.auto', { n: seconds })}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
+          )
+        )}
+      </Dialog>
+    </>
   );
 }

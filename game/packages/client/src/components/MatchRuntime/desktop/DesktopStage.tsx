@@ -8,6 +8,7 @@ import type { StageState } from '../model/stageState';
 import { buildSeatViews } from '../model/seatModel';
 import { markersBySeat } from '../seatMarkers';
 import { awaitedSeatIDs } from '../awaitingNotice';
+import { MatchOutcome } from '../shared/MatchOutcome';
 import { TableBoard } from '../stages/table/TableBoard';
 import { NoticeStack } from './NoticeStack';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
@@ -30,6 +31,7 @@ const CARD_SUMMARIES: Record<string, string> = {
 
 interface DesktopStageProps {
   readonly children: ReactNode;
+  readonly onRestart?: () => void;
   readonly controller: MatchController;
   readonly state: StageState;
   readonly board: BoardModel;
@@ -41,6 +43,7 @@ export function DesktopStage({
   board,
   onFocusLayer,
   children,
+  onRestart,
 }: DesktopStageProps) {
   const systemReduced = useReducedMotion();
   const motionPref = useEffectsStore((s) => s.prefs.motion);
@@ -165,6 +168,15 @@ export function DesktopStage({
             {board.viewerLayer === 0 ? '迷失层' : `第 ${board.viewerLayer} 层`}
           </span>
         </div>
+        {controller.winner && (
+          <MatchOutcome
+            winner={controller.winner}
+            winReason={controller.winReason}
+            isRemote={controller.isRemote}
+            onRestart={onRestart}
+            report={controller.report}
+          />
+        )}
         <TableBoard
           board={board}
           onFocusLayer={onFocusLayer}

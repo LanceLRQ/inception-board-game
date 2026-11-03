@@ -88,6 +88,15 @@ export function MobileLayout({ controller, boardHandle, topRight, onRestart }: M
               <MobileRail slots={slots} onOpenDetail={controller.preview.open} />
               <RailBubbles bubbles={controller.chat.bubbles} />
               <div className="tabletop-mobile-board">
+                {winner && (
+                  <MatchOutcome
+                    winner={winner}
+                    winReason={controller.winReason}
+                    isRemote={controller.isRemote}
+                    onRestart={onRestart}
+                    report={controller.report}
+                  />
+                )}
                 <TableBoard
                   board={board}
                   onFocusLayer={focusOn}
@@ -113,16 +122,6 @@ export function MobileLayout({ controller, boardHandle, topRight, onRestart }: M
             />
           </div>
         </div>
-      )}
-
-      {winner && (
-        <MatchOutcome
-          winner={winner}
-          winReason={controller.winReason}
-          isRemote={controller.isRemote}
-          onRestart={onRestart}
-          report={controller.report}
-        />
       )}
     </div>
   );

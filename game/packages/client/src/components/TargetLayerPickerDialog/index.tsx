@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { CardArt } from '../CardArt';
+import { getCardImageUrl } from '../../lib/cardImages';
 // TargetLayerPickerDialog · 选目标层对话框
 
 import { Layers } from 'lucide-react';
@@ -21,7 +24,7 @@ export interface TargetLayerPickerDialogProps {
   cardNameOf?: (cardId: string) => string;
   /** 可选：显式合法层（覆盖默认推导） */
   validLayers?: number[] | null;
-  onPick: (layer: number) => void;
+  onPick: (layer: number) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -33,6 +36,15 @@ export function TargetLayerPickerDialog({
   onPick,
   onCancel,
 }: TargetLayerPickerDialogProps) {
+  const intent = pending ? `${pending.card}:${pending.move}` : '';
+  const [seen, setSeen] = useState(intent);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  if (seen !== intent) {
+    setSeen(intent);
+    setPicked(null);
+    setConfirming(false);
+  }
   const open = pending != null;
   const cardName = pending?.card ? (cardNameOf?.(pending.card) ?? pending.card) : '';
   const options = computeLayerOptions({
@@ -48,7 +60,8 @@ export function TargetLayerPickerDialog({
         if (!o) onCancel();
       }}
       blocking={false}
-      size="sm"
+      size="md"
+      className="tabletop-choice-dialog"
       data-testid="target-layer-picker-dialog"
     >
       <DialogHeader>
@@ -61,7 +74,7 @@ export function TargetLayerPickerDialog({
         <DialogDescription>不合法的层已置灰。</DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <div className="flex flex-wrap items-center justify-center gap-3 py-2">
+        <div className="tabletop-target-options">
           {options.map((opt) => (
             <button
               key={opt.layer}
@@ -69,17 +82,39 @@ export function TargetLayerPickerDialog({
               disabled={opt.disabled}
               onClick={() => {
                 if (opt.disabled) return;
-                onPick(opt.layer);
+                setPicked(opt.layer);
               }}
               data-testid={`target-layer-${opt.layer}`}
-              className="min-w-[64px] rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="tabletop-target-option"
+              aria-pressed={picked === opt.layer}
             >
-              L{opt.layer}
+              <CardArt src={getCardImageUrl(`dream_${opt.layer}`)} trimBorder={false} />
+              <span>
+                <strong>第 {opt.layer} 层</strong>
+                <small>{opt.disabled ? '当前不可选' : '点击选择此层'}</small>
+              </span>
             </button>
           ))}
         </div>
       </DialogBody>
       <DialogFooter>
+        <button
+          type="button"
+          className="tabletop-primary"
+          data-testid="target-layer-confirm"
+          disabled={
+            confirming ||
+            picked === null ||
+            !options.some((opt) => opt.layer === picked && !opt.disabled)
+          }
+          onClick={() => {
+            if (confirming || picked === null) return;
+            setConfirming(true);
+            void Promise.resolve(onPick(picked)).then(() => setConfirming(false));
+          }}
+        >
+          {confirming ? '正在提交…' : '确认出牌'}
+        </button>
         <button
           type="button"
           onClick={onCancel}

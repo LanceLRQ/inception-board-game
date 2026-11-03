@@ -14,7 +14,11 @@ const testid = (id: string): string => `[data-testid="${id}"]`;
 export function seatSelectors(player: string, viewer: string | null): string[] {
   return player === viewer
     ? [testid('hand-dock')]
-    : [testid(`player-seat-${player}`), testid(`rail-slot-${player}`)];
+    : [
+        testid(`player-seat-${player}`),
+        testid(`rail-slot-${player}`),
+        testid(`occupant-${player}`),
+      ];
 }
 
 export const DECK_SELECTORS = [testid('deck-meter')];
@@ -50,7 +54,7 @@ export function centerOf(r: FxRect): { x: number; y: number } {
   return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
 }
 
-export const STAGE_SELECTORS = [testid('runtime-stage')];
+export const STAGE_SELECTORS = [testid('center-stage'), testid('runtime-stage')];
 
 /** 说明条与舞台区下沿的距离（移动布局，像素） */
 const CAPTION_INSET = 8;

@@ -1,9 +1,10 @@
-// 胜负结果：全屏覆盖层，含胜负文案、原因与「再来一局 / 返回大厅」按钮（移动、桌面共用）
+// 终局保留牌桌，按需打开结算、返回入口与举报。
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RotateCcw, Trophy } from 'lucide-react';
 import type { ReportModel } from '../controllerTypes';
+import { Dialog, DialogTitle } from '../../ui/dialog';
 import { OutcomeReport } from './OutcomeReport';
 
 interface MatchOutcomeProps {
@@ -24,37 +25,30 @@ export function MatchOutcome({
   report = null,
 }: MatchOutcomeProps) {
   const { t } = useTranslation();
-  const [minimized, setMinimized] = useState(false);
-  if (minimized)
-    return (
-      <button type="button" className="tabletop-result" onClick={() => setMinimized(false)}>
-        {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')} · 查看结算
-      </button>
-    );
+  const [open, setOpen] = useState(false);
+  const title = winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins');
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-background/90 p-6 pb-safe pt-safe"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('outcome.aria')}
-    >
-      <div
-        className="max-h-full w-full max-w-sm overflow-y-auto border border-line-strong bg-panel p-6 text-center"
-        data-testid="winner-banner"
-      >
-        <button
-          type="button"
-          className="ms-btn min-h-11 px-3 mb-3"
-          onClick={() => setMinimized(true)}
-        >
-          收起结算，查看牌桌
+    <>
+      <div className="tabletop-outcome" data-testid="winner-banner" role="status">
+        <div>
+          <strong>{title}</strong>
+          <p>终局牌桌保留，可继续翻看金库。</p>
+        </div>
+        <button type="button" onClick={() => setOpen(true)}>
+          查看结算
         </button>
-        <Trophy className="mx-auto mb-2 size-8 text-acc-bright" aria-hidden />
-        <h2 className="font-heading text-xl font-bold tracking-[.08em]">
-          {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')}
-        </h2>
+      </div>
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        blocking={false}
+        aria-label={t('outcome.aria')}
+        className="tabletop-outcome-dialog"
+      >
+        <Trophy className="size-8 text-acc" aria-hidden />
+        <DialogTitle>{title}</DialogTitle>
         {winReason && (
-          <p className="mt-1 text-xs text-dim" data-testid="win-reason">
+          <p className="mt-3 text-sm text-dim" data-testid="win-reason">
             {t(`localMatch.winReason.${winReason}`, { defaultValue: winReason })}
           </p>
         )}
@@ -62,15 +56,15 @@ export function MatchOutcome({
           type="button"
           onClick={onRestart}
           data-testid="restart-button"
-          className="mt-5 inline-flex min-h-11 touch-manipulation items-center justify-center gap-2 border border-acc bg-acc px-6 text-sm font-semibold text-background"
+          className="tabletop-primary mt-5"
         >
-          <RotateCcw className="size-4" aria-hidden />
+          <RotateCcw size={16} />
           {isRemote
             ? t('match.back_to_lobby', { defaultValue: '返回大厅' })
             : t('localMatch.restart')}
         </button>
         {report && <OutcomeReport report={report} />}
-      </div>
-    </div>
+      </Dialog>
+    </>
   );
 }

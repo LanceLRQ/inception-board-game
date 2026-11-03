@@ -74,6 +74,7 @@ export const TABLETOP_SCENARIO_IDS = [
   'tabletop-discard',
   'tabletop-peeked',
   'tabletop-dice',
+  'tabletop-dice-result',
   'tabletop-outcome',
 ] as const;
 export type FixtureScenarioId =

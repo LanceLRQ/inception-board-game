@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { CardArt } from '../CardArt';
+import { getCardImageUrl } from '../../lib/cardImages';
 // TargetPlayerPickerDialog · 选目标玩家对话框（从 LocalMatchRuntime 提炼）
 //
 // 适用于所有"需选目标玩家"场景：SHOOT / KICK / 念力牵引 / 共鸣 / shift 等
@@ -29,7 +32,8 @@ export interface TargetPlayerPickerDialogProps {
   viewerLayer: number;
   players: Record<
     string,
-    { isAlive: boolean; currentLayer: number; nickname?: string } | undefined
+    | { isAlive: boolean; currentLayer: number; nickname?: string; characterId?: string | null }
+    | undefined
   >;
   /** 梦主的座位、本人是不是梦主、持有贿赂牌的座位：移形换影与梦境窥视效果②的目标限制要用 */
   dreamMasterID?: string;
@@ -41,7 +45,7 @@ export interface TargetPlayerPickerDialogProps {
   masterCharacterId?: string | null;
   /** 卡牌显示名（可选） */
   cardNameOf?: (cardId: string) => string;
-  onPick: (targetPlayerID: string) => void;
+  onPick: (targetPlayerID: string) => void | Promise<void>;
   onCancel: () => void;
   /** 可选插槽：死亡宣言 / 额外选项（由调用方渲染） */
   decreeSlot?: ReactNode;
@@ -63,6 +67,15 @@ export function TargetPlayerPickerDialog({
   onCancel,
   decreeSlot,
 }: TargetPlayerPickerDialogProps) {
+  const intent = pending ? `${pending.card}:${pending.move}` : '';
+  const [seen, setSeen] = useState(intent);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  if (seen !== intent) {
+    setSeen(intent);
+    setPicked(null);
+    setConfirming(false);
+  }
   const open = pending != null;
   const cardName = pending?.card ? (cardNameOf?.(pending.card) ?? pending.card) : '';
   const options = computeTargetOptions({
@@ -86,6 +99,7 @@ export function TargetPlayerPickerDialog({
       }}
       blocking={false}
       size="md"
+      className="tabletop-choice-dialog"
       data-testid="target-player-picker-dialog"
     >
       <DialogHeader>
@@ -103,7 +117,7 @@ export function TargetPlayerPickerDialog({
       </DialogHeader>
       <DialogBody>
         {decreeSlot}
-        <div className="flex flex-wrap gap-2">
+        <div className="tabletop-target-options">
           {options.length === 0 ? (
             <span className="text-xs text-muted-foreground" data-testid="target-player-empty">
               无可选目标
@@ -126,25 +140,51 @@ export function TargetPlayerPickerDialog({
                 data-reason={opt.reason ?? undefined}
                 onClick={() => {
                   if (opt.disabled) return;
-                  onPick(opt.id);
+                  setPicked(opt.id);
                 }}
-                className="rounded-full bg-destructive px-3 py-1 text-xs text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                className="tabletop-target-option"
+                aria-pressed={picked === opt.id}
                 data-testid={`target-player-${opt.id}`}
               >
-                {opt.name}
-                {opt.reason === 'masterTarget'
-                  ? ' · 梦主（不可选）'
-                  : opt.reason === 'sameLayer' && opt.crossLayerNumber !== null
-                    ? ` · L${opt.crossLayerNumber}（跨层）`
-                    : opt.crossLayerAllowed && opt.crossLayerNumber !== null
-                      ? ` · L${opt.crossLayerNumber}（跨层可射）`
-                      : ''}
+                <CardArt
+                  src={getCardImageUrl(players[opt.id]?.characterId)}
+                  fallback={opt.name}
+                  trimBorder={false}
+                />
+                <span>
+                  <strong>{opt.name}</strong>
+                  <small>第 {players[opt.id]?.currentLayer} 层</small>
+                  {opt.reason === 'masterTarget'
+                    ? ' · 梦主（不可选）'
+                    : opt.reason === 'sameLayer' && opt.crossLayerNumber !== null
+                      ? ` · L${opt.crossLayerNumber}（跨层）`
+                      : opt.crossLayerAllowed && opt.crossLayerNumber !== null
+                        ? ` · L${opt.crossLayerNumber}（跨层可射）`
+                        : ''}
+                </span>
               </button>
             ))
           )}
         </div>
       </DialogBody>
       <DialogFooter>
+        <button
+          type="button"
+          className="tabletop-primary"
+          data-testid="target-player-confirm"
+          disabled={
+            confirming ||
+            picked === null ||
+            !options.some((opt) => opt.id === picked && !opt.disabled)
+          }
+          onClick={() => {
+            if (confirming || picked === null) return;
+            setConfirming(true);
+            void Promise.resolve(onPick(picked)).then(() => setConfirming(false));
+          }}
+        >
+          {confirming ? '正在提交…' : '确认出牌'}
+        </button>
         <button
           type="button"
           onClick={onCancel}

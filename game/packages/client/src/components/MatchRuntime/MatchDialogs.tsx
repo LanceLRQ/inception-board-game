@@ -75,7 +75,7 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         viewerHandCount={controller.hand.cards.length}
         masterCharacterId={view ? (view.players[view.dreamMasterID]?.characterId ?? null) : null}
         cardNameOf={(cardId) => getCardName(cardId)}
-        onPick={(id) => void play.confirmTargetPlayer(id)}
+        onPick={(id) => play.confirmTargetPlayer(id)}
         onCancel={() => play.cancelTargetPlayer()}
         decreeSlot={
           <>
@@ -141,7 +141,7 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         viewerLayer={viewerLayer}
         validLayers={play.targetLayerChoices ? [...play.targetLayerChoices] : null}
         cardNameOf={(cardId) => getCardName(cardId)}
-        onPick={(layer) => void play.confirmTargetLayer(layer)}
+        onPick={(layer) => play.confirmTargetLayer(layer)}
         onCancel={play.cancel}
       />
 
@@ -151,7 +151,7 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
         viewerLayer={viewerLayer}
         validLayers={[...masterMove.layers]}
         cardNameOf={() => t('entries.move.label')}
-        onPick={(layer) => void masterMove.pick(layer)}
+        onPick={(layer) => masterMove.pick(layer)}
         onCancel={masterMove.cancel}
       />
 
