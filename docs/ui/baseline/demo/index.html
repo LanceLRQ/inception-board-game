@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#111213" />
+    <title>盗梦都市 · 暗色牌桌交互原型</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mobile.css?mobile-table" />
+    <link rel="stylesheet" href="guide.css" />
+    <script src="cards.js" defer></script>
+    <script src="guide.js" defer></script>
+    <script src="state.js" defer></script>
+    <script src="app.js?guide-reader" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#hand-title">跳到我的手牌</a>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">◇</span>
+          <h1>盗梦都市</h1>
+          <span class="prototype-label">交互原型</span>
+        </div>
+        <div class="round-status">
+          <span class="status-dot"></span>你的回合<span class="muted"
+            >第 5 回合 · 出牌阶段</span
+          >
+        </div>
+        <div class="toolbar">
+          <button
+            class="text-button"
+            id="dice-preview"
+            title="掷骰演示"
+            aria-label="掷骰演示"
+          >
+            <span class="toolbar-label">掷骰演示</span>
+          </button>
+          <button
+            class="text-button"
+            id="motion-toggle"
+            title="减少动效"
+            aria-label="减少动效"
+            aria-pressed="false"
+          >
+            <span class="toolbar-label">减少动效</span>
+          </button>
+          <button class="text-button" id="reset" title="重置" aria-label="重置">
+            <span class="toolbar-label">重置</span>
+          </button>
+        </div>
+      </header>
+      <main class="workspace">
+        <aside class="players-panel" aria-labelledby="players-title">
+          <div class="section-heading">
+            <h2 id="players-title">同桌玩家</h2>
+            <span class="muted">6 人</span>
+          </div>
+          <div class="players-window">
+            <div id="players" class="players"></div>
+          </div>
+          <button class="text-button" id="next-turn" title="演示行动顺序轮转">
+            下一位 · 轮转演示 ↑
+          </button>
+          <div class="world-note">
+            <span class="muted">本局世界观</span><strong>盛夏</strong>
+            <p>所有盗梦者抽牌阶段的抽牌数量加 1。</p>
+            <button class="text-button" data-detail="dm_midsummer">
+              查看梦主完整说明 ↗
+            </button>
+          </div>
+        </aside>
+        <section class="board-panel" aria-labelledby="board-title">
+          <div class="board-heading">
+            <h2 id="board-title">梦境</h2>
+            <p id="board-subtitle">你在第二层</p>
+            <button class="text-button" id="board-demo">局面演示</button>
+          </div>
+          <div id="game-result" class="game-result" role="status" hidden></div>
+          <div class="layers" id="layers"></div>
+          <div id="limbo-players" class="limbo-players" hidden></div>
+          <div class="table-bottom">
+            <button class="pile" data-detail="action_back">
+              <img src="assets/action_back.webp" alt="原版行动牌背面" /><span
+                ><span class="muted">牌库</span
+                ><strong>117 <small>/ 140</small></strong></span
+              >
+            </button>
+            <div class="played-area" id="played-area">
+              <span class="muted">本回合出牌</span>
+              <div id="played-cards">
+                <span class="empty-caption">尚未出牌</span>
+              </div>
+            </div>
+            <div class="discard-count">
+              <span class="muted">弃牌堆</span
+              ><strong id="discard-count">3 <small>张</small></strong>
+            </div>
+          </div>
+          <div class="event-line" role="status" aria-live="polite">
+            <span class="event-mark" aria-hidden="true">↳</span
+            ><span id="event-text">选中一张手牌，准备你的行动。</span>
+          </div>
+        </section>
+        <aside class="selection-panel" aria-labelledby="selection-title">
+          <div class="section-heading">
+            <h2 id="selection-title">卡牌介绍</h2>
+            <span class="muted" id="selection-type">行动牌</span>
+          </div>
+          <div id="selection-content"></div>
+          <button class="secondary-button guide-entry" id="read-card">
+            游戏教程说明书
+          </button>
+          <div class="demo-note">
+            <strong>独立演示局面</strong>
+            <p>可体验五张行动牌与金库翻牌。掷骰固定为 4 点，不连接正式对局。</p>
+          </div>
+        </aside>
+        <section class="hand-panel" aria-labelledby="hand-title">
+          <div class="section-heading">
+            <div class="hand-heading">
+              <h2 id="hand-title" tabindex="-1">我的手牌</h2>
+              <span id="hand-count" class="muted">5 张</span>
+            </div>
+            <div class="hand-tools">
+              <span id="hand-phase" class="hand-hint">出牌阶段</span
+              ><button class="text-button" id="mobile-read">教程</button>
+            </div>
+          </div>
+          <div class="hand" id="hand"></div>
+          <div class="hand-actions">
+            <p id="action-help" role="status">点选手牌后操作，再点一次取消。</p>
+            <div id="hand-selection-actions" hidden>
+              <button class="secondary-button" id="inspect-card">
+                查看解析
+              </button>
+              <button class="primary-button" id="play-card">打出</button>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer>
+        <span>原版卡片 · 2.5D 交互演示</span
+        ><span>非商业原型 · 原卡版权归广州千骐动漫有限公司</span>
+      </footer>
+    </div>
+    <div id="player-tooltip" class="player-tooltip" role="tooltip" hidden></div>
+    <dialog
+      id="detail-dialog"
+      class="detail-dialog"
+      aria-labelledby="detail-name"
+    >
+      <div class="dialog-header">
+        <span>原卡与完整解析</span
+        ><button class="text-button" data-close="detail-dialog">关闭</button>
+      </div>
+      <div class="detail-layout">
+        <div class="detail-art">
+          <img
+            id="detail-image"
+            src="assets/action_shoot.webp"
+            alt="SHOOT 原卡"
+          /><button
+            class="secondary-button"
+            id="zoom-card"
+            aria-pressed="false"
+          >
+            放大原卡
+          </button>
+        </div>
+        <article class="detail-copy">
+          <span id="detail-category" class="muted"></span>
+          <h2 id="detail-name"></h2>
+          <div id="detail-text" class="full-rules"></div>
+          <p class="source-note">
+            文字来源：项目保存的原版说明书与卡牌资料。完整原图保留，便于逐项对照。
+          </p>
+        </article>
+      </div>
+    </dialog>
+    <dialog
+      id="target-dialog"
+      class="choice-dialog"
+      aria-labelledby="target-title"
+    >
+      <div class="dialog-header">
+        <span>出牌</span
+        ><button class="text-button" data-close="target-dialog">取消</button>
+      </div>
+      <h2 id="target-title">选择目标</h2>
+      <p id="target-description" class="muted"></p>
+      <div id="target-options" class="target-options"></div>
+      <button class="primary-button" id="confirm-target" disabled>
+        确认出牌
+      </button>
+    </dialog>
+    <dialog id="dice-dialog" class="dice-dialog" aria-labelledby="dice-title">
+      <div class="dialog-header">
+        <span>掷骰</span
+        ><button class="text-button" data-close="dice-dialog">收起</button>
+      </div>
+      <h2 id="dice-title">等待掷骰</h2>
+      <p id="dice-description" class="muted"></p>
+      <div class="dice-stage">
+        <div class="dice-floor"></div>
+        <div class="dice-perspective">
+          <div
+            id="die"
+            class="die"
+            role="img"
+            aria-label="立体骰子，等待掷骰"
+          ></div>
+        </div>
+      </div>
+      <div id="dice-result" class="dice-result" role="status">准备掷骰</div>
+      <p class="dice-note">原型演示：代目标玩家操作，固定展示 4 点。</p>
+      <div id="dice-destinations" class="dice-destinations"></div>
+      <button class="primary-button" id="roll-dice">掷骰</button>
+    </dialog>
+    <dialog
+      id="scene-dialog"
+      class="choice-dialog"
+      aria-labelledby="scene-title"
+    >
+      <div class="dialog-header">
+        <span>独立原型</span
+        ><button class="text-button" data-close="scene-dialog">关闭</button>
+      </div>
+      <h2 id="scene-title">选择演示局面</h2>
+      <p class="muted">切换会重置演示手牌与局面，不影响正式游戏。</p>
+      <div class="target-options">
+        <button class="target-option" data-scene="normal">
+          <span
+            >初始局面<small
+              >所有金库未查看；点击层数卡只能看到背面。</small
+            ></span
+          >
+        </button>
+        <button class="target-option" data-scene="peeked">
+          <span>窥视后<small>你已看过第三层；翻开只对你展示内容。</small></span>
+        </button>
+        <button class="target-option" data-scene="gold-ready">
+          <span
+            >金币开启前<small
+              >第二层剩 1 道心锁，打出解封公开金币。</small
+            ></span
+          >
+        </button>
+        <button class="target-option" data-scene="secret-ready">
+          <span
+            >秘密开启前<small
+              >你在第三层，剩 1 道心锁；解封后展示终局。</small
+            ></span
+          >
+        </button>
+        <button class="target-option" data-scene="discard-ready">
+          <span
+            >弃牌阶段<small
+              >7 张手牌，选择任意 2 张弃掉，保留 5 张。</small
+            ></span
+          >
+        </button>
+        <button class="target-option" data-scene="limbo">
+          <span
+            >迷失层状态<small
+              >星河已死亡、等待复活，独立显示在迷失层。</small
+            ></span
+          >
+        </button>
+      </div>
+    </dialog>
+    <dialog
+      id="guide-dialog"
+      class="guide-dialog"
+      aria-labelledby="guide-title"
+      data-view="list"
+    >
+      <header class="guide-header">
+        <div>
+          <h2 id="guide-title">游戏教程说明书</h2>
+          <p>原版规则与卡牌全文</p>
+        </div>
+        <button class="text-button" data-close="guide-dialog">关闭</button>
+      </header>
+      <label class="guide-category-picker"
+        >分类<select id="guide-category" aria-label="说明书分类"></select
+      ></label>
+      <div class="guide-layout">
+        <nav
+          id="guide-categories"
+          class="guide-categories"
+          aria-label="说明书分类"
+        ></nav>
+        <section class="guide-library" aria-label="教程目录与卡牌列表">
+          <div class="guide-library-tools">
+            <label class="guide-search"
+              >搜索当前分类<input
+                id="guide-search"
+                type="search"
+                placeholder="输入章节、名称或关键词"
+            /></label>
+            <p id="guide-count" class="muted" role="status"></p>
+          </div>
+          <div
+            id="guide-list"
+            class="guide-list"
+            tabindex="0"
+            aria-label="目录列表，可滚动"
+          ></div>
+        </section>
+        <section class="guide-reader" aria-label="完整内容阅读区">
+          <div class="guide-reader-toolbar">
+            <button id="guide-back" class="text-button">← 目录</button>
+            <span id="guide-location"></span>
+            <button
+              id="guide-zoom"
+              class="text-button"
+              aria-pressed="false"
+              hidden
+            >
+              放大原卡
+            </button>
+          </div>
+          <div
+            id="guide-content"
+            class="guide-content"
+            tabindex="0"
+            role="region"
+            aria-label="规则与卡牌全文，可滚动"
+          ></div>
+        </section>
+      </div>
+    </dialog>
+    <noscript
+      ><p class="noscript-note">
+        交互原型需要启用 JavaScript。原版规则可在同目录 README 中找到来源。
+      </p></noscript
+    >
+  </body>
+</html>

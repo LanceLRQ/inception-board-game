@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>盗梦都市 · 手机原型预览</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        background: #0c0d0e;
+        color: #f1f2f3;
+      }
+      body {
+        margin: 0;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 720px;
+        padding: 18px 20px;
+        margin: auto;
+        gap: 16px;
+        font-size: 14px;
+      }
+      header a {
+        color: #d5b276;
+        padding: 12px;
+      }
+      iframe {
+        display: block;
+        width: 390px;
+        height: 844px;
+        max-width: 100%;
+        margin: 0 auto 24px;
+        border: 1px solid #333;
+        border-radius: 12px;
+        background: #111213;
+      }
+      @media (max-width: 600px) {
+        header {
+          display: none;
+        }
+        iframe {
+          width: 100%;
+          height: 100dvh;
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span>手机交互预览 · 390 × 844</span
+      ><a href="index.html">打开自适应牌桌 ↗</a>
+    </header>
+    <iframe src="index.html" title="盗梦都市手机交互原型"></iframe>
+  </body>
+</html>

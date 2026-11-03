@@ -69,7 +69,16 @@ export const FIXTURE_SCENARIO_IDS = [
   'skill-unlock-spent',
 ] as const;
 
-export type FixtureScenarioId = (typeof FIXTURE_SCENARIO_IDS)[number];
+export const TABLETOP_SCENARIO_IDS = [
+  'tabletop-normal',
+  'tabletop-discard',
+  'tabletop-peeked',
+  'tabletop-dice',
+  'tabletop-outcome',
+] as const;
+export type FixtureScenarioId =
+  | (typeof FIXTURE_SCENARIO_IDS)[number]
+  | (typeof TABLETOP_SCENARIO_IDS)[number];
 
 /** 固定场景的人数范围与缺省人数 */
 export const FIXTURE_MIN_PLAYERS = MATCH_MIN_PLAYERS;
@@ -194,6 +203,10 @@ export function parseFixturePlayers(raw: string | null): number {
  *   ?fx=1        循环推送一组示例事件（抽牌、出牌、弃牌、转牌、移层、心锁、金库、击杀与复活），走查动画层
  */
 export function resolveFixtureScenario(searchParams: URLSearchParams): FixtureScenarioSpec {
+  const tabletop = TABLETOP_SCENARIO_IDS.find(
+    (id) => id === `tabletop-${searchParams.get('tabletop')}`,
+  );
+  if (tabletop) return { id: tabletop, players: 6 };
   const master = searchParams.get('as') === 'master';
   const pendingParam = searchParams.get('pending');
   const pending = pendingParam === '1';

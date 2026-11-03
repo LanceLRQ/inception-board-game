@@ -536,9 +536,108 @@ export function buildFixtureMatch(
   state: MatchState<SetupState>;
   viewer: string;
 } {
-  const base = startedMatch(players);
+  const base = startedMatch(id.startsWith('tabletop-') ? 6 : players);
   const master = base.G.dreamMasterID;
   const thieves = base.G.playerOrder.filter((seat) => seat !== master);
+  if (id.startsWith('tabletop-')) {
+    const viewer = thieves[0]!;
+    const order = [viewer, master, ...thieves.slice(1)];
+    const characters = [
+      'thief_space_queen',
+      'dm_midsummer',
+      'thief_apollo',
+      'thief_tourist',
+      'thief_capricornus',
+      'thief_lord_of_war',
+    ];
+    const names = ['你', '暮雨', '林间', '北辰', '南山', '星河'];
+    const positions: Layer[] = [2, 2, 2, 1, 3, 4];
+    const counts = [5, 3, 3, 4, 3, 2];
+    let G: SetupState = { ...base.G, playerOrder: order };
+    G = dealSpecific(
+      G,
+      viewer,
+      cards(
+        'action_shoot',
+        'action_unlock',
+        'action_dream_transit',
+        'action_kick',
+        'action_dream_peek',
+      ),
+    );
+    if (id === 'tabletop-discard')
+      G = dealSpecific(G, viewer, cards('action_shoot', 'action_unlock'));
+    order.forEach((seat, i) => {
+      if (i > 0) G = dealTop(G, seat, counts[i]!);
+      G = {
+        ...G,
+        players: {
+          ...G.players,
+          [seat]: {
+            ...G.players[seat]!,
+            characterId: characters[i]! as CardID,
+            nickname: names[i]!,
+            isRevealed: seat === master,
+          },
+        },
+      };
+    });
+    G = discardTop(G, 3);
+    G = placePlayers(
+      G,
+      Object.fromEntries(
+        order.map((seat, i) => [seat, { layer: positions[i]!, revealed: seat === master }]),
+      ),
+    );
+    const vaults = [...G.vaults].sort(
+      (a, b) => Number(b.contentType === 'secret') - Number(a.contentType === 'secret'),
+    );
+    G = {
+      ...G,
+      layers: Object.fromEntries(
+        Object.entries(G.layers).map(([key, layer]) => [
+          key,
+          { ...layer, heartLockValue: 6 - layer.layer },
+        ]),
+      ),
+      vaults: vaults.map((vault, i) => ({
+        ...vault,
+        layer: [3, 1, 2, 4][i]! as Layer,
+        isOpened: id === 'tabletop-outcome' && vault.contentType === 'secret',
+        openedBy: id === 'tabletop-outcome' && vault.contentType === 'secret' ? viewer : null,
+      })),
+      peekReveal:
+        id === 'tabletop-peeked' ? { peekerID: viewer, revealKind: 'vault', vaultLayer: 3 } : null,
+    };
+    let state = giveTurn({ ...base, ctx: { ...base.ctx, playOrder: order } }, G, viewer);
+    if (id === 'tabletop-discard') state = { ...state, G: { ...state.G, turnPhase: 'discard' } };
+    if (id === 'tabletop-outcome') {
+      state = { ...state, G: placePlayers(state.G, { [viewer]: { layer: 3, revealed: false } }) };
+      state = {
+        ...state,
+        G: {
+          ...state.G,
+          players: {
+            ...state.G.players,
+            [viewer]: {
+              ...state.G.players[viewer]!,
+              hand: state.G.players[viewer]!.hand.filter((card) => card !== UNLOCK_CARD),
+            },
+          },
+          deck: { ...state.G.deck, discardPile: [...state.G.deck.discardPile, UNLOCK_CARD] },
+          playedCardsThisTurn: [UNLOCK_CARD],
+          lastPlayedCardThisTurn: UNLOCK_CARD,
+          layers: { ...state.G.layers, 3: { ...state.G.layers[3]!, heartLockValue: 0 } },
+        },
+        ctx: { ...state.ctx, gameover: { winner: 'thief', reason: 'secret_vault_opened' } },
+      };
+    }
+    if (id === 'tabletop-dice') {
+      state = giveTurn(state, dealSpecific(state.G, master, cards('action_shoot')), master);
+      state = mustApply(state, master, 'playShoot', [viewer, 'action_shoot']);
+    }
+    return { state, viewer };
+  }
   const viewer = isMasterScenario(id) ? master : thieves[0]!;
   const response = RESPONSE_SPECS[id];
   const skillScene = SKILL_SCENES[id];
