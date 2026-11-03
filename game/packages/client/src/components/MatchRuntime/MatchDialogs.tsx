@@ -1,5 +1,5 @@
 // 对局弹窗群：响应类弹窗与出牌流程里的选目标 / 选模式 / 多步选择弹窗
-// 解封响应不在这里：两个布局各自用内联的响应窗口 / 响应条承载。
+// 桌面和手机共用响应弹层，避免重复挂载倒计时。
 // 只依赖控制层 MatchController；不关心页面布局，任何布局都可以直接挂载。
 
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,8 @@ import { GravityPoolPickerDialog } from '../GravityPoolPickerDialog';
 import { GraftResolverDialog } from '../GraftResolverDialog';
 import { ReviveDialog } from '../ReviveDialog';
 import { BlackSwanTourDialog } from '../BlackSwanTourDialog';
+import { ResponseWindow } from './desktop/ResponseWindow';
+import { AwaitedWindow } from './desktop/AwaitedWindow';
 import { AwaitedResponseSheet } from './shared/AwaitedResponseSheet';
 import type { MatchController } from './controllerTypes';
 
@@ -36,6 +38,8 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
 
   return (
     <>
+      <ResponseWindow controller={controller} />
+      <AwaitedWindow controller={controller} />
       {/* 本人应答（被 SHOOT 时的响应、天秤、处女、白羊等）里需要选牌 / 分牌 / 选层的弹窗 */}
       <AwaitedResponseSheet controller={controller} />
 
@@ -64,6 +68,7 @@ export function MatchDialogs({ controller }: MatchDialogsProps) {
 
       {/* 出牌时选目标玩家（SHOOT / KICK / 念力牵引 / 共鸣 / shift 等） */}
       <TargetPlayerPickerDialog
+        onOpenCard={controller.preview.open}
         pending={play.targetPlayerPending}
         viewerPlayerID={viewerSeat}
         viewerLayer={viewerLayer}

@@ -1,3 +1,5 @@
+import { PlayerAvatar } from '../../PlayerIdentity/PlayerAvatar';
+import { PlayerName } from '../../PlayerIdentity/PlayerName';
 import { useMemo, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { resolveReducedMotion } from '../../../theme/effects';
@@ -113,30 +115,24 @@ export function DesktopStage({
               data-current={seat.isCurrent}
               data-awaited={seat.isAwaited}
             >
-              <button
-                type="button"
-                onClick={() => seat.characterId && controller.preview.open(seat.characterId)}
-                disabled={!seat.characterId}
-                aria-label={`查看${seat.nickname}角色`}
-                data-testid={`player-avatar-${seat.id}`}
-              >
-                <CardArt src={seat.imageUrl} trimBorder={false} />
-              </button>
+              <PlayerAvatar
+                name={seat.nickname}
+                characterId={seat.characterId}
+                highlighted={seat.isViewer || seat.isCurrent}
+                current={seat.isCurrent}
+                testId={`player-avatar-${seat.id}`}
+                onOpenCard={controller.preview.open}
+              />
               <div>
                 <b>
-                  {seat.nickname}
-                  {seat.isMaster
-                    ? ' · 梦主'
-                    : seat.isViewer && seat.nickname !== '你'
-                      ? ' · 你'
-                      : ''}
-                  {seat.isCurrent && <em className="tabletop-turn-label">行动中</em>}
+                  <PlayerName name={seat.nickname} characterId={seat.characterId} />
                 </b>
-                <p>{seat.characterName}</p>
-                <small>
-                  {seat.isLost ? '迷失层' : `${seat.layer} 层`} · 手牌 {seat.handCount}
-                  {seat.isAwaited ? ' · 应答中' : ''}
-                </small>
+                <p className="tabletop-player-status">
+                  {seat.isCurrent && <span className="tabletop-turn-label">行动中</span>}
+                  <span>{seat.isLost ? '迷失层' : `${seat.layer} 层`}</span>
+                  <span>手牌 {seat.handCount}</span>
+                  {seat.isAwaited && <span>应答中</span>}
+                </p>
                 <SeatStatusBadges markers={seat.markers} seatId={seat.id} size="sm" />
                 <ChatBubble
                   entry={controller.chat.bubbles.get(seat.id)}

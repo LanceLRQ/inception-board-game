@@ -1,12 +1,10 @@
 // TargetLayerPickerDialog · 纯逻辑层
 //
 // 对于"需选目标层"的卡（梦境穿梭剂 / 梦境窥视 / 梦魇解封 等），
-// 当前简化规则：所有 L1-L4 均为候选；具体合法性由 engine 侧校验。
-// 未来若需前端过滤（如穿梭剂相邻层），可在 inputs 中扩展 validLayers。
+// 只列出可选层；梦境窥视的未打开金库列表由控制层传入，已窥视不影响再次选择。
 
 export interface TargetLayerOption {
   layer: number;
-  disabled: boolean;
 }
 
 export interface TargetLayerInputs {
@@ -27,7 +25,7 @@ export const ALL_LAYERS = [1, 2, 3, 4] as const;
  * 若传 inputs.validLayers 则优先使用。
  */
 export function computeValidLayers(inputs: TargetLayerInputs): number[] {
-  if (inputs.validLayers && inputs.validLayers.length > 0) return [...inputs.validLayers];
+  if (inputs.validLayers != null) return [...inputs.validLayers];
   if (inputs.cardId === 'action_dream_transit' || inputs.cardId === 'action_shoot_dream_transit') {
     const adj: number[] = [];
     if (inputs.viewerLayer - 1 >= 1) adj.push(inputs.viewerLayer - 1);
@@ -39,5 +37,5 @@ export function computeValidLayers(inputs: TargetLayerInputs): number[] {
 
 export function computeLayerOptions(inputs: TargetLayerInputs): TargetLayerOption[] {
   const valid = new Set(computeValidLayers(inputs));
-  return ALL_LAYERS.map((layer) => ({ layer, disabled: !valid.has(layer) }));
+  return ALL_LAYERS.filter((layer) => valid.has(layer)).map((layer) => ({ layer }));
 }

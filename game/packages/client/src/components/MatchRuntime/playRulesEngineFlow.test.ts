@@ -16,7 +16,12 @@ import type { PlayerSetup, SetupState } from '@icgame/game-engine/setup';
 import type { CardID } from '@icgame/shared';
 import { buildFixtureMatch } from '../../match/fixtures/buildScenario';
 import { computeTargetOptions } from '../TargetPlayerPickerDialog/logic';
-import { buildPlayArgs, derivePlayRules, nightmareUnlockLayers } from './controllerDerive';
+import {
+  buildPlayArgs,
+  derivePlayRules,
+  nightmareUnlockLayers,
+  playLayerChoices,
+} from './controllerDerive';
 import { deriveDockEntries } from './model/dockEntries';
 import { playBlockReason } from './model/handDerive';
 import { HEART_LOCK_REDUCED_BY_SKILL_KEY } from '../../lib/unlockLimit';
@@ -258,6 +263,54 @@ describe('【梦魇解封】的层：只列还盖着暗置梦魇的层', () => {
     expect(Object.values(viewOf(s.state, s.me).layers).every((l) => l.nightmareId === null)).toBe(
       true,
     );
+  });
+});
+
+describe('梦境窥视的目标：只选未打开金库，允许重复窥视', () => {
+  const peek = 'action_dream_peek';
+
+  it('已打开的层不出现在选项中，前端与引擎逐层一致', () => {
+    const s = thiefScene();
+    const base = setCharacter(s.state, s.master, 'dm_midsummer');
+    const state = editG(setHand(base, s.me, cards(peek, peek)), (G) => ({
+      ...G,
+      bribePool: [],
+      vaults: G.vaults.map((v) => ({
+        ...v,
+        contentType: v.layer === 1 ? 'secret' : 'coin',
+        isOpened: v.layer === 2,
+        openedBy: v.layer === 2 ? s.me : null,
+      })),
+    }));
+    const view = viewOf(state, s.me);
+    const listed = playLayerChoices(peek, view.layers, view.vaults);
+    expect(listed).toEqual([1, 3, 4]);
+    for (const layer of [1, 2, 3, 4]) {
+      expect(apply(state, s.me, 'playPeek', [peek, layer]) !== null).toBe(listed!.includes(layer));
+    }
+    const revealed = apply(state, s.me, 'playPeek', [peek, 3])!;
+    expect(revealed.G.peekReveal).toEqual({
+      peekerID: s.me,
+      revealKind: 'vault',
+      vaultLayer: 3,
+    });
+    const acknowledged = apply(revealed, s.me, 'peekerAcknowledge', []);
+    expect(acknowledged).not.toBeNull();
+    const nextView = viewOf(acknowledged!, s.me);
+    expect(playLayerChoices(peek, nextView.layers, nextView.vaults)).toContain(3);
+    expect(apply(acknowledged!, s.me, 'playPeek', [peek, 3])).not.toBeNull();
+  });
+
+  it('金库全部打开时没有可选层，不回退为全部层', () => {
+    const s = thiefScene();
+    const view = viewOf(s.state, s.me);
+    expect(
+      playLayerChoices(
+        peek,
+        view.layers,
+        view.vaults.map((v) => ({ ...v, isOpened: true })),
+      ),
+    ).toEqual([]);
   });
 });
 

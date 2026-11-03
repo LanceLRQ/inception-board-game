@@ -27,6 +27,7 @@ export function DesktopDock({
   const inDiscard = turn.phase === 'discard' && hand.mustDiscard;
   const skillEntries = skillPanel ? getSkillEntries(skillPanel.context) : [];
   const showActions = inDiscard ? actions.discardSelected > 0 : readingItem !== null;
+  const hasCards = hand.available && hand.items.length > 0;
   const note = inDiscard
     ? `选择 ${actions.discardRequired} 张弃牌，已选 ${actions.discardSelected} 张。`
     : verdict && !verdict.canPlay
@@ -36,17 +37,22 @@ export function DesktopDock({
         : '点选手牌后操作，再点一次取消。';
 
   return (
-    <section aria-label={t('dock.hand')} data-testid="hand-dock" className="tabletop-hand-panel">
+    <section
+      aria-label={t('dock.hand')}
+      data-testid="hand-dock"
+      className="tabletop-hand-panel"
+      data-empty={!hasCards || undefined}
+    >
       <div className="tabletop-section-heading">
         <div className="tabletop-hand-title">
           <h2>我的手牌</h2>
           <span>{hand.items.length} 张</span>
           {tools}
         </div>
-        <DockOps controller={controller} skillReady={skillEntries.length > 0} />
+        {hasCards && <DockOps controller={controller} skillReady={skillEntries.length > 0} />}
       </div>
       <div className="tabletop-hand" data-testid="human-hand">
-        {hand.available && hand.items.length ? (
+        {hasCards ? (
           hand.items.map((item) => {
             const target = cardTargetKind(item.card, controller.playRole);
             return (
@@ -69,48 +75,53 @@ export function DesktopDock({
             );
           })
         ) : (
-          <p className="tabletop-hand-empty">{t('dock.noHand')}</p>
-        )}
-      </div>
-      <div className="tabletop-hand-actions">
-        <p role="status">{note}</p>
-        {showActions && (
-          <div>
-            {readingItem && (
-              <button
-                type="button"
-                className="tabletop-secondary"
-                onClick={() => preview.open(readingItem.card)}
-              >
-                查看解析
-              </button>
-            )}
-            {inDiscard ? (
-              <button
-                type="button"
-                className="tabletop-primary"
-                data-testid="action-confirm-discard"
-                disabled={!actions.canConfirmDiscard}
-                onClick={actions.confirmDiscard}
-              >
-                弃掉 {actions.discardSelected} 张
-              </button>
-            ) : (
-              readingItem && (
-                <button
-                  type="button"
-                  className="tabletop-primary"
-                  data-testid="hand-commit-play"
-                  disabled={!verdict?.canPlay || play.pending !== null}
-                  onClick={() => play.commit(readingItem.card)}
-                >
-                  打出 {readingItem.name}
-                </button>
-              )
-            )}
+          <div className="tabletop-hand-empty">
+            <p>{t('dock.noHand')}</p>
+            <DockOps controller={controller} skillReady={skillEntries.length > 0} />
           </div>
         )}
       </div>
+      {hasCards && (
+        <div className="tabletop-hand-actions">
+          <p role="status">{note}</p>
+          {showActions && (
+            <div>
+              {readingItem && (
+                <button
+                  type="button"
+                  className="tabletop-secondary"
+                  onClick={() => preview.open(readingItem.card)}
+                >
+                  查看解析
+                </button>
+              )}
+              {inDiscard ? (
+                <button
+                  type="button"
+                  className="tabletop-primary"
+                  data-testid="action-confirm-discard"
+                  disabled={!actions.canConfirmDiscard}
+                  onClick={actions.confirmDiscard}
+                >
+                  弃掉 {actions.discardSelected} 张
+                </button>
+              ) : (
+                readingItem && (
+                  <button
+                    type="button"
+                    className="tabletop-primary"
+                    data-testid="hand-commit-play"
+                    disabled={!verdict?.canPlay || play.pending !== null}
+                    onClick={() => play.commit(readingItem.card)}
+                  >
+                    打出 {readingItem.name}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

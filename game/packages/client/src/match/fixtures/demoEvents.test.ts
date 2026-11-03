@@ -27,6 +27,8 @@ describe('demoEventBatches', () => {
         'move',
         'lock',
         'vault',
+        'peek',
+        'bribe',
         'died',
         'revived',
       ]),

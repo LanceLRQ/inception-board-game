@@ -30,7 +30,7 @@ export const peekMoves = {
       if (isDreamMaster(G, ctx.currentPlayer)) return INVALID_MOVE;
       if (!player.hand.includes(cardId)) return INVALID_MOVE;
       if (targetLayer < 1 || targetLayer > 4) return INVALID_MOVE;
-      const hasVault = G.vaults.some((v) => v.layer === targetLayer);
+      const hasVault = G.vaults.some((v) => v.layer === targetLayer && !v.isOpened);
       if (!hasVault) return INVALID_MOVE;
 
       // 棋局世界观：使用梦境窥视的人从牌库顶抽 2 张（对照：docs/manual/06-dream-master.md 棋局 112-113 行）

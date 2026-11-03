@@ -273,10 +273,29 @@ body:has(.ms-tabletop-runtime) {
 .tabletop-hand-card[aria-pressed='true'] .tabletop-card-label {
   color: var(--ms-acc);
 }
+.tabletop-hand-panel[data-empty] {
+  grid-template-rows: auto minmax(0, 1fr);
+}
 .tabletop-hand-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 120px;
+  height: 100%;
   align-self: center;
   color: var(--ms-dim);
   font-size: 14px;
+}
+.tabletop-hand-empty .tabletop-hand-tools {
+  justify-content: center;
+}
+.tabletop-response-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
 }
 .tabletop-hand-actions {
   display: flex;
@@ -411,15 +430,6 @@ body:has(.ms-tabletop-runtime) {
   outline: 1px dashed var(--ms-acc);
   outline-offset: -2px;
 }
-.tabletop-player > button {
-  width: 44px;
-  height: 60px;
-  flex-shrink: 0;
-}
-.tabletop-player > button > * {
-  width: 100%;
-  height: 100%;
-}
 .tabletop-player p,
 .tabletop-player small {
   color: var(--ms-dim);
@@ -486,8 +496,11 @@ body:has(.ms-tabletop-runtime) {
   border-radius: 10px;
 }
 .tabletop-layer[data-viewer-layer='true'] {
-  outline: 2px solid var(--ms-acc);
-  outline-offset: 3px;
+  outline: 3px solid #f5f8fa;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 2px #101214,
+    0 0 0 6px #101214;
 }
 .tabletop-layer[data-unlocking='true'] {
   outline: 2px dashed var(--ms-lock);
@@ -571,56 +584,6 @@ body:has(.ms-tabletop-runtime) {
   margin: -3px;
   overflow-x: auto;
   scrollbar-width: none;
-}
-.tabletop-occupant {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 2px;
-  border: 0;
-  border-radius: 50%;
-  background: #373b3fe6;
-}
-.tabletop-portrait {
-  display: block;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  overflow: hidden;
-  position: relative;
-}
-.tabletop-portrait img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.tabletop-portrait[data-cropped='false']:not([data-master='true']) img {
-  width: 220%;
-  height: auto;
-  max-width: none;
-  position: absolute;
-  left: -60%;
-  top: -40%;
-}
-.tabletop-occupant[data-self='true'] .tabletop-portrait {
-  outline: 2px solid var(--ms-acc);
-  outline-offset: 2px;
-}
-.tabletop-active-dot {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ms-acc);
-  outline: 2px solid #121a1d;
 }
 .tabletop-layer-die {
   position: absolute;
@@ -755,14 +718,6 @@ body:has(.ms-tabletop-runtime) {
   border-radius: 8px;
   gap: 12px;
   align-items: center;
-}
-.tabletop-player > button {
-  width: 42px;
-  height: 58px;
-}
-.tabletop-player[data-master='true'] > button {
-  width: 60px;
-  height: 43px;
 }
 .tabletop-player img {
   object-fit: contain;
@@ -1075,12 +1030,6 @@ body:has(.ms-tabletop-runtime) {
 }
 
 @media (pointer: coarse) {
-  .tabletop-occupant {
-    flex-basis: 44px;
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-  }
   .tabletop-layer-info,
   .tabletop-layer-status button {
     min-height: 44px;
@@ -1240,24 +1189,25 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
   padding: 2px;
   scrollbar-width: thin;
 }
-.tabletop-target-option {
+.tabletop-target-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   border: 1px solid var(--ms-line2);
   background: var(--ms-panel2);
-  color: var(--ms-ink);
   border-radius: 8px;
-  padding: 12px 16px;
-  text-align: left;
+  padding: 8px 12px;
 }
-.tabletop-target-option > img,
-.tabletop-target-option > [data-testid='card-art-fallback'] {
-  width: 46px;
-  height: 64px;
-  object-fit: contain;
-  flex-shrink: 0;
+.tabletop-target-option {
+  flex: 1;
+  min-width: 0;
+  min-height: 64px;
+  padding: 4px 0;
+  text-align: left;
+  color: var(--ms-ink);
+  background: transparent;
+  border: 0;
 }
 .tabletop-target-option strong {
   display: block;
@@ -1270,13 +1220,29 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
   font-size: 13px;
   color: var(--ms-dim);
 }
-.tabletop-target-option[aria-pressed='true'] {
+.tabletop-target-row[data-selected='true'] {
   border-color: var(--ms-acc);
   background: var(--ms-accsoft);
 }
 .tabletop-target-option:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+[data-testid='target-layer-picker-dialog'] .tabletop-target-options {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+[data-testid='target-layer-picker-dialog'] .tabletop-target-option {
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+[data-testid='target-layer-picker-dialog'] .tabletop-target-option[aria-pressed='true'] {
+  border-color: var(--ms-acc);
+  background: var(--ms-accsoft);
+}
+[data-testid='target-layer-picker-dialog'] .tabletop-target-option > img {
+  width: 100%;
+  height: auto;
 }
 .tabletop-dice-dialog {
   width: min(520px, calc(100vw - 32px));
@@ -1590,24 +1556,6 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
     flex-wrap: wrap;
     overflow: visible;
   }
-  .tabletop-mobile .tabletop-occupant {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    min-height: 44px;
-    flex: 0 0 44px;
-    padding: 6px;
-    background: transparent;
-  }
-  .tabletop-mobile .tabletop-portrait {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-  }
-  .tabletop-mobile .tabletop-active-dot {
-    right: 3px;
-    bottom: 5px;
-  }
   .tabletop-mobile .tabletop-layer-status {
     grid-column: 3;
     max-width: none;
@@ -1919,11 +1867,6 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
   align-items: center;
   gap: 12px;
 }
-.tabletop-mobile-seat-list > div > button {
-  width: 44px;
-  height: 62px;
-  flex-shrink: 0;
-}
 .tabletop-mobile-seat-list strong {
   font-size: 14px;
 }
@@ -1942,4 +1885,110 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
     min-height: 44px;
     margin-left: 0;
   }
+}
+
+/* 头像的边框属于圆形图片本身，避免外描边被滚动容器裁切。 */
+.player-avatar {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--avatar-size);
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  min-width: var(--avatar-size);
+  min-height: var(--avatar-size);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+}
+.player-avatar-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid #777b7c;
+  background: var(--ms-panel2);
+}
+.player-avatar[data-highlighted] .player-avatar-face {
+  border: 3px solid var(--ms-acc, #d5b276);
+}
+.player-avatar-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.player-avatar-face[data-cropped='false']:not([data-master='true']) img {
+  position: absolute;
+  width: 220%;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  left: -60%;
+  top: -40%;
+}
+.player-avatar-dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ms-acc, #d5b276);
+  box-shadow: 0 0 0 2px #121a1d;
+}
+.player-name {
+  overflow-wrap: anywhere;
+}
+.player-name-role {
+  font-weight: 400;
+  color: var(--ms-dim);
+}
+.tabletop-player > div {
+  min-width: 0;
+}
+@media (max-width: 1023px), (pointer: coarse) {
+  .player-avatar.tabletop-occupant {
+    min-width: 44px;
+    min-height: 44px;
+    flex-basis: 44px;
+  }
+  .tabletop-occupant .player-avatar-dot {
+    right: 4px;
+    bottom: 4px;
+  }
+}
+
+/* 药剂师的人物偏右，按原卡头部位置裁切，避免落在左侧暗背景。 */
+.player-avatar-face[data-cropped='false'][data-character='thief_chemist']:not([data-master='true'])
+  img {
+  width: 280%;
+  left: -130%;
+  top: -29%;
+}
+.tabletop-player-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin: 5px 0 0;
+  line-height: 1.5;
+}
+.tabletop-player-status .tabletop-turn-label {
+  margin: 0;
+  white-space: nowrap;
+}
+.tabletop-layer .player-avatar[data-highlighted] .player-avatar-face {
+  border-color: #f5f8fa;
+  box-shadow: 0 0 0 2px #101214;
+}
+
+.tabletop-player-status > span {
+  white-space: nowrap;
 }

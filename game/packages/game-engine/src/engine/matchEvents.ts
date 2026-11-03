@@ -208,6 +208,20 @@ export function describeMatchEvents(args: DescribeArgs): DescribedEvent[] {
     events.push({ kind: 'card_played', actor: playedBy, data: { player: playedBy, card } });
   }
 
+  // 窥视层数公开，金库内容仍只通过本人视图交付；梦主决策后不重复通知。
+  const vaultPeek =
+    after.pendingPeekDecision ??
+    (after.peekReveal?.revealKind === 'vault'
+      ? { peekerID: after.peekReveal.peekerID, targetLayer: after.peekReveal.vaultLayer }
+      : null);
+  if (vaultPeek && !before.pendingPeekDecision && !before.peekReveal) {
+    events.push({
+      kind: 'vault_peeked',
+      actor: vaultPeek.peekerID,
+      data: { player: vaultPeek.peekerID, layer: vaultPeek.targetLayer },
+    });
+  }
+
   // 每名玩家本步离开手牌、且不是打出的牌（弃掉、交给别人、放回牌库等），用于推导弃牌来源与转牌
   const leftHand = new Map<string, CardID[]>();
   for (const id of order) {

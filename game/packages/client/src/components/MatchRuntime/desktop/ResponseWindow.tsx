@@ -1,7 +1,10 @@
-// 解封响应窗口：舞台右上角的内联窗口，取代弹窗
-// 逻辑与移动端响应条、解封响应弹窗完全一致（共用 useUnlockResponse，发出的也是同样的 move）；
-// 本地来源到点自动放弃，联机由服务端代发。样式钩子类名：ms-response。
-
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../../ui/dialog';
 import { useTranslation } from 'react-i18next';
 import { Hourglass } from 'lucide-react';
 import { useUnlockResponse } from '../../UnlockResponse/useUnlockResponse';
@@ -30,11 +33,11 @@ export function ResponseWindow({ controller }: ResponseWindowProps) {
       : t('response.countdown', { seconds: remainingSec });
 
   return (
-    <div
-      role="group"
+    <Dialog
+      open
       aria-label={t('response.aria')}
       data-testid="unlock-response-window"
-      className="ms-response relative w-full overflow-hidden px-3.5 py-3"
+      className="tabletop-response-dialog"
     >
       {fraction !== null && (
         <i
@@ -43,20 +46,19 @@ export function ResponseWindow({ controller }: ResponseWindowProps) {
           data-testid="unlock-response-progress"
         />
       )}
-      <p className="font-mono text-[10px] tracking-[.26em] text-acc">
-        {t('desktop.response.title')}
-      </p>
-      <p className="my-2 text-xs leading-relaxed text-foreground">
-        {t('desktop.response.body', { name, layer: state.layer ?? '?' })}
-      </p>
-      <div className="flex gap-2">
+      <DialogHeader>
+        <DialogTitle>{t('desktop.response.title')}</DialogTitle>
+        <DialogDescription>
+          {t('desktop.response.body', { name, layer: state.layer ?? '?' })}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
         <button
           type="button"
           disabled={!state.canCancel}
           onClick={() => void controller.makeMove('respondCancelUnlock', [])}
           data-testid="unlock-response-cancel"
-          className="ms-btn min-h-8 px-3.5 text-[11.5px] tracking-[.14em]"
-          data-variant="primary"
+          className="tabletop-primary"
         >
           {t('response.play')}
         </button>
@@ -64,15 +66,15 @@ export function ResponseWindow({ controller }: ResponseWindowProps) {
           type="button"
           onClick={() => void controller.makeMove('passResponse', [])}
           data-testid="unlock-response-pass"
-          className="ms-btn min-h-8 px-3.5 text-[11.5px] tracking-[.14em]"
+          className="tabletop-secondary"
         >
           {t('response.pass')}
         </button>
-      </div>
+      </DialogFooter>
       <p className="mt-2 flex items-center gap-1 font-mono text-[9.5px] tracking-[.06em] text-faint">
         <Hourglass className="size-2.5 shrink-0" aria-hidden />
         {sub}
       </p>
-    </div>
+    </Dialog>
   );
 }

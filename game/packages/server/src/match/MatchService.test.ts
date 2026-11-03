@@ -502,12 +502,13 @@ describe('MatchService 挂机托管', () => {
   }
   /**
    * 回合主人自己的超时代发次数。回合外的应答（放弃响应、接受惩罚、被 SHOOT 时掷骰等）被代发不算挂机，
-   * Bot 出牌后真人座位会收到这类应答窗口与掷骰闸门，它们不计入。
+   * Bot 出牌后真人座位会收到这类应答窗口与掷骰闸门，它们不计入；5 秒正常抽牌也不计入。
    */
   function timeoutCount(h: Harness): number {
     return (h.onStep.mock.calls as StepArgs[]).filter(
       (c) =>
         c[1].source === 'timeout' &&
+        c[1].request.move !== 'doDraw' &&
         !c[1].request.move.startsWith('pass') &&
         !c[1].request.move.startsWith('respond') &&
         !(

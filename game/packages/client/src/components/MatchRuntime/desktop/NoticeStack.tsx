@@ -1,13 +1,9 @@
-// 舞台右上角的提示栈：托管横幅、等待提示、解封响应窗口
-// 高度由内容决定并上报给布局，座位规划据此把右列座位让到它下方；没有任何提示时整块不渲染。
-
+// 舞台提示栈：托管横幅与等待提示；需要玩家应答的交互由 MatchDialogs 承载。
 import { useEffect } from 'react';
 import { SelfTakeoverBanner } from '../../SelfTakeoverBanner';
 import { useElementSize } from '../../../hooks/useElementSize';
 import type { MatchController } from '../controllerTypes';
 import { AwaitingNotice } from '../shared/AwaitingNotice';
-import { AwaitedWindow } from './AwaitedWindow';
-import { ResponseWindow } from './ResponseWindow';
 import { EDGE_PAD, NOTICE_WIDTH } from './seatPlan';
 
 interface NoticeStackProps {
@@ -37,8 +33,6 @@ export function NoticeStack({ controller, onReserve }: NoticeStackProps) {
         hasResponseUi={controller.response.awaited !== null}
         className="ms-response px-3 py-2"
       />
-      <ResponseWindow controller={controller} />
-      <AwaitedWindow controller={controller} />
     </div>
   );
 }

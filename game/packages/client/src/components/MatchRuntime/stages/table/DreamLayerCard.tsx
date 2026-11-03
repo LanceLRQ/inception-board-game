@@ -4,7 +4,7 @@ import { TriangleAlert } from 'lucide-react';
 import { getCardImageUrl } from '../../../../lib/cardImages';
 import { getCardName } from '../../../../lib/cards';
 import { Die } from '../../../Die';
-import { Tooltip, TooltipTrigger, TooltipContent } from '../../../ui/tooltip';
+import { PlayerAvatar } from '../../../PlayerIdentity/PlayerAvatar';
 import type { BoardLayer, BoardOccupant } from '../../model/boardModel';
 
 interface DreamLayerCardProps {
@@ -13,58 +13,24 @@ interface DreamLayerCardProps {
   readonly onFocus: (layer: number) => void;
   readonly onOpenCard: (cardId: string) => void;
 }
-const PORTRAITS = new Set([
-  'thief_space_queen',
-  'thief_apollo',
-  'thief_tourist',
-  'thief_capricornus',
-  'thief_lord_of_war',
-]);
 export function OccupantChip({
   occupant,
-  named,
   onOpenCard,
 }: {
   occupant: BoardOccupant;
-  named: boolean;
   onOpenCard?: (id: string) => void;
 }) {
-  const name = `${occupant.name}${occupant.isSelf ? ' · 你' : ''}${occupant.isCurrent ? ' · 行动中' : ''}`;
   return (
-    <Tooltip>
-      <TooltipTrigger
-        className="tabletop-occupant"
-        data-self={occupant.isSelf}
-        data-current={occupant.isCurrent}
-        data-testid={`occupant-${occupant.id}`}
-        aria-label={name}
-        onClick={() => occupant.characterId && onOpenCard?.(occupant.characterId)}
-      >
-        {occupant.characterId ? (
-          <span
-            className="tabletop-portrait"
-            data-cropped={PORTRAITS.has(occupant.characterId)}
-            data-master={occupant.isMaster}
-          >
-            <img
-              src={
-                PORTRAITS.has(occupant.characterId)
-                  ? `/tabletop/portraits/${occupant.characterId}.webp`
-                  : getCardImageUrl(occupant.characterId)
-              }
-              alt=""
-            />
-          </span>
-        ) : (
-          <span>{occupant.name.slice(0, 1)}</span>
-        )}
-        {occupant.isCurrent && <i className="tabletop-active-dot" aria-hidden />}
-        {named && <span className="sr-only">{name}</span>}
-      </TooltipTrigger>
-      <TooltipContent>
-        {name} · {occupant.characterName}
-      </TooltipContent>
-    </Tooltip>
+    <PlayerAvatar
+      name={occupant.name}
+      characterId={occupant.characterId}
+      highlighted={occupant.isSelf || occupant.isCurrent}
+      current={occupant.isCurrent}
+      size={32}
+      className="tabletop-occupant"
+      testId={`occupant-${occupant.id}`}
+      onOpenCard={onOpenCard}
+    />
   );
 }
 export function DreamLayerCard({ row, focus, onFocus, onOpenCard }: DreamLayerCardProps) {
@@ -130,7 +96,7 @@ export function DreamLayerCard({ row, focus, onFocus, onOpenCard }: DreamLayerCa
       </button>
       <div className="tabletop-layer-players">
         {row.occupants.map((o) => (
-          <OccupantChip key={o.id} occupant={o} named={false} onOpenCard={onOpenCard} />
+          <OccupantChip key={o.id} occupant={o} onOpenCard={onOpenCard} />
         ))}
       </div>
       <span className="tabletop-layer-die">

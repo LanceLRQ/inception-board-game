@@ -46,9 +46,10 @@ describe('planNext', () => {
     expect(plan.kind).toBe('auto');
   });
 
-  it('轮到真人时挂回合截止，时长取回合时长', () => {
+  it('真人抽牌阶段统一等待 5 秒，超时正常抽牌', () => {
     const plan = planNext(afterSetup(), allSeats(5), timing);
-    expect(plan).toEqual({ kind: 'deadline', delayMs: 33_333 });
+    expect(plan).toEqual({ kind: 'deadline', delayMs: 5000 });
+    expect(timeoutAction(afterSetup())?.move).toBe('doDraw');
   });
 
   it('响应窗口用窗口自己的时长', () => {

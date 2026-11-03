@@ -5,7 +5,7 @@
 import { useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotionConfig } from 'framer-motion';
-import { Footprints, HeartPulse, Lock, Skull, Vault } from 'lucide-react';
+import { Eye, Footprints, HeartPulse, Lock, Skull, Vault } from 'lucide-react';
 import { Die3D } from '../../Die/Die3D';
 import { getCardImageUrl } from '../../../lib/cardImages';
 import { getCardName } from '../../../lib/cards';
@@ -118,6 +118,10 @@ function useCaption(
       return t('fx.revived', { name: name(cue.player), layer: cue.layer });
     case 'lock':
       return t('fx.lock', { layer: cue.layer, from: cue.from, to: cue.to });
+    case 'peek':
+      return t('fx.peek', { name: name(cue.player), layer: cue.layer });
+    case 'bribe':
+      return t('fx.bribe', { name: name(cue.player) });
     case 'vault':
       return t('fx.vault', {
         layer: cue.layer,
@@ -333,6 +337,25 @@ function CueAnimation({
         );
       case 'play':
         return <PlayedCard from={seat(cue.player)} card={cue.card} seconds={seconds} />;
+      case 'peek':
+        return (
+          <Flash
+            at={locate(layerSelectors(cue.layer))}
+            tone="acc"
+            icon={<Eye className="size-6" aria-hidden />}
+            text={`L${cue.layer}`}
+            seconds={seconds}
+          />
+        );
+      case 'bribe':
+        return (
+          <Flash
+            at={seat(cue.player)}
+            tone="acc"
+            icon={<CardArt src={getCardImageUrl('bribe_back')} className="h-10 w-7" />}
+            seconds={seconds}
+          />
+        );
       case 'discard':
         return (
           <Flights

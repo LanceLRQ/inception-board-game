@@ -6,6 +6,7 @@ import type { SetupState } from '@icgame/game-engine/setup';
 import type { MatchState } from '@icgame/game-engine/runner';
 import {
   DICE_ROLL_TIMEOUT_MS,
+  DRAW_TIMEOUT_MS,
   RESPONSE_WINDOW_TIMEOUT_MS,
   listAwaiting,
 } from '@icgame/game-engine';
@@ -59,6 +60,7 @@ function deadlineMs(
     return Math.min(RESPONSE_WINDOW_TIMEOUT_MS, timing.responseTimeoutCapMs ?? Infinity);
   }
   if (hasBlockingPending(state.G)) return timing.pendingTimeoutMs;
+  if (state.G.turnPhase === 'draw') return DRAW_TIMEOUT_MS;
   return timing.turnTimeoutMs;
 }
 

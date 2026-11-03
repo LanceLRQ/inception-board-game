@@ -39,7 +39,7 @@ const MAX_STEPS = 20000;
  * 让「自动循环停下就是轮到真人回合」的前提不成立。Bot 出牌自己的用例显式打开。
  */
 function makeSession(playerCount = 5, seed = 'sess', botPlaysCards = false): LocalMatchSession {
-  return new LocalMatchSession({ playerCount, seed, botPlaysCards });
+  return new LocalMatchSession({ playerCount, seed, botPlaysCards, now: () => 1000 });
 }
 
 /** 掷骰闸门在等真人：模拟及时点击的真人，立刻掷 */
@@ -56,7 +56,11 @@ function runUntilIdle(session: LocalMatchSession): number {
     const r = session.step();
     if (!r.ok) rejected++;
     if (r.waiting && rollIfAwaited(session)) continue;
-    if (!r.continue) return rejected;
+    if (
+      !r.continue ||
+      (r.waiting && session.view().G.turnPhase === 'draw' && !session.view().G.pendingDiceRoll)
+    )
+      return rejected;
   }
   throw new Error('自动循环没有停下');
 }
@@ -112,7 +116,8 @@ describe('LocalMatchSession', () => {
     // 停下之后再 step：没有可执行的动作
     const r = session.step();
     expect(r.action).toBeNull();
-    expect(r.continue).toBe(false);
+    expect(r.continue).toBe(true);
+    expect(r.waiting).toBe(true);
   });
 
   it('真人抽牌、结束行动、弃牌都被接受，之后 Bot 走完回合并回到真人', () => {
@@ -192,7 +197,7 @@ describe('LocalMatchSession', () => {
       if (session.view().ctx.gameover !== undefined) break;
       const r = session.step();
       if (!r.ok) autoRejected++;
-      if (r.continue) continue;
+      if (r.continue && !(r.waiting && session.view().drawDeadlineAt !== null)) continue;
       // 自动循环停下：轮到真人
       const { move, args } = humanPolicy(session);
       if (!session.humanMove(move, args).ok) humanRejected++;
@@ -253,11 +258,11 @@ describe('LocalMatchSession', () => {
     expect(r.continue).toBe(true);
   });
 
-  it('view() 只返回 G、ctx 与版本号，不含随机数状态', () => {
+  it('view() 返回公开视图、版本号和抽牌截止，不含随机数状态', () => {
     const session = makeSession();
     runUntilIdle(session);
     const view = session.view();
-    expect(Object.keys(view).sort()).toEqual(['G', 'ctx', 'stateID']);
+    expect(Object.keys(view).sort()).toEqual(['G', 'ctx', 'drawDeadlineAt', 'stateID']);
     expect(JSON.stringify(view)).not.toContain('rngState');
   });
 
@@ -523,6 +528,7 @@ describe('LocalMatchSession · 真人白羊的宽限期', () => {
   it('回合主人就是真人时不等；没有白羊选择时不等', () => {
     const session = makeSession();
     runUntilIdle(session);
+    expect(session.humanMove('doDraw', []).ok).toBe(true);
     patchState(session, { pendingAriesChoice: { ariesID: HUMAN, victimLayer: 1, victimID: '1' } });
     expect(session.step().waiting).toBeUndefined();
     patchState(session, { pendingAriesChoice: null });
@@ -857,7 +863,7 @@ describe('LocalMatchSession · Bot 出牌', () => {
       const r = session.step();
       if (!r.ok) rejected++;
       if (r.waiting && rollIfAwaited(session)) continue;
-      if (r.continue) continue;
+      if (r.continue && !(r.waiting && session.view().drawDeadlineAt !== null)) continue;
       if (answerPending(session)) {
         humanPassed++;
         continue;
@@ -916,5 +922,26 @@ describe('LocalMatchSession · 事件', () => {
       }
     }
     expect(session.eventsSince(-1).length).toBeLessThanOrEqual(EVENT_LOG_LIMIT);
+  });
+});
+
+describe('真人抽牌时限', () => {
+  it('5 秒前保留选择，到期抽牌，主动抽牌后不再重复触发', () => {
+    let now = 1000;
+    const session = new LocalMatchSession({
+      playerCount: 4,
+      seed: 'draw-deadline',
+      botPlaysCards: false,
+      now: () => now,
+    });
+    runUntilIdle(session);
+    expect(session.view().G.turnPhase).toBe('draw');
+    expect(session.step().waiting).toBe(true);
+    now += 4999;
+    expect(session.step().action).toBeNull();
+    now += 1;
+    expect(session.step().action?.move).toBe('doDraw');
+    expect(session.view().G.turnPhase).toBe('action');
+    expect(session.step().action).toBeNull();
   });
 });

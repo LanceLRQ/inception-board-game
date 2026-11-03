@@ -3,7 +3,8 @@
 // 结果由动画层播放（dice_rolled）。到时限由服务端（本地对局由 Worker）代掷；固定场景不推进，不显示倒计时。
 // 两个布局共用，样式钩子类名：ms-response / ms-btn。
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useReducedMotionConfig } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Check, Dices, Hourglass } from 'lucide-react';
 import { DICE_ROLL_TIMEOUT_MS } from '@icgame/game-engine';
@@ -44,8 +45,16 @@ function DicePresentation({ controller }: { controller: MatchController }) {
   const [closed, setClosed] = useState<string | null>(gate ? null : key);
   const [review, setReview] = useState<string | null>(null);
   const [sentFor, setSentFor] = useState<number | null>(null);
+  const reducedMotion = useReducedMotionConfig() === true;
+  const rollSeconds = reducedMotion ? 0 : 0.85;
+  const open = key !== null && closed !== key && (!controller.winner || review === key);
+  const showingResult = open && gate === null;
+  useEffect(() => {
+    if (!showingResult || key === null) return;
+    const timer = window.setTimeout(() => setClosed(key), rollSeconds * 1000 + 2000);
+    return () => window.clearTimeout(timer);
+  }, [showingResult, key, rollSeconds]);
   if (!key) return null;
-  const open = closed !== key && (!controller.winner || review === key);
   const name = (id: string) =>
     id === controller.viewerSeat ? t('fx.you') : controller.nicknameOf(id);
   const sent = gate && sentFor === gate.id;
@@ -114,7 +123,7 @@ function DicePresentation({ controller }: { controller: MatchController }) {
                         key={`${result!.id}:${row.player}:${i}`}
                         value={value}
                         size={64}
-                        seconds={0.85}
+                        seconds={rollSeconds}
                       />
                     ))}
                   </div>
@@ -141,12 +150,12 @@ function DicePresentation({ controller }: { controller: MatchController }) {
               : gate.canRoll
                 ? '准备好后点击掷骰'
                 : t('diceGate.waiting', { done: gate.rolledCount, total: gate.rollers.length })
-            : '点数由本局规则引擎产生，按角色与世界观继续结算。'}
+            : '掷骰结束后 2 秒自动收起。'}
         </p>
         {seconds !== null && (
           <p className="tabletop-dice-description">{t('diceGate.auto', { n: seconds })}</p>
         )}
-        {gate?.canRoll ? (
+        {gate?.canRoll && (
           <button
             type="button"
             className="tabletop-primary"
@@ -157,12 +166,6 @@ function DicePresentation({ controller }: { controller: MatchController }) {
             <Dices size={18} />
             {sent ? '等待结果…' : t('diceGate.roll')}
           </button>
-        ) : (
-          !gate && (
-            <button type="button" className="tabletop-primary" onClick={() => setClosed(key)}>
-              继续结算
-            </button>
-          )
         )}
       </Dialog>
     </>

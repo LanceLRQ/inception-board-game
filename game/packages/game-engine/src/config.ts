@@ -48,6 +48,9 @@ export const RESPONSE_WINDOW_TIMEOUT_MS = RESPONSE_WINDOW_TIMEOUT * 1000;
  */
 export const DICE_ROLL_TIMEOUT_MS = 15_000;
 
+/** 抽牌阶段选择时限；到期执行正常抽牌。 */
+export const DRAW_TIMEOUT_MS = 5_000;
+
 // 断线分级（秒）
 export const DISCONNECT_SILENT = 10;
 export const DISCONNECT_OFFLINE = 60;

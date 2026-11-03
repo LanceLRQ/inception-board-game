@@ -6,7 +6,8 @@ import { markersBySeat } from '../seatMarkers';
 import { awaitedSeatIDs } from '../awaitingNotice';
 import { getCharacterSkillSummary } from '../../../lib/cards';
 import { Dialog, DialogTitle } from '../../ui/dialog';
-import { CardArt } from '../../CardArt';
+import { PlayerAvatar } from '../../PlayerIdentity/PlayerAvatar';
+import { PlayerName } from '../../PlayerIdentity/PlayerName';
 import { SeatStatusBadges } from '../../SeatStatusBadges';
 
 /** 层条保留头像；较长的同桌状态和世界观按需阅读。 */
@@ -33,27 +34,25 @@ export function MobileTableInfo({
         <div className="tabletop-mobile-seat-list">
           {seats.map((seat) => (
             <div key={seat.id}>
-              <button
-                type="button"
-                disabled={!seat.characterId}
-                aria-label={`查看${seat.nickname}角色`}
-                onClick={() => {
+              <PlayerAvatar
+                name={seat.nickname}
+                characterId={seat.characterId}
+                highlighted={seat.isViewer || seat.isCurrent}
+                current={seat.isCurrent}
+                onOpenCard={(id) => {
                   setOpen(false);
-                  if (seat.characterId) controller.preview.open(seat.characterId);
+                  controller.preview.open(id);
                 }}
-              >
-                <CardArt src={seat.imageUrl} trimBorder={false} />
-              </button>
+              />
               <div>
                 <strong>
-                  {seat.nickname}
-                  {seat.isViewer ? ' · 你' : ''}
-                  {seat.isCurrent ? ' · 行动中' : ''}
+                  <PlayerName name={seat.nickname} characterId={seat.characterId} />
                 </strong>
-                <p>
-                  {seat.characterName} · {seat.isLost ? '迷失层' : `${seat.layer} 层`} · 手牌{' '}
-                  {seat.handCount}
-                  {seat.isAwaited ? ' · 应答中' : ''}
+                <p className="tabletop-player-status">
+                  {seat.isCurrent && <span className="tabletop-turn-label">行动中</span>}
+                  <span>{seat.isLost ? '迷失层' : `${seat.layer} 层`}</span>
+                  <span>手牌 {seat.handCount}</span>
+                  {seat.isAwaited && <span>应答中</span>}
                 </p>
                 <SeatStatusBadges markers={seat.markers} seatId={seat.id} size="sm" />
               </div>

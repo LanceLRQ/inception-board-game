@@ -2,7 +2,7 @@
 //
 // 结构：控制层 useMatchController（状态推导与交互流程）+ 布局 + 掷骰弹层 DiceGatePanel + 动画层 MatchFx + 弹窗群 MatchDialogs
 //   ≥1024px 用占满视口的 DesktopLayout，<1024px 用占满视口的 MobileLayout；
-//   两个布局都用内联的响应窗口 / 响应条承载解封响应，不再弹窗
+//   两个布局共用 MatchDialogs 中的响应弹层。
 
 import { HandSelectionProvider } from './shared/HandSelection';
 import { useBoardModel } from './model/useBoardModel';

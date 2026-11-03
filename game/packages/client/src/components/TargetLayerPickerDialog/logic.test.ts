@@ -38,17 +38,24 @@ describe('TargetLayerPickerDialog · logic', () => {
         }),
       ).toEqual([4]);
     });
+
+    it('显式空列表表示没有可选层，不回退为全部层', () => {
+      expect(
+        computeValidLayers({ cardId: 'action_dream_peek', viewerLayer: 2, validLayers: [] }),
+      ).toEqual([]);
+    });
   });
 
   describe('computeLayerOptions', () => {
-    it('disabled 反映 validLayers 补集', () => {
+    it('只列可选层，隐藏不能到达的层', () => {
       const opts = computeLayerOptions({ cardId: 'action_dream_transit', viewerLayer: 1 });
-      expect(opts).toEqual([
-        { layer: 1, disabled: true },
-        { layer: 2, disabled: false },
-        { layer: 3, disabled: true },
-        { layer: 4, disabled: true },
-      ]);
+      expect(opts).toEqual([{ layer: 2 }]);
+    });
+
+    it('梦境窥视默认保留全部金库层', () => {
+      expect(computeLayerOptions({ cardId: 'action_dream_peek', viewerLayer: 2 })).toEqual(
+        ALL_LAYERS.map((layer) => ({ layer })),
+      );
     });
   });
 });

@@ -126,11 +126,11 @@ test.describe('梦主 · 免费移动', () => {
     await entry.click();
 
     await expect(page.getByTestId('target-layer-picker-dialog')).toBeVisible();
-    // 固定场景里梦主在第 3 层：第 2、4 层可选，第 1 层与当前层置灰
+    // 固定场景里梦主在第 3 层：只显示相邻的第 2、4 层
     await expect(page.getByTestId('target-layer-2')).toBeEnabled();
     await expect(page.getByTestId('target-layer-4')).toBeEnabled();
-    await expect(page.getByTestId('target-layer-1')).toBeDisabled();
-    await expect(page.getByTestId('target-layer-3')).toBeDisabled();
+    await expect(page.getByTestId('target-layer-1')).toHaveCount(0);
+    await expect(page.getByTestId('target-layer-3')).toHaveCount(0);
 
     await page.getByTestId('target-layer-2').click();
     await page.getByTestId('target-layer-confirm').click();

@@ -62,6 +62,27 @@ describe('deriveActivity', () => {
     );
   });
 
+  it('梦境窥视公开发起者与层号，不携带金库内容', () => {
+    const base = { ...idle, pendingResponseWindow: null, pendingShootResponse: null };
+    for (const view of [
+      { ...base, pendingPeekDecision: { peekerID: '1', targetLayer: 3 } },
+      { ...base, peekReveal: { peekerID: '1', revealKind: 'vault' as const, vaultLayer: 3 } },
+    ]) {
+      expect(deriveActivity({ view, awaiting: { mine: false }, nicknameOf, cardNameOf })).toEqual({
+        kind: 'peekVault',
+        params: { name: 'P1', layer: 3 },
+      });
+    }
+    expect(
+      deriveActivity({
+        view: { ...base, peekReveal: { peekerID: '0', revealKind: 'bribe', targetThiefID: '1' } },
+        awaiting: null,
+        nicknameOf,
+        cardNameOf,
+      }),
+    ).toEqual({ kind: 'peekBribe', params: { name: 'P0', target: 'P1' } });
+  });
+
   it('本回合最后打出的牌，SHOOT 附骰点', () => {
     const base = { ...idle, pendingResponseWindow: null, pendingShootResponse: null };
     const plain = { ...base, lastPlayedCardThisTurn: 'action_unlock', lastShootRoll: null };

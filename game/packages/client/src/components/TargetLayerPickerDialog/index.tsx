@@ -71,27 +71,27 @@ export function TargetLayerPickerDialog({
             {cardName ? `${cardName} · 选择目标层` : '选择目标层'}
           </span>
         </DialogTitle>
-        <DialogDescription>不合法的层已置灰。</DialogDescription>
+        {pending?.card === 'action_dream_peek' && (
+          <DialogDescription>
+            仅可窥视未打开的金库，可重复窥视；层数公开，内容保密。
+          </DialogDescription>
+        )}
       </DialogHeader>
       <DialogBody>
         <div className="tabletop-target-options">
+          {options.length === 0 && <span className="col-span-4">无可选目标层</span>}
           {options.map((opt) => (
             <button
               key={opt.layer}
               type="button"
-              disabled={opt.disabled}
-              onClick={() => {
-                if (opt.disabled) return;
-                setPicked(opt.layer);
-              }}
+              onClick={() => setPicked(opt.layer)}
               data-testid={`target-layer-${opt.layer}`}
-              className="tabletop-target-option"
+              className="tabletop-target-option enabled:cursor-pointer"
               aria-pressed={picked === opt.layer}
             >
               <CardArt src={getCardImageUrl(`dream_${opt.layer}`)} trimBorder={false} />
               <span>
                 <strong>第 {opt.layer} 层</strong>
-                <small>{opt.disabled ? '当前不可选' : '点击选择此层'}</small>
               </span>
             </button>
           ))}
@@ -102,18 +102,14 @@ export function TargetLayerPickerDialog({
           type="button"
           className="tabletop-primary"
           data-testid="target-layer-confirm"
-          disabled={
-            confirming ||
-            picked === null ||
-            !options.some((opt) => opt.layer === picked && !opt.disabled)
-          }
+          disabled={confirming || picked === null || !options.some((opt) => opt.layer === picked)}
           onClick={() => {
             if (confirming || picked === null) return;
             setConfirming(true);
             void Promise.resolve(onPick(picked)).then(() => setConfirming(false));
           }}
         >
-          {confirming ? '正在提交…' : '确认出牌'}
+          {confirming ? '正在提交…' : '确认'}
         </button>
         <button
           type="button"

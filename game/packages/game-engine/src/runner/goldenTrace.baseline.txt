@@ -10,7 +10,7 @@ n=4 seed=s4-3 steps=289 accepted=263 end=gameover outcome=master:deck_exhausted 
 n=4 seed=s4-4 steps=340 accepted=307 end=gameover outcome=master:deck_exhausted final=842785c7ec91f5af5162d8d942ef774f cp=64f3f1869e27190f,aecfa7b3123a8ed9,4da8f3903044c2ba,23c1feb000afb451,99074bbd51e5a546,9fbcd8f2c01bcf20
 n=4 seed=s4-5 steps=303 accepted=274 end=gameover outcome=master:deck_exhausted final=b44648222d0f91e26ba45792b8931a8a cp=4963df4696c6008a,872c268966734f18,c75179ee0a6c35f4,5df694e95ed7211a,0fd7e6eca3cfb449,2a12a382a178f579
 n=4 seed=s4-6 steps=87 accepted=78 end=gameover outcome=thief:secret_vault_opened final=86d2c84dfd18746dbdded1fd896377df cp=665978e7218ccf5b
-n=4 seed=s4-7 steps=329 accepted=300 end=gameover outcome=master:deck_exhausted final=aff05d05c6a9e576ffd8e70e5b66ef96 cp=d7503c10c7c5353e,27b11cd30140f273,df61a7a4e245b5ab,f5976118d422fb64,5abe5685f1cc9a1d,5a3326206034c5ec
+n=4 seed=s4-7 steps=330 accepted=291 end=gameover outcome=master:deck_exhausted final=2a65298f7f1243bb11c02cd7479669d5 cp=d7503c10c7c5353e,27b11cd30140f273,df61a7a4e245b5ab,df7e89a7d5b60b9c,4b2410e5741dc741,da4921c8fce0d85f
 n=4 seed=s4-8 steps=382 accepted=344 end=gameover outcome=master:deck_exhausted final=48f1bf33b7487329daff4dc114aa456f cp=5a46d557ec6dd33d,6b13275edbb9e202,3975cfd8f30a31a2,d7acb1b7d9231087,90c5a783bad8b7d4,bf48a5e1b3bc9c49,b53e46774a9d9624
 n=4 seed=s4-9 steps=287 accepted=263 end=gameover outcome=master:deck_exhausted final=696e0629463a17185fe27a7287f8e6e0 cp=5a4f6a366869372d,b2fe793f1433f66a,80533c2940980cf6,7ea82de81f281096,f9cd8f954004f041
 n=4 seed=s4-10 steps=239 accepted=221 end=gameover outcome=master:deck_exhausted final=a3365f8fb7ab68265cae765b3623e7bb cp=04881e8e0b2af58c,90652348af01250f,79b97e0f7437af1f,b538924172cd394f

@@ -6,7 +6,8 @@ import { useTranslation } from 'react-i18next';
 import type { MatchView } from '@icgame/game-engine';
 import { logger } from '../../lib/logger';
 import type { PlayRole } from '../../lib/cards';
-import type { ActiveSkillDescriptor } from '../../lib/activeSkills';
+import { getSkillEntries, type ActiveSkillDescriptor } from '../../lib/activeSkills';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { handCardsAt, validHandPicks, toggleHandPick } from '../../lib/handPick';
 import type { MatchSource } from '../../match/matchSource';
 import { toast } from '@/lib/toast';
@@ -600,6 +601,33 @@ export function useMatchController(source: MatchSource): MatchController {
     },
   }));
 
+  const autoDraw = useDrawStore((s) => s.autoDraw);
+  const autoDrawSent = useRef<string | null>(null);
+  const drawStamp = G && mySeat !== null ? `${G.matchId}:${mySeat}:${G.turnNumber}` : null;
+  const hasDrawSkill =
+    entries.some((entry) => entry.kind !== 'skipDraw' && entry.enabled) ||
+    (skillPanel !== null &&
+      getSkillEntries(skillPanel.context).some(
+        (entry) => entry.enabled && entry.skill.requiredPhase === 'draw',
+      ));
+  const canAutoDraw =
+    source.kind !== 'fixture' &&
+    source.connection === 'connected' &&
+    !source.selfTakenOver &&
+    isMyTurn &&
+    turnPhase === 'draw' &&
+    !winner &&
+    !hasOtherPending &&
+    !!G &&
+    awaiting === null &&
+    !hasDrawSkill &&
+    autoDraw;
+  useEffect(() => {
+    if (!canAutoDraw || drawStamp === null || autoDrawSent.current === drawStamp) return;
+    autoDrawSent.current = drawStamp;
+    void makeMove('doDraw');
+  }, [canAutoDraw, drawStamp, makeMove]);
+
   const activeReviveDraft =
     reviveDraft !== null && reviveDraft.stamp === dockStamp ? reviveDraft : null;
   const reviveEntryKind: DockEntryKind | null = activeReviveDraft
@@ -787,7 +815,7 @@ export function useMatchController(source: MatchSource): MatchController {
           ? { card: effectivePending.card, move: effectivePending.move }
           : null,
       targetLayerChoices: effectivePending
-        ? playLayerChoices(effectivePending.card, G?.layers)
+        ? playLayerChoices(effectivePending.card, G?.layers, G?.vaults)
         : null,
       cancelTargetPlayer: () => {
         cancelPlay();

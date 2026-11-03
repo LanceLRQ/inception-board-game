@@ -555,6 +555,60 @@ describe('事件 · 解封', () => {
 });
 
 describe('事件 · 贿赂', () => {
+  it('同一金库可反复窥视，每次公开层号；贿赂成败和身份变化只给收牌者', () => {
+    const peek = 'action_dream_peek' as CardID;
+    const G = withBribes(scene('action', {}, { p1: { hand: [peek, peek] } }), [
+      { id: 'bribe-0', kind: 'deal' },
+    ]);
+    const first = step(load(G), 'p1', 'playPeek', [peek, 3]);
+    for (const viewer of ['p1', 'p2', 'p3', 'pM', null]) {
+      expect(one(eventsFor(first.events, viewer), 'vault_peeked').data).toEqual({
+        player: 'p1',
+        layer: 3,
+      });
+    }
+    const dealt = step(first.state, 'pM', 'masterPeekBribeDecision', [true], dice());
+    for (const viewer of ['p2', 'p3', 'pM', null]) {
+      const view = viewFor(dealt.state.G, viewer, { gameOver: false });
+      expect(view.peekReveal).toEqual({ peekerID: 'p1', revealKind: 'vault', vaultLayer: 3 });
+      expect(view.vaults.find((v) => v.layer === 3)?.contentType).toBe(
+        viewer === 'pM' ? G.vaults.find((v) => v.layer === 3)?.contentType : null,
+      );
+      expect(view.bribePool[0]?.kind).toBeNull();
+      expect(view.players.p1?.faction).toBe('thief');
+      expect(one(eventsFor(dealt.events, viewer), 'bribe_dealt').secret).toBeUndefined();
+    }
+    const own = viewFor(dealt.state.G, 'p1', { gameOver: false });
+    expect(own.bribePool[0]?.kind).toBe('deal');
+    expect(own.players.p1?.faction).toBe('master');
+    expect(own.vaults.find((v) => v.layer === 3)?.contentType).toBe(
+      G.vaults.find((v) => v.layer === 3)?.contentType,
+    );
+    expect(all(dealt.events, 'vault_peeked')).toHaveLength(0);
+    const acknowledged = step(dealt.state, 'p1', 'peekerAcknowledge');
+    const again = step(acknowledged.state, 'p1', 'playPeek', [peek, 3]);
+    expect(one(again.events, 'vault_peeked').data).toEqual({ player: 'p1', layer: 3 });
+    expect(again.state.G.peekReveal).toEqual({
+      peekerID: 'p1',
+      revealKind: 'vault',
+      vaultLayer: 3,
+    });
+  });
+
+  it('已打开的金币金库不能再次窥视，不消耗卡牌', () => {
+    const peek = 'action_dream_peek' as CardID;
+    const base = scene('action', {}, { p1: { hand: [peek] } });
+    const G = {
+      ...base,
+      vaults: base.vaults.map((v) =>
+        v.layer === 3 ? { ...v, isOpened: true, openedBy: 'p2' } : v,
+      ),
+    };
+    const result = applyMove(game, load(G), { playerID: 'p1', move: 'playPeek', args: [peek, 3] });
+    expect(result.ok).toBe(false);
+    expect(G.players.p1!.hand).toEqual([peek]);
+  });
+
   it('bribe_dealt：金库打开后梦主选择派贿赂，成败只给持有者，梦主自己的视角也看不到', () => {
     const G = withBribes(scene('action', { pendingVaultDecision: { layer: 2, openerID: 'p2' } }), [
       { id: 'bribe-0', kind: 'deal' },

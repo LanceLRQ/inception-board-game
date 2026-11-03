@@ -27,6 +27,8 @@ export type FxCue =
   | { readonly kind: 'revived'; readonly player: string; readonly layer: number }
   | { readonly kind: 'lock'; readonly layer: number; readonly from: number; readonly to: number }
   | { readonly kind: 'vault'; readonly layer: number; readonly content: string }
+  | { readonly kind: 'peek'; readonly player: string; readonly layer: number }
+  | { readonly kind: 'bribe'; readonly player: string }
   /** 掷骰闸门掷完：按掷骰人列出原始点数 */
   | {
       readonly kind: 'dice';
@@ -130,6 +132,15 @@ function cueOf(ev: MatchEvent): FxCue[] {
       const content = str(d.content);
       return layer !== null && content !== null ? [{ kind: 'vault', layer, content }] : [];
     }
+    case 'vault_peeked': {
+      const player = str(d.player);
+      const layer = num(d.layer);
+      return player !== null && layer !== null ? [{ kind: 'peek', player, layer }] : [];
+    }
+    case 'bribe_dealt': {
+      const player = str(d.to);
+      return player !== null ? [{ kind: 'bribe', player }] : [];
+    }
     case 'dice_rolled': {
       const purpose = str(d.purpose);
       const rolls = diceRows(d.rolls);
@@ -157,6 +168,8 @@ export const CUE_DURATION_MS: Readonly<Record<FxCue['kind'], number>> = {
   revived: 900,
   lock: 800,
   vault: 1000,
+  peek: 1800,
+  bribe: 1800,
   // 翻滚约 0.7 秒，停在点数上约 1.5 秒
   dice: 2200,
 };

@@ -487,7 +487,7 @@ function killPlayer(G: SetupState, seat: string): SetupState {
   return placed;
 }
 
-/** 把一张「失败」的贿赂牌交给某人：公开的只有谁持有；成败仍只有持有者与梦主能看 */
+/** 把一张「失败」的贿赂牌交给某人：公开的只有谁持有；成败只有持有者能看 */
 function giveBribe(G: SetupState, seat: string): SetupState {
   const at = G.bribePool.findIndex((b) => b.status === 'inPool' && b.kind === 'fail');
   if (at < 0) throw new Error('固定场景发贿赂牌失败：贿赂池里没有可派的牌');

@@ -42,6 +42,8 @@ export function demoEventBatches(G: MatchView, seat: string): EventBatch[] {
     ['player_moved', { player: other, from: layer, to: layer + 1 }],
     ['heart_lock_changed', { layer, from: lock, to: Math.max(lock - 1, 0) }],
     ['vault_opened', { vault: 'demo', layer, content: 'coin', openedBy: other }],
+    ['vault_peeked', { player: other, layer }],
+    ['bribe_dealt', { bribe: 'demo-bribe', to: other }],
     ['player_died', { player: other, layer, cause: null }],
     ['player_revived', { player: other, layer: 1 }],
   ];

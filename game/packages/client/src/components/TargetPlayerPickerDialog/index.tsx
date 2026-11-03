@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { CardArt } from '../CardArt';
-import { getCardImageUrl } from '../../lib/cardImages';
+import { PlayerAvatar } from '../PlayerIdentity/PlayerAvatar';
+import { PlayerName } from '../PlayerIdentity/PlayerName';
 // TargetPlayerPickerDialog · 选目标玩家对话框（从 LocalMatchRuntime 提炼）
 //
 // 适用于所有"需选目标玩家"场景：SHOOT / KICK / 念力牵引 / 共鸣 / shift 等
@@ -47,6 +47,7 @@ export interface TargetPlayerPickerDialogProps {
   cardNameOf?: (cardId: string) => string;
   onPick: (targetPlayerID: string) => void | Promise<void>;
   onCancel: () => void;
+  onOpenCard: (id: string) => void;
   /** 可选插槽：死亡宣言 / 额外选项（由调用方渲染） */
   decreeSlot?: ReactNode;
 }
@@ -65,6 +66,7 @@ export function TargetPlayerPickerDialog({
   cardNameOf,
   onPick,
   onCancel,
+  onOpenCard,
   decreeSlot,
 }: TargetPlayerPickerDialogProps) {
   const intent = pending ? `${pending.card}:${pending.move}` : '';
@@ -89,7 +91,7 @@ export function TargetPlayerPickerDialog({
     ...(viewerCharacterId !== undefined ? { viewerCharacterId } : {}),
     ...(viewerHandCount !== undefined ? { viewerHandCount } : {}),
     ...(masterCharacterId !== undefined ? { masterCharacterId } : {}),
-  });
+  }).filter((opt) => !opt.disabled);
 
   return (
     <Dialog
@@ -109,11 +111,9 @@ export function TargetPlayerPickerDialog({
             {cardName ? `${cardName} · 选择目标玩家` : '选择目标玩家'}
           </span>
         </DialogTitle>
-        <DialogDescription>
-          {pending?.card === 'action_dream_peek'
-            ? '只能查看已持有贿赂牌的盗梦者。'
-            : '同层限制由卡牌规则决定；跨层不可选的目标已置灰。'}
-        </DialogDescription>
+        {pending?.card === 'action_dream_peek' && (
+          <DialogDescription>只能查看已持有贿赂牌的盗梦者。</DialogDescription>
+        )}
       </DialogHeader>
       <DialogBody>
         {decreeSlot}
@@ -124,45 +124,35 @@ export function TargetPlayerPickerDialog({
             </span>
           ) : (
             options.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                disabled={opt.disabled}
-                title={
-                  opt.reason === 'masterTarget'
-                    ? '盗梦者不能对梦主使用移形换影'
-                    : opt.reason === 'sameLayer'
-                      ? '该 SHOOT 仅限同层目标'
-                      : opt.crossLayerAllowed
-                        ? '你的角色或世界观允许这张 SHOOT 打向别的层'
-                        : undefined
-                }
-                data-reason={opt.reason ?? undefined}
-                onClick={() => {
-                  if (opt.disabled) return;
-                  setPicked(opt.id);
-                }}
-                className="tabletop-target-option"
-                aria-pressed={picked === opt.id}
-                data-testid={`target-player-${opt.id}`}
-              >
-                <CardArt
-                  src={getCardImageUrl(players[opt.id]?.characterId)}
-                  fallback={opt.name}
-                  trimBorder={false}
+              <div key={opt.id} className="tabletop-target-row" data-selected={picked === opt.id}>
+                <PlayerAvatar
+                  name={opt.name}
+                  characterId={players[opt.id]?.characterId}
+                  highlighted={picked === opt.id}
+                  size={44}
+                  onOpenCard={onOpenCard}
                 />
-                <span>
-                  <strong>{opt.name}</strong>
-                  <small>第 {players[opt.id]?.currentLayer} 层</small>
-                  {opt.reason === 'masterTarget'
-                    ? ' · 梦主（不可选）'
-                    : opt.reason === 'sameLayer' && opt.crossLayerNumber !== null
-                      ? ` · L${opt.crossLayerNumber}（跨层）`
-                      : opt.crossLayerAllowed && opt.crossLayerNumber !== null
-                        ? ` · L${opt.crossLayerNumber}（跨层可射）`
-                        : ''}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  title={
+                    opt.crossLayerAllowed ? '你的角色或世界观允许这张 SHOOT 打向别的层' : undefined
+                  }
+                  onClick={() => setPicked(opt.id)}
+                  className="tabletop-target-option cursor-pointer"
+                  aria-pressed={picked === opt.id}
+                  data-testid={`target-player-${opt.id}`}
+                >
+                  <span>
+                    <strong>
+                      <PlayerName name={opt.name} characterId={players[opt.id]?.characterId} />
+                    </strong>
+                    <small>第 {players[opt.id]?.currentLayer} 层</small>
+                    {opt.crossLayerAllowed && opt.crossLayerNumber !== null && (
+                      <small>第 {opt.crossLayerNumber} 层可跨层射击</small>
+                    )}
+                  </span>
+                </button>
+              </div>
             ))
           )}
         </div>
@@ -172,18 +162,14 @@ export function TargetPlayerPickerDialog({
           type="button"
           className="tabletop-primary"
           data-testid="target-player-confirm"
-          disabled={
-            confirming ||
-            picked === null ||
-            !options.some((opt) => opt.id === picked && !opt.disabled)
-          }
+          disabled={confirming || picked === null || !options.some((opt) => opt.id === picked)}
           onClick={() => {
             if (confirming || picked === null) return;
             setConfirming(true);
             void Promise.resolve(onPick(picked)).then(() => setConfirming(false));
           }}
         >
-          {confirming ? '正在提交…' : '确认出牌'}
+          {confirming ? '正在提交…' : '确认'}
         </button>
         <button
           type="button"

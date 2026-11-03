@@ -575,7 +575,10 @@ export class MatchRoom {
     this.state = outcome.state;
     this.autoRejects = 0;
     this.timeoutMisses = 0;
-    this.reportSeatActivity(request.playerID, source, before.ctx.currentPlayer);
+    // 抽牌选择时间到是正常自动推进，不累计挂机次数。
+    if (!(source === 'timeout' && request.move === 'doDraw' && before.G.turnPhase === 'draw')) {
+      this.reportSeatActivity(request.playerID, source, before.ctx.currentPlayer);
+    }
     logger.info(
       {
         matchID: this.matchID,

@@ -6,6 +6,7 @@ import type { MatchViewState, SeatInfo } from '@icgame/game-engine';
 import type { RejectReason } from '@icgame/game-engine/runner';
 import type { LocalMatchWorker } from '../workers/localMatch.worker';
 import { LOCAL_HUMAN_SEAT } from '../workers/localSeat';
+import { toLocalDeadline, monotonicNow } from '../lib/deadlineClock';
 import { logger } from '../lib/logger';
 import { withSelfAvatar } from '../lib/avatarSeed';
 import { effectiveAvatarSeed } from '../hooks/useAvatar';
@@ -59,6 +60,7 @@ function buildSeats(view: MatchViewState): SeatInfo[] {
 export function createLocalSourceController(api: LocalMatchApi): LocalSourceController {
   const listeners = new Set<() => void>();
   let view: MatchViewState | null = null;
+  let drawDeadlineAt: number | null = null;
   let seats: SeatInfo[] = [];
   let connection: ConnectionState = 'connecting';
   let error: string | null = null;
@@ -92,9 +94,17 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
 
   const pull = async (): Promise<void> => {
     try {
-      const state = (await api.getState()) as MatchViewState | null;
+      const state = (await api.getState()) as
+        | (MatchViewState & { drawDeadlineAt?: number | null })
+        | null;
       if (state === null) return;
       view = state;
+      drawDeadlineAt = toLocalDeadline(
+        state.drawDeadlineAt ?? null,
+        undefined,
+        monotonicNow(),
+        Date.now(),
+      );
       seats = buildSeats(state);
       connection = 'connected';
       notify();
@@ -122,7 +132,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       view,
       seat: view === null ? null : LOCAL_HUMAN_SEAT,
       seats,
-      deadlineAt: null,
+      deadlineAt: drawDeadlineAt,
       connection,
       storageDegraded: false,
       error,

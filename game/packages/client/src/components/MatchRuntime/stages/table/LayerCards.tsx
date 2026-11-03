@@ -71,9 +71,7 @@ function LostStrip({
             {t('board.tower.lostEmpty')}
           </span>
         ) : (
-          row.occupants.map((o) => (
-            <OccupantChip key={o.id} occupant={o} named onOpenCard={onOpenCard} />
-          ))
+          row.occupants.map((o) => <OccupantChip key={o.id} occupant={o} onOpenCard={onOpenCard} />)
         )}
       </div>
     </div>

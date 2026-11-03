@@ -7,6 +7,8 @@ import type { AwaitingNotice } from '../awaitingNotice';
 export type ActivityKind =
   | 'unlockWindow'
   | 'shootResponse'
+  | 'peekVault'
+  | 'peekBribe'
   | 'awaitingMine'
   | 'awaitingOthers'
   | 'lastPlayedShoot'
@@ -25,7 +27,7 @@ export interface ActivityInput {
 }
 
 /**
- * 优先级：解封响应窗口 > 被射击的应答 > 其他等待应答 > 本回合最后打出的牌。
+ * 优先级：解封响应窗口 > 被射击的应答 > 梦境窥视 > 其他等待应答 > 本回合最后打出的牌。
  * 解封窗口里的未响应人数只算还没应答的玩家。
  */
 export function deriveActivity(input: ActivityInput): Activity | null {
@@ -49,6 +51,25 @@ export function deriveActivity(input: ActivityInput): Activity | null {
     return {
       kind: 'shootResponse',
       params: { shooter: nicknameOf(shoot.shooterID), target: nicknameOf(shoot.targetPlayerID) },
+    };
+  }
+
+  const peek = view.peekReveal;
+  const vaultPeek =
+    view.pendingPeekDecision ??
+    (peek?.revealKind === 'vault'
+      ? { peekerID: peek.peekerID, targetLayer: peek.vaultLayer }
+      : null);
+  if (vaultPeek) {
+    return {
+      kind: 'peekVault',
+      params: { name: nicknameOf(vaultPeek.peekerID), layer: vaultPeek.targetLayer },
+    };
+  }
+  if (peek?.revealKind === 'bribe') {
+    return {
+      kind: 'peekBribe',
+      params: { name: nicknameOf(peek.peekerID), target: nicknameOf(peek.targetThiefID) },
     };
   }
 

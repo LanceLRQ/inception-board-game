@@ -47,6 +47,18 @@ describe('cuesFromEvents', () => {
     ).toEqual([{ kind: 'draw', player: '0', count: 1, cards: ['action_kick'] }]);
   });
 
+  it('窥视和贿赂提示只使用公开信息，即便本人事件带私密内容也不展示', () => {
+    expect(
+      cuesFromEvents([
+        ev('vault_peeked', { player: '1', layer: 3 }),
+        ev('bribe_dealt', { bribe: 'b', to: '1' }, { to: ['1'], data: { kind: 'deal' } }),
+      ]),
+    ).toEqual([
+      { kind: 'peek', player: '1', layer: 3 },
+      { kind: 'bribe', player: '1' },
+    ]);
+  });
+
   it('弃牌按来源拆开，不是从手牌弃的归到 null', () => {
     const cues = cuesFromEvents([
       ev('cards_discarded', {

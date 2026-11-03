@@ -105,7 +105,13 @@ export function nightmareUnlockLayers(layers: MatchView['layers'] | undefined): 
 export function playLayerChoices(
   card: string,
   layers: MatchView['layers'] | undefined,
+  vaults: MatchView['vaults'] | undefined,
 ): number[] | null {
+  if (card === 'action_dream_peek') {
+    return [1, 2, 3, 4].filter((layer) =>
+      vaults?.some((vault) => vault.layer === layer && !vault.isOpened),
+    );
+  }
   return card === 'action_nightmare_unlock' ? nightmareUnlockLayers(layers) : null;
 }
 

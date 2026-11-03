@@ -406,13 +406,14 @@ test.describe('界面可点但引擎必拒：按引擎条件过滤', () => {
 });
 
 test.describe('SHOOT 的目标限制与射手·禁足', () => {
-  test('缺省场景：跨层目标置灰', async ({ page }) => {
+  test('缺省场景：隐藏不可选的跨层目标', async ({ page }) => {
     await openScene(page, '/game/debug');
     await selectAndPlayCard(page, await handIndexOf(page, 'SHOOT'));
     await expect(page.getByTestId('target-player-picker-dialog')).toBeVisible();
-    await expect(
-      page.getByTestId(/^target-player-\d+$/).and(page.locator('[data-reason="sameLayer"]')),
-    ).not.toHaveCount(0);
+    const options = page.getByTestId(/^target-player-\d+$/);
+    await expect(options).not.toHaveCount(0);
+    await expect(options.and(page.locator(':disabled'))).toHaveCount(0);
+    await expect(page.locator('[data-reason="sameLayer"]')).toHaveCount(0);
   });
 
   test('恐怖分子·远程：任意层的目标都可选', async ({ page }) => {

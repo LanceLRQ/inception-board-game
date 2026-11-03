@@ -177,3 +177,20 @@ describe('createLocalSourceController · 事件', () => {
     expect(heard).not.toHaveBeenCalled();
   });
 });
+
+it('本地抽牌截止转换为单调时钟，重复轮询不会重新给满 5 秒', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(1000);
+  vi.spyOn(performance, 'now').mockReturnValue(100);
+  const ctl = createLocalSourceController(
+    fakeApi({
+      getState: vi.fn(async () => ({ ...viewOf(['0', '1', '2', '3']), drawDeadlineAt: 6000 })),
+    }),
+  );
+  await ctl.refresh();
+  expect(ctl.getSnapshot().deadlineAt).toBe(5100);
+  vi.mocked(Date.now).mockReturnValue(3000);
+  vi.mocked(performance.now).mockReturnValue(2100);
+  await ctl.refresh();
+  expect(ctl.getSnapshot().deadlineAt).toBe(5100);
+  vi.restoreAllMocks();
+});

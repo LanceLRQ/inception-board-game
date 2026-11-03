@@ -6,6 +6,8 @@
 
 import {
   DICE_ROLL_TIMEOUT_MS,
+  DRAW_TIMEOUT_MS,
+  listAwaiting,
   InceptionCityGame,
   viewMatch,
   type MatchView,
@@ -43,6 +45,7 @@ export const ARIES_GRACE_MS = 20_000;
  * 不含随机种子、牌库顺序、他人手牌。
  */
 export interface SessionView {
+  drawDeadlineAt: number | null;
   G: MatchView;
   ctx: RunnerCtx;
   stateID: number;
@@ -165,7 +168,7 @@ export class LocalMatchSession {
   view(): SessionView {
     const { G, ctx, stateID } = viewMatch(game, this.state, this.humanPlayerID);
     // 视图钩子产出的就是 MatchView（协议类型里 G 只是不透明的 unknown）
-    return { G: G as MatchView, ctx, stateID };
+    return { G: G as MatchView, ctx, stateID, drawDeadlineAt: this.drawDeadline() };
   }
 
   /**
@@ -215,6 +218,18 @@ export class LocalMatchSession {
     return { playerID: human, move: 'rollDice', args: [], why: `${human} 超时，代为掷骰` };
   }
 
+  private drawDeadline(): number | null {
+    const { G, ctx } = this.state;
+    if (
+      ctx.gameover !== undefined ||
+      G.currentPlayerID !== this.humanPlayerID ||
+      G.turnPhase !== 'draw' ||
+      listAwaiting(G).some((item) => item.blocking)
+    )
+      return null;
+    return this.lastAppliedAt + DRAW_TIMEOUT_MS;
+  }
+
   /** 执行一步自动行动 */
   step(): StepResult {
     if (this.waitingForAries()) return { action: null, ok: true, continue: true, waiting: true };
@@ -226,6 +241,17 @@ export class LocalMatchSession {
         : [],
     });
     if (action === null) {
+      const drawDeadline = this.drawDeadline();
+      if (drawDeadline !== null) {
+        if (this.now() < drawDeadline)
+          return { action: null, ok: true, continue: true, waiting: true };
+        return this.apply({
+          playerID: this.humanPlayerID,
+          move: 'doDraw',
+          args: [],
+          why: '抽牌选择到期',
+        });
+      }
       // 掷骰闸门只等真人：到时限由会话代掷，不受 Bot 的节奏限制
       const dice = this.humanDiceTimeout();
       if (dice === undefined) return { action: null, ok: true, continue: false };

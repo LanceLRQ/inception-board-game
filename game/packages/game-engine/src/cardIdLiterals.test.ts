@@ -34,6 +34,7 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   nightmare_discarded: '领域事件类型：梦魇牌被弃',
   nightmare_revealed: '领域事件类型：梦魇牌被翻开',
   vault_opened: '领域事件类型：金库被打开',
+  vault_peeked: '领域事件类型：窥视金库，公开查看者与层号',
   bribe_held_required: '状态不变量的名字',
   bribe_in_pool: '状态不变量的名字',
   vault_not_opened_but_by: '状态不变量的名字',

@@ -147,7 +147,7 @@ describe('MatchRoom 排程', () => {
     const h = makeHarness(5, ['0', '1', '2', '3', '4'], {}, initial);
     h.room.start();
     expect(h.timers.pending()).toHaveLength(1);
-    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.turnTimeoutMs);
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + 5000);
     expect(h.timers.pending()[0]!.at).toBe(h.room.deadlineAt());
     expect(h.steps).toHaveLength(0);
   });
@@ -280,9 +280,22 @@ describe('seatActivityKind', () => {
 describe('MatchRoom 座位活动上报', () => {
   const humans = ['0', '1', '2', '3', '4'];
 
-  it('超时代发上报 timeout，对象是被代发的座位', async () => {
+  it('5 秒正常抽牌不累计挂机，并转为行动阶段截止', async () => {
     const onSeatActivity = vi.fn();
     const h = makeHarness(5, humans, { onSeatActivity }, stateAfterSetup(5));
+    h.room.start();
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + 5000);
+    h.timers.fireNext();
+    await h.room.idle();
+    expect(h.steps[0]!.request.move).toBe('doDraw');
+    expect(onSeatActivity).not.toHaveBeenCalled();
+    expect(h.room.current().G.turnPhase).toBe('action');
+    expect(h.room.deadlineAt()).toBe(h.timers.now() + timing.turnTimeoutMs);
+  });
+
+  it('超时代发上报 timeout，对象是被代发的座位', async () => {
+    const onSeatActivity = vi.fn();
+    const h = makeHarness(5, humans, { onSeatActivity }, thiefActionTurn(5).state);
     h.room.start();
     h.timers.fireNext();
     await h.room.idle();
@@ -316,7 +329,7 @@ describe('MatchRoom 座位活动上报', () => {
     const onSeatActivity = vi.fn(() => {
       throw new Error('boom');
     });
-    const h = makeHarness(5, humans, { onSeatActivity }, stateAfterSetup(5));
+    const h = makeHarness(5, humans, { onSeatActivity }, thiefActionTurn(5).state);
     h.room.start();
     h.timers.fireNext();
     await h.room.idle();
@@ -333,7 +346,7 @@ describe('MatchRoom 座位活动上报', () => {
           if (kind === 'timeout') h.takenOver.add(seat);
         },
       },
-      stateAfterSetup(5),
+      thiefActionTurn(5).state,
     );
     h.room.start();
     expect(h.room.deadlineAt()).not.toBeNull();
@@ -646,7 +659,7 @@ describe('MatchRoom 重新排程不延长等待', () => {
     const h = makeHarness(5, humans, {}, stateAfterSetup(5));
     h.room.start();
     const first = h.room.deadlineAt()!;
-    h.timers.t += timing.turnTimeoutMs / 2;
+    h.timers.t += (first - h.timers.now()) / 2;
     for (let i = 0; i < 5; i++) h.room.reschedule();
     expect(h.room.deadlineAt()).toBe(first);
     expect(h.timers.pending()).toHaveLength(1);
@@ -662,7 +675,7 @@ describe('MatchRoom 重新排程不延长等待', () => {
     h.room.start();
     const first = h.room.deadlineAt()!;
 
-    h.timers.t += timing.turnTimeoutMs / 2;
+    h.timers.t += (first - h.timers.now()) / 2;
     for (const s of humans) h.takenOver.add(s);
     h.room.reschedule();
     expect(h.room.deadlineAt()).toBeNull();
@@ -695,7 +708,7 @@ describe('MatchRoom 重新排程不延长等待', () => {
   it('托管期间 Bot 已经走了一步：回到真人后按新局面给满额时限', async () => {
     const h = makeHarness(5, humans, {}, stateAfterSetup(5));
     h.room.start();
-    h.timers.t += timing.turnTimeoutMs / 2;
+    h.timers.t += (h.room.deadlineAt()! - h.timers.now()) / 2;
     for (const s of humans) h.takenOver.add(s);
     h.room.reschedule();
     h.timers.fireNext();

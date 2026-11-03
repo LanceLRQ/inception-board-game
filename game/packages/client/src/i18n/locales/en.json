@@ -752,6 +752,8 @@
       "aria": "Latest activity",
       "unlockWindow": "{{name}} played Unlock on layer {{layer}} · waiting for {{waiting}}",
       "shootResponse": "{{shooter}} shot {{target}} · waiting for a response",
+      "peekVault": "{{name}} peeked at layer {{layer}}'s vault · contents private",
+      "peekBribe": "{{name}} inspected {{target}}'s bribes · contents private",
       "awaitingMine": "Waiting for your response",
       "awaitingOthers": "Waiting for other players",
       "lastPlayedShoot": "{{name}} played {{card}} · rolled {{roll}}",
@@ -1163,6 +1165,8 @@
   },
   "fx": {
     "you": "You",
+    "peek": "{{name}} peeked at layer {{layer}}'s vault · contents private",
+    "bribe": "The Dream Master gave {{name}} a bribe · contents private",
     "draw": "{{name}} drew {{n}} card(s)",
     "play": "{{name}} played {{card}}",
     "discard": "{{name}} discarded {{n}} card(s)",
