@@ -57,20 +57,22 @@ export function DockOps({ controller, commitName, onCommit, skillReady }: DockOp
         </button>
       )}
       <DockEntries entries={controller.entries} variant="desktop" />
-      <button
-        type="button"
-        disabled={!main.enabled}
-        onClick={onMain}
-        data-testid={main.testId}
-        data-kind={main.kind}
-        data-variant={main.enabled && main.kind !== 'end' ? 'primary' : undefined}
-        className="ms-btn min-h-8 px-3 text-[12px] tracking-[.14em] whitespace-nowrap"
-      >
-        {t(main.labelKey, {
-          selected: actions.discardSelected,
-          required: actions.discardRequired,
-        })}
-      </button>
+      {(main.kind !== 'confirmDiscard' || actions.discardSelected > 0) && (
+        <button
+          type="button"
+          disabled={!main.enabled}
+          onClick={onMain}
+          data-testid={main.testId}
+          data-kind={main.kind}
+          data-variant={main.enabled && main.kind !== 'end' ? 'primary' : undefined}
+          className="ms-btn min-h-8 px-3 text-[12px] tracking-[.14em] whitespace-nowrap"
+        >
+          {t(main.labelKey, {
+            selected: actions.discardSelected,
+            required: actions.discardRequired,
+          })}
+        </button>
+      )}
       <Popover open={skillOpen && skillPanel !== null} onOpenChange={setSkillOpen}>
         <PopoverTrigger
           disabled={!skillReady}

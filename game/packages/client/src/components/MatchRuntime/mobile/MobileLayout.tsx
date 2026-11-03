@@ -19,13 +19,12 @@ import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
 import { useMobileMode } from './useMobileMode';
 import { MobileDock } from './MobileDock';
-import { MobileLayerChips } from './MobileLayerChips';
 import { MobileNotices } from './MobileNotices';
 import { MobileRail } from './MobileRail';
 import { RailBubbles } from './RailBubbles';
 import { MobileTopBar } from './MobileTopBar';
-import { MobileTower } from './MobileTower';
-import { buildLayerChips } from '../model/boardModel';
+import { TableBoard } from '../stages/table/TableBoard';
+import { GameGuide } from '../../GameGuide';
 
 interface MobileLayoutProps {
   readonly controller: MatchController;
@@ -38,7 +37,7 @@ interface MobileLayoutProps {
 export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutProps) {
   const { t } = useTranslation();
   const { stage, winner } = controller;
-  const [dockOpen, setDockOpen] = useState(false);
+  const [dockOpen, setDockOpen] = useState(true);
   const mode = useMobileMode();
   const compact = mode === 'compact-landscape';
   const MobileAmbient = useThemeSkin().MobileAmbient;
@@ -56,7 +55,7 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
 
   return (
     <div
-      className="relative isolate mx-auto flex h-dvh w-full touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground tablet:max-w-[960px]"
+      className="tabletop-mobile relative isolate mx-auto flex h-dvh w-full touch-manipulation flex-col overflow-hidden bg-background pl-safe pr-safe text-foreground tablet:max-w-[960px]"
       data-testid="local-runtime"
       data-assets-ready={controller.assetsReady}
       data-layout="mobile"
@@ -65,6 +64,9 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
     >
       {MobileAmbient && <MobileAmbient />}
       <MobileTopBar controller={controller} topRight={topRight} />
+      <div className="tabletop-mobile-guide">
+        <GameGuide />
+      </div>
       <PreloadLine preload={controller.preload} />
 
       {!controller.ready && (
@@ -81,20 +83,16 @@ export function MobileLayout({ controller, topRight, onRestart }: MobileLayoutPr
       {state && board && (
         <div className={compact ? 'flex min-h-0 flex-1' : 'contents'}>
           <div className={compact ? 'flex min-w-0 flex-1 flex-col' : 'contents'}>
-            <MobileLayerChips
-              chips={buildLayerChips(board.layers)}
-              focusLayer={focusLayer}
-              onFocus={focusOn}
-            />
             <div className="flex min-h-0 flex-1" data-testid="runtime-stage">
               <MobileRail slots={slots} onOpenDetail={controller.preview.open} />
               <RailBubbles bubbles={controller.chat.bubbles} />
-              <MobileTower
-                board={board}
-                dockOpen={dockOpen && !compact}
-                mode={mode}
-                onOpenVault={controller.preview.open}
-              />
+              <div className="tabletop-mobile-board">
+                <TableBoard
+                  board={board}
+                  onFocusLayer={focusOn}
+                  onOpenCard={controller.preview.open}
+                />
+              </div>
             </div>
           </div>
           <div

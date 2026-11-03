@@ -3,7 +3,7 @@
 // 弃牌阶段点牌切换选中；行动阶段点牌选中，再点「打出」才进入出牌流程（两步出牌）。
 // 样式钩子类名：ms-dock。
 
-import { useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSkillEntries } from '../../../lib/activeSkills';
 import { CopyrightNotice } from '../../CopyrightNotice';
@@ -19,16 +19,17 @@ import { DockHandCard } from './DockHandCard';
 import { DockOps } from './DockOps';
 import { DockSelf } from './DockSelf';
 
+export type HandReading = { index: number; card: string; stamp: string } | null;
+
 interface DesktopDockProps {
+  readonly reading: HandReading;
+  readonly setReading: Dispatch<SetStateAction<HandReading>>;
   readonly controller: MatchController;
 }
 
-export function DesktopDock({ controller }: DesktopDockProps) {
+export function DesktopDock({ controller, reading, setReading }: DesktopDockProps) {
   const { t } = useTranslation();
   const { hand, self, turn, winner, skillPanel, preview, play, stage } = controller;
-  const [reading, setReading] = useState<{ index: number; card: string; stamp: string } | null>(
-    null,
-  );
   // 选中记录跟着回合与阶段走：换了阶段（抽牌后、进入弃牌等）自然失效
   const stamp = `${turn.number}:${turn.phase}`;
 

@@ -1,104 +1,155 @@
-// 桌面舞台：最底层是皮肤的背景氛围，其上是座位环、中央舞台（皮肤）、右上角提示栈
-// 舞台的尺寸变化会重新规划座位；中央舞台放在规划出的区域里。
-// 样式钩子类名：ms-stage。
-
-import { Suspense, useCallback, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useElementSize } from '../../../hooks/useElementSize';
-import { useThemeSkin } from '../../../theme/skins/useThemeSkin';
+import { useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import type { MatchController } from '../controllerTypes';
 import type { BoardModel } from '../model/boardModel';
-import { buildSeatViews, worldViewNames } from '../model/seatModel';
 import type { StageState } from '../model/stageState';
+import { buildSeatViews, worldViewNames } from '../model/seatModel';
 import { markersBySeat } from '../seatMarkers';
 import { awaitedSeatIDs } from '../awaitingNotice';
+import { TableBoard } from '../stages/table/TableBoard';
 import { NoticeStack } from './NoticeStack';
-import { SeatRing } from './SeatRing';
-import { planSeats } from './seatPlan';
+import { SeatStatusBadges } from '../../SeatStatusBadges';
+import { GameGuide } from '../../GameGuide';
+import guide from '../../GameGuide/content.json';
+import { getCardImageUrl } from '../../../lib/cardImages';
+import { ChatBubble } from '../shared/ChatBubble';
+import { CardArt } from '../../CardArt';
+import { getCharacterSkillSummary } from '../../../lib/cards';
 
 interface DesktopStageProps {
+  readonly readingCard: string | null;
   readonly controller: MatchController;
   readonly state: StageState;
   readonly board: BoardModel;
   readonly onFocusLayer: (layer: number) => void;
 }
+export function DesktopStage({
+  controller,
+  state,
+  board,
+  onFocusLayer,
+  readingCard,
+}: DesktopStageProps) {
+  const reduced = useReducedMotion();
 
-export function DesktopStage({ controller, state, board, onFocusLayer }: DesktopStageProps) {
-  const { t } = useTranslation();
-  const skin = useThemeSkin();
-  const [ref, size] = useElementSize<HTMLDivElement>();
-  const [reserveRight, setReserveRight] = useState(0);
-  const { stage, view, preview } = controller;
-
-  const seatMap = useMemo(() => {
-    const markers = stage ? markersBySeat(stage.seats) : undefined;
-    const awaited = view ? awaitedSeatIDs(view, state.viewerID) : [];
-    return new Map(buildSeatViews(state, markers, awaited).map((s) => [s.id, s]));
-  }, [state, stage, view]);
-
-  const viewer = state.viewerID;
-  const master = state.dreamMasterID;
-  const thieves = useMemo(
-    () => state.playerOrder.filter((id) => id !== viewer && id !== master),
-    [state.playerOrder, viewer, master],
-  );
-  const plan = useMemo(
-    () =>
-      size.w > 0 && size.h > 0
-        ? planSeats({
-            stage: size,
-            thieves,
-            masterId: master && master !== viewer ? master : null,
-            footprint: skin.center,
-            reserveRight,
-          })
-        : null,
-    [size, thieves, master, viewer, skin.center, reserveRight],
-  );
-
-  const handleReserve = useCallback((h: number) => setReserveRight(h), []);
-  const Ambient = skin.Ambient;
-  const CenterStage = skin.CenterStage;
-
+  const seats = useMemo(() => {
+    const entries = buildSeatViews(
+      state,
+      controller.stage ? markersBySeat(controller.stage.seats) : undefined,
+      controller.view ? awaitedSeatIDs(controller.view, state.viewerID) : [],
+    );
+    const index = entries.findIndex((s) => s.isCurrent);
+    return index > 0 ? [...entries.slice(index), ...entries.slice(0, index)] : entries;
+  }, [state, controller.stage, controller.view]);
+  const self = seats.find((s) => s.isViewer);
+  const info = self?.characterId ? getCharacterSkillSummary(self.characterId) : undefined;
+  const card = readingCard
+    ? Object.values(guide.cards).find((c) => c.id === readingCard)
+    : undefined;
   return (
-    <div
-      ref={ref}
-      className="ms-stage relative min-h-0 flex-1 overflow-hidden"
-      data-testid="runtime-stage"
-      data-density={plan?.density}
-    >
-      {Ambient && <Ambient />}
-      {plan && (
-        <>
-          <SeatRing
-            plan={plan}
-            seats={seatMap}
-            worldViews={worldViewNames(view)}
-            onOpenDetail={preview.open}
-            bubbles={controller.chat.bubbles}
-            stageWidth={size.w}
-          />
-          <div
-            className="ms-center absolute z-[5] transition-[top,height] duration-300"
-            style={{
-              left: plan.center.x,
-              top: plan.center.y,
-              width: plan.center.w,
-              height: plan.center.h,
-            }}
-            data-testid="center-stage"
-          >
-            <Suspense
-              fallback={
-                <p className="pt-8 text-center text-xs text-faint">{t('desktop.stage.loading')}</p>
-              }
+    <div className="ms-stage tabletop-stage" data-testid="runtime-stage">
+      <aside className="tabletop-players">
+        <h2>
+          同桌玩家 <small>{seats.length} 人</small>
+        </h2>
+        <div className="tabletop-player-list">
+          {seats.map((seat) => (
+            <motion.div
+              layout={!reduced}
+              transition={{ duration: 0.35 }}
+              key={seat.id}
+              className="tabletop-player"
+              data-testid={`player-seat-${seat.id}`}
+              data-current={seat.isCurrent}
+              data-awaited={seat.isAwaited}
             >
-              <CenterStage board={board} onFocusLayer={onFocusLayer} onOpenCard={preview.open} />
-            </Suspense>
-          </div>
-        </>
-      )}
-      <NoticeStack controller={controller} onReserve={handleReserve} />
+              <button
+                type="button"
+                onClick={() => seat.characterId && controller.preview.open(seat.characterId)}
+                disabled={!seat.characterId}
+                aria-label={`查看${seat.nickname}角色`}
+                data-testid={`player-avatar-${seat.id}`}
+              >
+                <CardArt src={seat.imageUrl} />
+              </button>
+              <div>
+                <b>
+                  {seat.nickname}
+                  {seat.isViewer ? ' · 你' : ''}
+                </b>
+                <p>{seat.characterName}</p>
+                <small>
+                  {seat.isLost ? '迷失层' : `${seat.layer} 层`} · 手牌 {seat.handCount}
+                  {seat.isCurrent ? ' · 行动中' : ''}
+                  {seat.isAwaited ? ' · 应答中' : ''}
+                </small>
+                <SeatStatusBadges markers={seat.markers} seatId={seat.id} size="sm" />
+                <ChatBubble
+                  entry={controller.chat.bubbles.get(seat.id)}
+                  seatId={seat.id}
+                  side="left"
+                />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </aside>
+      <section className="tabletop-center" data-testid="center-stage">
+        <div className="tabletop-heading">
+          <h2>深入梦境</h2>
+          <span>
+            第 {board.turn.number} 回合 · 你在
+            {board.viewerLayer === 0 ? '迷失层' : `第 ${board.viewerLayer} 层`}
+          </span>
+        </div>
+        <TableBoard
+          board={board}
+          onFocusLayer={onFocusLayer}
+          onOpenCard={controller.preview.open}
+        />
+        <NoticeStack controller={controller} onReserve={() => {}} />
+      </section>
+      <aside className="tabletop-reference">
+        <div className="tabletop-reference-body">
+          <h2>{card?.name ?? info?.name ?? '你的角色'}</h2>
+          {card && (
+            <>
+              <button
+                type="button"
+                className="tabletop-reference-art"
+                onClick={() => controller.preview.open(card.id)}
+                aria-label="阅读完整卡牌解析"
+              >
+                <CardArt src={getCardImageUrl(card.id)} />
+              </button>
+              <p className="whitespace-pre-line">{card.fullText}</p>
+            </>
+          )}
+          {!card && self?.characterId && (
+            <button
+              type="button"
+              className="tabletop-reference-art"
+              onClick={() => controller.preview.open(self.characterId!)}
+              aria-label="阅读角色完整解析"
+            >
+              <CardArt src={self.imageUrl} />
+            </button>
+          )}
+          {!card &&
+            info?.skills.map((skill) => (
+              <p key={skill.name}>
+                <b>{skill.name}</b>
+                <br />
+                {skill.description}
+              </p>
+            ))}
+          <h3>本局世界观</h3>
+          {worldViewNames(controller.view).map((name) => (
+            <p key={name}>{name}</p>
+          ))}
+        </div>
+        <GameGuide />
+      </aside>
     </div>
   );
 }

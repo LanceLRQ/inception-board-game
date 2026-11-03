@@ -1,5 +1,6 @@
 // 胜负结果：全屏覆盖层，含胜负文案、原因与「再来一局 / 返回大厅」按钮（移动、桌面共用）
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RotateCcw, Trophy } from 'lucide-react';
 import type { ReportModel } from '../controllerTypes';
@@ -23,6 +24,13 @@ export function MatchOutcome({
   report = null,
 }: MatchOutcomeProps) {
   const { t } = useTranslation();
+  const [minimized, setMinimized] = useState(false);
+  if (minimized)
+    return (
+      <button type="button" className="tabletop-result" onClick={() => setMinimized(false)}>
+        {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')} · 查看结算
+      </button>
+    );
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-background/90 p-6 pb-safe pt-safe"
@@ -34,6 +42,13 @@ export function MatchOutcome({
         className="max-h-full w-full max-w-sm overflow-y-auto border border-line-strong bg-panel p-6 text-center"
         data-testid="winner-banner"
       >
+        <button
+          type="button"
+          className="ms-btn min-h-11 px-3 mb-3"
+          onClick={() => setMinimized(true)}
+        >
+          收起结算，查看牌桌
+        </button>
         <Trophy className="mx-auto mb-2 size-8 text-acc-bright" aria-hidden />
         <h2 className="font-heading text-xl font-bold tracking-[.08em]">
           {winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins')}

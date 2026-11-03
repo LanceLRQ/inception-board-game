@@ -6,7 +6,7 @@
 // 虚拟尺寸再 transform 放大，舞台内部的排布与字号都按虚拟尺寸计算，卡牌与文字不会在大屏上显得过小。
 // 系数以 --ms-scale 暴露给子树，里面用 dvh / vw 的尺寸要除以它。
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CSSProperties } from 'react';
 import { useViewportSize } from '../../../hooks/useViewportSize';
@@ -16,7 +16,7 @@ import { tintLayerAttr } from '../../../theme/layerTints';
 import { useBoardModel } from '../model/useBoardModel';
 import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
-import { DesktopDock } from './DesktopDock';
+import { DesktopDock, type HandReading } from './DesktopDock';
 import { DesktopStage } from './DesktopStage';
 import { DesktopTopBar } from './DesktopTopBar';
 
@@ -31,6 +31,13 @@ interface DesktopLayoutProps {
 export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayoutProps) {
   const { t } = useTranslation();
   const { winner } = controller;
+  const [reading, setReading] = useState<HandReading>(null);
+  const readingCard =
+    reading &&
+    reading.stamp === `${controller.turn.number}:${controller.turn.phase}` &&
+    controller.hand.items[reading.index]?.card === reading.card
+      ? reading.card
+      : null;
   const { state, board, focusLayer, focusOn } = useBoardModel(controller);
   const viewport = useViewportSize();
   const scale = desktopScale(viewport.w, viewport.h);
@@ -73,11 +80,12 @@ export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayout
           <>
             <DesktopStage
               controller={controller}
+              readingCard={readingCard}
               state={state}
               board={board}
               onFocusLayer={focusOn}
             />
-            <DesktopDock controller={controller} />
+            <DesktopDock controller={controller} reading={reading} setReading={setReading} />
           </>
         )}
 

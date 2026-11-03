@@ -64,27 +64,28 @@ export function DockOps({ controller, skillReady, onOpenSkill, onOpenChat, layou
       {t('dock.skill')}
     </button>
   );
-  const mainButton = (
-    <button
-      type="button"
-      disabled={!main.enabled}
-      onClick={onMain}
-      data-testid={main.testId}
-      data-kind={main.kind}
-      className={cn(
-        'min-h-11 min-w-[68px] touch-manipulation border px-3 text-[11.5px] tracking-[.08em] whitespace-nowrap active:translate-y-px tablet:min-h-12 tablet:min-w-24 tablet:text-sm',
-        layout === 'row' && 'flex-[2]',
-        main.enabled
-          ? 'border-acc bg-acc-soft font-semibold text-acc-bright'
-          : 'border-line-strong bg-transparent text-faint',
-      )}
-    >
-      {t(main.labelKey, {
-        selected: actions.discardSelected,
-        required: actions.discardRequired,
-      })}
-    </button>
-  );
+  const mainButton =
+    main.kind === 'confirmDiscard' && actions.discardSelected === 0 ? null : (
+      <button
+        type="button"
+        disabled={!main.enabled}
+        onClick={onMain}
+        data-testid={main.testId}
+        data-kind={main.kind}
+        className={cn(
+          'min-h-11 min-w-[68px] touch-manipulation border px-3 text-[11.5px] tracking-[.08em] whitespace-nowrap active:translate-y-px tablet:min-h-12 tablet:min-w-24 tablet:text-sm',
+          layout === 'row' && 'flex-[2]',
+          main.enabled
+            ? 'border-acc bg-acc-soft font-semibold text-acc-bright'
+            : 'border-line-strong bg-transparent text-faint',
+        )}
+      >
+        {t(main.labelKey, {
+          selected: actions.discardSelected,
+          required: actions.discardRequired,
+        })}
+      </button>
+    );
 
   // 操作入口（复活 / 复活同伴 / 移动）单独占一行，排在技能与主操作之上；没有入口时不占位
   const entries = <DockEntries entries={controller.entries} variant="mobile" />;

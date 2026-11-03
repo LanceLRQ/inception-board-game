@@ -102,7 +102,9 @@ export function LayerCards({
           />
         ))}
       </div>
-      {lost && <LostStrip row={lost} focus={focusLayer === 0} onFocus={onFocus} />}
+      {lost && (lost.occupants.length > 0 || lost.hasViewer) && (
+        <LostStrip row={lost} focus={focusLayer === 0} onFocus={onFocus} />
+      )}
     </div>
   );
 }

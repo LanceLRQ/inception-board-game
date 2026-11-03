@@ -109,7 +109,7 @@ export function MobileDock({ controller, open: openState, onOpenChange, mode }: 
     if (!readingItem) return;
     play.commit(readingItem.card);
     setReading(null);
-    onOpenChange(false);
+    onOpenChange(true);
   };
 
   const bindDrag = useDrag(
