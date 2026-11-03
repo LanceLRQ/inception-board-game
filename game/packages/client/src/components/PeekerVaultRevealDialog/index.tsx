@@ -2,8 +2,10 @@
 // 对照：docs/manual/04-action-cards.md §梦境窥视 效果①
 // 复用 PeekerVaultRevealBanner/logic.ts
 
-import { Eye, KeyRound, Coins, HelpCircle } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import type { MatchView } from '@icgame/game-engine';
+import { getCardImageUrl } from '../../lib/cardImages';
+import { CardArt } from '../CardArt';
 import { computePeekerVaultRevealState } from '../PeekerVaultRevealBanner/logic.js';
 import {
   Dialog,
@@ -18,13 +20,6 @@ export interface PeekerVaultRevealDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
   makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
-}
-
-function vaultIcon(contentType: string) {
-  if (contentType === 'secret') return <KeyRound className="h-4 w-4 text-destructive" />;
-  if (contentType === 'coin') return <Coins className="h-4 w-4 text-acc-bright" />;
-  if (contentType === 'empty') return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
-  return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
 }
 
 function vaultLabel(contentType: string): string {
@@ -55,21 +50,27 @@ export function PeekerVaultRevealDialog({
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <div className="space-y-1.5">
+        <div className="flex flex-wrap justify-center gap-4">
           {vaults.length === 0 ? (
             <div className="text-xs text-muted-foreground">该层无金库。</div>
           ) : (
             vaults.map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center gap-2 rounded bg-background/60 px-2 py-1.5"
-              >
-                {vaultIcon(v.contentType)}
-                <span className="text-xs">
+              <figure key={v.id} className="flex flex-col items-center gap-2">
+                {(v.contentType === 'secret' || v.contentType === 'coin') && (
+                  <CardArt
+                    src={getCardImageUrl(
+                      v.contentType === 'secret' ? 'vault_secret' : 'vault_gold',
+                    )}
+                    alt={vaultLabel(v.contentType)}
+                    trimBorder={false}
+                    className="h-auto max-h-[min(42dvh,360px)] w-auto max-w-full rounded-md"
+                  />
+                )}
+                <figcaption className="text-xs text-muted-foreground">
                   {vaultLabel(v.contentType)}
                   {v.isOpened && ' · 已开启'}
-                </span>
-              </div>
+                </figcaption>
+              </figure>
             ))
           )}
         </div>
