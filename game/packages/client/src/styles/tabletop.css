@@ -1863,3 +1863,43 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
   gap: 2px;
   flex-shrink: 0;
 }
+
+.guide-workspace nav button {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.guide-workspace nav small {
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+.reference-text {
+  white-space: normal;
+}
+.reference-text p {
+  white-space: pre-wrap;
+  margin: 0 0 1.2em;
+}
+.reference-text h3 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+.reference-text ul {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin: 0 0 1.2em;
+}
+.reference-text .guide-rule-table {
+  clear: both;
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+.reference-text th {
+  min-width: 100px;
+  padding: 10px;
+  border: 1px solid var(--ms-line2);
+  background: var(--ms-panel2);
+  font-weight: 600;
+  text-align: left;
+}

@@ -2,19 +2,9 @@ import { useCallback, useRef, useState } from 'react';
 import { BookOpen, ArrowLeft, ZoomIn } from 'lucide-react';
 import { Dialog, DialogTitle } from '../ui/dialog';
 import { versionedCardImageUrl } from '../../lib/cardImageVersion';
-import content from './content.json';
+import { GUIDE_CATEGORIES as categories, guideEntries } from '../../lib/cardReference';
+import { ReferenceText } from './ReferenceText';
 
-const categories: Record<string, string> = {
-  tutorial: '入门与规则',
-  action: '行动牌',
-  thief: '盗梦者',
-  master: '梦主',
-  dream: '梦境牌',
-  vault: '金库牌',
-  bribe: '贿赂牌',
-  nightmare: '梦魇牌',
-  other: '道具与配置',
-};
 export function GameGuide() {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState('tutorial');
@@ -35,25 +25,10 @@ export function GameGuide() {
     list.current = node;
     if (node) node.scrollTop = listScroll.current;
   }, []);
-  const entries =
-    category === 'tutorial'
-      ? content.chapters.map((c) => ({
-          id: c.id,
-          name: c.name,
-          text: c.text,
-          image: undefined as string | undefined,
-        }))
-      : Object.values(content.cards)
-          .filter((c) => c.category === category)
-          .map((c) => ({
-            id: c.id,
-            name: c.name,
-            text: c.fullText,
-            image: versionedCardImageUrl(c.imagePath),
-          }));
-  const matches = entries.filter((c) =>
-    `${c.name} ${c.text}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-  );
+  const matches = guideEntries(category, query).map((entry) => ({
+    ...entry,
+    image: entry.image ? versionedCardImageUrl(entry.image) : undefined,
+  }));
   const current = matches.find((c) => c.id === selected) ?? matches[0];
   const changeCategory = (value: string) => {
     setCategory(value);
@@ -61,6 +36,9 @@ export function GameGuide() {
     setSelected('');
     setReading(false);
     setZoom(false);
+    listScroll.current = 0;
+    readerScroll.current = 0;
+    zoomScroll.current = 0;
     if (list.current) list.current.scrollTop = 0;
     if (reader.current) reader.current.scrollTop = 0;
   };
@@ -79,7 +57,7 @@ export function GameGuide() {
       >
         <header>
           <DialogTitle>游戏教程说明书</DialogTitle>
-          <p>原版规则与卡牌全文</p>
+          <p>103 个原版牌面 · 9 章规则 · 完整文字说明</p>
         </header>
         <select
           aria-label="说明书分类"
@@ -89,7 +67,7 @@ export function GameGuide() {
         >
           {Object.entries(categories).map(([id, name]) => (
             <option key={id} value={id}>
-              {name}
+              {name} · {guideEntries(id).length}
             </option>
           ))}
         </select>
@@ -102,7 +80,8 @@ export function GameGuide() {
                 aria-pressed={category === id}
                 onClick={() => changeCategory(id)}
               >
-                {name}
+                <span>{name}</span>
+                <small>{guideEntries(id).length}</small>
               </button>
             ))}
           </nav>
@@ -115,6 +94,10 @@ export function GameGuide() {
                 onChange={(e) => {
                   setQuery(e.target.value);
                   setReading(false);
+                  setZoom(false);
+                  listScroll.current = 0;
+                  readerScroll.current = 0;
+                  if (reader.current) reader.current.scrollTop = 0;
                   if (list.current) list.current.scrollTop = 0;
                 }}
                 placeholder="章节、卡牌或关键词"
@@ -141,7 +124,9 @@ export function GameGuide() {
                     readerScroll.current = 0;
                     setReading(true);
                     setZoom(false);
-                    if (reader.current) reader.current.scrollTop = 0;
+                    requestAnimationFrame(() => {
+                      if (reader.current) reader.current.scrollTop = 0;
+                    });
                   }}
                 >
                   {c.image && <img src={c.image} alt="" loading="lazy" />}
@@ -197,43 +182,7 @@ export function GameGuide() {
                 <>
                   <h2>{current.name}</h2>
                   {current.image && <img src={current.image} alt={`${current.name}完整原卡`} />}
-                  <div>
-                    {category !== 'tutorial'
-                      ? current.text
-                      : current.text.split(/\n\s*\n/).map((block, index) =>
-                          block.trim().startsWith('|') ? (
-                            <div
-                              className="guide-rule-table"
-                              tabIndex={0}
-                              aria-label="规则表格，可横向滚动"
-                              key={index}
-                            >
-                              <table>
-                                <tbody>
-                                  {block
-                                    .split('\n')
-                                    .filter((line) => !/^[\s|:-]+$/.test(line))
-                                    .map((line, row) => (
-                                      <tr key={row}>
-                                        {line
-                                          .trim()
-                                          .replace(/^\||\|$/g, '')
-                                          .split('|')
-                                          .map((cell, col) => (
-                                            <td key={col}>{cell.trim()}</td>
-                                          ))}
-                                      </tr>
-                                    ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <p className="mb-5" key={index}>
-                              {block.replace(/^#{1,4} /, '')}
-                            </p>
-                          ),
-                        )}
-                  </div>
+                  <ReferenceText text={current.text} />
                 </>
               )}
             </div>

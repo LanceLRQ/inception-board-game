@@ -5,7 +5,8 @@ import { Dialog } from '../ui/dialog';
 import { CardArt } from '../CardArt';
 import { getCardImageUrl, getCardBackImageUrl, hasCardBackImage } from '../../lib/cardImages';
 import { getCardName } from '../../lib/cards';
-import { CARD_REFERENCES } from '../../lib/cardReference';
+import { ReferenceText } from '../GameGuide/ReferenceText';
+import { CARD_REFERENCES, GUIDE_CATEGORIES } from '../../lib/cardReference';
 
 export interface CardDetailModalProps {
   cardId: CardID | null;
@@ -93,10 +94,10 @@ function ModalContent({
           </div>
         </div>
         <article className="tabletop-detail-copy" tabIndex={0} aria-label="完整文字说明，可滚动">
-          <small>{reference?.category}</small>
+          <small>{reference ? GUIDE_CATEGORIES[reference.category] : '卡牌背面'}</small>
           <h2>{displayName}</h2>
           <div className="tabletop-fulltext">
-            {reference?.fullText ?? '此为卡牌背面，尚无可公开的牌面内容。'}
+            <ReferenceText text={reference?.fullText ?? '此为卡牌背面，尚无可公开的牌面内容。'} />
           </div>
           <p className="tabletop-source-note">
             文字来源：原版说明书与卡牌资料。完整原图保留，便于逐项对照。
