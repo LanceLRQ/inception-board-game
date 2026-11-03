@@ -1,17 +1,6 @@
-// 桌面端对局布局（≥1024px）：占满视口、整页不滚动的外壳
-// 从上到下：片头条 → 舞台（背景氛围 + 座位环 + 中央舞台 + 右上提示栈）→ 底部坞（本人身份 + 手牌 + 操作）。
-// 只读控制层 MatchController；弹窗群由 MatchRuntime 另外挂载（解封响应改用本布局的响应窗口）。
-// 本布局与主题无关：主题的差异在皮肤的中央舞台、背景氛围与皮肤 CSS 里。
-// 大屏（1920×1080、2560×1440 等）整体按 desktopScale 放大：外壳占满视口，内壳取「视口 / 系数」的
-// 虚拟尺寸再 transform 放大，舞台内部的排布与字号都按虚拟尺寸计算，卡牌与文字不会在大屏上显得过小。
-// 系数以 --ms-scale 暴露给子树，里面用 dvh / vw 的尺寸要除以它。
-
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CSSProperties } from 'react';
-import { useViewportSize } from '../../../hooks/useViewportSize';
 import type { MatchController } from '../controllerTypes';
-import { desktopScale } from '../viewportMode';
 import { tintLayerAttr } from '../../../theme/layerTints';
 import { useBoardModel } from '../model/useBoardModel';
 import { MatchOutcome } from '../shared/MatchOutcome';
@@ -39,27 +28,15 @@ export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayout
       ? reading.card
       : null;
   const { state, board, focusLayer, focusOn } = useBoardModel(controller);
-  const viewport = useViewportSize();
-  const scale = desktopScale(viewport.w, viewport.h);
-  const innerStyle: CSSProperties & Record<'--ms-scale', number> =
-    scale > 1
-      ? {
-          width: viewport.w / scale,
-          height: viewport.h / scale,
-          transform: `scale(${scale})`,
-          '--ms-scale': scale,
-        }
-      : { width: '100%', height: '100%', '--ms-scale': 1 };
 
   return (
-    <div className="h-dvh w-full overflow-hidden bg-background">
+    <div className="tabletop-desktop">
       <div
-        className="flex origin-top-left flex-col overflow-hidden bg-background text-foreground"
-        style={innerStyle}
+        className="tabletop-shell"
         data-testid="local-runtime"
         data-assets-ready={controller.assetsReady}
         data-layout="desktop"
-        data-scale={scale}
+        data-scale={1}
         data-tint-layer={tintLayerAttr(focusLayer)}
       >
         <DesktopTopBar controller={controller} topRight={topRight} />
@@ -77,18 +54,21 @@ export function DesktopLayout({ controller, topRight, onRestart }: DesktopLayout
         )}
 
         {state && board && (
-          <>
-            <DesktopStage
-              controller={controller}
-              readingCard={readingCard}
-              state={state}
-              board={board}
-              onFocusLayer={focusOn}
-            />
+          <DesktopStage
+            controller={controller}
+            readingCard={readingCard}
+            state={state}
+            board={board}
+            onFocusLayer={focusOn}
+          >
             <DesktopDock controller={controller} reading={reading} setReading={setReading} />
-          </>
+          </DesktopStage>
         )}
 
+        <footer className="tabletop-footer">
+          <span>原版卡片 · 盗梦都市</span>
+          <span>原版版权归发行商所有</span>
+        </footer>
         {winner && (
           <MatchOutcome
             winner={winner}

@@ -29,25 +29,20 @@ export function DesktopTopBar({ controller, topRight }: DesktopTopBarProps) {
   const matchId = shortMatchId(view?.matchId);
 
   return (
-    <header
-      className="ms-topbar flex h-9 shrink-0 items-center gap-6 px-4 font-mono text-[10.5px] tracking-[.16em] text-faint"
-      data-testid="desktop-topbar"
-    >
-      <span className="shrink-0 truncate">
-        {t('desktop.top.brand')}
-        {matchId && ` — ${t('desktop.top.match', { id: matchId })}`}
-      </span>
-      <div className="mx-auto flex min-w-0 items-center gap-5">
+    <header className="tabletop-topbar" data-testid="desktop-topbar">
+      <div className="tabletop-brand">
+        <span aria-hidden>◇</span>
+        <h1>{t('desktop.top.brand')}</h1>
+        {matchId && <small>{matchId}</small>}
+      </div>
+      <div className="tabletop-turn">
         <span className="shrink-0 text-dim">
           {t('localMatch.turn')} {turn.number}
           <span className="mx-2 text-faint">·</span>
           {t(`localMatch.phase.${turn.phase}`, { defaultValue: turn.phase })}
         </span>
         <span
-          className={cn(
-            'min-w-0 truncate font-heading text-[13px] font-bold tracking-[.1em]',
-            turn.isMine ? 'text-acc-bright' : 'text-foreground',
-          )}
+          className={cn('tabletop-actor', turn.isMine ? 'text-acc-bright' : 'text-foreground')}
           data-testid="turn-indicator"
           data-mine={turn.isMine || undefined}
         >

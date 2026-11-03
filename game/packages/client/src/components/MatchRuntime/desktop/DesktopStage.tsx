@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { MatchController } from '../controllerTypes';
 import type { BoardModel } from '../model/boardModel';
@@ -17,6 +17,7 @@ import { CardArt } from '../../CardArt';
 import { getCharacterSkillSummary } from '../../../lib/cards';
 
 interface DesktopStageProps {
+  readonly children: ReactNode;
   readonly readingCard: string | null;
   readonly controller: MatchController;
   readonly state: StageState;
@@ -29,6 +30,7 @@ export function DesktopStage({
   board,
   onFocusLayer,
   readingCard,
+  children,
 }: DesktopStageProps) {
   const reduced = useReducedMotion();
 
@@ -47,7 +49,7 @@ export function DesktopStage({
     ? Object.values(guide.cards).find((c) => c.id === readingCard)
     : undefined;
   return (
-    <div className="ms-stage tabletop-stage" data-testid="runtime-stage">
+    <div className="tabletop-stage" data-testid="runtime-stage">
       <aside className="tabletop-players">
         <h2>
           同桌玩家 <small>{seats.length} 人</small>
@@ -96,9 +98,9 @@ export function DesktopStage({
       </aside>
       <section className="tabletop-center" data-testid="center-stage">
         <div className="tabletop-heading">
-          <h2>深入梦境</h2>
+          <h2>梦境</h2>
           <span>
-            第 {board.turn.number} 回合 · 你在
+            你在
             {board.viewerLayer === 0 ? '迷失层' : `第 ${board.viewerLayer} 层`}
           </span>
         </div>
@@ -150,6 +152,7 @@ export function DesktopStage({
         </div>
         <GameGuide />
       </aside>
+      {children}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 /*
  * 「深眠影院」皮肤：影院式暗场，黄铜描边与微光，直角画框，方形骰子。
- * 全部限定在 [data-theme='noir'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
+ * 全部限定在 [data-theme='noir']:not(:has(.ms-tabletop-runtime)) 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
  */
 
 /* ---------- 舞台与背景氛围 ---------- */
-[data-theme='noir'] .ms-stage {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-stage {
   background:
     radial-gradient(
       ellipse 62% 46% at 50% 46%,
@@ -18,14 +18,14 @@
     ),
     var(--ms-panel);
 }
-[data-theme='noir'] .noir-ambient {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .noir-ambient {
   background: radial-gradient(
     ellipse 120% 90% at 50% 40%,
     transparent 55%,
     color-mix(in srgb, var(--ms-bg) 55%, transparent) 100%
   );
 }
-[data-theme='noir'] .noir-orbit {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .noir-orbit {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -35,98 +35,99 @@
   border: 1px dashed color-mix(in srgb, var(--ms-ink) 10%, transparent);
   border-radius: 50%;
 }
-[data-theme='noir'] .noir-orbit::after {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .noir-orbit::after {
   content: '';
   position: absolute;
   inset: 46px;
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--ms-ink) 5%, transparent);
 }
-[data-theme='noir'] .ms-topbar {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-topbar {
   letter-spacing: 0.18em;
   background: color-mix(in srgb, var(--ms-bg) 60%, transparent);
 }
 
 /* ---------- 座位牌 ---------- */
-[data-theme='noir'] .ms-seat {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-seat {
   border-radius: 0;
   background: var(--ms-panel2);
 }
-[data-theme='noir'] .ms-seat[data-current] {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-current] {
   box-shadow:
     0 0 0 1px var(--ms-accsoft),
     0 0 34px color-mix(in srgb, var(--ms-acc) 16%, transparent);
 }
-[data-theme='noir'] .ms-seat[data-master] {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-master] {
   box-shadow: 0 10px 30px color-mix(in srgb, var(--ms-bg) 70%, transparent);
 }
-[data-theme='noir'] .ms-seat[data-master][data-current] {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-master][data-current] {
   box-shadow:
     0 0 0 1px var(--ms-accsoft),
     0 0 34px color-mix(in srgb, var(--ms-acc) 16%, transparent);
 }
-[data-theme='noir'] .ms-seat-flag {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-seat-flag {
   letter-spacing: 0.32em;
 }
 
 /* ---------- 卡面画框 / 层徽 / 骰子 ---------- */
-[data-theme='noir'] .ms-card {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-card {
   border-radius: 0;
   background: color-mix(in srgb, var(--ms-bg) 85%, var(--ms-panel));
   box-shadow: 0 6px 18px color-mix(in srgb, var(--ms-bg) 60%, transparent);
 }
-[data-theme='noir'] .ms-card img {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-card img {
   filter: saturate(0.92);
 }
-[data-theme='noir'] .ms-layerbadge {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-layerbadge {
   border-radius: 0;
 }
-[data-theme='noir'] .ms-die {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-die {
   --die-fill: color-mix(in srgb, var(--die-color) 16%, var(--ms-bg));
   --die-pip: var(--die-color);
   border-radius: 0;
   border: 1px solid color-mix(in srgb, var(--die-color) 45%, transparent);
 }
-[data-theme='noir'] .ms-die[data-empty] {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-die[data-empty] {
   background: transparent;
   border-style: dashed;
 }
 
 /* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
-[data-theme='noir'] .ms-handcard {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-handcard {
   border-radius: 0;
   background: color-mix(in srgb, var(--ms-bg) 85%, var(--ms-panel));
 }
-[data-theme='noir'] .ms-handcard:hover {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-handcard:hover {
   box-shadow: 0 18px 36px color-mix(in srgb, var(--ms-bg) 70%, transparent);
 }
-[data-theme='noir'] .ms-handcard[data-selected],
-[data-theme='noir'] .ms-handcard[data-reading] {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-handcard[data-selected],
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-handcard[data-reading] {
   box-shadow:
     0 0 0 1px var(--ms-acc),
     0 14px 34px color-mix(in srgb, var(--ms-acc) 14%, transparent);
 }
-[data-theme='noir'] .ms-dock {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-dock {
   background: color-mix(in srgb, var(--ms-bg) 92%, var(--ms-panel));
   backdrop-filter: blur(6px);
 }
-[data-theme='noir'] .ms-btn {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-btn {
   border-radius: 0;
   letter-spacing: 0.24em;
 }
-[data-theme='noir'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime))
+  .ms-btn[data-variant='primary']:not(:disabled):hover {
   box-shadow: 0 6px 24px color-mix(in srgb, var(--ms-acc) 28%, transparent);
 }
-[data-theme='noir'] .ms-response {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .ms-response {
   border-radius: 0;
   box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
 }
 
 /* ---------- 中央舞台：梦境剖面 ---------- */
-[data-theme='noir'] .noir-head {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .noir-head {
   border-bottom: 1px solid var(--ms-line2);
 }
-[data-theme='noir'] .noir-banner {
+[data-theme='noir']:not(:has(.ms-tabletop-runtime)) .noir-banner {
   color: var(--ms-acc);
   background: var(--ms-accsoft);
   border: 1px solid var(--ms-accsoft);

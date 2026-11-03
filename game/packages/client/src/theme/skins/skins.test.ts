@@ -265,7 +265,9 @@ describe('「梦境矩阵」皮肤样式', () => {
     expect(rule![0]).toContain('pointer-events: none');
     expect(rule![0]).toContain('repeating-linear-gradient');
     expect(Number(rule![0].match(/z-index:\s*(\d+)/)![1])).toBeLessThan(50);
-    expect(css).toContain(":root:not([data-fx-off~='scan']) [data-layout]::after");
+    expect(css.replace(/\s+/g, ' ')).toContain(
+      ":root:not([data-fx-off~='scan']) [data-layout]::after",
+    );
   });
 
   it('卡图降饱和可被 desat 开关关闭，只作用于对局里的卡图（不碰弹窗）', () => {

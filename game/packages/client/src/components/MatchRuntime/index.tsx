@@ -26,7 +26,7 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
   const controller = useMatchController(source);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   return (
-    <>
+    <div className="ms-tabletop-runtime">
       {isDesktop ? (
         <DesktopLayout controller={controller} topRight={topRight} onRestart={onRestart} />
       ) : (
@@ -36,6 +36,6 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
       <MatchFx source={source} nicknameOf={controller.nicknameOf} straddle={isDesktop} />
       <MatchDialogs controller={controller} />
       <MatchAssetGate entry={controller.entryAssets} />
-    </>
+    </div>
   );
 }

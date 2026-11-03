@@ -1,32 +1,204 @@
+/* 对局与挂到 body 的弹层共用令牌；离开对局立即恢复站点主题。 */
+body:has(.ms-tabletop-runtime) {
+  color-scheme: dark;
+  --ms-bg: #111213;
+  --ms-panel: #1a1b1d;
+  --ms-panel2: #242628;
+  --ms-ink: #f1f2f3;
+  --ms-dim: #b3b3ae;
+  --ms-faint: #b3b3ae;
+  --ms-line: #303235;
+  --ms-line2: #3b3d40;
+  --ms-acc: #d5b276;
+  --ms-accb: #e6c68c;
+  --ms-accsoft: #302b23;
+  --ms-lock: #d5b276;
+  --ms-blood: #b3433b;
+  --ms-ok: #8ca895;
+  --ms-sans: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --ms-serif: var(--ms-sans);
+  --ms-mono: var(--ms-sans);
+  --background: var(--ms-bg);
+  --foreground: var(--ms-ink);
+  --card: var(--ms-panel);
+  --card-foreground: var(--ms-ink);
+  --popover: var(--ms-panel2);
+  --popover-foreground: var(--ms-ink);
+  --border: var(--ms-line2);
+  --muted: var(--ms-panel2);
+  --muted-foreground: var(--ms-dim);
+  --primary: var(--ms-acc);
+  --primary-foreground: var(--ms-bg);
+  --ring: var(--ms-acc);
+  font-family: var(--ms-sans);
+}
+.ms-tabletop-runtime {
+  font-family: var(--ms-sans);
+  color: var(--ms-ink);
+  font-size: 14px;
+}
+.tabletop-desktop {
+  height: 100dvh;
+  overflow: hidden;
+  background: #111213;
+  position: relative;
+  isolation: isolate;
+}
+.tabletop-desktop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url('/tabletop/environment/dream-city-desktop.webp') center top / cover;
+  opacity: 0.3;
+}
+.tabletop-shell {
+  height: 100%;
+  max-width: 1720px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  --ms-scale: 1;
+}
+.tabletop-topbar {
+  min-height: 72px;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.tabletop-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.tabletop-brand > span {
+  color: var(--ms-acc);
+  font-size: 32px;
+  line-height: 1;
+}
+.tabletop-brand h1 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.tabletop-brand small {
+  font-size: 12px;
+  color: var(--ms-dim);
+}
+.tabletop-turn {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 14px;
+}
+.tabletop-actor {
+  order: -1;
+  white-space: nowrap;
+}
+.tabletop-actor::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--ms-acc);
+}
+.tabletop-topbar button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+}
 .tabletop-stage {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) 240px;
+  grid-template-columns: 190px minmax(0, 1fr) 284px;
+  grid-template-rows: minmax(300px, 1fr) 316px;
   gap: 16px;
   min-height: 0;
   flex: 1;
-  padding: 16px;
-  background: url('/tabletop/environment/dream-city-desktop.webp') center/cover;
+  padding: 8px 24px 0;
 }
 .tabletop-players,
 .tabletop-reference,
-.tabletop-center {
+.tabletop-center,
+.tabletop-hand-panel {
   min-width: 0;
   min-height: 0;
-  background: var(--ms-panel);
-  border-radius: 12px;
-  padding: 14px;
   display: flex;
   flex-direction: column;
+}
+.tabletop-players {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  padding: 12px 0;
   gap: 12px;
 }
+.tabletop-reference {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  padding: 24px;
+  gap: 16px;
+  background: var(--ms-panel);
+  border-radius: 10px;
+}
 .tabletop-center {
+  grid-column: 2;
+  grid-row: 1;
   position: relative;
-  background: var(--ms-bg) url('/tabletop/environment/table-felt.webp') center/cover;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 10px;
+  background: #121a1d url('/tabletop/environment/table-felt.webp') center / 384px repeat;
+}
+.tabletop-hand-panel.ms-dock {
+  grid-column: 2;
+  grid-row: 2;
+  border: 0;
+  border-radius: 10px;
+  padding: 20px;
+  background: var(--ms-panel);
+  overflow: hidden;
+}
+.tabletop-footer {
+  min-height: 38px;
+  padding: 10px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ms-dim);
+}
+.tabletop-center [data-testid='desktop-notices'] {
+  position: static;
+  width: 100% !important;
+  max-height: 40%;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.tabletop-heading {
+  min-height: 26px;
+  justify-content: flex-start;
+}
+@media (min-width: 1024px) and (max-width: 1180px) {
+  .tabletop-stage {
+    grid-template-columns: 154px minmax(400px, 1fr) 246px;
+    gap: 12px;
+    padding-inline: 16px;
+    grid-template-rows: minmax(300px, 1fr) 316px;
+  }
+  .tabletop-reference,
+  .tabletop-center,
+  .tabletop-hand-panel.ms-dock {
+    padding: 16px;
+  }
 }
 .tabletop-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 10px;
   font-size: 12px;
 }
@@ -228,11 +400,7 @@
   align-items: center;
   max-width: calc(100% - 20px);
 }
-.tabletop-center [data-testid='desktop-notices'] {
-  top: 44px;
-  max-height: calc(100% - 55px);
-  overflow: auto;
-}
+
 .tabletop-result {
   position: fixed;
   bottom: 12px;
@@ -390,18 +558,6 @@
 .guide-select,
 .guide-reader-actions .guide-back {
   display: none;
-}
-@media (max-width: 1100px) and (min-width: 1024px) {
-  .tabletop-stage {
-    grid-template-columns: 155px minmax(0, 1fr) 180px;
-    gap: 8px;
-    padding: 8px;
-  }
-  .tabletop-players,
-  .tabletop-reference,
-  .tabletop-center {
-    padding: 8px;
-  }
 }
 @media (max-width: 1023px) {
   .tabletop-mobile {
@@ -629,4 +785,11 @@
   color: var(--ms-bg);
   border-radius: 6px;
   min-height: 44px;
+}
+
+@media (min-width: 1500px) {
+  .tabletop-stage {
+    grid-template-columns: 208px minmax(430px, 1fr) 310px;
+    grid-template-rows: minmax(340px, 1fr) 316px;
+  }
 }

@@ -72,8 +72,7 @@ export function DesktopDock({ controller, reading, setReading }: DesktopDockProp
     <section
       aria-label={t('dock.hand')}
       data-testid="hand-dock"
-      className="ms-dock relative z-10 box-border flex shrink-0 flex-col"
-      style={{ height: 'clamp(164px, calc(25dvh / var(--ms-scale, 1)), 250px)' }}
+      className="ms-dock tabletop-hand-panel relative z-10 box-border flex flex-col"
     >
       <div className="flex min-h-0 flex-1 px-4 pb-1 pt-2">
         {self && (

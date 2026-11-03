@@ -1,12 +1,12 @@
 /*
  * 「筑梦蓝图」皮肤：深普鲁士蓝图纸、制图白线、网格底、轴测楼板与图签。
- * 全部限定在 [data-theme='blueprint'] 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
+ * 全部限定在 [data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) 之下；颜色一律由令牌推导（color-mix），不写颜色字面量。
  * 动效：陀螺旋转可由 data-fx-off 单独关闭（totem），网格底可关闭（grid）；
  * 系统「减少动效」（且 data-motion 不是 'full'）与 data-motion='reduced' 下全部停掉。
  */
 
 /* ---------- 舞台与背景氛围 ---------- */
-[data-theme='blueprint'] .ms-stage {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-stage {
   background:
     radial-gradient(
       ellipse 70% 52% at 50% 46%,
@@ -19,7 +19,7 @@
       var(--ms-panel)
     );
 }
-[data-theme='blueprint'] .blueprint-ambient {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-ambient {
   background: radial-gradient(
     ellipse 120% 90% at 50% 45%,
     transparent 55%,
@@ -27,8 +27,8 @@
   );
 }
 /* 图纸网格：24px 细格 + 120px 主格 */
-[data-theme='blueprint'] .blueprint-grid,
-[data-theme='blueprint'] [data-layout='mobile'] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-grid,
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) [data-layout='mobile'] {
   --bp-grid-fine: color-mix(in srgb, var(--ms-line) 46%, transparent);
   --bp-grid-main: var(--ms-line);
   background-image:
@@ -37,16 +37,16 @@
     repeating-linear-gradient(0deg, transparent 0 119px, var(--bp-grid-main) 119px 120px),
     repeating-linear-gradient(90deg, transparent 0 119px, var(--bp-grid-main) 119px 120px);
 }
-[data-theme='blueprint'] .blueprint-grid {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-grid {
   position: absolute;
   inset: 0;
 }
 /* 过中心的剖切轴线：点划线 */
-[data-theme='blueprint'] .blueprint-axis {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-axis {
   position: absolute;
   --bp-axis: color-mix(in srgb, var(--ms-ink) 9%, transparent);
 }
-[data-theme='blueprint'] .blueprint-axis-h {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-axis-h {
   left: 0;
   right: 0;
   top: 50%;
@@ -59,7 +59,7 @@
     transparent 25px 31px
   );
 }
-[data-theme='blueprint'] .blueprint-axis-v {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-axis-v {
   top: 0;
   bottom: 0;
   left: 50%;
@@ -72,14 +72,14 @@
     transparent 25px 31px
   );
 }
-[data-theme='blueprint'] .ms-topbar {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-topbar {
   letter-spacing: 0.18em;
   border-bottom-color: var(--ms-line2);
   background: color-mix(in srgb, var(--ms-bg) 82%, transparent);
 }
 
 /* ---------- 座位牌：图纸标记，四角带制图角标 ---------- */
-[data-theme='blueprint'] .ms-seat {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-seat {
   --bp-tick: color-mix(in srgb, var(--ms-ink) 70%, transparent);
   border-radius: 0;
   background:
@@ -93,79 +93,81 @@
     linear-gradient(var(--bp-tick), var(--bp-tick)) right bottom / 2px 10px no-repeat,
     color-mix(in srgb, var(--ms-panel) 90%, transparent);
 }
-[data-theme='blueprint'] .ms-seat[data-current] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-current] {
   --bp-tick: var(--ms-accb);
   box-shadow:
     0 0 0 1px var(--ms-accsoft),
     0 0 32px color-mix(in srgb, var(--ms-acc) 18%, transparent);
 }
-[data-theme='blueprint'] .ms-seat[data-lost] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-lost] {
   border-style: dashed;
 }
-[data-theme='blueprint'] .ms-seat[data-master] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-master] {
   box-shadow: 0 10px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
 }
-[data-theme='blueprint'] .ms-seat[data-master][data-current] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-seat[data-master][data-current] {
   box-shadow:
     0 0 0 1px var(--ms-accsoft),
     0 0 32px color-mix(in srgb, var(--ms-acc) 18%, transparent);
 }
-[data-theme='blueprint'] .ms-seat-flag {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-seat-flag {
   letter-spacing: 0.3em;
 }
 
 /* ---------- 卡面画框 / 层徽 / 骰子 ---------- */
-[data-theme='blueprint'] .ms-card {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-card {
   border-radius: 0;
   background: color-mix(in srgb, var(--ms-bg) 80%, var(--ms-panel));
 }
 /* 座位里的卡面外再套一圈细框，像图纸上的装订线 */
-[data-theme='blueprint'] .ms-seat:not([data-density='compact']) .ms-card {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime))
+  .ms-seat:not([data-density='compact'])
+  .ms-card {
   outline: 1px solid var(--ms-line);
   outline-offset: 2px;
 }
-[data-theme='blueprint'] .ms-layerbadge {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-layerbadge {
   border-radius: 0;
   border-style: solid;
   letter-spacing: 0.12em;
 }
-[data-theme='blueprint'] .ms-die {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-die {
   --die-fill: color-mix(in srgb, var(--die-color) 10%, var(--ms-bg));
   --die-pip: var(--die-color);
   border-radius: 1px;
   border: 1px solid color-mix(in srgb, var(--die-color) 52%, transparent);
   box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ms-bg) 70%, transparent);
 }
-[data-theme='blueprint'] .ms-die-pip {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-die-pip {
   box-shadow: 0 0 6px color-mix(in srgb, var(--die-color) 55%, transparent);
 }
-[data-theme='blueprint'] .ms-die[data-empty] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-die[data-empty] {
   background: transparent;
   border-style: dashed;
   box-shadow: none;
 }
 
 /* ---------- 手牌 / 底部坞 / 按钮 / 响应窗口 ---------- */
-[data-theme='blueprint'] .ms-handcard {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-handcard {
   border-radius: 0;
   background: var(--ms-bg);
 }
-[data-theme='blueprint'] .ms-handcard:hover {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-handcard:hover {
   box-shadow: 0 16px 34px color-mix(in srgb, var(--ms-bg) 75%, transparent);
 }
-[data-theme='blueprint'] .ms-handcard[data-selected],
-[data-theme='blueprint'] .ms-handcard[data-reading] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-handcard[data-selected],
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-handcard[data-reading] {
   box-shadow:
     0 0 0 1px var(--ms-acc),
     0 14px 32px color-mix(in srgb, var(--ms-acc) 14%, transparent);
 }
-[data-theme='blueprint'] .ms-handcard > span:last-child {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-handcard > span:last-child {
   border-top: 1px dashed var(--ms-line);
 }
-[data-theme='blueprint'] .ms-handcard-badge {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-handcard-badge {
   border-radius: 0;
 }
-[data-theme='blueprint'] .ms-dock {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-dock {
   background:
     repeating-linear-gradient(
       0deg,
@@ -180,30 +182,31 @@
     color-mix(in srgb, var(--ms-bg) 94%, var(--ms-panel));
   backdrop-filter: blur(6px);
 }
-[data-theme='blueprint'] .ms-btn {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-btn {
   border-radius: 0;
   letter-spacing: 0.24em;
 }
-[data-theme='blueprint'] .ms-btn[data-variant='primary']:not(:disabled):hover {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime))
+  .ms-btn[data-variant='primary']:not(:disabled):hover {
   box-shadow: 0 6px 24px color-mix(in srgb, var(--ms-acc) 30%, transparent);
 }
-[data-theme='blueprint'] .ms-response {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .ms-response {
   border-radius: 0;
   border-left: 3px solid var(--ms-acc);
   box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-bg) 60%, transparent);
 }
 
 /* ---------- 中央舞台：梦境剖面图 ---------- */
-[data-theme='blueprint'] .blueprint-head {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-head {
   border-bottom: 1px solid var(--ms-line2);
 }
-[data-theme='blueprint'] .blueprint-turn {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-turn {
   color: var(--ms-accb);
   background: var(--ms-accsoft);
   border: 1px solid var(--ms-accsoft);
 }
 /* 回合陀螺：黄铜锥面渐变的圆盘，缓缓旋转 */
-[data-theme='blueprint'] .blueprint-totem {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-totem {
   position: relative;
   display: block;
   width: 20px;
@@ -220,7 +223,7 @@
   box-shadow: 0 0 12px color-mix(in srgb, var(--ms-acc) 45%, transparent);
   animation: ms-spin 2.6s linear infinite;
 }
-[data-theme='blueprint'] .blueprint-totem::after {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)) .blueprint-totem::after {
   content: '';
   position: absolute;
   inset: 5px;
@@ -229,27 +232,32 @@
 }
 
 /* ---------- 动效开关 ---------- */
-[data-theme='blueprint']:root[data-fx-off~='grid'] .blueprint-grid {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-fx-off~='grid'] .blueprint-grid {
   display: none;
 }
-[data-theme='blueprint']:root[data-fx-off~='grid'] [data-layout='mobile'] {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-fx-off~='grid']
+  [data-layout='mobile'] {
   background-image: none;
 }
-[data-theme='blueprint']:root[data-fx-off~='totem'] .blueprint-totem {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-fx-off~='totem']
+  .blueprint-totem {
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-theme='blueprint']:root:not([data-motion='full']) .blueprint-totem,
-  [data-theme='blueprint']:root:not([data-motion='full']) .ms-seat-flag {
+  [data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root:not([data-motion='full'])
+    .blueprint-totem,
+  [data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root:not([data-motion='full'])
+    .ms-seat-flag {
     animation: none;
   }
 }
-[data-theme='blueprint']:root[data-motion='reduced'] .blueprint-totem,
-[data-theme='blueprint']:root[data-motion='reduced'] .ms-seat-flag {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-motion='reduced']
+  .blueprint-totem,
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-motion='reduced'] .ms-seat-flag {
   animation: none;
 }
-[data-theme='blueprint']:root[data-motion='reduced'] .ms-handcard,
-[data-theme='blueprint']:root[data-motion='reduced'] .ms-btn {
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-motion='reduced'] .ms-handcard,
+[data-theme='blueprint']:not(:has(.ms-tabletop-runtime)):root[data-motion='reduced'] .ms-btn {
   transition: none;
 }
