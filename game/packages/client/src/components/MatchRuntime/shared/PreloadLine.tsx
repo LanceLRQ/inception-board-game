@@ -23,7 +23,7 @@ export function PreloadLine({ preload }: { preload: PreloadProgress | null }) {
         data-testid="asset-preload-progress"
         className={cn(
           'pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-line transition-opacity duration-500',
-          done ? 'opacity-30' : 'opacity-100',
+          done ? 'opacity-0' : 'opacity-100',
         )}
       >
         <div

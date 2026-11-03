@@ -22,6 +22,7 @@ function recordMoves(page: Page): SentMove[] {
         sent.push({ move: ctx.move, args: ctx.args });
       });
   });
+  await page.getByTestId('target-player-confirm').click();
   return sent;
 }
 
@@ -45,6 +46,7 @@ async function playShootFrom(page: Page, url: string): Promise<SentMove[]> {
     .and(page.locator(':enabled'))
     .first()
     .click();
+  await page.getByTestId('target-player-confirm').click();
   return sent;
 }
 

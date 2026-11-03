@@ -133,6 +133,7 @@ test.describe('梦主 · 免费移动', () => {
     await expect(page.getByTestId('target-layer-3')).toBeDisabled();
 
     await page.getByTestId('target-layer-2').click();
+    await page.getByTestId('target-layer-confirm').click();
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
     expect(sent[0]).toEqual({ move: 'dreamMasterMove', args: [2] });
   });

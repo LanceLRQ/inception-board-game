@@ -8,6 +8,7 @@ async function openOutcome(page: import('@playwright/test').Page, query: string)
   await page.goto(`/game/debug?${query}`);
   await waitForAppReady(page);
   await expect(page.getByTestId('winner-banner')).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: '查看结算' }).click();
 }
 
 test.describe('固定场景 · 局后举报', () => {

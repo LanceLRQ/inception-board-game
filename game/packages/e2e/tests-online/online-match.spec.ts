@@ -114,6 +114,13 @@ async function currentTurn(page: Page): Promise<number> {
 
 /** 轮到自己时做最简单的合法操作；返回本轮是否点击过。其余座位交给服务端超时代发 */
 async function actOnce(page: Page): Promise<boolean> {
+  const dice = page.getByTestId('dice-gate');
+  if (await dice.isVisible()) {
+    const roll = page.getByTestId('dice-roll-button');
+    if ((await roll.isVisible()) && (await roll.isEnabled())) await roll.click();
+    else await dice.getByRole('button', { name: '收起', exact: true }).click();
+    return true;
+  }
   const draw = page.getByTestId('action-draw');
   const end = page.getByTestId('action-end');
   const skip = page.getByTestId('action-skip-discard');
@@ -136,17 +143,12 @@ async function actOnce(page: Page): Promise<boolean> {
     await skip.click({ timeout: 1_500 });
     return true;
   }
-  if (await confirm.isVisible()) {
-    // 按钮文案形如「确认弃牌（0/N）」，N 为必须弃掉的张数；弃牌选择按手牌位置记录，同名牌也能同时选中
-    const required = Number(/\/\s*(\d+)/.exec((await confirm.textContent()) ?? '')?.[1]);
+  const note = (await page.locator('.tabletop-hand-actions [role="status"]').textContent()) ?? '';
+  const required = Number(/选择 (\d+) 张弃牌/.exec(note)?.[1]);
+  if (required > 0) {
     const cards = page.getByTestId('human-hand').locator('[data-testid^="card-"]');
-    const count = await cards.count();
-    let picked = 0;
-    for (let i = 0; i < count && picked < required; i++) {
-      await cards.nth(i).click({ timeout: 1_500 });
-      picked += 1;
-    }
-    if (picked === required && (await confirm.isEnabled())) {
+    for (let i = 0; i < required; i++) await cards.nth(i).click({ timeout: 1_500 });
+    if (await confirm.isEnabled()) {
       await confirm.click({ timeout: 1_500 });
       return true;
     }
@@ -255,8 +257,10 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
     await expect(b.page.getByTestId('winner-banner')).toBeVisible({ timeout: 30_000 });
     state.over = true;
     await driving;
-    const bannerA = (await a.page.getByTestId('winner-banner').locator('h2').textContent()) ?? '';
-    const bannerB = (await b.page.getByTestId('winner-banner').locator('h2').textContent()) ?? '';
+    const bannerA =
+      (await a.page.getByTestId('winner-banner').locator('strong').textContent()) ?? '';
+    const bannerB =
+      (await b.page.getByTestId('winner-banner').locator('strong').textContent()) ?? '';
     expect(bannerA.trim().length).toBeGreaterThan(0);
     expect(bannerA.trim()).toBe(bannerB.trim());
 
@@ -265,6 +269,7 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
       [a, seatB],
       [b, seatA],
     ] as const) {
+      await me.page.getByRole('button', { name: '查看结算' }).click();
       await expect(me.page.getByTestId('outcome-report')).toBeVisible();
       await expect(me.page.locator('[data-testid^="report-row-"]')).toHaveCount(1);
       await expect(me.page.getByTestId(`report-button-${other}`)).toBeEnabled();

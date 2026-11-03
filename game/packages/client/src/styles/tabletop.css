@@ -1903,3 +1903,43 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
   font-weight: 600;
   text-align: left;
 }
+.tabletop-mobile-heading > button {
+  min-height: 44px;
+  padding: 4px;
+  font-size: 12px;
+  color: var(--ms-dim);
+}
+.tabletop-mobile-seat-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.tabletop-mobile-seat-list > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tabletop-mobile-seat-list > div > button {
+  width: 44px;
+  height: 62px;
+  flex-shrink: 0;
+}
+.tabletop-mobile-seat-list strong {
+  font-size: 14px;
+}
+.tabletop-mobile-seat-list p {
+  font-size: 12px;
+  color: var(--ms-dim);
+  margin-block: 4px;
+}
+@media (max-width: 1023px) {
+  .tabletop-piles [data-testid='pile-played'] > span:last-child {
+    overflow-x: auto;
+  }
+  .tabletop-piles [data-testid='pile-played'] button {
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+    margin-left: 0;
+  }
+}

@@ -10,7 +10,7 @@ test.describe('掷骰闸门', () => {
     await waitForAppReady(page);
     const gate = page.getByTestId('dice-gate');
     await expect(gate).toBeVisible({ timeout: 10_000 });
-    await expect(gate).toHaveAttribute('data-can-roll', 'true');
+    await expect(gate).toContainText('准备掷骰');
     await expect(gate).toContainText(/SHOOT/);
     const roll = page.getByTestId('dice-roll-button');
     await expect(roll).toBeEnabled();
@@ -30,7 +30,7 @@ test.describe('掷骰闸门', () => {
     const gate = page.getByTestId('dice-gate');
     await expect(gate).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('dice-roll-button')).toHaveCount(0);
-    await expect(page.getByTestId('dice-gate-waiting')).toContainText(/1\/\d|1 ?\/ ?\d/);
+    await expect(gate.locator('[role=status]')).toContainText(/1\/\d|1 ?\/ ?\d/);
     const rollers = page.getByTestId('dice-gate-rollers').locator('li');
     expect(await rollers.count()).toBeGreaterThan(1);
     await expect(rollers.and(page.locator('[data-rolled]'))).toHaveCount(1);

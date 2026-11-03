@@ -6,6 +6,7 @@ import type { MatchController } from '../controllerTypes';
 import { MatchOutcome } from '../shared/MatchOutcome';
 import { PreloadLine } from '../shared/PreloadLine';
 import { useMobileMode } from './useMobileMode';
+import { MobileTableInfo } from './MobileTableInfo';
 import { MobileDock } from './MobileDock';
 import { MobileNotices } from './MobileNotices';
 import { MobileTopBar } from './MobileTopBar';
@@ -40,7 +41,7 @@ export function MobileLayout({ controller, boardHandle, topRight, onRestart }: M
           <section className="tabletop-mobile-board" data-testid="runtime-stage">
             <header className="tabletop-mobile-heading">
               <h2>深入梦境</h2>
-              <span>点击头像与层数查看说明</span>
+              <MobileTableInfo controller={controller} state={state} />
             </header>
             {controller.winner && (
               <MatchOutcome

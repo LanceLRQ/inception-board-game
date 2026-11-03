@@ -42,8 +42,10 @@ function DicePresentation({ controller }: { controller: MatchController }) {
   const seconds = useDiceSeconds(controller, gate?.id ?? null);
   const key = gate ? `gate:${gate.id}` : result ? `result:${result.id}` : null;
   const [closed, setClosed] = useState<string | null>(gate ? null : key);
+  const [review, setReview] = useState<string | null>(null);
   const [sentFor, setSentFor] = useState<number | null>(null);
   if (!key) return null;
+  const open = closed !== key && (!controller.winner || review === key);
   const name = (id: string) =>
     id === controller.viewerSeat ? t('fx.you') : controller.nicknameOf(id);
   const sent = gate && sentFor === gate.id;
@@ -56,13 +58,20 @@ function DicePresentation({ controller }: { controller: MatchController }) {
   };
   return (
     <>
-      {closed === key && (
-        <button type="button" className="tabletop-dice-resume" onClick={() => setClosed(null)}>
+      {!open && (
+        <button
+          type="button"
+          className="tabletop-dice-resume"
+          onClick={() => {
+            setClosed(null);
+            setReview(key);
+          }}
+        >
           {gate ? '继续掷骰' : '查看上次掷骰'}
         </button>
       )}
       <Dialog
-        open={closed !== key}
+        open={open}
         onOpenChange={(open) => {
           if (!open) setClosed(key);
         }}
