@@ -67,7 +67,10 @@ export interface LobbyPrisma {
 export interface LobbyDeps {
   redis?: LobbyRedis;
   prisma?: LobbyPrisma;
-  matches?: Pick<MatchService, 'createFromRoom' | 'discardMatch' | 'isRunning'>;
+  matches?: Pick<
+    MatchService,
+    'createFromRoom' | 'discardMatch' | 'isRunning' | 'stopMatch' | 'leaveMatch'
+  >;
   /** 房间内容变了（成员增减、补 Bot、开始游戏）并已保存之后调用；它抛错不影响请求 */
   onRoomChange?: (room: RoomState) => void;
 }
@@ -109,7 +112,10 @@ export class LobbyService {
   private readonly redis: LobbyRedis;
   private readonly prisma: LobbyPrisma;
   private readonly matches:
-    | Pick<MatchService, 'createFromRoom' | 'discardMatch' | 'isRunning'>
+    | Pick<
+        MatchService,
+        'createFromRoom' | 'discardMatch' | 'isRunning' | 'stopMatch' | 'leaveMatch'
+      >
     | undefined;
   private readonly onRoomChange: ((room: RoomState) => void) | undefined;
 
@@ -210,6 +216,13 @@ export class LobbyService {
     const idx = room.players.findIndex((p) => p.playerId === playerId);
     if (idx === -1) return;
 
+    if (room.status === 'playing') {
+      if (room.ownerPlayerId === playerId) {
+        throw new AppError('CONFLICT', '房主请使用结束本局');
+      }
+      if (!this.matches || !room.matchId) throw new AppError('INTERNAL_ERROR', '对局服务未就绪');
+      await this.matches.leaveMatch(room.matchId, playerId);
+    }
     room.players.splice(idx, 1);
 
     if (room.players.length === 0) {
@@ -225,6 +238,19 @@ export class LobbyService {
 
     await this.saveRoom(room);
     logger.info({ roomId: room.id, playerId }, 'Player left room');
+  }
+
+  async endGame(code: string, requesterId: string): Promise<void> {
+    const room = await this.getRoom(code);
+    if (!room) throw new AppError('NOT_FOUND', '房间不存在或已过期');
+    if (room.ownerPlayerId !== requesterId) throw new AppError('FORBIDDEN', '只有房主才能结束本局');
+    if (room.status === 'finished') return;
+    if (room.status !== 'playing' || !room.matchId) throw new AppError('CONFLICT', '游戏尚未开始');
+    if (!this.matches) throw new AppError('INTERNAL_ERROR', '对局服务未就绪');
+    await this.matches.stopMatch(room.matchId);
+    room.status = 'finished';
+    await this.saveRoom(room);
+    logger.info({ roomId: room.id, requesterId }, 'Room match ended');
   }
 
   async kickPlayer(code: string, requesterId: string, targetId: string): Promise<RoomState> {

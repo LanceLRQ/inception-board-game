@@ -285,6 +285,8 @@ export class MatchSocket {
     if (
       msg?.code === 'REPLACED' ||
       msg?.code === 'MATCH_ABORTED' ||
+      msg?.code === 'MATCH_ENDED_BY_HOST' ||
+      msg?.code === 'MATCH_LEFT' ||
       msg?.code === 'BANNED' ||
       msg?.code === TOKEN_REVOKED_CODE
     ) {

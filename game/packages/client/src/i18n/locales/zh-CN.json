@@ -294,7 +294,9 @@
       "REPLACED": "你已在其他页面进入这局对局",
       "TOKEN_REVOKED": "这个账号已在其他设备上恢复，请重新进入",
       "BANNED": "这个账号已被封禁，无法进入对局",
-      "MATCH_ABORTED": "服务器无法继续这局对局，请稍后重新进入"
+      "MATCH_ABORTED": "服务器无法继续这局对局，请稍后重新进入",
+      "MATCH_ENDED_BY_HOST": "房主已结束本局游戏",
+      "MATCH_LEFT": "你已退出本局，席位由 Bot 接管"
     }
   },
   "network": {

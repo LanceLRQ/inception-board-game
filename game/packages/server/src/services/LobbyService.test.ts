@@ -69,6 +69,8 @@ describe('LobbyService', () => {
     createFromRoom: Mock<(room: RoomState) => Promise<string>>;
     discardMatch: Mock<(matchID: string) => Promise<void>>;
     isRunning: Mock<(matchID: string) => boolean>;
+    stopMatch: Mock<(matchID: string) => Promise<void>>;
+    leaveMatch: Mock<(matchID: string, playerId: string) => Promise<void>>;
   };
 
   beforeEach(() => {
@@ -77,9 +79,47 @@ describe('LobbyService', () => {
       createFromRoom: vi.fn(async (room: RoomState) => room.id),
       discardMatch: vi.fn(async () => undefined),
       isRunning: vi.fn(() => false),
+      stopMatch: vi.fn(async () => undefined),
+      leaveMatch: vi.fn(async () => undefined),
     };
     service = new LobbyService({ matches });
     vi.clearAllMocks();
+  });
+
+  describe('结束本局权限', () => {
+    async function playingRoom() {
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await service.createRoom('P1');
+      await service.joinRoom(room.code, 'P2');
+      await service.fillAI(room.code, 'P1', 2);
+      await service.startGame(room.code, 'P1');
+      return room;
+    }
+
+    it('成员与外部账号不能结束整桌，房主可结束且重复请求幂等', async () => {
+      const room = await playingRoom();
+      for (const player of ['P2', 'outsider']) {
+        await expect(service.endGame(room.code, player)).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+        });
+      }
+      expect((await service.getRoom(room.code))?.status).toBe('playing');
+      await service.endGame(room.code, 'P1');
+      await service.endGame(room.code, 'P1');
+      expect((await service.getRoom(room.code))?.status).toBe('finished');
+      expect(matches.stopMatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('成员退出保留房主和整桌，房主不能绕过结束接口直接离席', async () => {
+      const room = await playingRoom();
+      await expect(service.leaveRoom(room.code, 'P1')).rejects.toMatchObject({ code: 'CONFLICT' });
+      await service.leaveRoom(room.code, 'P2');
+      const saved = await service.getRoom(room.code);
+      expect(saved?.status).toBe('playing');
+      expect(saved?.ownerPlayerId).toBe('P1');
+      expect(saved?.players.some((p) => p.playerId === 'P2')).toBe(false);
+      expect(matches.leaveMatch).toHaveBeenCalledWith(room.id, 'P2');
+    });
   });
 
   describe('createRoom', () => {
@@ -534,7 +574,7 @@ describe('LobbyService', () => {
   });
 
   describe('房间变化通知', () => {
-    it('加入、补 Bot、离开、踢人、开始游戏保存之后各通知一次；创建与读取不通知', async () => {
+    it('加入、补 Bot、踢人、开始和结束游戏保存之后各通知一次；创建与读取不通知', async () => {
       const changes: RoomState[] = [];
       const svc = new LobbyService({
         matches,
@@ -561,8 +601,9 @@ describe('LobbyService', () => {
       expect(changes).toHaveLength(4);
       expect(changes[3]).toMatchObject({ status: 'playing', matchId: room.id });
 
-      await svc.leaveRoom(room.code, 'P1');
+      await svc.endGame(room.code, 'P1');
       expect(changes).toHaveLength(5);
+      expect(changes[4]?.status).toBe('finished');
     });
 
     it('监听函数抛错不影响请求本身', async () => {

@@ -341,6 +341,16 @@ describe('MatchSocket', () => {
     expect(socket.connectCalls).toBe(1);
   });
 
+  it.each(['MATCH_ENDED_BY_HOST', 'MATCH_LEFT'])('收到 %s 后停止重连且不能再发送行动', (code) => {
+    ready(1);
+    socket.fire('icg:error', { type: 'icg:error', code, message: 'x' });
+    expect(ms.getSnapshot().fatal).toBe(code);
+    expect(ms.getSnapshot().connection).toBe('failed');
+    socket.connected = false;
+    socket.fire('disconnect', 'io server disconnect');
+    expect(socket.connectCalls).toBe(1);
+  });
+
   it('sendMove 发出带新 intentId 与当前 stateID 的 icg:move，收到结果后完成', async () => {
     ready(7);
     const p = ms.sendMove('play', [1, 2]);

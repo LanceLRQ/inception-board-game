@@ -134,6 +134,11 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     onStorageHealth: (matchID, healthy) => gateway.sendStorageHealth(matchID, healthy),
     onResync: (matchID) => gateway.resyncMatch(matchID),
     onAborted: (matchID) => gateway.abortMatch(matchID),
+    onStopped: (matchID) => {
+      gateway.abortMatch(matchID, 'MATCH_ENDED_BY_HOST');
+      chat.disposeMatch(matchID);
+    },
+    onPlayerLeft: (matchID, seat) => gateway.removeMatchSeat(matchID, seat),
     // 大厅在对局服务之后才建好；恢复时才会用到，那时 lobby 已就绪
     lookupRoom: (code): Promise<RoomState | null> => lobby.getRoom(code),
     // 对局结束的标记已在最后一条 icg:step 的视图里；这一局的短语冷却记录随之回收

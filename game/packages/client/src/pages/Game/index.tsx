@@ -95,6 +95,7 @@ function OnlineMatch({
   return (
     <RemoteMatchRuntime
       url={realtimeUrl()}
+      roomCode={roomCode}
       token={token}
       matchID={matchID}
       topRight={roomCode && <RoomCodeBadge code={roomCode} />}

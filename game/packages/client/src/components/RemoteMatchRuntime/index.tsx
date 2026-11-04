@@ -1,6 +1,12 @@
 // 远程对局界面：连接服务端、重连提示，把状态交给与本地对局共用的对局界面
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useIdentityStore } from '../../stores/useIdentityStore';
+import { api } from '../../lib/api';
+import type { RoomState } from '../../lib/roomApi';
+import { roomKeys } from '../../lib/roomQueries';
+import { OnlineMatchActions } from './OnlineMatchActions';
 import { useTranslation } from 'react-i18next';
 import { useRemoteMatchSource } from '../../match/useRemoteMatchSource';
 import { useReconnect } from '../../hooks/useReconnect';
@@ -15,6 +21,7 @@ export interface RemoteMatchRuntimeProps {
   token: string;
   matchID: string;
   topRight?: ReactNode;
+  roomCode?: string | null;
   onExit: () => void;
   /** 对局不会再继续时通知一次：打完（finished）或握手被拒（rejected） */
   onSettled?: (reason: 'finished' | 'rejected') => void;
@@ -25,10 +32,21 @@ export function RemoteMatchRuntime({
   token,
   matchID,
   topRight,
+  roomCode,
   onExit,
   onSettled,
 }: RemoteMatchRuntimeProps) {
   const { t } = useTranslation();
+  const playerId = useIdentityStore((state) => state.playerId);
+  const roomQuery = useQuery({
+    queryKey: roomKeys.detail(roomCode ?? ''),
+    queryFn: () => api.get<RoomState>(`/rooms/code/${encodeURIComponent(roomCode!)}`),
+    enabled: !!roomCode,
+    // 开始游戏后可能仍缓存着 waiting 状态，进对局时重新核对房主与成员。
+    refetchOnMount: 'always',
+  });
+  const room = roomQuery.data;
+
   const source = useRemoteMatchSource({ url, token, matchID });
   const reconnect = useReconnect({ connectionState: source.connection });
 
@@ -62,7 +80,10 @@ export function RemoteMatchRuntime({
         className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-4 text-foreground"
         data-testid="remote-runtime"
       >
-        <p className="text-sm text-destructive" data-testid="remote-error">
+        <p
+          className={`text-sm ${source.error === 'match.fatal.MATCH_ENDED_BY_HOST' || source.error === 'match.fatal.MATCH_LEFT' ? 'text-foreground' : 'text-destructive'}`}
+          data-testid="remote-error"
+        >
           {t(source.error, { defaultValue: source.error })}
         </p>
         <button
@@ -89,7 +110,25 @@ export function RemoteMatchRuntime({
           {t('match.connecting', { defaultValue: '正在连接' })}
         </div>
       ) : (
-        <MatchRuntime source={source} topRight={topRight} onRestart={onExit} />
+        <MatchRuntime
+          source={source}
+          topRight={
+            <>
+              {topRight}
+              {room &&
+                room.matchId === matchID &&
+                room.status === 'playing' &&
+                room.players.some((p) => p.playerId === playerId) && (
+                  <OnlineMatchActions
+                    code={room.code}
+                    isOwner={room.ownerPlayerId === playerId}
+                    onExit={onExit}
+                  />
+                )}
+            </>
+          }
+          onRestart={onExit}
+        />
       )}
     </div>
   );

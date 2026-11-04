@@ -110,6 +110,17 @@ function makeStub() {
 }
 
 describe('PrismaMatchArchive', () => {
+  it('主动结束只写结束时间和中止原因，不写胜负与隐藏阵营', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    await archive.recordStop('m1');
+    expect(stub.match.update).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      data: { endedAt: expect.any(Date), winner: null, winReason: 'host_ended' },
+    });
+    expect(stub.matchPlayer.update).not.toHaveBeenCalled();
+  });
+
   it('recordStart：upsert 对局行，种子只存 sha256 且原文不出现在任何写入里', async () => {
     const stub = makeStub();
     const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);

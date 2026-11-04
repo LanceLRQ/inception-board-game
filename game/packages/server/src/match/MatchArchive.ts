@@ -49,6 +49,8 @@ export interface MatchArchive {
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
   ): Promise<void>;
+  /** 主动中止：记录结束时间，不公开阵营、不产生胜负。 */
+  recordStop(matchID: string): Promise<void>;
   listSteps(matchID: string): Promise<StepRow[]>;
   /** 记一段缺失的步骤；同一个 to 已记过视为已记录 */
   recordGap(matchID: string, fromStateID: number, toStateID: number): Promise<void>;
@@ -99,6 +101,10 @@ export class InMemoryMatchArchive implements MatchArchive {
     _seats: readonly RoomSeat[],
   ): Promise<void> {
     this.finished.set(matchID, structuredClone(final));
+    this.endedAt.set(matchID, new Date());
+  }
+
+  async recordStop(matchID: string): Promise<void> {
     this.endedAt.set(matchID, new Date());
   }
 
@@ -278,6 +284,13 @@ export class PrismaMatchArchive implements MatchArchive {
         data: { finalFaction: p.faction, won: winner === null ? null : p.faction === winner },
       });
     }
+  }
+
+  async recordStop(matchID: string): Promise<void> {
+    await this.prisma.match.update({
+      where: { id: matchID },
+      data: { endedAt: new Date(), winner: null, winReason: 'host_ended' },
+    });
   }
 
   async listSteps(matchID: string): Promise<StepRow[]> {

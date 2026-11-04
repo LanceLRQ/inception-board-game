@@ -22,6 +22,8 @@ export interface RoomSeat {
   playerId: string | null;
   nickname: string;
   isBot: boolean;
+  /** 主动退出的真人席位，由 Bot 永久接管，账号归属仍保留供归档。 */
+  departed?: boolean;
   /** 像素头像种子：建局时取自房间成员，公开信息 */
   avatarSeed?: string;
 }
@@ -38,7 +40,11 @@ export interface StepOutput {
 export interface RoomDeps {
   game: GameDef<SetupState>;
   /** 写快照；返回 'conflict' 表示版本对不上 */
-  persist(state: MatchState<SetupState>, expectedStateID: number): Promise<'ok' | 'conflict'>;
+  persist(
+    state: MatchState<SetupState>,
+    expectedStateID: number,
+    seats?: readonly RoomSeat[],
+  ): Promise<'ok' | 'conflict'>;
   /** 一步被接受并写完快照后调用；它抛错不影响对局 */
   onStep(output: StepOutput): void | Promise<void>;
   onGameOver(state: MatchState<SetupState>): void | Promise<void>;
@@ -70,7 +76,13 @@ export type SubmitResult =
   | { ok: true; stateID: number }
   | {
       ok: false;
-      code: 'duplicate_intent' | 'stale_state' | 'match_over' | 'internal_error' | RejectReason;
+      code:
+        | 'duplicate_intent'
+        | 'stale_state'
+        | 'match_over'
+        | 'not_in_match'
+        | 'internal_error'
+        | RejectReason;
     };
 
 /** 幂等表容量 */
@@ -102,7 +114,7 @@ export class MatchRoom {
   readonly matchID: string;
 
   private state: MatchState<SetupState>;
-  private readonly seatList: readonly RoomSeat[];
+  private seatList: readonly RoomSeat[];
   private readonly deps: RoomDeps;
 
   private tail: Promise<void> = Promise.resolve();
@@ -157,6 +169,9 @@ export class MatchRoom {
   ): Promise<SubmitResult> {
     return this.enqueue(async () => {
       if (this.closed || this.over) return { ok: false, code: 'match_over' };
+      if (this.seatList.some((s) => s.seat === seat && s.departed)) {
+        return { ok: false, code: 'not_in_match' };
+      }
 
       const intentKey = `${seat}:${input.intentId}`;
       const known = this.intents.get(intentKey);
@@ -213,6 +228,17 @@ export class MatchRoom {
     return this.seatList;
   }
 
+  /** 与玩家行动串行写入退出标记，保存成功后才交给 Bot。 */
+  leaveSeat(seat: string): Promise<void> {
+    return this.enqueue(async () => {
+      const next = this.seatList.map((s) => (s.seat === seat ? { ...s, departed: true } : s));
+      if (this.closed || this.over) return;
+      const saved = await this.deps.persist(this.state, this.state.stateID, next);
+      if (saved !== 'ok') throw new Error('退出时对局版本已变化，请重试');
+      this.seatList = next;
+    });
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -254,13 +280,13 @@ export class MatchRoom {
 
   private humanSeats(): string[] {
     return this.seatList
-      .filter((s) => !s.isBot && !this.deps.isTakenOver(s.seat))
+      .filter((s) => !s.isBot && !s.departed && !this.deps.isTakenOver(s.seat))
       .map((s) => s.seat);
   }
 
-  /** 真正的 Bot 座位：才会在出牌阶段按策略打行动牌（托管中的真人座位不算） */
+  /** Bot 与主动退出的席位按策略出牌；暂时托管的真人仍只代发基础行动。 */
   private botSeats(): string[] {
-    return this.seatList.filter((s) => s.isBot).map((s) => s.seat);
+    return this.seatList.filter((s) => s.isBot || s.departed).map((s) => s.seat);
   }
 
   /** 当前掷骰闸门开了多久；换了一道闸门就从现在重新记 */

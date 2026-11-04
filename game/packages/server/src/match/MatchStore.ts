@@ -36,6 +36,7 @@ export interface MatchStore {
     state: MatchState<SetupState>,
     expectedStateID: number,
     now: number,
+    seats?: readonly RoomSeat[],
   ): Promise<'ok' | 'conflict'>;
   load(matchID: string): Promise<MatchSnapshot | null>;
   listActive(): Promise<string[]>;
@@ -64,10 +65,16 @@ export class InMemoryMatchStore implements MatchStore {
     state: MatchState<SetupState>,
     expectedStateID: number,
     now: number,
+    seats?: readonly RoomSeat[],
   ): Promise<'ok' | 'conflict'> {
     const cur = this.snapshots.get(matchID);
     if (!cur || cur.state.stateID !== expectedStateID) return 'conflict';
-    this.snapshots.set(matchID, { ...cur, state: structuredClone(state), updatedAt: now });
+    this.snapshots.set(matchID, {
+      ...cur,
+      state: structuredClone(state),
+      updatedAt: now,
+      ...(seats ? { seats: structuredClone([...seats]) } : {}),
+    });
     return 'ok';
   }
 
@@ -149,13 +156,19 @@ export class RedisMatchStore implements MatchStore {
     state: MatchState<SetupState>,
     expectedStateID: number,
     now: number,
+    seats?: readonly RoomSeat[],
   ): Promise<'ok' | 'conflict'> {
     const key = RedisKeys.matchSnapshot(matchID);
     const raw = await this.redis.get(key);
     if (raw === null) return 'conflict';
     const cur = JSON.parse(raw) as MatchSnapshot;
     if (cur.state.stateID !== expectedStateID) return 'conflict';
-    const next: MatchSnapshot = { ...cur, state, updatedAt: now };
+    const next: MatchSnapshot = {
+      ...cur,
+      state,
+      updatedAt: now,
+      ...(seats ? { seats: [...seats] } : {}),
+    };
     const res = await this.redis.eval(SAVE_SCRIPT, 1, key, raw, JSON.stringify(next));
     return res === 'ok' ? 'ok' : 'conflict';
   }

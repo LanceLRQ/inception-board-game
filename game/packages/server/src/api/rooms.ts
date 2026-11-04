@@ -103,5 +103,10 @@ export function createRoomsRouter(lobby: LobbyService): Router {
     ctx.body = { matchId };
   });
 
+  router.post('/rooms/:code/end', async (ctx) => {
+    await lobby.endGame(ctx.params.code!, ctx.state.player.playerId);
+    ctx.body = { ok: true };
+  });
+
   return router;
 }

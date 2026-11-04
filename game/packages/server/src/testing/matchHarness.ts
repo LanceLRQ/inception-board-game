@@ -29,7 +29,7 @@ import type { TimingConfig } from '../match/scheduling.js';
 import { InMemoryBanChecker } from '../services/BanChecker.js';
 import { InMemoryChatLog } from '../services/ChatLog.js';
 import { BotManager, type BotManagerOptions } from '../services/BotManager.js';
-import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
+import type { LobbyRedis, RoomPlayer, RoomState } from '../services/LobbyService.js';
 import { InMemoryRateGuard, type RateGuardMutable } from '../services/RateGuardService.js';
 
 /** 测试用的短时长：Bot 步 1 毫秒，各类截止 40 毫秒 */
@@ -44,6 +44,7 @@ export const FAST_TIMING: TimingConfig = {
 export const HAND_LIMIT = 5;
 
 export interface ServerOptions {
+  lobbyRedis?: LobbyRedis;
   store?: MatchStore;
   archive?: MatchArchive;
   /** 聊天记录；不给时用内存实现 */
@@ -83,7 +84,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<TestServer>
     store,
     archive,
     chatLog,
-    lobbyRedis: {
+    lobbyRedis: opts.lobbyRedis ?? {
       get: noop,
       setex: async () => 'OK',
       set: async () => 'OK',

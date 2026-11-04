@@ -47,6 +47,8 @@ export interface MatchServiceDeps {
   onResync?(matchID: string): void;
   /** 对局无法继续（重新加载失败）：通知这一局的连接并断开 */
   onAborted?(matchID: string): void;
+  onStopped?(matchID: string): void;
+  onPlayerLeft?(matchID: string, seat: string): void;
   /** 按房间码读房间状态，用来识别撤销没删干净的残留快照；不注入时恢复不做这项判断 */
   lookupRoom?(roomCode: string): Promise<Pick<RoomState, 'status'> | null>;
 }
@@ -133,6 +135,34 @@ export class MatchService {
     await this.teardown(matchID);
   }
 
+  /** 房主主动中止；保留步骤归档，不伪造引擎胜负。 */
+  async stopMatch(matchID: string): Promise<void> {
+    const room = this.rooms.get(matchID);
+    if (!room) return;
+    room.close();
+    await room.idle();
+    if (!(await this.archiver.drain(matchID))) {
+      throw new AppError('INTERNAL_ERROR', '历史记录尚未保存，请重试');
+    }
+    if (room.current().ctx.gameover === undefined) await this.deps.archive.recordStop(matchID);
+    await this.deps.store.discard(matchID);
+    this.rooms.delete(matchID);
+    this.deps.bot.disposeMatch(matchID);
+    this.deps.onStopped?.(matchID);
+    logger.info({ matchID }, 'match ended by room owner');
+  }
+
+  async leaveMatch(matchID: string, playerId: string): Promise<void> {
+    const room = this.rooms.get(matchID);
+    const seat = this.seatOf(matchID, playerId);
+    if (!room || seat === null) return;
+    await room.leaveSeat(seat);
+    if (!room.seats().some((s) => s.seat === seat && s.departed)) return;
+    this.deps.bot.markPermanent(matchID, seat);
+    this.deps.onPlayerLeft?.(matchID, seat);
+    logger.info({ matchID, seat }, 'player left match, bot takes over');
+  }
+
   private async teardown(matchID: string): Promise<void> {
     const room = this.rooms.get(matchID);
     this.rooms.delete(matchID);
@@ -172,7 +202,7 @@ export class MatchService {
     if (playerId === '') return null;
     const room = this.rooms.get(matchID);
     if (!room) return null;
-    const hit = room.seats().find((s) => !s.isBot && s.playerId === playerId);
+    const hit = room.seats().find((s) => !s.isBot && !s.departed && s.playerId === playerId);
     return hit?.seat ?? null;
   }
 
@@ -246,6 +276,10 @@ export class MatchService {
     else await this.reconcileArchive(matchID, replacing.current().stateID, state.stateID);
     if (!stillCurrent()) return 'superseded';
 
+    if (state.ctx.gameover === undefined && (await this.deps.archive.matchInfo(matchID))?.endedAt) {
+      await this.deps.store.discard(matchID);
+      return 'discarded';
+    }
     if (state.ctx.gameover !== undefined) {
       logger.info({ matchID, stateID: state.stateID }, 'restored match already over');
       await this.finishMatch(matchID, state, snapshot.seats);
@@ -380,8 +414,8 @@ export class MatchService {
     const { deps } = this;
     const room: MatchRoom = new MatchRoom(matchID, seats, state, {
       game,
-      persist: (next, expectedStateID) =>
-        deps.store.save(matchID, next, expectedStateID, deps.timers.now()),
+      persist: (next, expectedStateID, nextSeats) =>
+        deps.store.save(matchID, next, expectedStateID, deps.timers.now(), nextSeats),
       onStep: async (output) => {
         // 入队立即返回：归档在后台按序写、失败重试，不拖慢对局
         this.archiver.enqueue({
@@ -415,7 +449,8 @@ export class MatchService {
     // （原地替换时座位的在线记录仍然有效，不重置）
     if (!inPlace) {
       for (const s of seats) {
-        if (!s.isBot) deps.bot.onDisconnect(matchID, s.seat);
+        if (s.departed) deps.bot.markPermanent(matchID, s.seat);
+        else if (!s.isBot) deps.bot.onDisconnect(matchID, s.seat);
       }
     }
     room.start();

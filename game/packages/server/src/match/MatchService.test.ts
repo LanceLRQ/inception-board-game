@@ -1389,3 +1389,46 @@ describe('MatchService 结尾缺步时不报完整', () => {
     expect(gaps[0]!.from).toBe(1);
   });
 });
+
+describe('主动结束与退出', () => {
+  it('结束后停止行动、保留公开历史且不产生胜负，重启不会恢复', async () => {
+    const onStopped = vi.fn();
+    const h = makeHarness({ onStopped });
+    const id = await h.svc.createFromRoom(makeRoom(4, [0, 1]));
+    await fireSteps(h, id, 1);
+    const room = h.svc.get(id)!;
+    const before = room.current().stateID;
+    await h.svc.stopMatch(id);
+    expect(h.svc.get(id)).toBeNull();
+    expect(await h.store.listActive()).toEqual([]);
+    expect(await h.archive.listSteps(id)).toHaveLength(before);
+    expect((await h.archive.matchInfo(id))?.endedAt).toBeInstanceOf(Date);
+    expect(h.archive.finished.has(id)).toBe(false);
+    expect(onStopped).toHaveBeenCalledWith(id);
+    expect(await room.submit('0', { move: 'doDraw', args: [], intentId: 'late' })).toEqual({
+      ok: false,
+      code: 'match_over',
+    });
+    const restored = makeHarness({}, h);
+    expect((await restored.svc.restoreAll()).restored).toBe(0);
+  });
+
+  it('成员退出由 Bot 接管，其余玩家继续，退出席位重启后也不能重新操作', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0, 1]));
+    await h.svc.leaveMatch(id, 'acct-1');
+    expect(h.svc.seatOf(id, 'acct-1')).toBeNull();
+    expect(h.svc.seatOf(id, 'acct-0')).toBe('0');
+    expect(h.bot.isBotControlled(id, '1')).toBe(true);
+    expect((await h.store.load(id))?.seats[1]?.departed).toBe(true);
+    expect(
+      await h.svc.get(id)!.submit('1', { move: 'doDraw', args: [], intentId: 'late' }),
+    ).toEqual({ ok: false, code: 'not_in_match' });
+    h.svc.shutdown();
+    const restored = makeHarness({}, h);
+    expect((await restored.svc.restoreAll()).restored).toBe(1);
+    expect(restored.svc.seatOf(id, 'acct-1')).toBeNull();
+    expect(restored.bot.isBotControlled(id, '1')).toBe(true);
+    restored.svc.shutdown();
+  });
+});

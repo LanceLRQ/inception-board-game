@@ -204,14 +204,22 @@ export class SocketGateway {
   }
 
   /** 对局无法继续：通知这局的所有连接并断开 */
-  abortMatch(matchID: string): void {
+  abortMatch(matchID: string, code = 'MATCH_ABORTED'): void {
     for (const sid of [...this.deps.registry.getSocketsByMatch(matchID)]) {
       this.emitTo(sid, {
         type: 'icg:error',
-        code: 'MATCH_ABORTED',
+        code,
         message: 'Match interrupted',
       });
       this.io?.sockets.sockets.get(sid)?.disconnect(true);
+    }
+  }
+
+  removeMatchSeat(matchID: string, seat: string): void {
+    for (const conn of this.deps.registry.listMatchConnections(matchID)) {
+      if (conn.seat !== seat) continue;
+      this.emitTo(conn.socketId, { type: 'icg:error', code: 'MATCH_LEFT', message: 'Left match' });
+      this.io?.sockets.sockets.get(conn.socketId)?.disconnect(true);
     }
   }
 
