@@ -16,6 +16,7 @@ interface DockHandCardProps {
   readonly reading: boolean;
   /** 行动阶段轮到本人但这张牌此刻打不出 */
   readonly blocked: boolean;
+  readonly arriving?: boolean;
   readonly onTap: () => void;
   readonly onDetail: () => void;
 }
@@ -27,6 +28,7 @@ export function DockHandCard({
   targetText,
   reading,
   blocked,
+  arriving = false,
   onTap,
   onDetail,
 }: DockHandCardProps) {
@@ -44,6 +46,8 @@ export function DockHandCard({
   return (
     <button
       type="button"
+      disabled={arriving}
+      aria-hidden={arriving || undefined}
       {...handlers}
       // 屏幕阅读器等辅助技术触发的合成点击（鼠标 / 触摸的点按已由指针事件处理）
       onClick={(e) => {
@@ -59,7 +63,9 @@ export function DockHandCard({
       aria-label={stateText ? `${item.name}（${stateText}）` : item.name}
       aria-pressed={highlighted}
       className="tabletop-hand-card"
-      style={{ '--tilt': `${tilt}deg` } as CSSProperties}
+      style={
+        { '--tilt': `${tilt}deg`, visibility: arriving ? 'hidden' : undefined } as CSSProperties
+      }
     >
       <span className="tabletop-hand-art">
         <CardArt

@@ -2,7 +2,7 @@
 // 移层、击杀与复活、心锁变化、金库打开、掷骰结果。每个动作配一行说明（读屏也会念）。
 // 「减少动效」开启时不播飞行与闪烁，只显示说明。起止点见 anchors.ts。
 
-import { useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useContext, useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotionConfig } from 'framer-motion';
 import { Eye, Footprints, HeartPulse, Lock, Skull, Vault } from 'lucide-react';
@@ -26,7 +26,7 @@ import {
 } from './anchors';
 import type { DiceRow, FxCue } from './cues';
 import type { PlayingCue } from './fxQueue';
-import { useFxPlayer } from './useFxPlayer';
+import { FxPlaybackContext } from './useFxPlayer';
 
 /** 一个动作里最多飞几张牌（再多也只是更密，不更清楚） */
 const MAX_FLYING = 4;
@@ -40,7 +40,7 @@ interface MatchFxProps {
 }
 
 export function MatchFx({ source, nicknameOf, straddle }: MatchFxProps) {
-  const playing = useFxPlayer(source.events);
+  const { playing } = useContext(FxPlaybackContext);
   const reduced = useReducedMotionConfig() === true;
   const caption = useCaption(playing?.cue ?? null, source.seat, nicknameOf);
   const captionStyle = useCaptionStyle(caption, straddle);

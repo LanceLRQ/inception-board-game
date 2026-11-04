@@ -50,3 +50,27 @@ export function startNext(state: FxQueueState): FxQueueState {
 export function finishCue(state: FxQueueState, id: number): FxQueueState {
   return state.playing?.id === id ? { ...state, playing: null } : state;
 }
+
+/** 新入手的同名牌从手牌末尾匹配，保留原有手牌的位置与可操作性。 */
+export function arrivingHandIndices(
+  hand: readonly string[],
+  viewer: string,
+  state: FxQueueState,
+): ReadonlySet<number> {
+  const arriving = [state.playing?.cue, ...state.pending].flatMap((cue) =>
+    (cue?.kind === 'draw' && cue.player === viewer) ||
+    (cue?.kind === 'transfer' && cue.to === viewer)
+      ? (cue.cards ?? [])
+      : [],
+  );
+  const indices = new Set<number>();
+  for (const card of arriving) {
+    for (let index = hand.length - 1; index >= 0; index--) {
+      if (hand[index] === card && !indices.has(index)) {
+        indices.add(index);
+        break;
+      }
+    }
+  }
+  return indices;
+}

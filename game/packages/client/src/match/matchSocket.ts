@@ -334,13 +334,13 @@ export class MatchSocket {
       }
       return;
     }
+    this.deliverEvents(msg.events, stateID);
     this.update({
       view: msg.view,
       seat: msg.seat,
       seats: msg.seats,
       deadlineAt: this.localDeadline(msg),
     });
-    this.deliverEvents(msg.events, stateID);
   }
 
   /** 服务端消息里的截止信息 → 本机单调时钟上的截止点 */

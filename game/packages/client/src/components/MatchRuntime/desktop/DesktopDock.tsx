@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
+import { useReducedMotionConfig } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { getSkillEntries } from '../../../lib/activeSkills';
 import type { MatchController } from '../controllerTypes';
@@ -12,6 +13,8 @@ import { useHandSelection } from '../shared/HandSelection';
 import { MyBribeCards } from '../shared/MyBribeCards';
 import { DockHandCard } from './DockHandCard';
 import { DockOps } from './DockOps';
+import { FxPlaybackContext } from '../fx/useFxPlayer';
+import { arrivingHandIndices } from '../fx/fxQueue';
 
 export function DesktopDock({
   controller,
@@ -22,6 +25,15 @@ export function DesktopDock({
 }) {
   const { t } = useTranslation();
   const { hand, turn, winner, skillPanel, preview, play, actions } = controller;
+  const playback = useContext(FxPlaybackContext);
+  const reduced = useReducedMotionConfig() === true;
+  const arriving = reduced
+    ? new Set<number>()
+    : arrivingHandIndices(
+        hand.items.map((item) => item.card),
+        controller.viewerSeat,
+        playback,
+      );
   const { readingItem, select } = useHandSelection();
   const verdictCtx = { isMyTurn: turn.isMine, turnPhase: turn.phase, winner };
   const verdict = readingItem ? cardVerdict(readingItem, verdictCtx) : null;
@@ -66,6 +78,7 @@ export function DesktopDock({
                 tilt={(item.index - (hand.items.length - 1) / 2) * 2}
                 reading={readingItem?.index === item.index}
                 blocked={isBlockedInAction(item, verdictCtx)}
+                arriving={arriving.has(item.index)}
                 onTap={() => {
                   if (item.mode === 'discard') {
                     hand.tap(item.index);

@@ -8,11 +8,33 @@ import {
   finishCue,
   playbackRate,
   startNext,
+  arrivingHandIndices,
 } from './fxQueue';
 
 const play = (card: string): FxCue => ({ kind: 'play', player: '1', card });
 
 describe('fxQueue', () => {
+  it('新抽到的同名牌等动画完成再显示，原有手牌不受影响', () => {
+    const state = startNext(
+      enqueueCues(EMPTY_FX_QUEUE, [{ kind: 'draw', player: 'me', count: 2, cards: ['a', 'b'] }]),
+    );
+    expect([...arrivingHandIndices(['a', 'a', 'b'], 'me', state)]).toEqual([1, 2]);
+    expect(arrivingHandIndices(['a', 'a', 'b'], 'other', state).size).toBe(0);
+    expect(
+      arrivingHandIndices(['a', 'a', 'b'], 'me', finishCue(state, state.playing!.id)).size,
+    ).toBe(0);
+  });
+
+  it('排队中的入手动画也隐藏新牌，交牌只影响接收人', () => {
+    const state = startNext(
+      enqueueCues(EMPTY_FX_QUEUE, [
+        play('x'),
+        { kind: 'transfer', from: 'other', to: 'me', count: 1, cards: ['b'] },
+      ]),
+    );
+    expect([...arrivingHandIndices(['b', 'b'], 'me', state)]).toEqual([1]);
+    expect(arrivingHandIndices(['b'], 'other', state).size).toBe(0);
+  });
   it('按到达顺序一个接一个播，播完才轮到下一个', () => {
     let s = enqueueCues(EMPTY_FX_QUEUE, [play('a'), play('b')]);
     s = startNext(s);

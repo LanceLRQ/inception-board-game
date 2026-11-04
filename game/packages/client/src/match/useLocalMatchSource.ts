@@ -85,7 +85,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
     const batches = api.getEvents ? await api.getEvents(eventCursor) : [];
     let cursor = Math.max(eventCursor, state.stateID);
     for (const batch of batches) {
-      if (batch.stateID <= eventCursor) continue;
+      if (batch.stateID <= eventCursor || batch.stateID > state.stateID) continue;
       events.emit(batch);
       cursor = Math.max(cursor, batch.stateID);
     }
@@ -107,8 +107,8 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       );
       seats = buildSeats(state);
       connection = 'connected';
-      notify();
       await pullEvents(state);
+      notify();
     } catch {
       /* worker 可能已关闭 */
     }

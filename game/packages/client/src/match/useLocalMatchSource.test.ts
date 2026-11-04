@@ -119,6 +119,22 @@ describe('createLocalSourceController', () => {
 });
 
 describe('createLocalSourceController · 事件', () => {
+  it('先交付本次视图对应的动画，再通知手牌更新，不提前播放下一步', async () => {
+    let stateID = 3;
+    const ctl = createLocalSourceController(
+      fakeApi({
+        getState: async () => ({ ...viewOf(['0', '1']), stateID }),
+        getEvents: async () => [batch(4), batch(5)],
+      }),
+    );
+    await ctl.refresh();
+    const order: string[] = [];
+    ctl.getSnapshot().events.subscribe((b) => order.push(`event:${b.stateID}`));
+    ctl.subscribe(() => order.push(`view:${ctl.getSnapshot().view!.stateID}`));
+    stateID = 4;
+    await ctl.refresh();
+    expect(order).toEqual(['event:4', 'view:4']);
+  });
   const batch = (stateID: number, kind = 'card_played') => ({
     stateID,
     events: [{ stateID, index: 0, kind, actor: '1', data: {} }],

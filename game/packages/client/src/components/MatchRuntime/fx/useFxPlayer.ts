@@ -1,12 +1,14 @@
 // 订阅来源的事件，把动作排进队列逐个播放
 // 返回当前正在播的动作（没有为 null），由动画层按它渲染。
 
-import { useEffect, useState } from 'react';
+import { createContext, useEffect, useState } from 'react';
 import type { EventFeed } from '../../../match/eventFeed';
 import { cuesFromEvents } from './cues';
-import { EMPTY_FX_QUEUE, enqueueCues, finishCue, startNext, type PlayingCue } from './fxQueue';
+import { EMPTY_FX_QUEUE, enqueueCues, finishCue, startNext, type FxQueueState } from './fxQueue';
 
-export function useFxPlayer(feed: EventFeed): PlayingCue | null {
+export const FxPlaybackContext = createContext(EMPTY_FX_QUEUE);
+
+export function useFxPlayer(feed: EventFeed): FxQueueState {
   const [state, setState] = useState(EMPTY_FX_QUEUE);
 
   useEffect(
@@ -28,5 +30,5 @@ export function useFxPlayer(feed: EventFeed): PlayingCue | null {
     return () => clearTimeout(timer);
   }, [playing]);
 
-  return playing;
+  return state;
 }
