@@ -17,6 +17,7 @@ import { MobileLayout } from './mobile/MobileLayout';
 import { useMatchController } from './useMatchController';
 import { FxPlaybackContext, useFxPlayer } from './fx/useFxPlayer';
 import { MatchHistoryProvider } from './shared/MatchHistoryPanel';
+import { EndLocalMatch } from './shared/EndLocalMatch';
 
 interface MatchRuntimeProps {
   readonly source: MatchSource;
@@ -31,6 +32,14 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
   const boardHandle = useBoardModel(controller);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const playback = useFxPlayer(source.events);
+  const topTools = (
+    <>
+      {topRight}
+      {source.kind === 'local' && source.endMatch && onRestart && (
+        <EndLocalMatch endMatch={source.endMatch} onExit={onRestart} />
+      )}
+    </>
+  );
   return (
     <FxPlaybackContext.Provider value={playback}>
       <MatchHistoryProvider
@@ -44,14 +53,14 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
               <DesktopLayout
                 boardHandle={boardHandle}
                 controller={controller}
-                topRight={topRight}
+                topRight={topTools}
                 onRestart={onRestart}
               />
             ) : (
               <MobileLayout
                 boardHandle={boardHandle}
                 controller={controller}
-                topRight={topRight}
+                topRight={topTools}
                 onRestart={onRestart}
               />
             )}

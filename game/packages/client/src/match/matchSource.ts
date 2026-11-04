@@ -46,6 +46,8 @@ export interface MatchSource {
   readonly events: EventFeed;
   /** 整局公开记录，包含刷新或重连之前的步骤。 */
   loadHistory?(): Promise<MatchHistorySnapshot>;
+  /** 本地结束对局，停止自动行动并清除续玩存档。 */
+  endMatch?(): Promise<void>;
   makeMove(move: string, args?: unknown[]): Promise<MoveOutcome>;
   /** 取消本人座位的托管；本地来源是无操作 */
   resume(): void;

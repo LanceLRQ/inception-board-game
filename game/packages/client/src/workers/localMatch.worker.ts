@@ -55,6 +55,7 @@ export interface LocalMatchWorker {
   /** stateID 之后各步的事件（已按真人座位裁剪）；会话尚未建立时为空 */
   getEvents: (sinceStateID: number) => Promise<EventBatch[]>;
   getHistory: () => Promise<MatchHistorySnapshot>;
+  endMatch: () => Promise<void>;
   /** 会话尚未建立时返回 null；被拒时 reason 是运行器的拒绝码 */
   makeMove: (move: string, args: unknown[]) => Promise<LocalMoveResult | null>;
   getPlayerId: () => Promise<string>;
@@ -275,6 +276,17 @@ const workerApi: LocalMatchWorker = {
 
   async getHistory() {
     return session?.history() ?? { batches: [], complete: false };
+  },
+
+  async endMatch() {
+    generation += 1;
+    clearTimer();
+    session = null;
+    const writer = persistence;
+    persistence = null;
+    await writer?.idle();
+    if (writer) await (await getSaves()).clear();
+    logFlow('local match ended by player');
   },
 
   async makeMove(move: string, args: unknown[]) {

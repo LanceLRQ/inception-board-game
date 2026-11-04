@@ -33,6 +33,7 @@ export interface LocalMatchApi {
   /** stateID 之后各步的事件（已按本人座位裁剪）；没有这个接口就不推事件 */
   getEvents?(sinceStateID: number): Promise<EventBatch[]>;
   getHistory?(): Promise<MatchHistorySnapshot>;
+  endMatch?(): Promise<void>;
 }
 
 export interface LocalSourceController {
@@ -148,6 +149,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       report: null,
       events,
       loadHistory,
+      endMatch: () => api.endMatch?.() ?? Promise.resolve(),
       makeMove,
       resume: () => {},
     };
