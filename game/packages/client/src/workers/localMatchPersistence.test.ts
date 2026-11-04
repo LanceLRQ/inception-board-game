@@ -43,6 +43,28 @@ function runToHuman(session: LocalMatchSession): void {
 }
 
 describe('startLocalMatch', () => {
+  it('公开历史随存档恢复，旧存档可继续且标明早期记录缺失', async () => {
+    const saves = makeSaves();
+    const original = playedSession('history-save');
+    const writer = createMatchPersistence(saves, 4, log);
+    writer.onChange(original, () => true);
+    await writer.idle();
+    const restored = await startLocalMatch(
+      { playerCount: 4, persist: true, resume: true },
+      saves,
+      log,
+    );
+    expect(restored.session.history()).toEqual(original.history());
+    expect(JSON.stringify(restored.session.history())).not.toContain('"secret"');
+    await saveSession(saves, original);
+    const legacy = await startLocalMatch(
+      { playerCount: 4, persist: true, resume: true },
+      saves,
+      log,
+    );
+    expect(legacy.resumed).toBe(true);
+    expect(legacy.session.history()).toEqual({ batches: [], complete: false });
+  });
   it('不恢复也不存档：直接开新局，不碰存档', async () => {
     const store = createMemoryStore();
     const saves = makeSaves(store);

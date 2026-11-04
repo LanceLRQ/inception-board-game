@@ -12,7 +12,12 @@ import { withSelfAvatar } from '../lib/avatarSeed';
 import { effectiveAvatarSeed } from '../hooks/useAvatar';
 import { useIdentityStore } from '../stores/useIdentityStore';
 import { NO_CHAT } from './chat';
-import { createEventEmitter, NO_EVENTS, type EventBatch } from './eventFeed';
+import {
+  createEventEmitter,
+  NO_EVENTS,
+  type EventBatch,
+  type MatchHistorySnapshot,
+} from './eventFeed';
 import type { ConnectionState, MatchSource, MoveOutcome } from './matchSource';
 
 /** 取状态的间隔（毫秒） */
@@ -27,6 +32,7 @@ export interface LocalMatchApi {
   ): Promise<{ ok: true } | { ok: false; reason: RejectReason } | null>;
   /** stateID 之后各步的事件（已按本人座位裁剪）；没有这个接口就不推事件 */
   getEvents?(sinceStateID: number): Promise<EventBatch[]>;
+  getHistory?(): Promise<MatchHistorySnapshot>;
 }
 
 export interface LocalSourceController {
@@ -66,6 +72,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
   let error: string | null = null;
   let snapshot: MatchSource;
   const events = createEventEmitter();
+  const loadHistory = () => api.getHistory?.() ?? Promise.resolve({ batches: [], complete: false });
   /** 已推过事件的版本号；第一次取到状态时才定下来（之前的事件不补播） */
   let eventCursor: number | null = null;
   /** 轮询与出牌后的刷新排队执行，同一批事件不会推两次 */
@@ -140,6 +147,7 @@ export function createLocalSourceController(api: LocalMatchApi): LocalSourceCont
       chat: NO_CHAT,
       report: null,
       events,
+      loadHistory,
       makeMove,
       resume: () => {},
     };

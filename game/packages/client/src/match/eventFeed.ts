@@ -9,6 +9,11 @@ export interface EventBatch {
   readonly events: readonly MatchEvent[];
 }
 
+export interface MatchHistorySnapshot {
+  readonly batches: readonly EventBatch[];
+  readonly complete: boolean;
+}
+
 export type EventListener = (batch: EventBatch) => void;
 
 export interface EventFeed {

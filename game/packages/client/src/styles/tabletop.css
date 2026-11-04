@@ -658,6 +658,31 @@ body:has(.ms-tabletop-runtime) {
   background: var(--ms-panel2);
   border-radius: 6px;
 }
+
+.tabletop-history-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  order: 4;
+  min-height: 44px;
+  padding: 4px 8px;
+  color: var(--ms-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.tabletop-history-trigger:hover {
+  color: var(--ms-ink);
+}
+.tabletop-history-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, calc(100vw - 32px));
+  max-width: 720px;
+  height: min(760px, calc(100dvh - 32px));
+  padding: 0;
+  overflow: hidden;
+}
 .tabletop-piles .ms-pile {
   background: transparent;
   border: 0;

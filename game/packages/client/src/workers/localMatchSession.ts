@@ -12,7 +12,7 @@ import {
   viewMatch,
   type MatchView,
 } from '@icgame/game-engine';
-import type { EventBatch } from '../match/eventFeed.js';
+import type { EventBatch, MatchHistorySnapshot } from '../match/eventFeed.js';
 import type { SetupState } from '@icgame/game-engine/setup';
 import {
   applyMove,
@@ -81,6 +81,7 @@ export interface LocalMatchSessionOptions {
   botStepMs?: number;
   /** 从存档恢复的状态；给了就沿用它，不再新建对局（playerCount 与 seed 此时不起作用） */
   restoredState?: MatchState<SetupState>;
+  publicHistory?: readonly EventBatch[];
 }
 
 /**
@@ -127,8 +128,13 @@ export class LocalMatchSession {
   private diceWait: { id: number; since: number } | null = null;
   /** 最近几步的事件，已按真人座位裁剪（别人的秘密不留在这里） */
   private eventLog: EventBatch[] = [];
+  private publicHistory: EventBatch[];
 
   constructor(options: LocalMatchSessionOptions) {
+    this.publicHistory = (options.publicHistory ?? []).map((batch) => ({
+      stateID: batch.stateID,
+      events: eventsFor(batch.events, null),
+    }));
     this.humanPlayerID = options.humanPlayerID ?? LOCAL_HUMAN_SEAT;
     this.now = options.now ?? Date.now;
     this.botPlaysCards = options.botPlaysCards ?? true;
@@ -294,6 +300,15 @@ export class LocalMatchSession {
     return this.eventLog.filter((b) => b.stateID > stateID);
   }
 
+  history(): MatchHistorySnapshot {
+    return {
+      batches: this.publicHistory,
+      complete:
+        this.publicHistory.length === this.state.stateID &&
+        this.publicHistory.every((batch, index) => batch.stateID === index + 1),
+    };
+  }
+
   /** move 落地：换上新状态，记下这一步的事件 */
   private accept(outcome: Extract<MoveOutcome<SetupState>, { ok: true }>): void {
     this.state = outcome.state;
@@ -302,6 +317,10 @@ export class LocalMatchSession {
     const events = eventsFor(outcome.events, this.humanPlayerID);
     if (events.length === 0) return;
     this.eventLog.push({ stateID: outcome.state.stateID, events });
+    this.publicHistory.push({
+      stateID: outcome.state.stateID,
+      events: eventsFor(outcome.events, null),
+    });
     if (this.eventLog.length > EVENT_LOG_LIMIT) this.eventLog.shift();
   }
 

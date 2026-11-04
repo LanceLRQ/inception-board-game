@@ -2,10 +2,11 @@
 //
 // 端点：
 //   GET  /matches/:id          - 对局元信息（需登录；未结束时不含阵营与胜负）
+//   GET  /matches/:id/history  - 本局成员可读的整局公开历史（进行中也可读）
 //   GET  /matches/:id/events   - 对局步骤（需登录；游标分页，按观察者座位裁剪）
 //   POST /matches/local-upload - 人机对局上传（骨架）
 //
-// 事件读自对局归档，裁剪规则与回放接口一致：对局未结束返回 409，
+// events 端点读自对局归档，裁剪规则与回放接口一致：对局未结束返回 409，
 // 请求者是这局的真人座位成员就按他的座位裁剪，否则按旁观者；每步的请求不返回。
 
 import Router from '@koa/router';
@@ -15,7 +16,7 @@ import { AppError } from '../infra/errors.js';
 import { isUuid } from '../infra/uuid.js';
 import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
 import type { MatchArchive } from '../match/MatchArchive.js';
-import { loadFinishedMatch, toStepView } from './archiveEvents.js';
+import { isComplete, loadFinishedMatch, toStepView } from './archiveEvents.js';
 import { toMatchOutcome, toMatchPlayerViews, type MatchMetaRow } from './matchMeta.js';
 
 export interface MatchesRouterDeps {
@@ -32,6 +33,21 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
   const router = new Router();
   const { archive } = deps;
   const loadMatch = deps.loadMatch ?? loadMatchFromDb;
+
+  // 当局历史只向本局成员提供，始终按旁观者裁剪，连本人的秘密也不带。
+  router.get('/matches/:id/history', authMiddleware, async (ctx) => {
+    const id = ctx.params.id!;
+    const info = await archive.matchInfo(id);
+    if (!info) throw new AppError('NOT_FOUND', 'Match not found');
+    if (!info.seats.some((seat) => seat.playerId === ctx.state.player.playerId)) {
+      throw new AppError('FORBIDDEN', 'Not a match participant');
+    }
+    const [steps, gaps] = await Promise.all([archive.listSteps(id), archive.listGaps(id)]);
+    ctx.body = {
+      batches: steps.map((step) => toStepView(step, null)),
+      complete: steps.length === 0 ? gaps.length === 0 : isComplete(steps, gaps),
+    };
+  });
 
   // GET /matches/:id - 对局元信息（需登录；未结束时不含阵营与胜负）
   router.get('/matches/:id', authMiddleware, async (ctx) => {

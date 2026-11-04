@@ -10,6 +10,7 @@ import { getCardName } from '../../../lib/cards';
 import { CardArt } from '../../CardArt';
 import type { BoardDeck, BoardPiles } from '../model/boardModel';
 import { DiscardPileDialog } from './DiscardPileDialog';
+import { MatchHistoryButton } from './MatchHistoryPanel';
 
 interface PileRowProps {
   readonly deck: BoardDeck;
@@ -95,6 +96,8 @@ export function PileRow({ deck, piles, onOpenCard, small = false, className }: P
           </span>
         </span>
       </button>
+
+      <MatchHistoryButton />
 
       <div
         className={cn(

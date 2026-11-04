@@ -67,7 +67,7 @@ function DicePresentation({ controller }: { controller: MatchController }) {
   };
   return (
     <>
-      {!open && (
+      {!open && gate && (
         <button
           type="button"
           className="tabletop-dice-resume"
@@ -76,7 +76,7 @@ function DicePresentation({ controller }: { controller: MatchController }) {
             setReview(key);
           }}
         >
-          {gate ? '继续掷骰' : '查看上次掷骰'}
+          继续掷骰
         </button>
       )}
       <Dialog

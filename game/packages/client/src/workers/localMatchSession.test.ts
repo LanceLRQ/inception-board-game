@@ -916,12 +916,16 @@ describe('LocalMatchSession · 事件', () => {
     const session = makeSession(5, 'log-cap');
     for (let i = 0; i < EVENT_LOG_LIMIT + 20; i++) {
       const r = session.step();
-      if (!r.continue) {
+      if (r.waiting && rollIfAwaited(session)) continue;
+      if (!r.continue || r.waiting) {
         const { move, args } = humanPolicy(session);
         session.humanMove(move, args);
       }
     }
     expect(session.eventsSince(-1).length).toBeLessThanOrEqual(EVENT_LOG_LIMIT);
+    expect(session.history().batches.length).toBeGreaterThan(EVENT_LOG_LIMIT);
+    expect(session.history().complete).toBe(true);
+    expect(JSON.stringify(session.history())).not.toContain('"secret"');
   });
 });
 

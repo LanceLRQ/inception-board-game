@@ -78,6 +78,32 @@ describe('GET /matches/:id/events', () => {
   });
 });
 
+describe('GET /matches/:id/history', () => {
+  it('允许本局成员在进行中读取公开历史，禁止外部用户', async () => {
+    const s = await setup();
+    expect((await s.get(`/matches/${RUNNING_ID}/history`)).status).toBe(401);
+    expect((await s.get(`/matches/${RUNNING_ID}/history`, tokenFor(ACCOUNT_OUTSIDER))).status).toBe(
+      403,
+    );
+    const result = await s.get(`/matches/${RUNNING_ID}/history`, tokenFor(ACCOUNT_SEAT1));
+    expect(result.status).toBe(200);
+    expect(result.json.batches).toBeDefined();
+    expect(result.text).not.toContain('"secret"');
+    expect(result.text).not.toContain('"request"');
+  });
+
+  it('即使请求者是秘密的接收人，历史仍然不返回私密内容', async () => {
+    const s = await setup();
+    const result = await s.get(`/matches/${FINISHED_ID}/history`, tokenFor(ACCOUNT_SEAT1));
+    expect(result.status).toBe(200);
+    expect(result.json.complete).toBe(true);
+    expect(result.json.batches.map((b: { stateID: number }) => b.stateID)).toEqual([1, 2, 3, 4, 5]);
+    expect(result.text).not.toContain(SEAT1_SECRET);
+    expect(result.text).not.toContain('"secret"');
+    expect(result.text).not.toContain('"args"');
+  });
+});
+
 describe('GET /matches/:id', () => {
   it('未登录 → 401', async () => {
     const s = await setup();

@@ -16,6 +16,7 @@ import { DiceGatePanel } from './shared/DiceGatePanel';
 import { MobileLayout } from './mobile/MobileLayout';
 import { useMatchController } from './useMatchController';
 import { FxPlaybackContext, useFxPlayer } from './fx/useFxPlayer';
+import { MatchHistoryProvider } from './shared/MatchHistoryPanel';
 
 interface MatchRuntimeProps {
   readonly source: MatchSource;
@@ -32,29 +33,35 @@ export function MatchRuntime({ source, topRight, onRestart }: MatchRuntimeProps)
   const playback = useFxPlayer(source.events);
   return (
     <FxPlaybackContext.Provider value={playback}>
-      <HandSelectionProvider controller={controller}>
-        <div className="ms-tabletop-runtime">
-          {isDesktop ? (
-            <DesktopLayout
-              boardHandle={boardHandle}
-              controller={controller}
-              topRight={topRight}
-              onRestart={onRestart}
-            />
-          ) : (
-            <MobileLayout
-              boardHandle={boardHandle}
-              controller={controller}
-              topRight={topRight}
-              onRestart={onRestart}
-            />
-          )}
-          <DiceGatePanel controller={controller} />
-          <MatchFx source={source} nicknameOf={controller.nicknameOf} straddle={isDesktop} />
-          <MatchDialogs controller={controller} />
-          <MatchAssetGate entry={controller.entryAssets} />
-        </div>
-      </HandSelectionProvider>
+      <MatchHistoryProvider
+        key={`${controller.view?.matchId}:${controller.viewerSeat}`}
+        source={source}
+        nicknameOf={controller.nicknameOf}
+      >
+        <HandSelectionProvider controller={controller}>
+          <div className="ms-tabletop-runtime">
+            {isDesktop ? (
+              <DesktopLayout
+                boardHandle={boardHandle}
+                controller={controller}
+                topRight={topRight}
+                onRestart={onRestart}
+              />
+            ) : (
+              <MobileLayout
+                boardHandle={boardHandle}
+                controller={controller}
+                topRight={topRight}
+                onRestart={onRestart}
+              />
+            )}
+            <DiceGatePanel controller={controller} />
+            <MatchFx source={source} nicknameOf={controller.nicknameOf} straddle={isDesktop} />
+            <MatchDialogs controller={controller} />
+            <MatchAssetGate entry={controller.entryAssets} />
+          </div>
+        </HandSelectionProvider>
+      </MatchHistoryProvider>
     </FxPlaybackContext.Provider>
   );
 }

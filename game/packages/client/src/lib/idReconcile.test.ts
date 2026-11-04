@@ -144,6 +144,8 @@ const NOT_CARD_IDS: Readonly<Record<string, string>> = {
   vault_opened: '对局事件的类型名（金库被打开），不是牌 id',
   vault_peeked: '对局事件的类型名（窥视金库），不是牌 id',
   bribe_dealt: '对局事件的类型名（派发贿赂牌），不是牌 id',
+  nightmare_revealed: '对局事件的类型名（翻开梦魇），不是牌 id',
+  nightmare_discarded: '对局事件的类型名（弃置梦魇），不是牌 id',
 };
 
 const ID_LITERAL =

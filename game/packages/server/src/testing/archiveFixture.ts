@@ -79,6 +79,7 @@ export async function seedArchive(): Promise<InMemoryMatchArchive> {
 
 /** 响应体里测试关心的字段；其他字段按需断言 */
 export interface JsonBody {
+  batches: Array<{ stateID: number; events: MatchEvent[] }>;
   data: Array<{ stateID: number; at: string; events: Array<{ kind: string }> }>;
   nextCursor: string | null;
   hasMore: boolean;

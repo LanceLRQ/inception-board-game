@@ -6,6 +6,7 @@
 import { LocalMatchSession, buildMatchSeed, type SessionView } from './localMatchSession.js';
 import { LOCAL_HUMAN_SEAT } from './localSeat.js';
 import type { LocalMatchSaves } from '../lib/localMatchSave.js';
+import type { MatchHistorySnapshot } from '../match/eventFeed.js';
 
 /** 日志出口：Worker 里用 console，测试里用桩 */
 export interface PersistenceLog {
@@ -54,6 +55,7 @@ export async function startLocalMatch(
           humanPlayerID: LOCAL_HUMAN_SEAT,
           botPlaysCards: request.botPlaysCards,
           botStepMs: request.botStepMs,
+          publicHistory: record.publicHistory,
         });
         log.flow('local match restored', {
           playerCount: record.playerCount,
@@ -123,6 +125,7 @@ export function createCoalescingWriter(): {
 
 /** 会话里与存档有关的那部分，便于测试时替换 */
 export interface PersistableSession {
+  history?(): MatchHistorySnapshot;
   view(): SessionView;
   snapshot(): unknown;
 }
@@ -156,6 +159,7 @@ export function createMatchPersistence(
           turn: G.turnNumber,
           stateID,
           state: session.snapshot(),
+          publicHistory: session.history?.().batches,
         });
       });
     },

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { usePageVisibility } from '../hooks/usePageVisibility';
+import { api } from '../lib/api';
 import { submitMatchReport, type ReportChannel } from '../lib/reportApi';
 import { createIoSocket } from './createIoSocket';
 import { MatchSocket, type MatchSocketSnapshot } from './matchSocket';
 import { isSelfTakenOver, type MatchSource, type MoveOutcome } from './matchSource';
-import { NO_EVENTS, type EventFeed } from './eventFeed';
+import { NO_EVENTS, type EventFeed, type MatchHistorySnapshot } from './eventFeed';
 
 export interface RemoteMatchParams {
   url: string;
@@ -118,9 +119,13 @@ export function useRemoteMatchSource({ url, token, matchID }: RemoteMatchParams)
   );
 
   const events = useMemo(() => eventFeedOf(socket), [socket]);
+  const loadHistory = useCallback(
+    () => api.get<MatchHistorySnapshot>(`/matches/${encodeURIComponent(matchID)}/history`),
+    [matchID],
+  );
 
   return useMemo(
-    () => toMatchSource(snapshot, sendMove, resume, sendChat, report, events),
-    [snapshot, sendMove, resume, sendChat, report, events],
+    () => ({ ...toMatchSource(snapshot, sendMove, resume, sendChat, report, events), loadHistory }),
+    [snapshot, sendMove, resume, sendChat, report, events, loadHistory],
   );
 }

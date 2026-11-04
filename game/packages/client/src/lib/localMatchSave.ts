@@ -7,6 +7,7 @@
 
 import { logger } from './logger';
 import { openKeyValueStore, type KeyValueStore } from './idbStore';
+import type { EventBatch } from '../match/eventFeed';
 
 export const SAVE_DB_NAME = 'icgame-local';
 /** 数据库结构版本；存档的内容格式变化时用 SAVE_FORMAT_VERSION，不动这里 */
@@ -32,6 +33,7 @@ export interface LocalSaveMeta {
 }
 
 export interface LocalSaveInput {
+  publicHistory?: readonly EventBatch[];
   playerCount: number;
   turn: number;
   stateID: number;
@@ -40,6 +42,7 @@ export interface LocalSaveInput {
 }
 
 export interface LocalSaveRecord extends LocalSaveMeta {
+  publicHistory?: readonly EventBatch[];
   state: unknown;
 }
 
@@ -126,13 +129,21 @@ export function createLocalMatchSaves(
       const meta = await readMeta();
       if (meta === null) return null;
       try {
-        const stored = await store.get<{ stateID?: unknown; state?: unknown }>(STATE_KEY);
+        const stored = await store.get<{
+          stateID?: unknown;
+          state?: unknown;
+          publicHistory?: EventBatch[];
+        }>(STATE_KEY);
         if (stored === undefined || stored.stateID !== meta.stateID || stored.state == null) {
           logger.warn('storage', 'local save discarded: state missing or out of step with meta');
           await clear();
           return null;
         }
-        return { ...meta, state: stored.state };
+        return {
+          ...meta,
+          state: stored.state,
+          ...(Array.isArray(stored.publicHistory) ? { publicHistory: stored.publicHistory } : {}),
+        };
       } catch (err) {
         logger.warn('storage', 'local save state read failed, discarding', err);
         await clear();
@@ -150,7 +161,10 @@ export function createLocalMatchSaves(
       };
       try {
         await store.setMany([
-          [STATE_KEY, { stateID: input.stateID, state: input.state }],
+          [
+            STATE_KEY,
+            { stateID: input.stateID, state: input.state, publicHistory: input.publicHistory },
+          ],
           [META_KEY, meta],
         ]);
       } catch (err) {
