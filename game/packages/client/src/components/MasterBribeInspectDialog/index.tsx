@@ -2,8 +2,9 @@
 // 对照：docs/manual/04-action-cards.md §梦境窥视 效果②
 // 复用 MasterBribeInspectBanner/logic.ts
 
-import { Eye, Handshake, ShieldX, HelpCircle } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import type { MatchView } from '@icgame/game-engine';
+import { BribeCardGallery } from '../BribeCardGallery';
 import { computeMasterBribeInspectState } from '../MasterBribeInspectBanner/logic.js';
 import {
   Dialog,
@@ -18,20 +19,6 @@ export interface MasterBribeInspectDialogProps {
   G: MatchView | null | undefined;
   viewerPlayerID: string;
   makeMove: (move: string, args: unknown[]) => Promise<unknown> | void;
-}
-
-type BribeKind = 'deal' | 'fail' | null;
-
-function bribeIcon(kind: BribeKind) {
-  if (kind === 'deal') return <Handshake className="h-4 w-4 text-destructive" />;
-  if (kind === 'fail') return <ShieldX className="h-4 w-4 text-faint" />;
-  return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
-}
-
-function bribeLabel(kind: BribeKind): string {
-  if (kind === 'deal') return 'DEAL · 成交（该盗梦者已转阵营）';
-  if (kind === 'fail') return '碎裂 · 未成交';
-  return '未知';
 }
 
 export function MasterBribeInspectDialog({
@@ -53,21 +40,11 @@ export function MasterBribeInspectDialog({
         <DialogDescription>仅你可见。</DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <div className="space-y-1.5">
-          {bribes.length === 0 ? (
-            <div className="text-xs text-muted-foreground">该盗梦者未持有贿赂牌。</div>
-          ) : (
-            bribes.map((b) => (
-              <div
-                key={b.id}
-                className="flex items-center gap-2 rounded bg-background/60 px-2 py-1.5"
-              >
-                {bribeIcon(b.kind)}
-                <span className="text-xs">{bribeLabel(b.kind)}</span>
-              </div>
-            ))
-          )}
-        </div>
+        {bribes.length === 0 ? (
+          <div className="text-xs text-muted-foreground">该盗梦者未持有贿赂牌。</div>
+        ) : (
+          <BribeCardGallery bribes={bribes} />
+        )}
       </DialogBody>
       <DialogFooter>
         <button

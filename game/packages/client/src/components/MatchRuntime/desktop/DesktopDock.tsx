@@ -9,6 +9,7 @@ import {
   isBlockedInAction,
 } from '../model/handDerive';
 import { useHandSelection } from '../shared/HandSelection';
+import { MyBribeCards } from '../shared/MyBribeCards';
 import { DockHandCard } from './DockHandCard';
 import { DockOps } from './DockOps';
 
@@ -47,6 +48,7 @@ export function DesktopDock({
         <div className="tabletop-hand-title">
           <h2>我的手牌</h2>
           <span>{hand.items.length} 张</span>
+          <MyBribeCards view={controller.view} viewerSeat={controller.viewerSeat} />
           {tools}
         </div>
         {hasCards && <DockOps controller={controller} skillReady={skillEntries.length > 0} />}
