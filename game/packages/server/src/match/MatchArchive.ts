@@ -6,7 +6,12 @@ import { createHash } from 'node:crypto';
 import { matchOutcome } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import type { MatchEvent, MatchState, MoveRequest } from '@icgame/game-engine/runner';
-import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
+import { buildAchievementRows } from '../seed/seed.js';
+import {
+  computeEarnedAchievements,
+  type AchievementPlayerInput,
+} from '../services/achievements.js';
 import type { RoomSeat } from './MatchRoom.js';
 import type { MatchSnapshot } from './MatchStore.js';
 
@@ -143,12 +148,15 @@ export class InMemoryMatchArchive implements MatchArchive {
 
 /** PrismaMatchArchive 实际用到的最小接口，便于测试打桩 */
 export interface PrismaArchiveClient {
+  $transaction: PrismaClient['$transaction'];
   match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique'>;
   matchPlayer: Pick<
     PrismaClient['matchPlayer'],
     'createMany' | 'update' | 'findMany' | 'deleteMany'
   >;
   matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany' | 'findFirst' | 'deleteMany'>;
+  achievement: Pick<PrismaClient['achievement'], 'createMany'>;
+  playerAchievement: Pick<PrismaClient['playerAchievement'], 'createMany'>;
 }
 
 const PRISMA_UNIQUE_VIOLATION = 'P2002';
@@ -267,23 +275,75 @@ export class PrismaMatchArchive implements MatchArchive {
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
   ): Promise<void> {
-    const { winner, reason } = matchOutcome(final.ctx.gameover, final.G);
-    await this.prisma.match.update({
-      where: { id: matchID },
-      data: {
-        endedAt: new Date(),
-        winner,
-        winReason: reason === null ? null : reason.slice(0, WIN_REASON_MAX),
-      },
-    });
-    for (const s of seats) {
-      const p = final.G.players[s.seat];
-      if (!p) continue;
-      await this.prisma.matchPlayer.update({
-        where: { matchId_seat: { matchId: matchID, seat: Number(s.seat) } },
-        data: { finalFaction: p.faction, won: winner === null ? null : p.faction === winner },
+    const { G } = final;
+    const { winner, reason } = matchOutcome(final.ctx.gameover, G);
+    const participants = seats.filter(
+      (s): s is RoomSeat & { playerId: string } => !s.isBot && !s.departed && s.playerId !== null,
+    );
+    const awards: Array<{ playerId: string; achievementId: string }> = [];
+    if (winner !== null && participants.length > 0) {
+      // 击杀、解封与贿赂已有终局累计值。被击杀次数从已落库的步骤读取。
+      const deaths = new Map<string, number>();
+      for (const { events } of await this.listSteps(matchID)) {
+        for (const event of events) {
+          if (event.kind !== 'player_died') continue;
+          const { player, cause } = event.data;
+          if (typeof player === 'string' && typeof cause === 'string') {
+            deaths.set(player, (deaths.get(player) ?? 0) + 1);
+          }
+        }
+      }
+      const stats: AchievementPlayerInput[] = [];
+      for (const s of participants) {
+        const p = G.players[s.seat];
+        if (!p) continue;
+        stats.push({
+          playerID: s.playerId,
+          faction: p.faction,
+          originalFaction: s.seat === G.dreamMasterID ? 'master' : 'thief',
+          result: p.faction === winner ? 'win' : 'lose',
+          kills: p.shootCount,
+          unlockSuccessCount: p.unlockCount,
+          bribesReceived: p.bribeReceived,
+          diedCount: deaths.get(s.seat) ?? 0,
+        });
+      }
+      const earned = computeEarnedAchievements(stats, {
+        totalRounds: G.turnNumber,
+        winnerFaction: winner,
       });
+      for (const [playerId, ids] of earned) {
+        for (const achievementId of ids) awards.push({ playerId, achievementId });
+      }
     }
+
+    const writes: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.match.update({
+        where: { id: matchID },
+        data: {
+          endedAt: new Date(),
+          winner,
+          winReason: reason === null ? null : reason.slice(0, WIN_REASON_MAX),
+        },
+      }),
+    ];
+    for (const s of seats) {
+      const p = G.players[s.seat];
+      if (!p) continue;
+      writes.push(
+        this.prisma.matchPlayer.update({
+          where: { matchId_seat: { matchId: matchID, seat: Number(s.seat) } },
+          data: { finalFaction: p.faction, won: winner === null ? null : p.faction === winner },
+        }),
+      );
+    }
+    if (awards.length > 0) {
+      writes.push(
+        this.prisma.achievement.createMany({ data: buildAchievementRows(), skipDuplicates: true }),
+        this.prisma.playerAchievement.createMany({ data: awards, skipDuplicates: true }),
+      );
+    }
+    await this.prisma.$transaction(writes);
   }
 
   async recordStop(matchID: string): Promise<void> {

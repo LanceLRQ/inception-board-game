@@ -617,6 +617,19 @@ describe('MatchService 挂机托管', () => {
 });
 
 describe('MatchService 对局结束', () => {
+  it('正常终局归档读取席位最新的主动退出标记', async () => {
+    const h = makeHarness();
+    const id = await h.svc.createFromRoom(makeRoom(4, [0]));
+    const finish = vi.spyOn(h.archive, 'recordFinish');
+    await h.svc.leaveMatch(id, 'acct-0');
+    expect(h.svc.get(id)!.seats()[0]?.departed).toBe(true);
+
+    await drain(h, id, () => h.onGameOver.mock.calls.length > 0);
+
+    expect(finish).toHaveBeenCalledOnce();
+    expect(finish.mock.calls[0]![2][0]).toMatchObject({ seat: '0', departed: true });
+  });
+
   it('全 Bot 房间打完：各调用一次 recordFinish / store.finish / disposeMatch / onGameOver，房间延迟移除', async () => {
     const h = makeHarness();
     const recordFinish = vi.spyOn(h.archive, 'recordFinish');

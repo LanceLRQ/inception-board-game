@@ -427,7 +427,7 @@ export class MatchService {
         });
         await deps.onStep(matchID, output);
       },
-      onGameOver: (final): Promise<void> => this.finishMatch(matchID, final, seats, room),
+      onGameOver: (final): Promise<void> => this.finishMatch(matchID, final, room.seats(), room),
       isTakenOver: (seat) => deps.bot.isBotControlled(matchID, seat),
       onSeatActivity: (seat, kind) => {
         // 达到阈值时 Bot 管理器会触发接管事件，由构造函数里的订阅重新排程并通知座位变化

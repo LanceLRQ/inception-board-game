@@ -86,6 +86,13 @@ describe('InMemoryMatchArchive', () => {
 
 function makeStub() {
   const stub = {
+    $transaction: vi.fn((operations: Array<Promise<unknown>>) => Promise.all(operations)),
+    achievement: {
+      createMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
+    },
+    playerAchievement: {
+      createMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
+    },
     match: {
       upsert: vi.fn(async (_arg: unknown) => ({})),
       update: vi.fn(async (_arg: unknown) => ({})),
@@ -119,6 +126,7 @@ describe('PrismaMatchArchive', () => {
       data: { endedAt: expect.any(Date), winner: null, winReason: 'host_ended' },
     });
     expect(stub.matchPlayer.update).not.toHaveBeenCalled();
+    expect(stub.playerAchievement.createMany).not.toHaveBeenCalled();
   });
 
   it('recordStart：upsert 对局行，种子只存 sha256 且原文不出现在任何写入里', async () => {
@@ -249,6 +257,96 @@ describe('PrismaMatchArchive', () => {
     for (const call of stub.matchPlayer.update.mock.calls) {
       expect((call[0] as { data: { won: unknown } }).data.won).toBeNull();
     }
+    expect(stub.playerAchievement.createMany).not.toHaveBeenCalled();
+  });
+
+  it('recordFinish：终局成就随对局结果一起写入，重试不覆盖已获得的成就', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    const snap = makeTestSnapshot('m1');
+    const final = snap.state;
+    final.ctx.gameover = { winner: 'thief', reason: 'vault_secret' };
+    final.G.turnNumber = 10;
+    final.G.dreamMasterID = '3';
+    for (const seat of snap.seats) final.G.players[seat.seat]!.faction = 'thief';
+    final.G.players['3']!.faction = 'master';
+    Object.assign(final.G.players['0']!, { shootCount: 1, unlockCount: 5, bribeReceived: 3 });
+    final.G.players['1']!.shootCount = 1;
+    final.G.players['2']!.shootCount = 1;
+    const departed = { ...snap.seats[2]!, playerId: 'account-2', isBot: false, departed: true };
+    const seats = [snap.seats[0]!, snap.seats[1]!, departed, snap.seats[3]!];
+    stub.matchEvent.findMany.mockResolvedValue([
+      {
+        matchId: 'm1',
+        moveCounter: 1,
+        eventKind: 'step',
+        createdAt: new Date(),
+        payload: {
+          request,
+          events: ['3', '3', '3'].map((cause, index) => ({
+            kind: 'player_died',
+            stateID: 1,
+            index,
+            actor: '3',
+            data: { player: '0', cause },
+          })),
+        },
+      },
+    ]);
+
+    await archive.recordFinish('m1', final, seats);
+    await archive.recordFinish('m1', final, seats);
+
+    expect(stub.$transaction).toHaveBeenCalledTimes(2);
+    expect(stub.achievement.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([expect.objectContaining({ id: 'first_kill', name: '首杀' })]),
+      skipDuplicates: true,
+    });
+    expect(stub.playerAchievement.createMany).toHaveBeenCalledTimes(2);
+    for (const [arg] of stub.playerAchievement.createMany.mock.calls) {
+      expect(arg).toEqual({
+        data: ['first_kill', 'unlock_master', 'rich_kingdom', 'blitzkrieg', 'unbreakable'].map(
+          (achievementId) => ({ playerId: 'account-0', achievementId }),
+        ),
+        skipDuplicates: true,
+      });
+    }
+  });
+
+  it('recordFinish：非击杀造成的死亡不计入不屈不挠，背叛者按起始阵营判定', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    const snap = makeTestSnapshot('m1');
+    snap.state.ctx.gameover = { winner: 'master', reason: 'deck_exhausted' };
+    snap.state.G.dreamMasterID = '3';
+    snap.state.G.players['0']!.faction = 'master';
+    stub.matchEvent.findMany.mockResolvedValue([
+      ...['3', '3', null].map((cause, index) => ({
+        matchId: 'm1',
+        moveCounter: index + 1,
+        eventKind: 'step',
+        createdAt: new Date(),
+        payload: {
+          request,
+          events: [
+            {
+              kind: 'player_died',
+              stateID: index + 1,
+              index: 0,
+              actor: '3',
+              data: { player: '0', cause },
+            },
+          ],
+        },
+      })),
+    ]);
+
+    await archive.recordFinish('m1', snap.state, snap.seats);
+
+    expect(stub.playerAchievement.createMany).toHaveBeenCalledWith({
+      data: [{ playerId: 'account-0', achievementId: 'double_agent' }],
+      skipDuplicates: true,
+    });
   });
 
   it('listSteps：只取 step 行并按版本号升序，形状不对的行跳过', async () => {
