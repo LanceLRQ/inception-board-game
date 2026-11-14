@@ -4,6 +4,9 @@
 // 接口完全对齐 ReportArchive，方便 ReportService / admin API 任意切换注入。
 
 import type { PrismaClient } from '../generated/prisma/client.js';
+import { isUuid } from '../infra/uuid.js';
+import { createPrismaReputationStore } from './PrismaReputationStore.js';
+import { ReputationService } from './ReputationService.js';
 import {
   DuplicateReportError,
   type ReportArchive,
@@ -46,8 +49,7 @@ export function toReportRecord(row: PrismaReportRow): ReportRecord {
 }
 
 export class PrismaReportArchive implements ReportArchive {
-  /** 传事务客户端时，读写都落在那个事务里 */
-  constructor(private readonly prisma: Pick<PrismaClient, 'report'>) {}
+  constructor(private readonly prisma: Pick<PrismaClient, 'report' | '$transaction'>) {}
 
   async insert(input: Omit<ReportRecord, 'id'>): Promise<ReportRecord> {
     try {
@@ -93,25 +95,49 @@ export class PrismaReportArchive implements ReportArchive {
   }
 
   async updateStatus(id: string, patch: ReportStatusPatch): Promise<ReportRecord | null> {
-    const existing = await this.prisma.report.findUnique({ where: { id } });
-    if (!existing) return null;
-
-    // 与 InMemoryReportArchive 一致的语义：
-    //   - status=pending  → 清空 resolvedAt / resolvedByOperatorId（重开案）
-    //   - status=其他     → 自动填 resolvedAt=now；operator 有传则覆盖，不传保留原值
+    if (!isUuid(id)) return null;
     const isPending = patch.status === 'pending';
-    const row = await this.prisma.report.update({
-      where: { id },
-      data: {
-        status: patch.status,
-        resolvedAt: isPending ? null : new Date(),
-        resolvedByOperatorId: isPending
-          ? null
-          : (patch.resolvedByOperatorID ?? existing.resolvedByOperatorId),
-        notes: patch.notes ?? existing.notes,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const [row] = await tx.report.updateManyAndReturn({
+        where: { id },
+        data: {
+          status: patch.status,
+          resolvedAt: isPending ? null : new Date(),
+          ...(isPending
+            ? { resolvedByOperatorId: null }
+            : patch.resolvedByOperatorID !== undefined && {
+                resolvedByOperatorId: patch.resolvedByOperatorID,
+              }),
+          ...(patch.notes !== undefined && { notes: patch.notes }),
+        },
+      });
+      if (!row) return null;
+      // 状态更新先锁住举报行，重复确认和重开再确认都只能扣一次。
+      if (
+        patch.status === 'resolved' &&
+        !row.reputationApplied &&
+        (row.reason === 'afk' || row.reason === 'cheating') &&
+        isUuid(row.matchId) &&
+        isUuid(row.targetId)
+      ) {
+        const match = await tx.match.findUnique({
+          where: { id: row.matchId },
+          select: { mode: true },
+        });
+        if (match?.mode === 'matchmaking') {
+          const target = await tx.player.findUnique({
+            where: { id: row.targetId },
+            select: { id: true },
+          });
+          if (target) {
+            const reputation = new ReputationService(createPrismaReputationStore(tx));
+            await reputation.adjust(target.id, 'report');
+            await tx.report.update({ where: { id }, data: { reputationApplied: true } });
+          }
+        }
+      }
+      return toReportRecord(row);
     });
-    return toReportRecord(row);
   }
 }
 

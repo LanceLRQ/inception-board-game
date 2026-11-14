@@ -1,4 +1,4 @@
-// 举报路由单测：对局成员由注入的内存表提供，归档与信誉分用内存实现；只 mock 日志
+// 举报路由单测：对局成员与举报归档使用内存实现；只 mock 日志
 
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
@@ -10,7 +10,6 @@ import { createPrismaReputationStore } from '../services/PrismaReputationStore.j
 import { errorHandler } from '../middleware/errorHandler.js';
 import { signToken } from '../infra/jwt.js';
 import { InMemoryReportArchive, ReportService } from '../services/ReportService.js';
-import { InMemoryReputationStore, ReputationService } from '../services/ReputationService.js';
 
 vi.mock('../infra/logger.js', () => ({
   logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -46,9 +45,8 @@ afterEach(async () => {
 });
 
 async function setup() {
-  const reputation = new ReputationService(new InMemoryReputationStore());
   const archive = new InMemoryReportArchive();
-  const reportService = new ReportService(reputation, { archive });
+  const reportService = new ReportService({ archive });
   const app = new Koa();
   app.use(errorHandler);
   app.use(bodyParser());
@@ -68,27 +66,27 @@ async function setup() {
     });
     return { status: res.status, json: (await res.json()) as Record<string, unknown> };
   }
-  return { post, reputation, archive };
+  return { post, archive };
 }
 
 describe('POST /matches/:id/report', () => {
-  it('正常举报 201，并扣目标信誉分、落一条记录', async () => {
-    const { post, reputation, archive } = await setup();
+  it('正常举报 201，入库等待核实，响应中没有信誉分', async () => {
+    const { post, archive } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'afk' });
     expect(res.status).toBe(201);
-    expect(res.json.targetNewScore).toBe(40);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(40);
+    expect(res.json).toEqual({ reported: true });
     const rows = await archive.list({});
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       reporterID: ACCOUNT_A,
       targetID: ACCOUNT_B,
       matchID: MATCH_ID,
+      status: 'pending',
     });
   });
 
-  it('同一对局 ID 换大小写再举报仍是 409，且只扣一次分', async () => {
-    const { post, reputation, archive } = await setup();
+  it('同一对局 ID 换大小写再举报仍是 409', async () => {
+    const { post, archive } = await setup();
     const first = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'afk' });
     expect(first.status).toBe(201);
     const upper = await post(MATCH_ID.toUpperCase(), ACCOUNT_A, { targetSeat: 1, reason: 'afk' });
@@ -98,7 +96,6 @@ describe('POST /matches/:id/report', () => {
       reason: 'afk',
     });
     expect(mixed.status).toBe(409);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(40);
     const rows = await archive.list({});
     expect(rows).toHaveLength(1);
     expect(rows[0]?.matchID).toBe(MATCH_ID);
@@ -115,11 +112,10 @@ describe('POST /matches/:id/report', () => {
     expect(malformed.status).toBe(404);
   });
 
-  it('举报人不是这局成员 403，且不扣分不落库', async () => {
-    const { post, reputation, archive } = await setup();
+  it('举报人不是这局成员 403，且不落库', async () => {
+    const { post, archive } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_OUTSIDER, { targetSeat: 1, reason: 'afk' });
     expect(res.status).toBe(403);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(50);
     expect(archive.size()).toBe(0);
   });
 
@@ -137,18 +133,16 @@ describe('POST /matches/:id/report', () => {
   });
 
   it('举报自己 400', async () => {
-    const { post, reputation } = await setup();
+    const { post } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 0, reason: 'afk' });
     expect(res.status).toBe(400);
-    expect((await reputation.get(ACCOUNT_A)).score).toBe(50);
   });
 
-  it('重复举报 409，信誉分只扣一次', async () => {
-    const { post, reputation, archive } = await setup();
+  it('重复举报 409，归档只留一条记录', async () => {
+    const { post, archive } = await setup();
     expect((await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'afk' })).status).toBe(201);
     const again = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'cheating' });
     expect(again.status).toBe(409);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(40);
     expect(archive.size()).toBe(1);
   });
 
@@ -171,14 +165,14 @@ describe('createPrismaReputationStore.applyDelta', () => {
         updatedAt: new Date(),
       },
     ]);
-    const findUnique = vi.fn();
+    const findMany = vi.fn();
     const store = createPrismaReputationStore({
-      reputation: { findUnique },
+      reputation: { findMany },
       $queryRaw: queryRaw,
     } as never);
     const rec = await store.applyDelta(ACCOUNT_B, -10, 50);
     expect(rec.score).toBe(40);
     expect(queryRaw).toHaveBeenCalledTimes(1);
-    expect(findUnique).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

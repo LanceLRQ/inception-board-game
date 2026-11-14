@@ -17,7 +17,7 @@ import type { LobbyRedis } from '../services/LobbyService.js';
 import { InMemoryChatLog } from '../services/ChatLog.js';
 import { InMemoryRateGuard } from '../services/RateGuardService.js';
 import type { ReportsPrisma } from '../api/reports.js';
-import { InMemoryReportArchive, ReportService } from '../services/ReportService.js';
+import { ReportService } from '../services/ReportService.js';
 import { InMemoryReputationStore, ReputationService } from '../services/ReputationService.js';
 import { createMemoryIdentityPrisma } from './memoryIdentity.js';
 
@@ -113,9 +113,9 @@ export interface DevServer {
 
 /**
  * 内存版的举报依赖：对局成员表直接读运行中的对局座位（举报只会发生在刚打完的对局上，
- * 对局在结束后还会保留一小段时间），举报与信誉分都存在进程内。
+ * 对局在结束后还会保留一小段时间），举报存在进程内。
  */
-function memoryReports(getRealtime: () => Realtime | null, reputation: ReputationService) {
+function memoryReports(getRealtime: () => Realtime | null) {
   const prisma: ReportsPrisma = {
     match: {
       async findUnique({ where }) {
@@ -134,7 +134,7 @@ function memoryReports(getRealtime: () => Realtime | null, reputation: Reputatio
   };
   return {
     prisma,
-    reportService: new ReportService(reputation, { archive: new InMemoryReportArchive() }),
+    reportService: new ReportService(),
   };
 }
 
@@ -160,7 +160,7 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
       },
     }),
     identityPrisma: identity,
-    reports: memoryReports(() => started, reputation),
+    reports: memoryReports(() => started),
     heartbeatRedis: redis,
     rateGuard: new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
     timing: opts.timing ?? devTimingFromEnv(process.env),

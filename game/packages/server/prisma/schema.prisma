@@ -271,6 +271,7 @@ model Report {
   resolvedAt           DateTime? @map("resolved_at") @db.Timestamptz
   resolvedByOperatorId String?   @map("resolved_by_operator_id") @db.VarChar(64)
   notes                String?   @db.VarChar(500)
+  reputationApplied   Boolean   @default(false) @map("reputation_applied")
 
   @@unique([matchId, reporterId, targetId], map: "uq_reports_match_reporter_target")
   @@index([status, createdAt(sort: Desc)], map: "idx_reports_status_created")

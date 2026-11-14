@@ -1,8 +1,18 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
+import Koa from 'koa';
+import bodyParser from 'koa-bodyparser';
+import { createAdminRouter } from '../api/admin.js';
+import { createOperatorAuthMiddleware } from '../middleware/operatorAuth.js';
+import { errorHandler } from '../middleware/errorHandler.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { createPrismaReputationStore } from '../services/PrismaReputationStore.js';
 import { ReputationService } from '../services/ReputationService.js';
+import { PrismaReportArchive } from '../services/PrismaReportArchive.js';
+import { ReportService } from '../services/ReportService.js';
 import { PrismaMatchArchive } from './MatchArchive.js';
 import { makeTestSnapshot } from './MatchStore.contract.js';
 
@@ -113,6 +123,70 @@ describe.skipIf(!databaseUrl)('信誉分 · PostgreSQL', () => {
     } finally {
       await prisma.match.delete({ where: { id: matchID } });
       await prisma.player.delete({ where: { id } });
+    }
+  });
+
+  it('只在快速匹配的挂机和作弊举报首次核实时扣分', async () => {
+    const accounts = await prisma.player.createManyAndReturn({
+      data: ['举报人', '举报对象'].map((nickname) => ({ nickname, avatarSeed: 'test' })),
+    });
+    const [reporter, target] = accounts;
+    const matches = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    const reports = new PrismaReportArchive(prisma);
+    const service = new ReportService({ archive: reports });
+    const token = 'operator-test-token';
+    const app = new Koa();
+    app.use(errorHandler);
+    app.use(bodyParser());
+    app.use(
+      createAdminRouter({
+        archive: reports,
+        auth: createOperatorAuthMiddleware({ token }),
+      }).routes(),
+    );
+    const server = createServer(app.callback()).listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const scenarios = [
+      { matchID: matches[0]!, mode: 'friend', reason: 'afk' },
+      { matchID: matches[1]!, mode: 'matchmaking', reason: 'abusive' },
+      { matchID: matches[2]!, mode: 'matchmaking', reason: 'cheating' },
+    ] as const;
+    try {
+      for (const { matchID, mode } of scenarios) {
+        await prisma.match.create({ data: { id: matchID, mode } });
+      }
+      const submit = (matchID: string, reason: 'afk' | 'abusive' | 'cheating') =>
+        service.submit({ matchID, reason, reporterID: reporter!.id, targetID: target!.id });
+      for (const { matchID, reason } of scenarios) {
+        expect(await submit(matchID, reason)).toEqual({ ok: true });
+      }
+      expect((await reputation.get(target!.id)).score).toBe(50);
+
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      for (const { matchID } of scenarios) {
+        const [report] = await reports.list({ matchID });
+        const resolve = () =>
+          fetch(`${base}/admin/reports/${report!.id}`, {
+            method: 'PATCH',
+            headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ status: 'resolved' }),
+          });
+        const results = await Promise.all([resolve(), resolve()]);
+        for (const res of results) {
+          expect(res.status).toBe(200);
+          expect(await res.json()).toMatchObject({ status: 'resolved' });
+        }
+      }
+      expect((await reputation.get(target!.id)).score).toBe(40);
+      const [confirmed] = await reports.list({ matchID: matches[2]! });
+      await reports.updateStatus(confirmed!.id, { status: 'pending' });
+      await reports.updateStatus(confirmed!.id, { status: 'resolved' });
+      expect((await reputation.get(target!.id)).score).toBe(40);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await prisma.report.deleteMany({ where: { matchId: { in: matches } } });
+      await prisma.match.deleteMany({ where: { id: { in: matches } } });
+      await prisma.player.deleteMany({ where: { id: { in: accounts.map((a) => a.id) } } });
     }
   });
 });

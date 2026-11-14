@@ -5,7 +5,7 @@
 //   - 请求体：{ targetSeat, reason, description? }；目标由座位号在这局的成员里解析，
 //     不接受客户端传来的账号 ID，避免举报与本局无关的人
 //   - 举报人必须是这局的真人成员；目标必须是另一个真人座位
-//   - 去重与扣分由 ReportService 处理：落库（唯一约束判重）与扣信誉分在同一个事务内
+//   - 提交只入库；重复举报由数据库唯一约束拦截
 
 import Router from '@koa/router';
 import { z } from 'zod';
@@ -13,8 +13,6 @@ import { authMiddleware } from '../middleware/auth.js';
 import { prisma as defaultPrisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { isUuid } from '../infra/uuid.js';
-import { createPrismaReputationStore } from '../services/PrismaReputationStore.js';
-import { ReputationService } from '../services/ReputationService.js';
 import {
   ReportService,
   VALID_REPORT_REASONS,
@@ -114,29 +112,15 @@ export function createReportsRouter(deps: ReportsRouterDeps): Router {
     }
 
     ctx.status = 201;
-    ctx.body = {
-      reported: true,
-      targetNewScore: result.targetNewScore,
-    };
+    ctx.body = { reported: true };
   });
 
   return router;
 }
 
-/** 生产依赖：全局数据库客户端 + 数据库举报归档；落库与扣分绑在同一个事务里 */
 export function createDefaultReportsDeps(): ReportsRouterDeps {
-  const reputation = new ReputationService(createPrismaReputationStore(defaultPrisma));
   return {
-    prisma: defaultPrisma as unknown as ReportsPrisma,
-    reportService: new ReportService(reputation, {
-      archive: new PrismaReportArchive(defaultPrisma),
-      runAtomically: (fn) =>
-        defaultPrisma.$transaction((tx) =>
-          fn({
-            archive: new PrismaReportArchive(tx),
-            reputation: new ReputationService(createPrismaReputationStore(tx)),
-          }),
-        ),
-    }),
+    prisma: defaultPrisma,
+    reportService: new ReportService({ archive: new PrismaReportArchive(defaultPrisma) }),
   };
 }

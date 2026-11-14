@@ -1,16 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReportService, InMemoryReportArchive } from './ReportService.js';
-import { ReputationService, InMemoryReputationStore } from './ReputationService.js';
 
 describe('ReportService', () => {
-  let rep: ReputationService;
   let svc: ReportService;
-  let store: InMemoryReputationStore;
 
   beforeEach(() => {
-    store = new InMemoryReputationStore();
-    rep = new ReputationService(store);
-    svc = new ReportService(rep);
+    svc = new ReportService();
   });
 
   describe('validation', () => {
@@ -49,28 +44,6 @@ describe('ReportService', () => {
   });
 
   describe('successful submit', () => {
-    it('deducts 10 score from target', async () => {
-      const r = await svc.submit({
-        matchID: 'm1',
-        reporterID: 'p1',
-        targetID: 'p2',
-        reason: 'afk',
-      });
-      expect(r.ok).toBe(true);
-      if (r.ok) expect(r.targetNewScore).toBe(40);
-    });
-
-    it('does not affect the reporter', async () => {
-      await svc.submit({
-        matchID: 'm1',
-        reporterID: 'p1',
-        targetID: 'p2',
-        reason: 'afk',
-      });
-      const reporterRec = await rep.get('p1');
-      expect(reporterRec.score).toBe(50);
-    });
-
     it('accepts all 4 valid reasons', async () => {
       const reasons = ['cheating', 'afk', 'abusive', 'other'] as const;
       for (const reason of reasons) {
@@ -82,9 +55,6 @@ describe('ReportService', () => {
         });
         expect(r.ok).toBe(true);
       }
-      // p2 被扣 4 次 × -10 = 10
-      const rec = await rep.get('p2');
-      expect(rec.score).toBe(10);
     });
   });
 
@@ -104,9 +74,6 @@ describe('ReportService', () => {
       });
       expect(r2.ok).toBe(false);
       if (!r2.ok) expect(r2.code).toBe('DUPLICATE');
-      // 第二次不扣分，分数应仍是 40
-      const rec = await rep.get('p2');
-      expect(rec.score).toBe(40);
     });
 
     it('different reporters can each report same target once', async () => {
@@ -118,8 +85,6 @@ describe('ReportService', () => {
         reason: 'afk',
       });
       expect(r2.ok).toBe(true);
-      const rec = await rep.get('p3');
-      expect(rec.score).toBe(30);
     });
 
     it('different matches: same pair can report again', async () => {
@@ -134,70 +99,17 @@ describe('ReportService', () => {
     });
   });
 
-  describe('落库失败不扣分', () => {
-    it('归档写入抛错时不扣信誉分，错误向上抛出', async () => {
+  describe('落库失败', () => {
+    it('归档写入抛错时错误向上抛出', async () => {
       const failing = new InMemoryReportArchive();
       failing.insert = async () => {
         throw new Error('db down');
       };
-      const failingSvc = new ReportService(rep, { archive: failing });
+      const failingSvc = new ReportService({ archive: failing });
       await expect(
         failingSvc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' }),
       ).rejects.toThrow('db down');
-      expect((await rep.get('p2')).score).toBe(50);
     });
-  });
-});
-
-describe('ReportService · 落库与扣分原子', () => {
-  it('两次并发举报同一目标（不同举报人）后恰好扣两次', async () => {
-    const rep = new ReputationService(new InMemoryReputationStore());
-    const svc = new ReportService(rep);
-    const [a, b] = await Promise.all([
-      svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p3', reason: 'afk' }),
-      svc.submit({ matchID: 'm1', reporterID: 'p2', targetID: 'p3', reason: 'afk' }),
-    ]);
-    expect(a.ok && b.ok).toBe(true);
-    expect((await rep.get('p3')).score).toBe(30);
-  });
-
-  it('扣分那一步失败时举报行不残留，同一举报可以重新提交', async () => {
-    const store = new InMemoryReputationStore();
-    const archive = new InMemoryReportArchive();
-    const realApply = store.applyDelta.bind(store);
-    let failOnce = true;
-    store.applyDelta = async (id, delta, initial) => {
-      if (failOnce) {
-        failOnce = false;
-        throw new Error('db down');
-      }
-      return realApply(id, delta, initial);
-    };
-    const svc = new ReportService(new ReputationService(store), { archive });
-    const input = { matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' as const };
-    await expect(svc.submit(input)).rejects.toThrow('db down');
-    expect(archive.size()).toBe(0);
-    const retry = await svc.submit(input);
-    expect(retry.ok).toBe(true);
-    expect(archive.size()).toBe(1);
-  });
-
-  it('提供事务执行器时，落库与扣分都在同一次执行内完成', async () => {
-    const store = new InMemoryReputationStore();
-    const archive = new InMemoryReportArchive();
-    const rep = new ReputationService(store);
-    let runs = 0;
-    const svc = new ReportService(rep, {
-      archive,
-      runAtomically: async (fn) => {
-        runs += 1;
-        return fn({ archive, reputation: rep });
-      },
-    });
-    await svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' });
-    expect(runs).toBe(1);
-    expect(archive.size()).toBe(1);
-    expect((await rep.get('p2')).score).toBe(40);
   });
 });
 
@@ -209,8 +121,7 @@ describe('ReportService · 注入 ReportArchive 后', () => {
 
   beforeEach(() => {
     archive = new InMemoryReportArchive();
-    const rep = new ReputationService(new InMemoryReputationStore());
-    svc = new ReportService(rep, { archive });
+    svc = new ReportService({ archive });
   });
 
   it('成功提交后 archive 持久化一条 pending 记录', async () => {
