@@ -69,9 +69,8 @@ export class MatchService {
     );
   }
 
-  /** 房间点开始：建立权威对局，返回 matchID（= 房间 id） */
-  async createFromRoom(room: RoomState): Promise<string> {
-    const matchID = room.id;
+  /** 房间点开始：首局沿用房间 id，后续局使用独立编号。 */
+  async createFromRoom(room: RoomState, matchID = room.id): Promise<string> {
     if (this.rooms.has(matchID) || this.creating.has(matchID)) {
       throw new AppError('CONFLICT', '该对局已存在');
     }
@@ -89,6 +88,7 @@ export class MatchService {
       const snapshot: MatchSnapshot = {
         matchID,
         roomCode: room.code,
+        roomId: room.id,
         seats,
         setup,
         state,

@@ -55,6 +55,8 @@ export default function Lobby() {
   const [inputNickname, setInputNickname] = useState('');
   // 创建房间参数
   const [maxPlayers, setMaxPlayers] = useState(6);
+  const [seriesMode, setSeriesMode] = useState('unlimited');
+  const [seriesLength, setSeriesLength] = useState(7);
   // 加入房间
   const [joinCode, setJoinCode] = useState('');
 
@@ -110,7 +112,18 @@ export default function Lobby() {
   const createRoomMutation = useMutation({
     mutationKey: ['lobby', 'createRoom'],
     mutationFn: (size: number) =>
-      roomApi.createRoom({ playerId: playerId ?? '', nickname, avatarSeed }, { maxPlayers: size }),
+      roomApi.createRoom(
+        { playerId: playerId ?? '', nickname, avatarSeed },
+        {
+          maxPlayers: size,
+          seriesLength:
+            seriesMode === 'unlimited'
+              ? undefined
+              : seriesMode === 'custom'
+                ? seriesLength
+                : Number(seriesMode),
+        },
+      ),
     onSuccess: (res, size) => {
       logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers: size });
       navigate(`/room/${res.code}`);
@@ -318,10 +331,41 @@ export default function Lobby() {
             </option>
           ))}
         </select>
+        <label className="mb-2 block text-sm text-dim" htmlFor="lobby-series">
+          {t('series.format')}
+        </label>
+        <select
+          id="lobby-series"
+          className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 text-foreground"
+          value={seriesMode}
+          onChange={(e) => setSeriesMode(e.target.value)}
+        >
+          <option value="unlimited">{t('series.unlimited')}</option>
+          <option value="3">BO3</option>
+          <option value="5">BO5</option>
+          <option value="custom">{t('series.custom')}</option>
+        </select>
+        {seriesMode === 'custom' && (
+          <input
+            aria-label={t('series.rounds')}
+            type="number"
+            min={1}
+            max={99}
+            step={1}
+            value={Number.isNaN(seriesLength) ? '' : seriesLength}
+            onChange={(e) => setSeriesLength(e.target.valueAsNumber)}
+            className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2"
+          />
+        )}
         <Button
           type="button"
           onClick={handleCreateRoom}
-          disabled={loading || roomBusy}
+          disabled={
+            loading ||
+            roomBusy ||
+            (seriesMode === 'custom' &&
+              (!Number.isInteger(seriesLength) || seriesLength < 1 || seriesLength > 99))
+          }
           className="h-10 w-full px-4 font-bold"
           data-testid="lobby-create"
         >

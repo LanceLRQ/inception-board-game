@@ -864,6 +864,20 @@
     },
     "wait": "Waiting"
   },
+  "series": {
+    "format": "Match format",
+    "unlimited": "Unlimited rounds",
+    "custom": "Custom rounds",
+    "rounds": "Number of rounds",
+    "returnToRoom": "Return to Room",
+    "scores": "Room scores",
+    "finished": "Series complete",
+    "played": "{{played}} rounds completed",
+    "progress": "{{played}} / {{limit}} rounds completed",
+    "points": "{{score}} pts",
+    "settling": "Saving match results…",
+    "nextRound": "Start Next Round"
+  },
   "outcome": {
     "mvp": "Match MVP",
     "aria": "Match result"

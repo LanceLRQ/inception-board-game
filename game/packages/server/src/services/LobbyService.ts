@@ -11,6 +11,7 @@ import { prisma as defaultPrisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { logger } from '../infra/logger.js';
 import type { MatchService } from '../match/MatchService.js';
+import type { RoomMatchResult } from '../match/MatchArchive.js';
 
 // 避开 0/O/1/I 的可用字符集
 const ROOM_CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -27,9 +28,17 @@ export interface RoomState {
   status: 'waiting' | 'playing' | 'finished';
   /** 开始游戏后写入：权威对局的编号 */
   matchId?: string;
+  seriesLength?: number;
+  series?: RoomSeries;
   players: RoomPlayer[];
   createdAt: number;
   expiresAt: number;
+}
+
+interface RoomSeries {
+  played: number;
+  limit: number | null;
+  scores: RoomMatchResult['scores'];
 }
 
 export interface RoomPlayer {
@@ -73,6 +82,7 @@ export interface LobbyDeps {
   >;
   /** 房间内容变了（成员增减、补 Bot、开始游戏）并已保存之后调用；它抛错不影响请求 */
   onRoomChange?: (room: RoomState) => void;
+  roomResults?: (roomId: string) => Promise<RoomMatchResult[]>;
 }
 
 /** 房间推送给成员的内容：只含房间本身的公开信息，没有任何对局内的隐藏信息 */
@@ -84,6 +94,7 @@ export interface RoomPayload {
   ruleVariant: string;
   status: RoomState['status'];
   matchId?: string;
+  series?: RoomSeries;
   players: RoomPlayer[];
 }
 
@@ -97,6 +108,7 @@ export function toRoomPayload(room: RoomState): RoomPayload {
     ruleVariant: room.ruleVariant,
     status: room.status,
     ...(room.matchId !== undefined ? { matchId: room.matchId } : {}),
+    ...(room.series !== undefined ? { series: room.series } : {}),
     players: room.players.map((p) => ({
       playerId: p.playerId,
       nickname: p.nickname,
@@ -118,12 +130,14 @@ export class LobbyService {
       >
     | undefined;
   private readonly onRoomChange: ((room: RoomState) => void) | undefined;
+  private readonly roomResults: LobbyDeps['roomResults'];
 
   constructor(deps: LobbyDeps = {}) {
     this.redis = deps.redis ?? createRedisClient();
     this.prisma = deps.prisma ?? defaultPrisma;
     this.matches = deps.matches;
     this.onRoomChange = deps.onRoomChange;
+    this.roomResults = deps.roomResults;
   }
 
   private generateRoomCode(): string {
@@ -142,6 +156,7 @@ export class LobbyService {
       ruleVariant?: string;
       exCardsEnabled?: boolean;
       expansionEnabled?: boolean;
+      seriesLength?: number;
     } = {},
   ): Promise<RoomState> {
     const code = await this.generateUniqueCode();
@@ -160,6 +175,7 @@ export class LobbyService {
       exCardsEnabled: options.exCardsEnabled ?? false,
       expansionEnabled: options.expansionEnabled ?? false,
       status: 'waiting',
+      ...(options.seriesLength !== undefined && { seriesLength: options.seriesLength }),
       players: [
         {
           playerId: ownerId,
@@ -181,15 +197,15 @@ export class LobbyService {
   }
 
   async joinRoom(code: string, playerId: string): Promise<RoomState> {
-    const room = await this.getRoom(code);
+    const room = await this.getRoomForDisplay(code);
     if (!room) throw new AppError('NOT_FOUND', '房间不存在或已过期');
-    if (room.status !== 'waiting') throw new AppError('ROOM_STARTED', '游戏已开始');
-    if (room.players.length >= room.maxPlayers) throw new AppError('ROOM_FULL', '房间已满');
 
     // 已在房间则直接返回
     if (room.players.some((p) => p.playerId === playerId)) {
       return room;
     }
+    if (room.status === 'playing') throw new AppError('ROOM_STARTED', '游戏已开始');
+    if (room.players.length >= room.maxPlayers) throw new AppError('ROOM_FULL', '房间已满');
 
     const player = await this.prisma.player.findUnique({ where: { id: playerId } });
     if (!player) throw new AppError('NOT_FOUND', 'Player not found');
@@ -210,7 +226,7 @@ export class LobbyService {
   }
 
   async leaveRoom(code: string, playerId: string): Promise<void> {
-    const room = await this.getRoom(code);
+    const room = await this.getRoomForDisplay(code);
     if (!room) throw new AppError('NOT_FOUND', '房间不存在或已过期');
 
     const idx = room.players.findIndex((p) => p.playerId === playerId);
@@ -267,13 +283,13 @@ export class LobbyService {
   }
 
   async startGame(code: string, requesterId: string): Promise<string> {
-    const room = await this.getRoom(code);
+    const room = await this.getRoomForDisplay(code);
     if (!room) throw new AppError('NOT_FOUND', '房间不存在或已过期');
     if (room.ownerPlayerId !== requesterId) throw new AppError('FORBIDDEN', '只有房主才能开始');
     if (room.players.length < MIN_START_PLAYERS) {
       throw new AppError('CONFLICT', `至少需要 ${MIN_START_PLAYERS} 名玩家`);
     }
-    if (room.status !== 'waiting') throw new AppError('ROOM_STARTED', '游戏已开始');
+    if (room.status === 'playing') throw new AppError('ROOM_STARTED', '游戏已开始');
     if (!this.matches) throw new AppError('INTERNAL_ERROR', '对局服务未就绪');
 
     const lockKey = RedisKeys.roomStarting(code);
@@ -281,16 +297,34 @@ export class LobbyService {
     if (locked !== 'OK') throw new AppError('CONFLICT', '正在开始');
 
     try {
-      // 持有开始锁且房间确认是 waiting：同 id 还在运行的对局只能是撤销没清干净的残留，先撤销再建
-      if (this.matches.isRunning(room.id)) {
-        logger.warn({ roomId: room.id }, 'discarding leftover match before start');
-        await this.matches.discardMatch(room.id);
+      const current = await this.getRoomForDisplay(code);
+      if (!current || current.status === 'playing') {
+        throw new AppError('ROOM_STARTED', '游戏已开始');
       }
-      const matchId = await this.matches.createFromRoom(room);
-      room.status = 'playing';
-      room.matchId = matchId;
+      if (current.ownerPlayerId !== requesterId) {
+        throw new AppError('FORBIDDEN', '只有房主才能开始');
+      }
+      if (current.players.length < MIN_START_PLAYERS) {
+        throw new AppError('CONFLICT', `至少需要 ${MIN_START_PLAYERS} 名玩家`);
+      }
+      if (
+        current.seriesLength !== undefined &&
+        current.series &&
+        current.series.played >= current.seriesLength
+      ) {
+        throw new AppError('CONFLICT', '系列赛已结束');
+      }
+      const nextID = current.matchId ? crypto.randomUUID() : current.id;
+      // 首局仍可复用撤销后留下的编号；已经结束并入档的局始终保留。
+      if (this.matches.isRunning(nextID)) {
+        logger.warn({ roomId: room.id }, 'discarding leftover match before start');
+        await this.matches.discardMatch(nextID);
+      }
+      const matchId = await this.matches.createFromRoom(current, nextID);
+      current.status = 'playing';
+      current.matchId = matchId;
       try {
-        await this.saveRoom(room);
+        await this.saveRoom(current);
       } catch (err) {
         // 房间仍是 waiting，对局却已在运行；不撤销的话再点开始只会得到「已存在」
         await this.matches.discardMatch(matchId);
@@ -298,9 +332,10 @@ export class LobbyService {
       }
       logger.info({ roomId: room.id, matchId }, 'Game started');
       return matchId;
-    } catch (err) {
-      await this.redis.del(lockKey);
-      throw err;
+    } finally {
+      await this.redis
+        .del(lockKey)
+        .catch((err) => logger.warn({ err, code }, 'room start lock cleanup failed'));
     }
   }
 
@@ -310,11 +345,35 @@ export class LobbyService {
     return JSON.parse(raw) as RoomState;
   }
 
-  async fillAI(code: string, requesterId: string, count?: number): Promise<RoomState> {
+  /** 从已落库结算投影房间状态，重试或重启都不会重复加分。 */
+  async getRoomForDisplay(code: string): Promise<RoomState | null> {
     const room = await this.getRoom(code);
+    if (!room) return null;
+    if (!room.matchId && room.seriesLength === undefined) return room;
+    const results = room.matchId ? ((await this.roomResults?.(room.id)) ?? []) : [];
+    const totals = new Map<string, RoomMatchResult['scores'][number]>();
+    let played = 0;
+    for (const result of results) {
+      if (result.id === room.matchId) room.status = 'finished';
+      if (result.scored) played++;
+      for (const score of result.scores) {
+        const previous = totals.get(score.playerId)?.score ?? 0;
+        totals.set(score.playerId, { ...score, score: previous + score.score });
+      }
+    }
+    room.series = {
+      played,
+      limit: room.seriesLength ?? null,
+      scores: [...totals.values()].sort((a, b) => b.score - a.score),
+    };
+    return room;
+  }
+
+  async fillAI(code: string, requesterId: string, count?: number): Promise<RoomState> {
+    const room = await this.getRoomForDisplay(code);
     if (!room) throw new AppError('NOT_FOUND', '房间不存在');
     if (room.ownerPlayerId !== requesterId) throw new AppError('FORBIDDEN', '只有房主才能添加 AI');
-    if (room.status !== 'waiting') throw new AppError('ROOM_STARTED', '游戏已开始');
+    if (room.status === 'playing') throw new AppError('ROOM_STARTED', '游戏已开始');
 
     const slots = count ?? room.maxPlayers - room.players.length;
     const actual = Math.min(slots, room.maxPlayers - room.players.length);

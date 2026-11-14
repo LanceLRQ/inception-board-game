@@ -24,6 +24,11 @@ export interface RoomState {
   status: 'waiting' | 'playing' | 'finished';
   /** 服务端开始游戏后给出的权威对局编号（本地模拟房间没有） */
   matchId?: string;
+  series?: {
+    played: number;
+    limit: number | null;
+    scores: Array<{ playerId: string; nickname: string; score: number }>;
+  };
   players: RoomPlayer[];
 }
 
@@ -45,6 +50,7 @@ export interface StartGameResult {
 export interface CreateRoomOptions {
   maxPlayers?: number;
   ruleVariant?: string;
+  seriesLength?: number;
 }
 
 export interface IdentityInfo {
@@ -250,7 +256,10 @@ export const roomApi = {
   createRoom: (owner: IdentityInfo, opts: CreateRoomOptions = {}) =>
     withFallback(
       () => realRoomApi.createRoom(owner, opts),
-      () => mockRoomApi.createRoom(owner, opts),
+      () =>
+        opts.seriesLength === undefined
+          ? mockRoomApi.createRoom(owner, opts)
+          : Promise.reject(new ApiRequestError(503, 'UNAVAILABLE', '系列赛需要连接服务端')),
     ),
   joinRoom: (code: string, me: IdentityInfo) =>
     withFallback(

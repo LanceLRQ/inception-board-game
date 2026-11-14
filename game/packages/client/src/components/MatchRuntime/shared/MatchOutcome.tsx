@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Film, RotateCcw, Trophy } from 'lucide-react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { api } from '../../../lib/api';
 import { useIdentityStore } from '../../../stores/useIdentityStore';
 import type { ReportModel } from '../controllerTypes';
@@ -30,6 +30,8 @@ export function MatchOutcome({
 }: MatchOutcomeProps) {
   const { t } = useTranslation();
   const { matchId } = useParams();
+  const [search] = useSearchParams();
+  const roomCode = search.get('code');
   const [open, setOpen] = useState(false);
   const playerId = useIdentityStore((state) => state.playerId);
   const { data: settlement } = useQuery({
@@ -78,6 +80,15 @@ export function MatchOutcome({
           </div>
         )}
         <div className="mt-5 flex flex-wrap gap-2">
+          {isRemote && roomCode && (
+            <Link
+              to={`/room/${encodeURIComponent(roomCode)}`}
+              state={{ settledMatchId: matchId }}
+              className="tabletop-primary inline-flex items-center gap-2"
+            >
+              {t('series.returnToRoom')}
+            </Link>
+          )}
           <button
             type="button"
             onClick={onRestart}

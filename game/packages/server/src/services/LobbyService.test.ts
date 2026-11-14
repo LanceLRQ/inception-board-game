@@ -66,7 +66,7 @@ function makePlayer(id: string, nickname?: string) {
 describe('LobbyService', () => {
   let service: LobbyService;
   let matches: {
-    createFromRoom: Mock<(room: RoomState) => Promise<string>>;
+    createFromRoom: Mock<(room: RoomState, matchID?: string) => Promise<string>>;
     discardMatch: Mock<(matchID: string) => Promise<void>>;
     isRunning: Mock<(matchID: string) => boolean>;
     stopMatch: Mock<(matchID: string) => Promise<void>>;
@@ -330,6 +330,35 @@ describe('LobbyService', () => {
       const saved = await service.getRoom(room.code);
       expect(saved!.matchId).toBe('match-xyz');
       expect(saved!.status).toBe('playing');
+    });
+
+    it('系列赛保留每局归档，累计真人积分，到达局数上限后禁止开新局', async () => {
+      const results = vi.fn().mockResolvedValue([]);
+      service = new LobbyService({ matches, roomResults: results });
+      matches.createFromRoom.mockImplementation(async (room, matchID) => matchID ?? room.id);
+      prismaMock.player.findUnique.mockResolvedValue(makePlayer('P1'));
+      const room = await service.createRoom('P1', { seriesLength: 3 });
+      await service.fillAI(room.code, 'P1', 3);
+      const finished: Array<{
+        id: string;
+        scored: boolean;
+        scores: { playerId: string; nickname: string; score: number }[];
+      }> = [];
+      for (let round = 1; round <= 3; round++) {
+        const id = await service.startGame(room.code, 'P1');
+        expect(finished.some((match) => match.id === id)).toBe(false);
+        finished.push({
+          id,
+          scored: true,
+          scores: [{ playerId: 'P1', nickname: 'Nick-P1', score: 4 }],
+        });
+        results.mockResolvedValue(finished);
+        await expect(service.getRoomForDisplay(room.code)).resolves.toMatchObject({
+          status: 'finished',
+          series: { played: round, limit: 3, scores: [{ playerId: 'P1', score: round * 4 }] },
+        });
+      }
+      await expect(service.startGame(room.code, 'P1')).rejects.toMatchObject({ code: 'CONFLICT' });
     });
 
     it('starts a game with robots filling the seats', async () => {

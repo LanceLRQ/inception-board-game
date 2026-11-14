@@ -18,6 +18,7 @@ export function createRoomsRouter(lobby: LobbyService): Router {
     ruleVariant: z.string().default('classic'),
     exCardsEnabled: z.boolean().default(false),
     expansionEnabled: z.boolean().default(false),
+    seriesLength: z.number().int().min(1).max(99).optional(),
   });
 
   router.post('/rooms', async (ctx) => {
@@ -41,7 +42,7 @@ export function createRoomsRouter(lobby: LobbyService): Router {
   // GET /rooms/code/:code - 用房间码查询
   router.get('/rooms/code/:code', async (ctx) => {
     const code = ctx.params.code!;
-    const room = await lobby.getRoom(code);
+    const room = await lobby.getRoomForDisplay(code);
     if (!room) throw new AppError('NOT_FOUND', '房间不存在或已过期');
 
     ctx.body = {
@@ -52,6 +53,7 @@ export function createRoomsRouter(lobby: LobbyService): Router {
       currentPlayers: room.players.length,
       status: room.status,
       matchId: room.matchId,
+      series: room.series,
       players: room.players,
       expiresAt: room.expiresAt,
     };

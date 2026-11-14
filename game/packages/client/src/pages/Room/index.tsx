@@ -4,7 +4,7 @@
 // 开始后：真实后端 → 全体进入同一局联机对局；本地模拟 → 本地人机对局。
 
 import { useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, LogOut, Play, Users } from 'lucide-react';
@@ -25,6 +25,8 @@ export default function Room() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { code: rawCode } = useParams<{ code: string }>();
+  const settledMatchId = (useLocation().state as { settledMatchId?: string } | null)
+    ?.settledMatchId;
   const code = (rawCode ?? '').toUpperCase();
   const { isAuthenticated, isInitialized, playerId, nickname } = useAuth();
   const { seed: avatarSeed } = useAvatar();
@@ -56,6 +58,7 @@ export default function Room() {
   const sync = useRoomSync({
     code,
     enabled: join.isSuccess,
+    ...(settledMatchId && { settledMatchId }),
     onRemoved: () => navigate('/lobby', { replace: true }),
   });
   const room = sync.room;
@@ -74,12 +77,15 @@ export default function Room() {
 
   // status 变为 playing 时跳 Game：真实后端进入联机对局，本地模拟保持原行为
   useEffect(() => {
+    if (settledMatchId && room?.matchId === settledMatchId) return;
     const target = resolveGameRedirect(room, playerId, isMockMode());
     if (target) navigate(target, { replace: true });
-  }, [room, playerId, navigate]);
+  }, [room, playerId, navigate, settledMatchId]);
 
   const isOwner = !!room && !!playerId && room.ownerPlayerId === playerId;
   const { canStart, missing: missingPlayers } = startGate(room);
+  const series = room?.series;
+  const seriesOver = series != null && series.limit !== null && series.played >= series.limit;
 
   const fillAi = useMutation({
     mutationKey: ['room', 'fillAi', code],
@@ -213,42 +219,69 @@ export default function Room() {
         ))}
       </ul>
 
-      {isOwner ? (
-        <div className="flex flex-col gap-2">
-          {emptySeats > 0 && (
+      {series && (series.limit !== null || series.played > 0) && (
+        <section className="space-y-2 rounded-md border border-line bg-panel p-3">
+          <h2 className="font-semibold">{t(seriesOver ? 'series.finished' : 'series.scores')}</h2>
+          <p className="text-sm text-dim">
+            {series.limit === null
+              ? t('series.played', { played: series.played })
+              : t('series.progress', { played: series.played, limit: series.limit })}
+          </p>
+          <ul className="space-y-1 text-sm">
+            {series.scores.map(({ playerId: id, nickname, score }) => (
+              <li key={id} className="flex justify-between gap-2">
+                <span className="truncate">{nickname}</span>
+                <span className="tabular-nums">{t('series.points', { score })}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {room.status === 'playing' && (
+        <p role="status" className="text-sm text-dim">
+          {t('series.settling')}
+        </p>
+      )}
+
+      {room.status !== 'playing' &&
+        !seriesOver &&
+        (isOwner ? (
+          <div className="flex flex-col gap-2">
+            {emptySeats > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fillAi.mutate()}
+                disabled={busy}
+                className="h-10 gap-2 border-primary/50 bg-primary/20 px-4 font-bold text-foreground hover:bg-primary/30"
+                data-testid="room-fill-ai"
+              >
+                <Bot size={16} />
+                {t('room.fillAi')}
+              </Button>
+            )}
             <Button
               type="button"
-              variant="outline"
-              onClick={() => fillAi.mutate()}
-              disabled={busy}
-              className="h-10 gap-2 border-primary/50 bg-primary/20 px-4 font-bold text-foreground hover:bg-primary/30"
-              data-testid="room-fill-ai"
+              onClick={() => start.mutate()}
+              disabled={busy || !canStart}
+              className="h-11 gap-2 px-4 font-bold"
+              data-testid="room-start"
             >
-              <Bot size={16} />
-              {t('room.fillAi')}
+              <Play size={16} />
+              {t(room.status === 'finished' ? 'series.nextRound' : 'room.start')}
             </Button>
-          )}
-          <Button
-            type="button"
-            onClick={() => start.mutate()}
-            disabled={busy || !canStart}
-            className="h-11 gap-2 px-4 font-bold"
-            data-testid="room-start"
-          >
-            <Play size={16} />
-            {t('room.start')}
-          </Button>
-          {!canStart && (
-            <p className="text-center text-xs text-dim" data-testid="room-need-players">
-              {t('room.needPlayers', { n: missingPlayers, min: MATCH_MIN_PLAYERS })}
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-md border border-line p-3 text-center text-sm text-dim">
-          {t('room.notOwner')}
-        </div>
-      )}
+            {!canStart && (
+              <p className="text-center text-xs text-dim" data-testid="room-need-players">
+                {t('room.needPlayers', { n: missingPlayers, min: MATCH_MIN_PLAYERS })}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-md border border-line p-3 text-center text-sm text-dim">
+            {t('room.notOwner')}
+          </div>
+        ))}
 
       {error && (
         <div className="rounded-md bg-blood/20 p-3 text-sm text-destructive" role="alert">

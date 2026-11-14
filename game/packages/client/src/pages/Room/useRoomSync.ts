@@ -17,6 +17,7 @@ export interface UseRoomSyncOptions {
   code: string;
   /** 已进入房间之后才开始同步 */
   enabled: boolean;
+  settledMatchId?: string;
   /** 服务端告知本人已被移出房间 */
   onRemoved: () => void;
 }
@@ -28,7 +29,12 @@ export interface RoomSync {
   pushStatus: RoomPushStatus;
 }
 
-export function useRoomSync({ code, enabled, onRemoved }: UseRoomSyncOptions): RoomSync {
+export function useRoomSync({
+  code,
+  enabled,
+  settledMatchId,
+  onRemoved,
+}: UseRoomSyncOptions): RoomSync {
   const queryClient = useQueryClient();
   const visible = useDocumentVisible();
   const [pushStatus, setPushStatus] = useState<RoomPushStatus>('idle');
@@ -74,7 +80,13 @@ export function useRoomSync({ code, enabled, onRemoved }: UseRoomSyncOptions): R
     queryKey: roomKeys.detail(code),
     queryFn: () => roomApi.getRoom(code),
     enabled: enabled && !!code,
-    refetchInterval: roomPollInterval(pushStatus, visible),
+    refetchInterval: (query) =>
+      visible &&
+      settledMatchId &&
+      query.state.data?.matchId === settledMatchId &&
+      query.state.data?.status === 'playing'
+        ? 1500
+        : roomPollInterval(pushStatus, visible),
   });
 
   return { room: query.data ?? null, error: query.error, pushStatus };

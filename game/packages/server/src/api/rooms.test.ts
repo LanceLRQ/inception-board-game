@@ -99,7 +99,7 @@ describe('createRoomsRouter', () => {
       status: 'waiting',
       expiresAt: 5,
     }));
-    const res = await call({ getRoom }, 'GET', '/rooms/code/ABC234');
+    const res = await call({ getRoomForDisplay: getRoom }, 'GET', '/rooms/code/ABC234');
     expect(getRoom).toHaveBeenCalledWith('ABC234');
     expect(res.json).toMatchObject({ code: 'ABC234', currentPlayers: 2 });
   });
@@ -116,7 +116,7 @@ describe('createRoomsRouter', () => {
       matchId: 'match-9',
       expiresAt: 5,
     }));
-    const res = await call({ getRoom }, 'GET', '/rooms/code/ABC234');
+    const res = await call({ getRoomForDisplay: getRoom }, 'GET', '/rooms/code/ABC234');
     expect(res.json).toMatchObject({ status: 'playing', matchId: 'match-9', players });
   });
 

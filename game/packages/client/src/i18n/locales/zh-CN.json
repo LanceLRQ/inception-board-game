@@ -838,6 +838,20 @@
     },
     "wait": "等待"
   },
+  "series": {
+    "format": "赛制",
+    "unlimited": "不限局数",
+    "custom": "自定义局数",
+    "rounds": "系列赛局数",
+    "returnToRoom": "返回房间",
+    "scores": "房间积分",
+    "finished": "系列赛已结束",
+    "played": "已完成 {{played}} 局",
+    "progress": "已完成 {{played}} / {{limit}} 局",
+    "points": "{{score}} 分",
+    "settling": "正在保存本局结算…",
+    "nextRound": "开始下一局"
+  },
   "outcome": {
     "mvp": "本局 MVP",
     "aria": "对局结果"

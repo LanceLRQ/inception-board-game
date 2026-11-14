@@ -152,12 +152,13 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
   // 房间推送网关：握手时按房间码查房间，房间变化时推给成员；大厅服务在它之后才建好，所以都用闭包转调
   const rooms = new RoomGateway({
     bans,
-    getRoom: (code) => lobby.getRoom(code),
+    getRoom: (code) => lobby.getRoomForDisplay(code),
   });
   const lobby = new LobbyService({
     redis: deps.lobbyRedis,
     prisma: deps.lobbyPrisma,
     matches,
+    roomResults: (roomId) => deps.archive.roomResults?.(roomId) ?? Promise.resolve([]),
     onRoomChange: (room) => rooms.publish(room),
   });
   const metrics = new MetricsRegistry({

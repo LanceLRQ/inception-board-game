@@ -38,6 +38,19 @@ export interface StepGap {
   to: number;
 }
 
+export interface RoomMatchResult {
+  id: string;
+  scored: boolean;
+  scores: Array<{ playerId: string; nickname: string; score: number }>;
+}
+
+function matchScore(G: SetupState, seat: RoomSeat, won: boolean | null): number | null {
+  if (seat.isBot || seat.departed || won === null) return null;
+  if (!won) return 0;
+  const shattered = G.bribePool.some((card) => card.kind === 'fail' && card.heldBy === seat.seat);
+  return G.players[seat.seat]?.faction === 'thief' && shattered ? 4 : 3;
+}
+
 export interface MatchArchive {
   /**
    * 建局时：写对局元信息与各座位。
@@ -65,6 +78,7 @@ export interface MatchArchive {
   lastStepID(matchID: string): Promise<number>;
   /** 对局不存在返回 null */
   matchInfo(matchID: string): Promise<MatchInfo | null>;
+  roomResults?(roomId: string): Promise<RoomMatchResult[]>;
 }
 
 export class InMemoryMatchArchive implements MatchArchive {
@@ -72,6 +86,7 @@ export class InMemoryMatchArchive implements MatchArchive {
   readonly finished = new Map<string, MatchState<SetupState>>();
   private readonly steps = new Map<string, Map<number, StepRow>>();
   private readonly endedAt = new Map<string, Date>();
+  private readonly finishedSeats = new Map<string, readonly RoomSeat[]>();
   /** 缺口按 to 去重，与数据库实现的唯一约束一致 */
   private readonly gaps = new Map<string, Map<number, StepGap>>();
 
@@ -85,6 +100,7 @@ export class InMemoryMatchArchive implements MatchArchive {
     this.finished.delete(matchID);
     this.steps.delete(matchID);
     this.endedAt.delete(matchID);
+    this.finishedSeats.delete(matchID);
     this.gaps.delete(matchID);
   }
 
@@ -104,14 +120,31 @@ export class InMemoryMatchArchive implements MatchArchive {
   async recordFinish(
     matchID: string,
     final: MatchState<SetupState>,
-    _seats: readonly RoomSeat[],
+    seats: readonly RoomSeat[],
   ): Promise<void> {
     this.finished.set(matchID, structuredClone(final));
+    this.finishedSeats.set(matchID, structuredClone(seats));
     this.endedAt.set(matchID, new Date());
   }
 
   async recordStop(matchID: string): Promise<void> {
     this.endedAt.set(matchID, new Date());
+  }
+
+  async roomResults(roomId: string): Promise<RoomMatchResult[]> {
+    const results: RoomMatchResult[] = [];
+    for (const [id, snapshot] of this.started) {
+      if ((snapshot.roomId ?? id) !== roomId || !this.endedAt.has(id)) continue;
+      const final = this.finished.get(id);
+      const winner = final ? matchOutcome(final.ctx.gameover, final.G).winner : null;
+      const scores = (this.finishedSeats.get(id) ?? []).flatMap((seat) => {
+        if (!final || !seat.playerId || winner === null) return [];
+        const score = matchScore(final.G, seat, final.G.players[seat.seat]?.faction === winner);
+        return score === null ? [] : [{ playerId: seat.playerId, nickname: seat.nickname, score }];
+      });
+      results.push({ id, scored: winner !== null, scores });
+    }
+    return results;
   }
 
   async matchInfo(matchID: string): Promise<MatchInfo | null> {
@@ -150,7 +183,7 @@ export class InMemoryMatchArchive implements MatchArchive {
 /** PrismaMatchArchive 实际用到的最小接口，便于测试打桩 */
 export interface PrismaArchiveClient {
   $transaction: PrismaClient['$transaction'];
-  match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique'>;
+  match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique' | 'findMany'>;
   matchPlayer: Pick<
     PrismaClient['matchPlayer'],
     'createMany' | 'update' | 'findMany' | 'deleteMany'
@@ -218,7 +251,7 @@ export class PrismaMatchArchive implements MatchArchive {
       },
     };
     const fields = {
-      roomId: snapshot.matchID,
+      roomId: snapshot.roomId ?? snapshot.matchID,
       ruleVariant: g.ruleVariant,
       exEnabled: g.exCardsEnabled,
       expansionEnabled: g.expansionEnabled,
@@ -378,12 +411,14 @@ export class PrismaMatchArchive implements MatchArchive {
       const p = G.players[s.seat];
       if (!p) continue;
       const mvp = mvpBySeat.get(s.seat);
+      const won = winner === null || s.departed ? null : p.faction === winner;
       writes.push(
         this.prisma.matchPlayer.update({
           where: { matchId_seat: { matchId: matchID, seat: Number(s.seat) } },
           data: {
             finalFaction: p.faction,
-            won: winner === null || s.departed ? null : p.faction === winner,
+            won,
+            score: matchScore(G, s, won),
             abandoned: s.departed === true,
             ...(mvp && { isMvp: mvp.isMVP, mvpScore: mvp.mvpScore }),
           },
@@ -404,6 +439,28 @@ export class PrismaMatchArchive implements MatchArchive {
       where: { id: matchID },
       data: { endedAt: new Date(), winner: null, winReason: 'host_ended' },
     });
+  }
+
+  async roomResults(roomId: string): Promise<RoomMatchResult[]> {
+    const matches = await this.prisma.match.findMany({
+      where: { roomId, endedAt: { not: null } },
+      orderBy: { startedAt: 'asc' },
+      select: {
+        id: true,
+        winner: true,
+        matchPlayers: {
+          where: { playerId: { not: null }, score: { not: null } },
+          select: { playerId: true, nickname: true, score: true },
+        },
+      },
+    });
+    return matches.map(({ id, winner, matchPlayers }) => ({
+      id,
+      scored: winner !== null,
+      scores: matchPlayers.flatMap(({ playerId, nickname, score }) =>
+        playerId === null || score === null ? [] : [{ playerId, nickname, score }],
+      ),
+    }));
   }
 
   async listSteps(matchID: string): Promise<StepRow[]> {

@@ -271,6 +271,13 @@ describe('PrismaMatchArchive', () => {
     for (const seat of snap.seats) final.G.players[seat.seat]!.faction = 'thief';
     final.G.players['3']!.faction = 'master';
     Object.assign(final.G.players['0']!, { shootCount: 1, unlockCount: 5, bribeReceived: 3 });
+    final.G.bribePool.push({
+      id: 'test-fail',
+      kind: 'fail',
+      status: 'shattered',
+      heldBy: '0',
+      originalOwnerId: '0',
+    });
     final.G.players['1']!.shootCount = 1;
     final.G.players['2']!.shootCount = 1;
     const departed = { ...snap.seats[2]!, playerId: 'account-2', isBot: false, departed: true };
@@ -313,11 +320,11 @@ describe('PrismaMatchArchive', () => {
     }
     expect(stub.matchPlayer.update).toHaveBeenCalledWith({
       where: { matchId_seat: { matchId: 'm1', seat: 0 } },
-      data: expect.objectContaining({ isMvp: true, mvpScore: expect.any(Number) }),
+      data: expect.objectContaining({ isMvp: true, mvpScore: expect.any(Number), score: 4 }),
     });
     expect(stub.matchPlayer.update).toHaveBeenCalledWith({
       where: { matchId_seat: { matchId: 'm1', seat: 2 } },
-      data: expect.objectContaining({ isMvp: false, abandoned: true }),
+      data: expect.objectContaining({ isMvp: false, abandoned: true, score: null }),
     });
   });
 
