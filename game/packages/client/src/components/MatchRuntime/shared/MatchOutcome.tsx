@@ -1,9 +1,12 @@
 // 终局保留牌桌，按需打开结算、返回入口与举报。
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Film, RotateCcw, Trophy } from 'lucide-react';
 import { Link, useParams } from 'react-router';
+import { api } from '../../../lib/api';
+import { useIdentityStore } from '../../../stores/useIdentityStore';
 import type { ReportModel } from '../controllerTypes';
 import { Dialog, DialogTitle } from '../../ui/dialog';
 import { OutcomeReport } from './OutcomeReport';
@@ -28,6 +31,18 @@ export function MatchOutcome({
   const { t } = useTranslation();
   const { matchId } = useParams();
   const [open, setOpen] = useState(false);
+  const playerId = useIdentityStore((state) => state.playerId);
+  const { data: settlement } = useQuery({
+    queryKey: ['match-settlement', matchId, playerId],
+    queryFn: ({ signal }) =>
+      api.get<{
+        endedAt: string | null;
+        players: Array<{ seat: number; nickname: string; isMvp?: boolean }>;
+      }>(`/matches/${encodeURIComponent(matchId!)}`, { signal, cache: 'no-store' }),
+    enabled: open && isRemote && Boolean(matchId && playerId),
+    refetchInterval: (query) => (open && query.state.data?.endedAt === null ? 1000 : false),
+  });
+  const mvps = settlement?.players.filter((player) => player.isMvp) ?? [];
   const title = winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins');
   return (
     <>
@@ -53,6 +68,14 @@ export function MatchOutcome({
           <p className="mt-3 text-sm text-dim" data-testid="win-reason">
             {t(`localMatch.winReason.${winReason}`, { defaultValue: winReason })}
           </p>
+        )}
+        {mvps.length > 0 && (
+          <div className="mt-4 text-sm" data-testid="match-mvps">
+            <h3 className="font-semibold">{t('outcome.mvp')}</h3>
+            <p className="mt-1 text-dim">
+              {new Intl.ListFormat().format(mvps.map((player) => player.nickname))}
+            </p>
+          </div>
         )}
         <div className="mt-5 flex flex-wrap gap-2">
           <button

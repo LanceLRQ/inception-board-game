@@ -839,6 +839,7 @@
     "wait": "等待"
   },
   "outcome": {
+    "mvp": "本局 MVP",
     "aria": "对局结果"
   },
   "preload": {

@@ -10,6 +10,7 @@ export interface MatchMetaPlayerRow {
   finalFaction: string | null;
   won: boolean | null;
   abandoned: boolean | null;
+  isMvp?: boolean;
 }
 
 export interface MatchMetaRow {
@@ -34,6 +35,7 @@ export interface MatchPlayerView {
   finalFaction?: string | null;
   won?: boolean | null;
   abandoned?: boolean | null;
+  isMvp?: boolean;
 }
 
 /** 玩家列表映射：未结束只给座位、昵称与是否 Bot */
@@ -51,6 +53,7 @@ export function toMatchPlayerViews(
           finalFaction: mp.finalFaction,
           won: mp.won,
           abandoned: mp.abandoned,
+          ...(mp.isMvp && { isMvp: true }),
         }
       : {}),
   }));

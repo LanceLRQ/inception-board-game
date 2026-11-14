@@ -311,6 +311,14 @@ describe('PrismaMatchArchive', () => {
         skipDuplicates: true,
       });
     }
+    expect(stub.matchPlayer.update).toHaveBeenCalledWith({
+      where: { matchId_seat: { matchId: 'm1', seat: 0 } },
+      data: expect.objectContaining({ isMvp: true, mvpScore: expect.any(Number) }),
+    });
+    expect(stub.matchPlayer.update).toHaveBeenCalledWith({
+      where: { matchId_seat: { matchId: 'm1', seat: 2 } },
+      data: expect.objectContaining({ isMvp: false, abandoned: true }),
+    });
   });
 
   it('recordFinish：非击杀造成的死亡不计入不屈不挠，背叛者按起始阵营判定', async () => {

@@ -865,6 +865,7 @@
     "wait": "Waiting"
   },
   "outcome": {
+    "mvp": "Match MVP",
     "aria": "Match result"
   },
   "preload": {

@@ -12,6 +12,7 @@ import {
   computeEarnedAchievements,
   type AchievementPlayerInput,
 } from '../services/achievements.js';
+import { computeMvpResults, type MvpPlayerStats } from '../services/mvpScore.js';
 import type { RoomSeat } from './MatchRoom.js';
 import type { MatchSnapshot } from './MatchStore.js';
 
@@ -277,38 +278,84 @@ export class PrismaMatchArchive implements MatchArchive {
   ): Promise<void> {
     const { G } = final;
     const { winner, reason } = matchOutcome(final.ctx.gameover, G);
-    const participants = seats.filter(
-      (s): s is RoomSeat & { playerId: string } => !s.isBot && !s.departed && s.playerId !== null,
-    );
+    const participants = seats.filter((s) => !s.isBot && s.playerId !== null);
     const awards: Array<{ playerId: string; achievementId: string }> = [];
+    const mvpBySeat = new Map<string, ReturnType<typeof computeMvpResults>[number]>();
     if (winner !== null && participants.length > 0) {
-      // 击杀、解封与贿赂已有终局累计值。被击杀次数从已落库的步骤读取。
-      const deaths = new Map<string, number>();
-      for (const { events } of await this.listSteps(matchID)) {
-        for (const event of events) {
-          if (event.kind !== 'player_died') continue;
-          const { player, cause } = event.data;
-          if (typeof player === 'string' && typeof cause === 'string') {
-            deaths.set(player, (deaths.get(player) ?? 0) + 1);
+      const counters = new Map(
+        participants.map(({ seat }) => [
+          seat,
+          {
+            diedCount: 0,
+            damageDealt: 0,
+            turnsTaken: 0,
+            cardsPlayed: 0,
+            reviveCount: 0,
+            unlockCanceledCount: 0,
+            vaultOpenedByYou: 0,
+          },
+        ]),
+      );
+      for (const { events, request } of await this.listSteps(matchID)) {
+        for (const { kind, actor, data } of events) {
+          const acting = actor === null ? undefined : counters.get(actor);
+          const player = typeof data.player === 'string' ? counters.get(data.player) : undefined;
+          if (kind === 'player_died' && typeof data.cause === 'string') {
+            const killer = counters.get(data.cause);
+            if (player) player.diedCount++;
+            if (killer) killer.damageDealt++;
+          } else if (kind === 'turn_started' && typeof data.owner === 'string') {
+            const owner = counters.get(data.owner);
+            if (owner) owner.turnsTaken++;
+          } else if (kind === 'card_played' && player) {
+            player.cardsPlayed++;
+          } else if (kind === 'player_revived' && acting && actor !== data.player) {
+            acting.reviveCount++;
+          } else if (
+            kind === 'unlock_resolved' &&
+            data.success === false &&
+            request.move === 'respondCancelUnlock' &&
+            acting
+          ) {
+            acting.unlockCanceledCount++;
+          } else if (kind === 'vault_opened' && typeof data.openedBy === 'string') {
+            const opener = counters.get(data.openedBy);
+            if (opener) opener.vaultOpenedByYou++;
           }
         }
       }
-      const stats: AchievementPlayerInput[] = [];
+      const achievements: AchievementPlayerInput[] = [];
+      const mvpStats: MvpPlayerStats[] = [];
       for (const s of participants) {
         const p = G.players[s.seat];
-        if (!p) continue;
-        stats.push({
-          playerID: s.playerId,
+        const counts = counters.get(s.seat);
+        if (!p || !counts) continue;
+        const stats = {
           faction: p.faction,
-          originalFaction: s.seat === G.dreamMasterID ? 'master' : 'thief',
-          result: p.faction === winner ? 'win' : 'lose',
           kills: p.shootCount,
           unlockSuccessCount: p.unlockCount,
           bribesReceived: p.bribeReceived,
-          diedCount: deaths.get(s.seat) ?? 0,
+        };
+        const result = p.faction === winner ? 'win' : 'lose';
+        const { diedCount, ...contributions } = counts;
+        mvpStats.push({
+          ...stats,
+          ...contributions,
+          playerID: s.seat,
+          result: s.departed ? 'abandoned' : result,
         });
+        if (!s.departed && s.playerId !== null) {
+          achievements.push({
+            ...stats,
+            playerID: s.playerId,
+            originalFaction: s.seat === G.dreamMasterID ? 'master' : 'thief',
+            result,
+            diedCount,
+          });
+        }
       }
-      const earned = computeEarnedAchievements(stats, {
+      for (const result of computeMvpResults(mvpStats)) mvpBySeat.set(result.playerID, result);
+      const earned = computeEarnedAchievements(achievements, {
         totalRounds: G.turnNumber,
         winnerFaction: winner,
       });
@@ -330,10 +377,16 @@ export class PrismaMatchArchive implements MatchArchive {
     for (const s of seats) {
       const p = G.players[s.seat];
       if (!p) continue;
+      const mvp = mvpBySeat.get(s.seat);
       writes.push(
         this.prisma.matchPlayer.update({
           where: { matchId_seat: { matchId: matchID, seat: Number(s.seat) } },
-          data: { finalFaction: p.faction, won: winner === null ? null : p.faction === winner },
+          data: {
+            finalFaction: p.faction,
+            won: winner === null || s.departed ? null : p.faction === winner,
+            abandoned: s.departed === true,
+            ...(mvp && { isMvp: mvp.isMVP, mvpScore: mvp.mvpScore }),
+          },
         }),
       );
     }
