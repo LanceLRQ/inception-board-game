@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { MoveRequest, MatchEvent } from '@icgame/game-engine/runner';
+import { InMemoryReputationStore, ReputationService } from '../services/ReputationService.js';
 import { makeTestSnapshot, makeTestState } from './MatchStore.contract.js';
 import {
   InMemoryMatchArchive,
@@ -82,11 +83,39 @@ describe('InMemoryMatchArchive', () => {
     await a.recordFinish('m1', snap.state, snap.seats);
     expect((await a.matchInfo('m1'))?.endedAt).toBeInstanceOf(Date);
   });
+
+  it('只给快速匹配真人结算信誉，重试不重复结算', async () => {
+    const reputation = new ReputationService(new InMemoryReputationStore());
+    const archive = new InMemoryMatchArchive(reputation);
+    const snapshot = makeTestSnapshot('quick');
+    const final = snapshot.state;
+    final.ctx.gameover = { winner: 'thief' };
+    const seats = [
+      snapshot.seats[0]!,
+      { ...snapshot.seats[1]!, playerId: 'left', isBot: false, departed: true },
+      { ...snapshot.seats[2]!, playerId: 'late', isBot: false, turnTimeouts: 3 },
+      { ...snapshot.seats[3]!, playerId: 'bot' },
+    ];
+
+    await archive.recordStart({ ...snapshot, matchID: 'friend', seats });
+    await archive.recordFinish('friend', final, seats);
+    expect((await reputation.get('account-0')).score).toBe(50);
+    expect((await reputation.get('left')).score).toBe(50);
+
+    await archive.recordStart({ ...snapshot, mode: 'matchmaking', seats });
+    await Promise.all([
+      archive.recordFinish('quick', final, seats),
+      archive.recordFinish('quick', final, seats),
+    ]);
+    expect(await reputation.get('account-0')).toMatchObject({ score: 52, completedMatches: 1 });
+    expect(await reputation.get('left')).toMatchObject({ score: 45, completedMatches: 0 });
+    expect(await reputation.get('late')).toMatchObject({ score: 49, completedMatches: 1 });
+    expect(await reputation.get('bot')).toMatchObject({ score: 50, completedMatches: 0 });
+  });
 });
 
 function makeStub() {
   const stub = {
-    $transaction: vi.fn((operations: Array<Promise<unknown>>) => Promise.all(operations)),
     achievement: {
       createMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
     },
@@ -96,11 +125,12 @@ function makeStub() {
     match: {
       upsert: vi.fn(async (_arg: unknown) => ({})),
       update: vi.fn(async (_arg: unknown) => ({})),
+      updateManyAndReturn: vi.fn(async (_arg: unknown) => [{ mode: 'friend' }]),
       findUnique: vi.fn(async (_arg: unknown) => null as { endedAt: Date | null } | null),
     },
     matchPlayer: {
       createMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
-      update: vi.fn(async (_arg: unknown) => ({})),
+      update: vi.fn(async (_arg: unknown) => ({ playerId: null })),
       findMany: vi.fn(
         async (_arg: unknown) => [] as Array<{ seat: number; playerId: string | null }>,
       ),
@@ -113,7 +143,10 @@ function makeStub() {
       deleteMany: vi.fn(async (_arg: unknown) => ({ count: 0 })),
     },
   };
-  return stub;
+  return {
+    ...stub,
+    $transaction: vi.fn((run: (tx: typeof stub) => Promise<unknown>) => run(stub)),
+  };
 }
 
 describe('PrismaMatchArchive', () => {
@@ -241,11 +274,11 @@ describe('PrismaMatchArchive', () => {
     final.ctx.gameover = { winner: 'thief', reason: 'x'.repeat(150) };
     await archive.recordFinish('m1', final, snap.seats);
 
-    const m = stub.match.update.mock.calls[0]![0] as {
+    const m = stub.match.updateManyAndReturn.mock.calls[0]![0] as {
       where: { id: string };
       data: { endedAt: Date; winner: string | null; winReason: string | null };
     };
-    expect(m.where).toEqual({ id: 'm1' });
+    expect(m.where).toEqual({ id: 'm1', endedAt: null });
     expect(m.data.endedAt).toBeInstanceOf(Date);
     expect(m.data.winner).toBe('thief');
     expect(m.data.winReason).toHaveLength(100);
@@ -272,7 +305,8 @@ describe('PrismaMatchArchive', () => {
     final.G.winReason = null;
     await archive.recordFinish('m1', final, snap.seats);
     expect(
-      (stub.match.update.mock.calls[0]![0] as { data: { winner: unknown } }).data.winner,
+      (stub.match.updateManyAndReturn.mock.calls[0]![0] as { data: { winner: unknown } }).data
+        .winner,
     ).toBeNull();
     for (const call of stub.matchPlayer.update.mock.calls) {
       expect((call[0] as { data: { won: unknown } }).data.won).toBeNull();
@@ -322,6 +356,8 @@ describe('PrismaMatchArchive', () => {
     ]);
 
     await archive.recordFinish('m1', final, seats);
+    stub.match.updateManyAndReturn.mockResolvedValueOnce([]);
+    stub.match.findUnique.mockResolvedValueOnce({ endedAt: new Date() });
     await archive.recordFinish('m1', final, seats);
 
     expect(stub.$transaction).toHaveBeenCalledTimes(2);
@@ -329,7 +365,7 @@ describe('PrismaMatchArchive', () => {
       data: expect.arrayContaining([expect.objectContaining({ id: 'first_kill', name: '首杀' })]),
       skipDuplicates: true,
     });
-    expect(stub.playerAchievement.createMany).toHaveBeenCalledTimes(2);
+    expect(stub.playerAchievement.createMany).toHaveBeenCalledTimes(1);
     for (const [arg] of stub.playerAchievement.createMany.mock.calls) {
       expect(arg).toEqual({
         data: ['first_kill', 'unlock_master', 'rich_kingdom', 'blitzkrieg', 'unbreakable'].map(
@@ -341,10 +377,12 @@ describe('PrismaMatchArchive', () => {
     expect(stub.matchPlayer.update).toHaveBeenCalledWith({
       where: { matchId_seat: { matchId: 'm1', seat: 0 } },
       data: expect.objectContaining({ isMvp: true, mvpScore: expect.any(Number), score: 4 }),
+      select: { playerId: true },
     });
     expect(stub.matchPlayer.update).toHaveBeenCalledWith({
       where: { matchId_seat: { matchId: 'm1', seat: 2 } },
       data: expect.objectContaining({ isMvp: false, abandoned: true, score: null }),
+      select: { playerId: true },
     });
   });
 

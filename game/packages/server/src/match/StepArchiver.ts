@@ -5,7 +5,10 @@
 // 队列超过上限时（数据库长时间不可用）丢弃最旧的并记下缺口，让回放接口能告诉调用方记录不完整。
 
 import { logger } from '../infra/logger.js';
+import type { SetupState } from '@icgame/game-engine/setup';
+import type { MatchState } from '@icgame/game-engine/runner';
 import type { MatchArchive, StepRow } from './MatchArchive.js';
+import type { RoomSeat } from './MatchRoom.js';
 import type { MatchSnapshot } from './MatchStore.js';
 
 /** 每局队列的上限 */
@@ -29,6 +32,12 @@ interface GapRange {
 interface MatchQueue {
   /** 对局元信息：步骤与缺口都以它为外键，写成功之前后面的一律不写 */
   start: { snapshot: MatchSnapshot; restore: boolean } | null;
+  finish: {
+    state: MatchState<SetupState>;
+    seats: readonly RoomSeat[];
+    endedAt: Date;
+    removeFromActive: () => Promise<void>;
+  } | null;
   rows: StepRow[];
   gaps: GapRange[];
   /** 正在等待 await 归档写入返回 */
@@ -99,6 +108,20 @@ export class StepArchiver {
     this.kick(matchID, q, false);
   }
 
+  /** 匹配终局随步骤一起重试；写完结果后才移出活跃集合。 */
+  enqueueFinish(
+    matchID: string,
+    state: MatchState<SetupState>,
+    seats: readonly RoomSeat[],
+    endedAt: Date,
+    removeFromActive: () => Promise<void>,
+  ): void {
+    if (this.stopped) return;
+    const q = this.queueOf(matchID);
+    q.finish = { state, seats, endedAt, removeFromActive };
+    this.kick(matchID, q, false);
+  }
+
   /** 等这一局队列写完，写完返回 true；超时只记 ERROR 并返回 false，写入仍会在后台继续重试 */
   async drain(matchID: string, timeoutMs = ARCHIVE_DRAIN_TIMEOUT_MS): Promise<boolean> {
     const q = this.queues.get(matchID);
@@ -140,7 +163,9 @@ export class StepArchiver {
 
   pendingOf(matchID: string): number {
     const q = this.queues.get(matchID);
-    return q ? q.rows.length + q.gaps.length + (q.start ? 1 : 0) : 0;
+    return q
+      ? q.rows.length + q.gaps.length + Number(q.start !== null) + Number(q.finish !== null)
+      : 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -150,6 +175,7 @@ export class StepArchiver {
     if (!q) {
       q = {
         start: null,
+        finish: null,
         rows: [],
         gaps: [],
         writing: false,
@@ -188,7 +214,8 @@ export class StepArchiver {
         const start = q.start;
         const gap = start ? undefined : q.gaps[0];
         const row = start ? undefined : q.rows[0];
-        if (!start && !gap && !row) break;
+        const finish = !start && !gap && !row ? q.finish : null;
+        if (!start && !gap && !row && !finish) break;
         try {
           if (start) {
             if (start.restore) await this.archive.recordStart(start.snapshot, true);
@@ -196,14 +223,25 @@ export class StepArchiver {
           } else if (gap) {
             q.writingGap = gap;
             await this.archive.recordGap(matchID, gap.from, gap.to);
-          } else await this.archive.appendStep(row!);
+          } else if (row) {
+            await this.archive.appendStep(row);
+          } else if (finish) {
+            await this.archive.recordFinish(matchID, finish.state, finish.seats, finish.endedAt);
+            if (this.queues.get(matchID) === q) await finish.removeFromActive();
+          }
         } catch (err) {
           q.writingGap = null;
           this.scheduleRetry(
             matchID,
             q,
             err,
-            start ? { start: true } : gap ? { gapTo: gap.to } : { stateID: row!.stateID },
+            start
+              ? { start: true }
+              : gap
+                ? { gapTo: gap.to }
+                : row
+                  ? { stateID: row.stateID }
+                  : { finish: true },
           );
           return;
         }
@@ -213,7 +251,8 @@ export class StepArchiver {
         } else if (gap) {
           q.gaps.shift();
           q.writingGap = null;
-        } else q.rows.shift();
+        } else if (row) q.rows.shift();
+        else if (q.finish === finish) q.finish = null;
         q.backoffMs = ARCHIVE_RETRY_BASE_MS;
       }
       if (this.queues.get(matchID) === q) this.queues.delete(matchID);
@@ -227,7 +266,7 @@ export class StepArchiver {
     matchID: string,
     q: MatchQueue,
     err: unknown,
-    at: { stateID: number } | { gapTo: number } | { start: true },
+    at: { stateID: number } | { gapTo: number } | { start: true } | { finish: true },
   ): void {
     const delay = q.backoffMs;
     q.backoffMs = Math.min(q.backoffMs * 2, ARCHIVE_RETRY_MAX_MS);

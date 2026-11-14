@@ -1,6 +1,5 @@
 import { trustProxyFromEnv } from './app.js';
 import { purgeExpiredShortLinks } from './api/shortLink.js';
-import { createPrismaReputationStore } from './api/reports.js';
 import { buildRealtime, timingFromEnv } from './bootstrap.js';
 import { logger } from './infra/logger.js';
 import { metricsPortFromEnv, startMetricsServer } from './infra/metrics.js';
@@ -12,6 +11,7 @@ import { archiveColdReplays } from './match/ColdReplay.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
 import { PrismaChatLog } from './services/ChatLog.js';
+import { createPrismaReputationStore } from './services/PrismaReputationStore.js';
 import { ReputationService } from './services/ReputationService.js';
 import { isOperatorTokenTooShort, MIN_OPERATOR_TOKEN_LENGTH } from './middleware/operatorAuth.js';
 import { isWildcardInProduction, resolveCorsOrigins } from './middleware/cors.js';

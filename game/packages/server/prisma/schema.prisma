@@ -216,11 +216,12 @@ model TutorialProgress {
 
 /// 信誉分
 model Reputation {
-  playerId    String   @id @map("player_id") @db.Uuid
-  score       Int      @default(1000) @db.SmallInt
-  level       String   @default("normal") @db.VarChar(20)
-  decayedAt   DateTime @default(now()) @map("decayed_at") @db.Timestamptz
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  playerId         String   @id @map("player_id") @db.Uuid
+  score            Int      @default(50) @db.SmallInt
+  level            String   @default("regular") @db.VarChar(20)
+  completedMatches Int      @default(0) @map("completed_matches")
+  decayedAt        DateTime @default(now()) @map("decayed_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 

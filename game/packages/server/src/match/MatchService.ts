@@ -68,7 +68,19 @@ export class MatchService {
     this.archiver = new StepArchiver(deps.archive, deps.timers);
     this.unsubscribe.push(
       deps.bot.onTakeover((matchID) => this.seatsChanged(matchID)),
-      deps.bot.onAbandon((matchID) => this.seatsChanged(matchID)),
+      deps.bot.onAbandon((matchID, seat) => {
+        const room = this.rooms.get(matchID);
+        if (room?.mode !== 'matchmaking') {
+          this.seatsChanged(matchID);
+          return;
+        }
+        const player = room.seats().find((s) => s.seat === seat && !s.departed);
+        if (player?.playerId) {
+          void this.leaveMatch(matchID, player.playerId).catch((err: unknown) =>
+            logger.error({ matchID, seat, err }, 'could not record disconnect abandonment'),
+          );
+        }
+      }),
     );
   }
 
@@ -131,7 +143,7 @@ export class MatchService {
         // 元信息走归档队列，写成功之前这一局的步骤不写；不等它，数据库不可用不该挡住开局
         this.archiver.enqueueStart(snapshot);
 
-        this.deps.bot.registerMatch(matchID);
+        this.deps.bot.registerMatch(matchID, origin.mode === 'matchmaking');
         this.mount(matchID, seats, state, false, origin.mode);
       } catch (err) {
         await this.teardown(matchID);
@@ -181,8 +193,7 @@ export class MatchService {
     const room = this.rooms.get(matchID);
     const seat = this.seatOf(matchID, playerId);
     if (!room || seat === null) return;
-    await room.leaveSeat(seat);
-    if (!room.seats().some((s) => s.seat === seat && s.departed)) return;
+    if (!(await room.leaveSeat(seat))) return;
     this.deps.bot.markPermanent(matchID, seat);
     this.deps.onPlayerLeft?.(matchID, seat);
     logger.info({ matchID, seat }, 'player left match, bot takes over');
@@ -325,11 +336,17 @@ export class MatchService {
     }
     if (state.ctx.gameover !== undefined) {
       logger.info({ matchID, stateID: state.stateID }, 'restored match already over');
-      await this.finishMatch(matchID, state, snapshot.seats);
+      await this.finishMatch(
+        matchID,
+        state,
+        snapshot.seats,
+        new Date(snapshot.updatedAt),
+        snapshot.mode,
+      );
       return 'finished';
     }
 
-    if (!inPlace) this.deps.bot.registerMatch(matchID);
+    if (!inPlace) this.deps.bot.registerMatch(matchID, snapshot.mode === 'matchmaking');
     this.mount(matchID, snapshot.seats, state, inPlace, snapshot.mode);
     logger.info(
       { matchID, stateID: state.stateID, numPlayers: snapshot.seats.length, inPlace },
@@ -456,10 +473,13 @@ export class MatchService {
     mode?: MatchSnapshot['mode'],
   ): void {
     const { deps } = this;
+    let lastSavedAt = deps.timers.now();
     const roomDeps: RoomDeps = {
       game,
-      persist: (next, expectedStateID, nextSeats) =>
-        deps.store.save(matchID, next, expectedStateID, deps.timers.now(), nextSeats),
+      persist: (next, expectedStateID, nextSeats) => {
+        lastSavedAt = deps.timers.now();
+        return deps.store.save(matchID, next, expectedStateID, lastSavedAt, nextSeats);
+      },
       onStep: async (output) => {
         // 入队立即返回：归档在后台按序写、失败重试，不拖慢对局
         this.archiver.enqueue({
@@ -471,8 +491,10 @@ export class MatchService {
         });
         await deps.onStep(matchID, output);
       },
-      onGameOver: (final): Promise<void> => this.finishMatch(matchID, final, room.seats(), room),
+      onGameOver: (final): Promise<void> =>
+        this.finishMatch(matchID, final, room.seats(), new Date(lastSavedAt), mode, room),
       isTakenOver: (seat) => deps.bot.isBotControlled(matchID, seat),
+      isAbandoned: (seat) => deps.bot.isPastDisconnectDeadline(matchID, seat),
       onSeatActivity: (seat, kind) => {
         // 达到阈值时 Bot 管理器会触发接管事件，由构造函数里的订阅重新排程并通知座位变化
         if (kind === 'timeout') deps.bot.recordTimeout(matchID, seat);
@@ -506,31 +528,23 @@ export class MatchService {
     matchID: string,
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
+    endedAt: Date,
+    mode?: MatchSnapshot['mode'],
     room?: MatchRoom,
   ): Promise<void> {
     const { deps } = this;
-    // 先等这一局的步骤全部落库，再写结束信息，避免出现「已结束但缺步」的归档；
-    // 等不到（超时）与写结束信息失败同样处理
-    let archived = await this.archiver.drain(matchID);
-    if (!archived) {
-      logger.error({ matchID }, 'archive steps not fully written, keeping match active for retry');
+    if (mode === 'matchmaking') {
+      this.archiver.enqueueFinish(matchID, final, seats, endedAt, () => deps.store.finish(matchID));
+      await this.archiver.drain(matchID);
     } else {
+      // 先等这一局的步骤全部落库，再写结束信息。
       try {
-        await deps.archive.recordFinish(matchID, final, seats);
+        if (await this.archiver.drain(matchID)) {
+          await deps.archive.recordFinish(matchID, final, seats);
+          await deps.store.finish(matchID);
+        }
       } catch (err) {
-        archived = false;
-        logger.error(
-          { matchID, err },
-          'archive recordFinish failed, keeping match active for retry',
-        );
-      }
-    }
-    // 归档失败时对局留在活跃集合里，下次进程启动恢复到「已结束的快照」时会再走一遍结束流程
-    if (archived) {
-      try {
-        await deps.store.finish(matchID);
-      } catch (err) {
-        logger.error({ matchID, err }, 'store finish failed');
+        logger.error({ matchID, err }, 'match settlement failed, keeping match active for retry');
       }
     }
     this.safely(matchID, 'bot dispose', () => deps.bot.disposeMatch(matchID));

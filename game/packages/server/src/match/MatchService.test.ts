@@ -89,12 +89,12 @@ class FlakyStore extends InMemoryMatchStore {
 class FlakyBotManager extends BotManager {
   failRegister = 0;
   disposed: string[] = [];
-  override registerMatch(matchID: string): void {
+  override registerMatch(matchID: string, matchmaking?: boolean): void {
     if (this.failRegister > 0) {
       this.failRegister -= 1;
       throw new Error('register failed');
     }
-    super.registerMatch(matchID);
+    super.registerMatch(matchID, matchmaking);
   }
   override disposeMatch(matchID: string): void {
     this.disposed.push(matchID);
@@ -367,7 +367,7 @@ describe('MatchService 建局', () => {
     const h = makeHarness();
     const register = vi.spyOn(h.bot, 'registerMatch');
     await h.svc.createFromRoom(makeRoom(4, [0]));
-    expect(register).toHaveBeenCalledWith('room-1');
+    expect(register).toHaveBeenCalledWith('room-1', false);
   });
 });
 
@@ -638,6 +638,29 @@ describe('MatchService 挂机托管', () => {
     expect(h.bot.takeoverReason(id, '0')).toBe('idle');
   });
 
+  it.each(['matchmaking', 'friend'] as const)(
+    '断线硬截止只在快速匹配记为弃局（%s）',
+    async (mode) => {
+      const h = makeHarness();
+      const room = makeRoom(4, [0, 1, 2, 3]);
+      const id =
+        mode === 'matchmaking'
+          ? await h.svc.createMatchedMatch(room.id, room.players)
+          : await h.svc.createFromRoom(room);
+      h.timers.t += 60_000;
+      h.bot.tick();
+      expect((await h.store.load(id))?.seats[0]?.departed).toBeUndefined();
+      h.bot.onReconnect(id, '1');
+      h.timers.t += 120_000;
+      h.bot.tick();
+      await h.svc.get(id)?.idle();
+      const snapshot = await h.store.load(id);
+      expect(snapshot?.seats[0]?.departed).toBe(mode === 'matchmaking' ? true : undefined);
+      expect(snapshot?.seats[1]?.departed).toBeUndefined();
+      h.svc.shutdown();
+    },
+  );
+
   it('因断线被接管的座位重连后解除', async () => {
     const { h, id } = await setup();
     h.bot.onDisconnect(id, '0');
@@ -736,6 +759,22 @@ describe('MatchService 对局结束', () => {
     // 归档对象是共用的：第一次抛错、重启后重试一次
     expect(recordFinish).toHaveBeenCalledTimes(2);
     expect(await second.store.listActive()).toEqual([]);
+  });
+
+  it('快速匹配终局归档暂时失败，恢复后在同一进程重试一次并移除活跃快照', async () => {
+    const h = makeHarness();
+    const recordFinish = vi
+      .spyOn(h.archive, 'recordFinish')
+      .mockRejectedValueOnce(new Error('pg down'));
+    await h.svc.createMatchedMatch('matched-id', makeRoom(4).players);
+    for (let i = 0; i < 20_000 && h.onGameOver.mock.calls.length === 0; i++) {
+      await pump();
+      h.timers.fireNext();
+    }
+    expect(recordFinish).toHaveBeenCalledTimes(2);
+    expect(h.onGameOver).toHaveBeenCalledTimes(1);
+    expect(await h.store.listActive()).toEqual([]);
+    h.svc.shutdown();
   });
 });
 

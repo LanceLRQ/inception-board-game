@@ -13,19 +13,8 @@ import { authMiddleware } from '../middleware/auth.js';
 import { prisma as defaultPrisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { isUuid } from '../infra/uuid.js';
-import type { PrismaClient } from '../generated/prisma/client.js';
-import { Prisma } from '../generated/prisma/client.js';
-import {
-  REPUTATION_LEVEL_FLOORS,
-  REPUTATION_MAX,
-  REPUTATION_MIN,
-  ReputationService,
-  computeNextScore,
-  computeReputationLevel,
-  type ReputationLevel,
-  type ReputationRecord,
-  type ReputationStore,
-} from '../services/ReputationService.js';
+import { createPrismaReputationStore } from '../services/PrismaReputationStore.js';
+import { ReputationService } from '../services/ReputationService.js';
 import {
   ReportService,
   VALID_REPORT_REASONS,
@@ -132,56 +121,6 @@ export function createReportsRouter(deps: ReportsRouterDeps): Router {
   });
 
   return router;
-}
-
-/** 信誉分存储用到的客户端部分；事务客户端同样满足 */
-type ReputationPrisma = Pick<PrismaClient, 'reputation' | '$queryRaw'>;
-
-/**
- * 基于 Prisma 的信誉分存储。
- * 加减分是一条 INSERT ... ON CONFLICT DO UPDATE：分数在数据库里原子计算并夹在上下限内，
- * 并发举报不会互相覆盖；等级在同一条语句里按同一组阈值重算。
- */
-export function createPrismaReputationStore(prisma: ReputationPrisma): ReputationStore {
-  const toRecord = (row: {
-    playerId: string;
-    score: number;
-    level: string;
-    updatedAt: Date;
-  }): ReputationRecord => ({
-    playerId: row.playerId,
-    score: row.score,
-    level: row.level as ReputationLevel,
-    updatedAt: row.updatedAt,
-  });
-  return {
-    async get(playerId) {
-      const row = await prisma.reputation.findUnique({ where: { playerId } });
-      return row ? toRecord(row) : null;
-    },
-    async applyDelta(playerId, delta, initialScore) {
-      const firstScore = computeNextScore(initialScore, delta);
-      const next = Prisma.sql`LEAST(${REPUTATION_MAX}, GREATEST(${REPUTATION_MIN}, "reputation"."score" + ${delta}))`;
-      const rows = await prisma.$queryRaw<
-        Array<{ playerId: string; score: number; level: string; updatedAt: Date }>
-      >`
-        INSERT INTO "reputation" ("player_id", "score", "level", "decayed_at", "updated_at")
-        VALUES (${playerId}::uuid, ${firstScore}, ${computeReputationLevel(firstScore)}, now(), now())
-        ON CONFLICT ("player_id") DO UPDATE SET
-          "score" = ${next},
-          "level" = CASE
-            WHEN ${next} < ${REPUTATION_LEVEL_FLOORS.watched} THEN 'restricted'
-            WHEN ${next} < ${REPUTATION_LEVEL_FLOORS.normal} THEN 'watched'
-            WHEN ${next} < ${REPUTATION_LEVEL_FLOORS.trusted} THEN 'normal'
-            ELSE 'trusted'
-          END,
-          "updated_at" = now()
-        RETURNING "player_id" AS "playerId", "score", "level", "updated_at" AS "updatedAt"`;
-      const row = rows[0];
-      if (!row) throw new Error('reputation upsert returned no row');
-      return toRecord(row);
-    },
-  };
 }
 
 /** 生产依赖：全局数据库客户端 + 数据库举报归档；落库与扣分绑在同一个事务里 */

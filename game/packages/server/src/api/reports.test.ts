@@ -5,7 +5,8 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import Koa from 'koa';
 import bodyParser from 'koa-bodyparser';
-import { createPrismaReputationStore, createReportsRouter, type ReportsPrisma } from './reports.js';
+import { createReportsRouter, type ReportsPrisma } from './reports.js';
+import { createPrismaReputationStore } from '../services/PrismaReputationStore.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 import { signToken } from '../infra/jwt.js';
 import { InMemoryReportArchive, ReportService } from '../services/ReportService.js';
@@ -75,8 +76,8 @@ describe('POST /matches/:id/report', () => {
     const { post, reputation, archive } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'afk' });
     expect(res.status).toBe(201);
-    expect(res.json.targetNewScore).toBe(990);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(990);
+    expect(res.json.targetNewScore).toBe(40);
+    expect((await reputation.get(ACCOUNT_B)).score).toBe(40);
     const rows = await archive.list({});
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -97,7 +98,7 @@ describe('POST /matches/:id/report', () => {
       reason: 'afk',
     });
     expect(mixed.status).toBe(409);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(990);
+    expect((await reputation.get(ACCOUNT_B)).score).toBe(40);
     const rows = await archive.list({});
     expect(rows).toHaveLength(1);
     expect(rows[0]?.matchID).toBe(MATCH_ID);
@@ -118,7 +119,7 @@ describe('POST /matches/:id/report', () => {
     const { post, reputation, archive } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_OUTSIDER, { targetSeat: 1, reason: 'afk' });
     expect(res.status).toBe(403);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(1000);
+    expect((await reputation.get(ACCOUNT_B)).score).toBe(50);
     expect(archive.size()).toBe(0);
   });
 
@@ -139,7 +140,7 @@ describe('POST /matches/:id/report', () => {
     const { post, reputation } = await setup();
     const res = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 0, reason: 'afk' });
     expect(res.status).toBe(400);
-    expect((await reputation.get(ACCOUNT_A)).score).toBe(1000);
+    expect((await reputation.get(ACCOUNT_A)).score).toBe(50);
   });
 
   it('重复举报 409，信誉分只扣一次', async () => {
@@ -147,7 +148,7 @@ describe('POST /matches/:id/report', () => {
     expect((await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'afk' })).status).toBe(201);
     const again = await post(MATCH_ID, ACCOUNT_A, { targetSeat: 1, reason: 'cheating' });
     expect(again.status).toBe(409);
-    expect((await reputation.get(ACCOUNT_B)).score).toBe(990);
+    expect((await reputation.get(ACCOUNT_B)).score).toBe(40);
     expect(archive.size()).toBe(1);
   });
 
@@ -161,15 +162,22 @@ describe('POST /matches/:id/report', () => {
 describe('createPrismaReputationStore.applyDelta', () => {
   it('一次加减只发一条原子写入语句，不先读后写', async () => {
     const queryRaw = vi.fn(async () => [
-      { playerId: ACCOUNT_B, score: 990, level: 'normal', updatedAt: new Date() },
+      {
+        playerId: ACCOUNT_B,
+        score: 40,
+        level: 'regular',
+        completedMatches: 0,
+        decayedAt: new Date(),
+        updatedAt: new Date(),
+      },
     ]);
     const findUnique = vi.fn();
     const store = createPrismaReputationStore({
       reputation: { findUnique },
       $queryRaw: queryRaw,
     } as never);
-    const rec = await store.applyDelta(ACCOUNT_B, -10, 1000);
-    expect(rec.score).toBe(990);
+    const rec = await store.applyDelta(ACCOUNT_B, -10, 50);
+    expect(rec.score).toBe(40);
     expect(queryRaw).toHaveBeenCalledTimes(1);
     expect(findUnique).not.toHaveBeenCalled();
   });

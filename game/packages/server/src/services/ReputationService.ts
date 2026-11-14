@@ -1,30 +1,28 @@
-// ReputationService - 信誉分规则与 upsert
-// 反作弊与信誉分
-//
-// 规则（MVP 简化）：
-//   - 初始 1000 分
-//   - 被举报（任意原因）-10（最低 0）
-//   - 掉线弃局 -20
-//   - 正常完局 +2（上限 1500）
-//   - level 分档：0-599 restricted / 600-799 watched / 800-1099 normal / 1100+ trusted
-//
-// 设计：Store 接口化，生产用 Prisma 适配器，测试用 InMemoryStore
-
-export type ReputationLevel = 'restricted' | 'watched' | 'normal' | 'trusted';
-export const INITIAL_REPUTATION_SCORE = 1000;
+export type ReputationLevel = 'low' | 'regular' | 'trusted';
+export const INITIAL_REPUTATION_SCORE = 50;
 export const REPUTATION_MIN = 0;
-export const REPUTATION_MAX = 1500;
+export const REPUTATION_MAX = 100;
+export const REPUTATION_RECOVERY_MS = 30 * 24 * 60 * 60 * 1000;
+export const REPUTATION_TIMEOUT_THRESHOLD = 3;
 
-export const REPUTATION_DELTAS = {
+const ABANDON_DELTA = -5;
+const TIMEOUT_DELTA = -3;
+const COMPLETE_DELTA = 2;
+const REPUTATION_DELTAS = {
   report: -10,
-  abandon: -20,
-  complete: +2,
+  abandon: ABANDON_DELTA,
+  complete: COMPLETE_DELTA,
+  completeWithTimeouts: COMPLETE_DELTA + TIMEOUT_DELTA,
+  abandonWithTimeouts: ABANDON_DELTA + TIMEOUT_DELTA,
 } as const;
+export type ReputationChange = keyof typeof REPUTATION_DELTAS;
 
 export interface ReputationRecord {
   readonly playerId: string;
   readonly score: number;
   readonly level: ReputationLevel;
+  readonly completedMatches: number;
+  readonly decayedAt: Date;
   readonly updatedAt: Date;
 }
 
@@ -35,18 +33,27 @@ export interface ReputationStore {
    * 没有记录时从 initialScore 起算。必须由存储自己保证并发安全（不能「读出再写回」），
    * 否则两个并发举报会丢掉一次扣分。
    */
-  applyDelta(playerId: string, delta: number, initialScore: number): Promise<ReputationRecord>;
+  applyDelta(
+    playerId: string,
+    delta: number,
+    initialScore: number,
+    completed?: number,
+    at?: Date,
+  ): Promise<ReputationRecord>;
 }
 
 /** 等级下限分数；SQL 版的等级计算也读这组常量，保证两边一致 */
-export const REPUTATION_LEVEL_FLOORS = { watched: 600, normal: 800, trusted: 1100 } as const;
+export const REPUTATION_LEVEL_FLOORS = { regular: 40, trusted: 70, trustedCompletions: 20 };
 
-/** 纯函数：根据当前分计算等级 */
-export function computeReputationLevel(score: number): ReputationLevel {
-  if (score < REPUTATION_LEVEL_FLOORS.watched) return 'restricted';
-  if (score < REPUTATION_LEVEL_FLOORS.normal) return 'watched';
-  if (score < REPUTATION_LEVEL_FLOORS.trusted) return 'normal';
-  return 'trusted';
+export function computeReputationLevel(score: number, completedMatches = 0): ReputationLevel {
+  if (score < REPUTATION_LEVEL_FLOORS.regular) return 'low';
+  if (
+    score >= REPUTATION_LEVEL_FLOORS.trusted &&
+    completedMatches >= REPUTATION_LEVEL_FLOORS.trustedCompletions
+  ) {
+    return 'trusted';
+  }
+  return 'regular';
 }
 
 /** 纯函数：计算下一个信誉分（夹到 [MIN, MAX]） */
@@ -55,6 +62,11 @@ export function computeNextScore(current: number, delta: number): number {
   if (next < REPUTATION_MIN) return REPUTATION_MIN;
   if (next > REPUTATION_MAX) return REPUTATION_MAX;
   return next;
+}
+
+function recoveredScore(score: number, since: Date, now: Date, initialScore: number): number {
+  const periods = Math.max(0, Math.floor((+now - +since) / REPUTATION_RECOVERY_MS));
+  return score + Math.min(Math.max(initialScore - score, 0), periods);
 }
 
 export interface ReputationServiceOptions {
@@ -73,21 +85,32 @@ export class ReputationService {
 
   async get(playerId: string): Promise<ReputationRecord> {
     const rec = await this.store.get(playerId);
-    if (rec) return rec;
+    if (rec) {
+      // 查询不写库；实际加减分时由存储在同一动作内应用恢复并重置计时。
+      const score = recoveredScore(rec.score, rec.decayedAt, new Date(), this.initialScore);
+      return { ...rec, score, level: computeReputationLevel(score, rec.completedMatches) };
+    }
     // 未建档：返回初始值快照（不写入，等到 adjust 时才 upsert）
+    const now = new Date();
     return {
       playerId,
       score: this.initialScore,
       level: computeReputationLevel(this.initialScore),
-      updatedAt: new Date(),
+      completedMatches: 0,
+      decayedAt: now,
+      updatedAt: now,
     };
   }
 
-  async adjust(
-    playerId: string,
-    deltaKey: keyof typeof REPUTATION_DELTAS,
-  ): Promise<ReputationRecord> {
-    return this.store.applyDelta(playerId, REPUTATION_DELTAS[deltaKey], this.initialScore);
+  async adjust(playerId: string, deltaKey: ReputationChange, at?: Date): Promise<ReputationRecord> {
+    const completed = deltaKey === 'complete' || deltaKey === 'completeWithTimeouts' ? 1 : 0;
+    return this.store.applyDelta(
+      playerId,
+      REPUTATION_DELTAS[deltaKey],
+      this.initialScore,
+      completed,
+      at,
+    );
   }
 }
 
@@ -105,12 +128,21 @@ export class InMemoryReputationStore implements ReputationStore {
     playerId: string,
     delta: number,
     initialScore: number,
+    completed = 0,
+    at = new Date(),
   ): Promise<ReputationRecord> {
-    const score = computeNextScore(this.records.get(playerId)?.score ?? initialScore, delta);
+    const previous = this.records.get(playerId);
+    const current = previous
+      ? recoveredScore(previous.score, previous.decayedAt, at, initialScore)
+      : initialScore;
+    const score = computeNextScore(current, delta);
+    const completedMatches = (previous?.completedMatches ?? 0) + completed;
     const rec: ReputationRecord = {
       playerId,
       score,
-      level: computeReputationLevel(score),
+      level: computeReputationLevel(score, completedMatches),
+      completedMatches,
+      decayedAt: previous && previous.decayedAt > at ? previous.decayedAt : at,
       updatedAt: new Date(),
     };
     this.records.set(playerId, rec);

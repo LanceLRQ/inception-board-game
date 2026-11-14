@@ -14,6 +14,7 @@ import {
   type RejectReason,
 } from '@icgame/game-engine/runner';
 import { logger } from '../infra/logger.js';
+import { REPUTATION_TIMEOUT_THRESHOLD } from '../services/ReputationService.js';
 import { planNext, timeoutAction, type TimingConfig } from './scheduling.js';
 
 export interface RoomSeat {
@@ -22,8 +23,10 @@ export interface RoomSeat {
   playerId: string | null;
   nickname: string;
   isBot: boolean;
-  /** 主动退出的真人席位，由 Bot 永久接管，账号归属仍保留供归档。 */
+  /** 真人已弃局，由 Bot 永久接管，账号归属仍保留供归档。 */
   departed?: boolean;
+  /** 快速匹配中累计的本人回合超时次数，达到扣分门槛后停止累计。 */
+  turnTimeouts?: number;
   /** 像素头像种子：建局时取自房间成员，公开信息 */
   avatarSeed?: string;
 }
@@ -50,6 +53,8 @@ export interface RoomDeps {
   onGameOver(state: MatchState<SetupState>): void | Promise<void>;
   /** 某个真人座位此刻是否由 Bot 接管 */
   isTakenOver(seat: string): boolean;
+  /** 终局时核对仍然离线且已经超过硬截止的匹配座位。 */
+  isAbandoned?(seat: string): boolean;
   /**
    * 真人座位有了一步被接受的行动：本人提交（player）或被超时代发（timeout）。
    * 在这一步之后的排程之前调用，回调里把座位转为托管，排程就按托管算；它抛错不影响对局。
@@ -232,13 +237,16 @@ export class MatchRoom {
   }
 
   /** 与玩家行动串行写入退出标记，保存成功后才交给 Bot。 */
-  leaveSeat(seat: string): Promise<void> {
+  leaveSeat(seat: string): Promise<boolean> {
     return this.enqueue(async () => {
+      if (this.closed || this.over || this.seatList.some((s) => s.seat === seat && s.departed)) {
+        return false;
+      }
       const next = this.seatList.map((s) => (s.seat === seat ? { ...s, departed: true } : s));
-      if (this.closed || this.over) return;
-      const saved = await this.deps.persist(this.state, this.state.stateID, next);
+      const saved = await this.persistWithRetry(this.state, this.state.stateID, next);
       if (saved !== 'ok') throw new Error('退出时对局版本已变化，请重试');
       this.seatList = next;
+      return true;
     });
   }
 
@@ -503,16 +511,17 @@ export class MatchRoom {
   private async persistWithRetry(
     next: MatchState<SetupState>,
     expectedStateID: number,
+    seats?: readonly RoomSeat[],
   ): Promise<'ok' | 'conflict' | 'error'> {
     let threw = false;
     for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
       if (attempt > 0) await this.sleep(PERSIST_RETRY_DELAYS_MS[attempt - 1]!);
       try {
-        const result = await this.deps.persist(next, expectedStateID);
+        const result = await this.deps.persist(next, expectedStateID, seats);
         if (result === 'ok') return 'ok';
         if (!threw) return 'conflict';
         const stored = (await this.deps.loadStoredVersion?.()) ?? null;
-        if (stored === next.stateID) return 'ok';
+        if (stored === next.stateID && next.stateID !== expectedStateID) return 'ok';
         if (stored !== null && stored !== expectedStateID) return 'conflict';
         // 库里仍是旧版本（或没读到）：写入没有生效，继续重试
         threw = true;
@@ -544,12 +553,9 @@ export class MatchRoom {
   }
 
   /** Bot 自动步与 Bot 座位不算「真人的活动」 */
-  private reportSeatActivity(seat: string, source: StepOutput['source'], turnOwner: string): void {
-    const kind = seatActivityKind(source, seat, turnOwner);
-    if (kind === null || this.deps.onSeatActivity === undefined) return;
-    if (this.seatList.find((s) => s.seat === seat)?.isBot !== false) return;
+  private reportSeatActivity(seat: string, kind: 'player' | 'timeout'): void {
     try {
-      this.deps.onSeatActivity(seat, kind);
+      this.deps.onSeatActivity?.(seat, kind);
     } catch (err) {
       logger.error({ matchID: this.matchID, seat, err }, 'onSeatActivity failed');
     }
@@ -572,7 +578,25 @@ export class MatchRoom {
       return { ok: false, code: outcome.reason };
     }
 
-    const persisted = await this.persistWithRetry(outcome.state, before.stateID);
+    // 抽牌选择时间到是正常推进；回合外的应答也不累计挂机。
+    const seat = this.seatList.find((s) => s.seat === request.playerID && !s.isBot && !s.departed);
+    const activity =
+      seat && !(source === 'timeout' && request.move === 'doDraw' && before.G.turnPhase === 'draw')
+        ? seatActivityKind(source, seat.seat, before.ctx.currentPlayer)
+        : null;
+    const turnTimeouts = seat?.turnTimeouts ?? 0;
+    const gameOver = outcome.state.ctx.gameover !== undefined;
+    const countTimeout = activity === 'timeout' && turnTimeouts < REPUTATION_TIMEOUT_THRESHOLD;
+    const seats =
+      this.mode === 'matchmaking' && (countTimeout || gameOver)
+        ? this.seatList.map((s) => {
+            const next = countTimeout && s === seat ? { ...s, turnTimeouts: turnTimeouts + 1 } : s;
+            return gameOver && !next.isBot && !next.departed && this.deps.isAbandoned?.(next.seat)
+              ? { ...next, departed: true }
+              : next;
+          })
+        : undefined;
+    const persisted = await this.persistWithRetry(outcome.state, before.stateID, seats);
     // 等写快照期间房间可能已被关闭（撤销、关停、被新房间替换）：这一步不能再生效，
     // 否则旧房间会推进状态、向连接下发，并触发已不属于它的回调
     if (this.closed) {
@@ -602,12 +626,10 @@ export class MatchRoom {
     this.setStorageHealth(true);
 
     this.state = outcome.state;
+    if (seats) this.seatList = seats;
     this.autoRejects = 0;
     this.timeoutMisses = 0;
-    // 抽牌选择时间到是正常自动推进，不累计挂机次数。
-    if (!(source === 'timeout' && request.move === 'doDraw' && before.G.turnPhase === 'draw')) {
-      this.reportSeatActivity(request.playerID, source, before.ctx.currentPlayer);
-    }
+    if (activity !== null) this.reportSeatActivity(request.playerID, activity);
     logger.info(
       {
         matchID: this.matchID,
@@ -619,7 +641,6 @@ export class MatchRoom {
       'move accepted',
     );
 
-    const gameOver = outcome.state.ctx.gameover !== undefined;
     if (gameOver) {
       this.over = true;
       this.clearTimer();

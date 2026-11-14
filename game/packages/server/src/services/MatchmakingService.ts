@@ -5,7 +5,7 @@ import { RedisKeys } from '../infra/redisKeys.js';
 import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from './BanChecker.js';
 import type { LobbyPrisma } from './LobbyService.js';
-import { computeReputationLevel, type ReputationService } from './ReputationService.js';
+import { type ReputationService } from './ReputationService.js';
 
 const TICKET_TTL = 60;
 const ASSIGNMENT_TTL = 86_400;
@@ -157,8 +157,8 @@ export class MatchmakingService {
     if (this.deps.matches.isPlayerInActiveMatch(playerId)) {
       throw new AppError('CONFLICT', '你还有一场进行中的对局');
     }
-    const { score } = await this.deps.reputation.get(playerId);
-    const queue = `${playerCount}:classic:${computeReputationLevel(score)}`;
+    const { level } = await this.deps.reputation.get(playerId);
+    const queue = `${playerCount}:classic:${level}`;
     const raw = await this.run(ENQUEUE, playerId, queue, playerCount, TICKET_TTL);
     return this.advance(playerId, JSON.parse(raw as string) as Ticket);
   }

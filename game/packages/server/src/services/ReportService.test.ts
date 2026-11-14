@@ -57,7 +57,7 @@ describe('ReportService', () => {
         reason: 'afk',
       });
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.targetNewScore).toBe(990);
+      if (r.ok) expect(r.targetNewScore).toBe(40);
     });
 
     it('does not affect the reporter', async () => {
@@ -68,7 +68,7 @@ describe('ReportService', () => {
         reason: 'afk',
       });
       const reporterRec = await rep.get('p1');
-      expect(reporterRec.score).toBe(1000);
+      expect(reporterRec.score).toBe(50);
     });
 
     it('accepts all 4 valid reasons', async () => {
@@ -82,9 +82,9 @@ describe('ReportService', () => {
         });
         expect(r.ok).toBe(true);
       }
-      // p2 被扣 4 次 × -10 = 960
+      // p2 被扣 4 次 × -10 = 10
       const rec = await rep.get('p2');
-      expect(rec.score).toBe(960);
+      expect(rec.score).toBe(10);
     });
   });
 
@@ -104,9 +104,9 @@ describe('ReportService', () => {
       });
       expect(r2.ok).toBe(false);
       if (!r2.ok) expect(r2.code).toBe('DUPLICATE');
-      // 第二次不扣分，分数应仍是 990
+      // 第二次不扣分，分数应仍是 40
       const rec = await rep.get('p2');
-      expect(rec.score).toBe(990);
+      expect(rec.score).toBe(40);
     });
 
     it('different reporters can each report same target once', async () => {
@@ -119,7 +119,7 @@ describe('ReportService', () => {
       });
       expect(r2.ok).toBe(true);
       const rec = await rep.get('p3');
-      expect(rec.score).toBe(980);
+      expect(rec.score).toBe(30);
     });
 
     it('different matches: same pair can report again', async () => {
@@ -144,7 +144,7 @@ describe('ReportService', () => {
       await expect(
         failingSvc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' }),
       ).rejects.toThrow('db down');
-      expect((await rep.get('p2')).score).toBe(1000);
+      expect((await rep.get('p2')).score).toBe(50);
     });
   });
 });
@@ -158,7 +158,7 @@ describe('ReportService · 落库与扣分原子', () => {
       svc.submit({ matchID: 'm1', reporterID: 'p2', targetID: 'p3', reason: 'afk' }),
     ]);
     expect(a.ok && b.ok).toBe(true);
-    expect((await rep.get('p3')).score).toBe(980);
+    expect((await rep.get('p3')).score).toBe(30);
   });
 
   it('扣分那一步失败时举报行不残留，同一举报可以重新提交', async () => {
@@ -197,7 +197,7 @@ describe('ReportService · 落库与扣分原子', () => {
     await svc.submit({ matchID: 'm1', reporterID: 'p1', targetID: 'p2', reason: 'afk' });
     expect(runs).toBe(1);
     expect(archive.size()).toBe(1);
-    expect((await rep.get('p2')).score).toBe(990);
+    expect((await rep.get('p2')).score).toBe(40);
   });
 });
 

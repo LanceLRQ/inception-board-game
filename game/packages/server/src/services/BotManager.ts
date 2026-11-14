@@ -37,6 +37,7 @@ export interface DisconnectSnapshot {
 }
 
 interface MatchEntry {
+  readonly matchmaking: boolean;
   readonly manager: AITakeoverManager;
   /** playerID → 最近一次掉线时间戳；已在线的不在表中 */
   readonly disconnects: Map<string, number>;
@@ -95,8 +96,8 @@ export class BotManager {
   }
 
   /** 登记对局：必须先登记，未登记的对局其掉线与超时记录会被忽略（对局撤销或结束后的迟到事件不会把登记建回来） */
-  registerMatch(matchID: string): void {
-    this.ensureMatch(matchID);
+  registerMatch(matchID: string, matchmaking = false): void {
+    this.ensureMatch(matchID, matchmaking);
   }
 
   /** 对局结束：释放资源 */
@@ -114,7 +115,7 @@ export class BotManager {
   /** 玩家掉线 */
   onDisconnect(matchID: string, playerID: string): void {
     const entry = this.matches.get(matchID);
-    if (!entry) return;
+    if (!entry || entry.permanent.has(playerID)) return;
     entry.disconnects.set(playerID, this.now());
   }
 
@@ -122,12 +123,21 @@ export class BotManager {
   onReconnect(matchID: string, playerID: string): void {
     const entry = this.matches.get(matchID);
     if (!entry) return;
+    if (entry.matchmaking && this.isPastDisconnectDeadline(matchID, playerID)) {
+      this.fireAbandon(matchID, playerID);
+      return;
+    }
     entry.disconnects.delete(playerID);
     // 非永久接管：立即回切
     const rec = entry.manager.list().find((r) => r.playerID === playerID);
     if (rec && !rec.onPermanent) {
       entry.manager.restore(playerID);
     }
+  }
+
+  isPastDisconnectDeadline(matchID: string, seat: string): boolean {
+    const disconnectedAt = this.matches.get(matchID)?.disconnects.get(seat);
+    return disconnectedAt !== undefined && this.now() - disconnectedAt >= this.hardCutoffMs;
   }
 
   /**
@@ -181,6 +191,7 @@ export class BotManager {
   markPermanent(matchID: string, playerID: string): void {
     const entry = this.ensureMatch(matchID);
     entry.permanent.add(playerID);
+    entry.disconnects.delete(playerID);
     entry.manager.takeover(playerID, 'abandoned', { onPermanent: true });
     this.fireTakeover(matchID, entry.manager.list().find((r) => r.playerID === playerID)!);
   }
@@ -250,10 +261,11 @@ export class BotManager {
     }
   }
 
-  private ensureMatch(matchID: string): MatchEntry {
+  private ensureMatch(matchID: string, matchmaking = false): MatchEntry {
     let entry = this.matches.get(matchID);
     if (!entry) {
       entry = {
+        matchmaking,
         manager: new AITakeoverManager(),
         disconnects: new Map(),
         permanent: new Set(),

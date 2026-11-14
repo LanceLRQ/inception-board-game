@@ -71,7 +71,7 @@ describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
         });
       const status = (user: User) =>
         api<{ status: string; matchId: string }>(base, 'GET', '/matchmake', user.token);
-      await reputationStore.applyDelta(otherReputation!.playerId, -300, 1000);
+      await reputationStore.applyDelta(otherReputation!.playerId, -15, 50);
       expect((await fetch(`${base}/matchmake`)).status).toBe(401);
       expect(await join(otherSize!, 5)).toMatchObject({ status: 'queued', playerCount: 5 });
       expect(await join(otherReputation!)).toMatchObject({ status: 'queued' });

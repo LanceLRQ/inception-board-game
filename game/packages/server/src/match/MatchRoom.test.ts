@@ -56,6 +56,7 @@ function makeHarness(
   humans: readonly string[] = [],
   patch: Partial<RoomDeps> = {},
   initial: MatchState<SetupState> = newMatch(n),
+  mode?: 'matchmaking',
 ): Harness {
   const timers = new FakeTimers();
   const steps: StepOutput[] = [];
@@ -77,7 +78,7 @@ function makeHarness(
     timers,
     ...patch,
   };
-  const room = new MatchRoom('m1', makeSeats(n, humans), initial, deps);
+  const room = new MatchRoom('m1', makeSeats(n, humans), initial, deps, mode);
   return { room, timers, steps, persisted, gameOver, takenOver, deps };
 }
 
@@ -280,6 +281,24 @@ describe('seatActivityKind', () => {
 describe('MatchRoom 座位活动上报', () => {
   const humans = ['0', '1', '2', '3', '4'];
 
+  it('终局快照会将已超过断线期限的真人标记弃局', async () => {
+    const persist = vi.fn<RoomDeps['persist']>().mockResolvedValue('ok');
+    const h = makeHarness(
+      5,
+      humans,
+      { persist, isAbandoned: (seat: string) => seat === '4' },
+      thiefActionTurn(5).state,
+      'matchmaking',
+    );
+    // 用正常自动步推进到引擎终局，中间保持测试座位的临时托管。
+    for (const seat of humans) h.takenOver.add(seat);
+    h.room.start();
+    await drain(h);
+    expect(h.gameOver).toHaveBeenCalledOnce();
+    expect(h.room.seats()[4]?.departed).toBe(true);
+    expect(persist.mock.lastCall?.[2]?.[4]?.departed).toBe(true);
+  });
+
   it('5 秒正常抽牌不累计挂机，并转为行动阶段截止', async () => {
     const onSeatActivity = vi.fn();
     const h = makeHarness(5, humans, { onSeatActivity }, stateAfterSetup(5));
@@ -303,6 +322,21 @@ describe('MatchRoom 座位活动上报', () => {
     expect(onSeatActivity).toHaveBeenCalledTimes(1);
     expect(onSeatActivity).toHaveBeenCalledWith(h.steps[0]!.request.playerID, 'timeout');
   });
+
+  it.each(['matchmaking', undefined] as const)(
+    '回合内超时与对局版本一起写入快照（mode=%s）',
+    async (mode) => {
+      const persist = vi.fn<RoomDeps['persist']>().mockResolvedValue('ok');
+      const h = makeHarness(5, humans, { persist }, thiefActionTurn(5).state, mode);
+      h.room.start();
+      h.timers.fireNext();
+      await h.room.idle();
+      const seat = h.steps[0]!.request.playerID;
+      const count = mode === 'matchmaking' ? 1 : undefined;
+      expect(h.room.seats().find((s) => s.seat === seat)?.turnTimeouts).toBe(count);
+      expect(persist.mock.calls[0]?.[2]?.find((s) => s.seat === seat)?.turnTimeouts).toBe(count);
+    },
+  );
 
   it('玩家本人被接受的 move 上报 player', async () => {
     const onSeatActivity = vi.fn();

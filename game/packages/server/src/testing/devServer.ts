@@ -115,7 +115,7 @@ export interface DevServer {
  * 内存版的举报依赖：对局成员表直接读运行中的对局座位（举报只会发生在刚打完的对局上，
  * 对局在结束后还会保留一小段时间），举报与信誉分都存在进程内。
  */
-function memoryReports(getRealtime: () => Realtime | null) {
+function memoryReports(getRealtime: () => Realtime | null, reputation: ReputationService) {
   const prisma: ReportsPrisma = {
     match: {
       async findUnique({ where }) {
@@ -132,7 +132,6 @@ function memoryReports(getRealtime: () => Realtime | null) {
       },
     },
   };
-  const reputation = new ReputationService(new InMemoryReputationStore());
   return {
     prisma,
     reportService: new ReportService(reputation, { archive: new InMemoryReportArchive() }),
@@ -143,24 +142,25 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
   const redis = new MemoryRedis();
   let started: Realtime | null = null;
   const identity = createMemoryIdentityPrisma();
+  const reputation = opts.reputation ?? new ReputationService(new InMemoryReputationStore());
   // 配置了固定种子时，每一局都用同一个种子（端到端用例要求每次走同一局）；
   // 生产环境配置该变量会在这里抛错，进程拒绝启动
   const randomSeed = opts.randomSeed ?? resolveFixedMatchSeed(process.env);
   if (randomSeed !== undefined) logger.warn('fixed match seed enabled (test only)');
   const rt = buildRealtime({
     store: new InMemoryMatchStore(),
-    archive: new InMemoryMatchArchive(),
+    archive: new InMemoryMatchArchive(reputation),
     chatLog: new InMemoryChatLog(),
     lobbyRedis: redis,
     lobbyPrisma: identity,
     ...(opts.matchmakingRedis && {
       matchmaking: {
         redis: opts.matchmakingRedis,
-        reputation: opts.reputation ?? new ReputationService(new InMemoryReputationStore()),
+        reputation,
       },
     }),
     identityPrisma: identity,
-    reports: memoryReports(() => started),
+    reports: memoryReports(() => started, reputation),
     heartbeatRedis: redis,
     rateGuard: new InMemoryRateGuard({ maxPerWindow: 1_000_000 }),
     timing: opts.timing ?? devTimingFromEnv(process.env),

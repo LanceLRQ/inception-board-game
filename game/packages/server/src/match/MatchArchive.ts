@@ -6,13 +6,19 @@ import { createHash } from 'node:crypto';
 import { matchOutcome } from '@icgame/game-engine';
 import type { SetupState } from '@icgame/game-engine/setup';
 import type { MatchEvent, MatchState, MoveRequest } from '@icgame/game-engine/runner';
-import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
+import type { PrismaClient } from '../generated/prisma/client.js';
 import { buildAchievementRows } from '../seed/seed.js';
 import {
   computeEarnedAchievements,
   type AchievementPlayerInput,
 } from '../services/achievements.js';
 import { computeMvpResults, type MvpPlayerStats } from '../services/mvpScore.js';
+import { createPrismaReputationStore } from '../services/PrismaReputationStore.js';
+import {
+  REPUTATION_TIMEOUT_THRESHOLD,
+  ReputationService,
+  type ReputationChange,
+} from '../services/ReputationService.js';
 import type { RoomSeat } from './MatchRoom.js';
 import type { MatchSnapshot } from './MatchStore.js';
 import { readColdReplay, type ColdEvent, type ReplayObjectStore } from './ColdReplay.js';
@@ -64,6 +70,12 @@ function matchScore(G: SetupState, seat: RoomSeat, won: boolean | null): number 
   return G.players[seat.seat]?.faction === 'thief' && shattered ? 4 : 3;
 }
 
+function matchReputationChange(seat: RoomSeat): ReputationChange {
+  const timedOut = (seat.turnTimeouts ?? 0) >= REPUTATION_TIMEOUT_THRESHOLD;
+  if (seat.departed) return timedOut ? 'abandonWithTimeouts' : 'abandon';
+  return timedOut ? 'completeWithTimeouts' : 'complete';
+}
+
 export interface MatchArchive {
   /**
    * 建局时：写对局元信息与各座位。
@@ -81,6 +93,7 @@ export interface MatchArchive {
     matchID: string,
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
+    endedAt?: Date,
   ): Promise<void>;
   /** 主动中止：记录结束时间，不公开阵营、不产生胜负。 */
   recordStop(matchID: string): Promise<void>;
@@ -104,6 +117,8 @@ export class InMemoryMatchArchive implements MatchArchive {
   private readonly finishedSeats = new Map<string, readonly RoomSeat[]>();
   /** 缺口按 to 去重，与数据库实现的唯一约束一致 */
   private readonly gaps = new Map<string, Map<number, StepGap>>();
+
+  constructor(private readonly reputation?: ReputationService) {}
 
   async recordStart(snapshot: MatchSnapshot, restore = false): Promise<void> {
     if (restore && this.started.has(snapshot.matchID)) return;
@@ -137,10 +152,19 @@ export class InMemoryMatchArchive implements MatchArchive {
     matchID: string,
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
+    endedAt = new Date(),
   ): Promise<void> {
+    if (this.endedAt.has(matchID)) return;
     this.finished.set(matchID, structuredClone(final));
     this.finishedSeats.set(matchID, structuredClone(seats));
-    this.endedAt.set(matchID, new Date());
+    this.endedAt.set(matchID, endedAt);
+    if (this.reputation && this.started.get(matchID)?.mode === 'matchmaking') {
+      for (const s of seats) {
+        if (!s.isBot && s.playerId) {
+          await this.reputation.adjust(s.playerId, matchReputationChange(s), endedAt);
+        }
+      }
+    }
   }
 
   async recordStop(matchID: string): Promise<void> {
@@ -228,8 +252,6 @@ export interface PrismaArchiveClient {
     'createMany' | 'update' | 'findMany' | 'deleteMany'
   >;
   matchEvent: Pick<PrismaClient['matchEvent'], 'create' | 'findMany' | 'findFirst' | 'deleteMany'>;
-  achievement: Pick<PrismaClient['achievement'], 'createMany'>;
-  playerAchievement: Pick<PrismaClient['playerAchievement'], 'createMany'>;
 }
 
 const PRISMA_UNIQUE_VIOLATION = 'P2002';
@@ -371,6 +393,7 @@ export class PrismaMatchArchive implements MatchArchive {
     matchID: string,
     final: MatchState<SetupState>,
     seats: readonly RoomSeat[],
+    endedAt = new Date(),
   ): Promise<void> {
     const { G } = final;
     const { winner, reason } = matchOutcome(final.ctx.gameover, G);
@@ -460,23 +483,32 @@ export class PrismaMatchArchive implements MatchArchive {
       }
     }
 
-    const writes: Prisma.PrismaPromise<unknown>[] = [
-      this.prisma.match.update({
-        where: { id: matchID },
+    await this.prisma.$transaction(async (tx) => {
+      // 结束标记与结算同一事务。归档重试或并发处理时，只允许第一次写入。
+      const [match] = await tx.match.updateManyAndReturn({
+        where: { id: matchID, endedAt: null },
         data: {
-          endedAt: new Date(),
+          endedAt,
           winner,
           winReason: reason === null ? null : reason.slice(0, WIN_REASON_MAX),
         },
-      }),
-    ];
-    for (const s of seats) {
-      const p = G.players[s.seat];
-      if (!p) continue;
-      const mvp = mvpBySeat.get(s.seat);
-      const won = winner === null || s.departed ? null : p.faction === winner;
-      writes.push(
-        this.prisma.matchPlayer.update({
+        select: { mode: true },
+      });
+      if (!match) {
+        const existing = await tx.match.findUnique({
+          where: { id: matchID },
+          select: { id: true },
+        });
+        if (!existing) throw new Error(`match ${matchID} missing during settlement`);
+        return;
+      }
+      const reputationSeats: Array<{ playerId: string; change: ReputationChange }> = [];
+      for (const s of seats) {
+        const p = G.players[s.seat];
+        if (!p) continue;
+        const mvp = mvpBySeat.get(s.seat);
+        const won = winner === null || s.departed ? null : p.faction === winner;
+        const row = await tx.matchPlayer.update({
           where: { matchId_seat: { matchId: matchID, seat: Number(s.seat) } },
           data: {
             finalFaction: p.faction,
@@ -485,16 +517,24 @@ export class PrismaMatchArchive implements MatchArchive {
             abandoned: s.departed === true,
             ...(mvp && { isMvp: mvp.isMVP, mvpScore: mvp.mvpScore }),
           },
-        }),
-      );
-    }
-    if (awards.length > 0) {
-      writes.push(
-        this.prisma.achievement.createMany({ data: buildAchievementRows(), skipDuplicates: true }),
-        this.prisma.playerAchievement.createMany({ data: awards, skipDuplicates: true }),
-      );
-    }
-    await this.prisma.$transaction(writes);
+          select: { playerId: true },
+        });
+        if (match.mode === 'matchmaking' && !s.isBot && row.playerId !== null) {
+          reputationSeats.push({ playerId: row.playerId, change: matchReputationChange(s) });
+        }
+      }
+      if (awards.length > 0) {
+        await tx.achievement.createMany({ data: buildAchievementRows(), skipDuplicates: true });
+        await tx.playerAchievement.createMany({ data: awards, skipDuplicates: true });
+      }
+      if (reputationSeats.length > 0) {
+        const reputation = new ReputationService(createPrismaReputationStore(tx));
+        reputationSeats.sort((a, b) => a.playerId.localeCompare(b.playerId));
+        for (const { playerId, change } of reputationSeats) {
+          await reputation.adjust(playerId, change, endedAt);
+        }
+      }
+    });
   }
 
   async recordStop(matchID: string): Promise<void> {

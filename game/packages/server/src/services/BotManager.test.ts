@@ -132,6 +132,17 @@ describe('BotManager', () => {
   });
 
   describe('permanent takeover (friend-room host leaving)', () => {
+    it('reconnect at the hard deadline reports abandonment for a ranked seat before clearing disconnect', () => {
+      const matches = new BotManager({ now: () => now });
+      matches.registerMatch('ranked', true);
+      const abandon = vi.fn();
+      matches.onAbandon(abandon);
+      matches.onDisconnect('ranked', 'p1');
+      now += 180_000;
+      matches.onReconnect('ranked', 'p1');
+      expect(abandon).toHaveBeenCalledWith('ranked', 'p1');
+    });
+
     it('markPermanent keeps bot control after reconnect', () => {
       bot.markPermanent('m1', 'p1');
       expect(bot.isBotControlled('m1', 'p1')).toBe(true);
