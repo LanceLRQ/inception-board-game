@@ -4,7 +4,7 @@
 // 开始后：真实后端 → 全体进入同一局联机对局；本地模拟 → 本地人机对局。
 
 import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, LogOut, Play, Users } from 'lucide-react';
@@ -192,9 +192,19 @@ export default function Room() {
             <div className="flex min-w-0 items-center gap-2">
               <PixelAvatar seed={roomPlayerAvatarSeed(p)} size={28} />
               {p.isBot && <Bot size={14} className="text-primary" />}
-              <span className="truncate" data-testid={`room-player-${p.seat}`}>
-                {p.nickname}
-              </span>
+              {p.isBot || isMockMode() ? (
+                <span className="truncate" data-testid={`room-player-${p.seat}`}>
+                  {p.nickname}
+                </span>
+              ) : (
+                <Link
+                  to={`/players/${encodeURIComponent(p.playerId)}`}
+                  className="truncate underline-offset-4 hover:underline"
+                  data-testid={`room-player-${p.seat}`}
+                >
+                  {p.nickname}
+                </Link>
+              )}
               {p.playerId === playerId && (
                 <span className="rounded bg-panel-2 px-1.5 py-0.5 text-xs text-foreground">
                   {t('room.you')}

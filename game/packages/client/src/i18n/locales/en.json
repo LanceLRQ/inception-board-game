@@ -864,6 +864,26 @@
     },
     "wait": "Waiting"
   },
+  "profile": {
+    "title": "Player Profile",
+    "openFor": "View profile for {{nickname}}",
+    "notFound": "Player not found.",
+    "loadFailed": "Could not load the player profile.",
+    "total": "Recorded matches",
+    "wins": "Wins",
+    "losses": "Losses",
+    "winRate": "Win rate",
+    "abandoned": "Abandoned",
+    "mvps": "MVP awards",
+    "history": "Match history",
+    "historyFailed": "Could not load match history.",
+    "noMatches": "No finished matches yet.",
+    "left": "Left match",
+    "stopped": "Stopped",
+    "win": "Win",
+    "loss": "Loss",
+    "loadMore": "Load more"
+  },
   "series": {
     "format": "Match format",
     "unlimited": "Unlimited rounds",

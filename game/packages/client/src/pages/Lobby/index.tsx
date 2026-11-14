@@ -2,7 +2,7 @@
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
 import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
@@ -13,6 +13,8 @@ import {
 } from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
 import { roomApi } from '../../lib/roomApi';
+import { isOfflineIdentity } from '../../lib/identityApi';
+import { useIdentityStore } from '../../stores/useIdentityStore';
 import { requestErrorMessage } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { readOnlineMatch } from '../../lib/onlineMatchMemo';
@@ -55,6 +57,7 @@ export default function Lobby() {
   const [inputNickname, setInputNickname] = useState('');
   // 创建房间参数
   const [maxPlayers, setMaxPlayers] = useState(6);
+  const token = useIdentityStore((state) => state.token);
   const [seriesMode, setSeriesMode] = useState('unlimited');
   const [seriesLength, setSeriesLength] = useState(7);
   // 加入房间
@@ -285,9 +288,20 @@ export default function Lobby() {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 bg-background p-6 text-foreground">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
-        <span className="min-w-0 truncate text-sm text-dim" data-testid="lobby-nickname">
-          {nickname}
-        </span>
+        {playerId && token && !isOfflineIdentity(token) ? (
+          <Link
+            to={`/players/${encodeURIComponent(playerId)}`}
+            className="min-w-0 truncate rounded px-2 py-2 text-sm text-primary underline-offset-4 hover:underline"
+            data-testid="lobby-nickname"
+            aria-label={t('profile.openFor', { nickname })}
+          >
+            {nickname}
+          </Link>
+        ) : (
+          <span className="min-w-0 truncate text-sm text-dim" data-testid="lobby-nickname">
+            {nickname}
+          </span>
+        )}
       </div>
 
       <AvatarPicker

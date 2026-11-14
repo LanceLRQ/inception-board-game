@@ -4,6 +4,8 @@ import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { nicknameSchema } from '../infra/nicknameSchema.js';
+import { paginationSchema } from '../infra/pagination.js';
+import { isUuid } from '../infra/uuid.js';
 import { AVATAR_PALETTES, generatePixelAvatar } from '@icgame/shared';
 
 const router = new Router();
@@ -66,39 +68,71 @@ router.patch('/players/me', authMiddleware, async (ctx) => {
 // GET /players/:id/stats - 玩家战绩（公开）
 router.get('/players/:id/stats', async (ctx) => {
   const { id } = ctx.params;
+  if (!id || !isUuid(id)) throw new AppError('NOT_FOUND', 'Player not found');
   const player = await prisma.player.findUnique({
     where: { id },
-    select: { id: true, nickname: true, avatarSeed: true, createdAt: true },
+    select: { id: true, nickname: true, avatarSeed: true },
   });
   if (!player) throw new AppError('NOT_FOUND', 'Player not found');
 
-  const matchPlayers = await prisma.matchPlayer.findMany({
-    where: { playerId: id },
-    select: { won: true, role: true, finalFaction: true, abandoned: true },
+  const outcomes = await prisma.matchPlayer.groupBy({
+    by: ['won', 'abandoned', 'isMvp'],
+    where: {
+      playerId: id,
+      match: { endedAt: { not: null } },
+      OR: [{ won: { not: null } }, { abandoned: true }],
+    },
+    _count: { _all: true },
   });
-
-  const total = matchPlayers.length;
-  const wins = matchPlayers.filter((mp) => mp.won).length;
-  const abandoned = matchPlayers.filter((mp) => mp.abandoned).length;
+  let wins = 0;
+  let losses = 0;
+  let abandoned = 0;
+  let mvps = 0;
+  for (const result of outcomes) {
+    const count = result._count._all;
+    if (result.abandoned) {
+      abandoned += count;
+      continue;
+    }
+    if (result.won) wins += count;
+    else losses += count;
+    if (result.isMvp) mvps += count;
+  }
+  const decided = wins + losses;
 
   ctx.body = {
-    player: { id: player.id, nickname: player.nickname, avatarSeed: player.avatarSeed },
-    stats: { total, wins, losses: total - wins, abandoned, winRate: total > 0 ? wins / total : 0 },
+    player,
+    stats: {
+      total: decided + abandoned,
+      wins,
+      losses,
+      abandoned,
+      mvps,
+      winRate: decided ? wins / decided : 0,
+    },
   };
 });
 
 // GET /players/me/matches - 我的历史对局（分页）
 router.get('/players/me/matches', authMiddleware, async (ctx) => {
   const { playerId } = ctx.state.player;
-  const cursor = ctx.query.cursor as string | undefined;
-  const limit = Math.min(parseInt(ctx.query.limit as string) || 20, 100);
+  const { cursor, limit } = paginationSchema.parse(ctx.query);
+  const where = { playerId, match: { endedAt: { not: null } } };
+  if (cursor !== undefined && !isUuid(cursor))
+    throw new AppError('VALIDATION_ERROR', 'invalid cursor');
+  const anchor = cursor
+    ? await prisma.matchPlayer.findFirst({
+        where: { ...where, matchId: cursor },
+        select: { seat: true },
+      })
+    : null;
+  if (cursor && !anchor) throw new AppError('VALIDATION_ERROR', 'invalid cursor');
 
   const matchPlayers = await prisma.matchPlayer.findMany({
-    where: {
-      playerId,
-      ...(cursor && { matchId: { lt: cursor } }),
-    },
-    orderBy: { matchId: 'desc' },
+    where,
+    orderBy: [{ match: { endedAt: 'desc' } }, { matchId: 'desc' }, { seat: 'asc' }],
+    ...(cursor &&
+      anchor && { cursor: { matchId_seat: { matchId: cursor, seat: anchor.seat } }, skip: 1 }),
     take: limit + 1,
     include: { match: true },
   });
@@ -115,6 +149,8 @@ router.get('/players/me/matches', authMiddleware, async (ctx) => {
       finalFaction: mp.finalFaction,
       won: mp.won,
       abandoned: mp.abandoned,
+      isMvp: mp.isMvp,
+      score: mp.score,
       startedAt: mp.match.startedAt,
       endedAt: mp.match.endedAt,
       winner: mp.match.winner,

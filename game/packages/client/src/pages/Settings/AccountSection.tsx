@@ -108,6 +108,14 @@ export function AccountSection() {
         </div>
       ) : (
         <div className="flex flex-col gap-3 text-sm">
+          {!offline && (
+            <Link
+              to={`/players/${encodeURIComponent(playerId)}`}
+              className="inline-flex min-h-11 items-center self-start text-primary underline-offset-4 hover:underline"
+            >
+              {t('profile.title')}
+            </Link>
+          )}
           <AvatarPicker
             seed={avatar.seed}
             onRoll={avatar.roll}

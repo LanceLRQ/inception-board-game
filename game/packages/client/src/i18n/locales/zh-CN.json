@@ -838,6 +838,26 @@
     },
     "wait": "等待"
   },
+  "profile": {
+    "title": "玩家资料",
+    "openFor": "查看 {{nickname}} 的资料",
+    "notFound": "未找到该玩家。",
+    "loadFailed": "暂时无法加载玩家资料。",
+    "total": "计入战绩的场次",
+    "wins": "胜场",
+    "losses": "负场",
+    "winRate": "胜率",
+    "abandoned": "弃局",
+    "mvps": "MVP 次数",
+    "history": "历史对局",
+    "historyFailed": "暂时无法加载历史对局。",
+    "noMatches": "暂无已结束的对局。",
+    "left": "已退出",
+    "stopped": "已中止",
+    "win": "胜利",
+    "loss": "失败",
+    "loadMore": "加载更多"
+  },
   "series": {
     "format": "赛制",
     "unlimited": "不限局数",

@@ -11,6 +11,7 @@ const Room = lazy(() => import('./pages/Room'));
 const Game = lazy(() => import('./pages/Game'));
 const LocalMatch = lazy(() => import('./pages/LocalMatch'));
 const Replay = lazy(() => import('./pages/Replay'));
+const PlayerProfile = lazy(() => import('./pages/PlayerProfile'));
 const Settings = lazy(() => import('./pages/Settings'));
 const About = lazy(() => import('./pages/About'));
 const Tutorial = lazy(() => import('./pages/Tutorial'));
@@ -78,6 +79,14 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <Replay />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/players/:playerId',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <PlayerProfile />
           </Suspense>
         ),
       },
