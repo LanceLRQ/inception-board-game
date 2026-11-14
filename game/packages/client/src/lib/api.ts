@@ -75,7 +75,8 @@ export function isNetworkError(err: unknown): boolean {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path, { method: 'GET' }),
+  get: <T>(path: string, options?: Pick<RequestInit, 'signal' | 'cache'>) =>
+    request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body: unknown) =>

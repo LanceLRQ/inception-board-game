@@ -258,12 +258,13 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
   //   全部步骤，按观察者座位裁剪，与 /events 同一规则
   router.get('/replays/:id/download', async (ctx) => {
     const { id } = ctx.params;
+    if (!id || !isUuid(id)) throw new AppError('NOT_FOUND', 'Replay not found');
     const { viewer, steps, complete, gaps } = await loadFinishedMatch(
       archive,
-      id!,
+      id,
       await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
     );
-    const meta = await loadDownloadMeta(id!);
+    const meta = await loadDownloadMeta(id);
     if (!meta) throw new AppError('NOT_FOUND', 'Replay not found');
 
     ctx.set('Content-Disposition', `attachment; filename="replay-${id}.json"`);

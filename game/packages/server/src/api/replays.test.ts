@@ -73,6 +73,13 @@ describe('回放接口 · 对局状态', () => {
     }
   });
 
+  it('下载回放收到无效对局编号时返回 404，跳过 UUID 数据库查询', async () => {
+    const { server, archive } = await setup();
+    const matchInfo = vi.spyOn(archive, 'matchInfo');
+    expect((await server.get('/replays/invalid/download')).status).toBe(404);
+    expect(matchInfo).not.toHaveBeenCalled();
+  });
+
   it('对局未结束 → 409，响应里没有任何事件内容', async () => {
     const { server } = await setup();
     for (const suffix of ['events', 'range', 'frames', 'download']) {

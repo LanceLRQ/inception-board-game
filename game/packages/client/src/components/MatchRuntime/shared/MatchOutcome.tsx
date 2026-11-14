@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RotateCcw, Trophy } from 'lucide-react';
+import { Film, RotateCcw, Trophy } from 'lucide-react';
+import { Link, useParams } from 'react-router';
 import type { ReportModel } from '../controllerTypes';
 import { Dialog, DialogTitle } from '../../ui/dialog';
 import { OutcomeReport } from './OutcomeReport';
@@ -25,6 +26,7 @@ export function MatchOutcome({
   report = null,
 }: MatchOutcomeProps) {
   const { t } = useTranslation();
+  const { matchId } = useParams();
   const [open, setOpen] = useState(false);
   const title = winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins');
   return (
@@ -52,17 +54,28 @@ export function MatchOutcome({
             {t(`localMatch.winReason.${winReason}`, { defaultValue: winReason })}
           </p>
         )}
-        <button
-          type="button"
-          onClick={onRestart}
-          data-testid="restart-button"
-          className="tabletop-primary mt-5"
-        >
-          <RotateCcw size={16} />
-          {isRemote
-            ? t('match.back_to_lobby', { defaultValue: '返回大厅' })
-            : t('localMatch.restart')}
-        </button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onRestart}
+            data-testid="restart-button"
+            className="tabletop-primary inline-flex items-center gap-2"
+          >
+            <RotateCcw size={16} aria-hidden />
+            {isRemote
+              ? t('match.back_to_lobby', { defaultValue: '返回大厅' })
+              : t('localMatch.restart')}
+          </button>
+          {isRemote && matchId && (
+            <Link
+              to={`/replay/${encodeURIComponent(matchId)}`}
+              className="tabletop-secondary inline-flex items-center gap-2"
+            >
+              <Film size={16} aria-hidden />
+              {t('replay.open')}
+            </Link>
+          )}
+        </div>
         {report && <OutcomeReport report={report} />}
       </Dialog>
     </>

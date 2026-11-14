@@ -270,6 +270,11 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
       [b, seatA],
     ] as const) {
       await me.page.getByRole('button', { name: '查看结算' }).click();
+      const matchID = /\/game\/([^/?]+)/.exec(me.page.url())![1]!;
+      await expect(me.page.getByRole('link', { name: '观看回放' })).toHaveAttribute(
+        'href',
+        `/replay/${matchID}`,
+      );
       await expect(me.page.getByTestId('outcome-report')).toBeVisible();
       await expect(me.page.locator('[data-testid^="report-row-"]')).toHaveCount(1);
       await expect(me.page.getByTestId(`report-button-${other}`)).toBeEnabled();
