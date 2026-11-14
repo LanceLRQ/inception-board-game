@@ -5,7 +5,7 @@ import { RedisKeys } from '../infra/redisKeys.js';
 import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from './BanChecker.js';
 import type { LobbyPrisma } from './LobbyService.js';
-import type { ReputationService } from './ReputationService.js';
+import type { ReputationLevel, ReputationService } from './ReputationService.js';
 
 const TICKET_TTL = 60;
 const ASSIGNMENT_TTL = 86_400;
@@ -21,6 +21,10 @@ interface Ticket {
   order: number;
   matchId?: string;
   queuedUntil?: number;
+}
+
+function queueKey(playerCount: number, level: ReputationLevel): string {
+  return `${playerCount}:classic:${level}`;
 }
 
 // 同一账号的票据跨队列唯一；用自增序号保持同一毫秒入队时的先后顺序。
@@ -143,7 +147,7 @@ export class MatchmakingService {
   constructor(
     private readonly deps: {
       redis: Pick<Redis, 'eval'>;
-      reputation: Pick<ReputationService, 'get'>;
+      reputation: Pick<ReputationService, 'get' | 'getMany'>;
       prisma: LobbyPrisma;
       bans: Pick<BanChecker, 'isBanned'>;
       matches: Pick<
@@ -235,7 +239,7 @@ export class MatchmakingService {
 
   private async queueFor(playerId: string, playerCount: number): Promise<string> {
     const { level } = await this.deps.reputation.get(playerId);
-    return `${playerCount}:classic:${level}`;
+    return queueKey(playerCount, level);
   }
 
   private async tryMatch(playerId: string, ticket: Ticket): Promise<void> {
@@ -258,10 +262,9 @@ export class MatchmakingService {
       try {
         const profiles = await Promise.all(
           players.map(async (id, seat) => {
-            const [profile, banned, queue] = await Promise.all([
+            const [profile, banned] = await Promise.all([
               this.deps.prisma.player.findUnique({ where: { id } }),
               this.deps.bans.isBanned(id),
-              this.queueFor(id, ticket.playerCount),
             ]);
             if (!profile || banned) return null;
             return {
@@ -271,23 +274,28 @@ export class MatchmakingService {
               seat,
               isBot: false,
               joinedAt: Date.now(),
-              queue,
             };
           }),
         );
-        const verified = profiles
-          .filter((profile) => profile !== null)
-          .filter(({ playerId }) => !this.deps.matches.isPlayerInActiveMatch(playerId));
-        destinations = Object.fromEntries(verified.map(({ playerId, queue }) => [playerId, queue]));
+        // 账号检查后，用同一次查询读取整桌候选人的信誉。
+        const candidates = profiles.filter((profile) => profile !== null);
+        const levels = await this.deps.reputation.getMany(
+          candidates.map(({ playerId }) => playerId),
+        );
+        destinations = Object.fromEntries(
+          levels.map(({ playerId, level }) => [playerId, queueKey(ticket.playerCount, level)]),
+        );
+        const verified = candidates.filter(({ playerId }) => {
+          if (!this.deps.matches.isPlayerInActiveMatch(playerId)) return true;
+          delete destinations[playerId];
+          return false;
+        });
         if (
           verified.length === players.length &&
-          verified.every(({ queue }) => queue === ticket.queue)
+          verified.every(({ playerId }) => destinations[playerId] === ticket.queue)
         ) {
           creating = true;
-          await this.deps.matches.createMatchedMatch(
-            id,
-            verified.map(({ queue: _queue, ...profile }) => profile),
-          );
+          await this.deps.matches.createMatchedMatch(id, verified);
           started = true;
         }
       } finally {

@@ -20,9 +20,11 @@ export function createPrismaReputationStore(prisma: ReputationPrisma): Reputatio
     level: row.level as ReputationLevel,
   });
   return {
-    async get(playerId) {
-      const row = await prisma.reputation.findUnique({ where: { playerId } });
-      return row ? toRecord(row) : null;
+    async findMany(playerIds) {
+      const rows = await prisma.reputation.findMany({
+        where: { playerId: { in: [...playerIds] } },
+      });
+      return rows.map(toRecord);
     },
     async applyDelta(playerId, delta, initialScore, completed = 0, at = new Date()) {
       const firstScore = computeNextScore(initialScore, delta);

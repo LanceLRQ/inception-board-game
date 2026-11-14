@@ -74,10 +74,19 @@ describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
       const ticket = await request(changed!, 'POST');
       await request(a!, 'POST');
       await request(b!, 'POST');
-      await store.applyDelta(changed!.playerId, -12, 50);
 
-      // 跨档的玩家还没来得及轮询，由其他玩家触发配桌。
-      expect(await request(c!, 'POST')).toMatchObject({ status: 'queued' });
+      // 配桌已经读取候选账号，信誉在整桌复核前发生变化。
+      const findMany = store.findMany.bind(store);
+      const readCohorts = vi.spyOn(store, 'findMany').mockImplementation(async (ids) => {
+        if (ids.length === 4) await store.applyDelta(changed!.playerId, -12, 50);
+        return findMany(ids);
+      });
+      try {
+        expect(await request(c!, 'POST')).toMatchObject({ status: 'queued' });
+        expect(readCohorts).toHaveBeenCalledWith([changed, a, b, c].map((user) => user!.playerId));
+      } finally {
+        readCohorts.mockRestore();
+      }
       expect(rt.matches.activeCount()).toBe(0);
       expect(await request(changed!)).toEqual({ ...ticket, lowReputation: true });
       expect(await request(d!, 'POST')).toMatchObject({ status: 'matched' });

@@ -27,7 +27,7 @@ export interface ReputationRecord {
 }
 
 export interface ReputationStore {
-  get(playerId: string): Promise<ReputationRecord | null>;
+  findMany(playerIds: readonly string[]): Promise<ReputationRecord[]>;
   /**
    * 原子地加减信誉分：分数夹在 [REPUTATION_MIN, REPUTATION_MAX]，等级随之重算；
    * 没有记录时从 initialScore 起算。必须由存储自己保证并发安全（不能「读出再写回」），
@@ -84,22 +84,25 @@ export class ReputationService {
   }
 
   async get(playerId: string): Promise<ReputationRecord> {
-    const rec = await this.store.get(playerId);
-    if (rec) {
-      // 查询不写库；实际加减分时由存储在同一动作内应用恢复并重置计时。
-      const score = recoveredScore(rec.score, rec.decayedAt, new Date(), this.initialScore);
-      return { ...rec, score, level: computeReputationLevel(score, rec.completedMatches) };
-    }
-    // 未建档：返回初始值快照（不写入，等到 adjust 时才 upsert）
+    return (await this.getMany([playerId]))[0]!;
+  }
+
+  async getMany(playerIds: readonly string[]): Promise<ReputationRecord[]> {
+    if (playerIds.length === 0) return [];
     const now = new Date();
-    return {
-      playerId,
-      score: this.initialScore,
-      level: computeReputationLevel(this.initialScore),
-      completedMatches: 0,
-      decayedAt: now,
-      updatedAt: now,
-    };
+    const records = new Map((await this.store.findMany(playerIds)).map((r) => [r.playerId, r]));
+    return playerIds.map((playerId) => {
+      const rec = records.get(playerId) ?? {
+        playerId,
+        score: this.initialScore,
+        completedMatches: 0,
+        decayedAt: now,
+        updatedAt: now,
+      };
+      // 查询不写库；实际加减分时由存储在同一动作内应用恢复并重置计时。
+      const score = recoveredScore(rec.score, rec.decayedAt, now, this.initialScore);
+      return { ...rec, score, level: computeReputationLevel(score, rec.completedMatches) };
+    });
   }
 
   async adjust(playerId: string, deltaKey: ReputationChange, at?: Date): Promise<ReputationRecord> {
@@ -121,6 +124,10 @@ export class InMemoryReputationStore implements ReputationStore {
 
   async get(playerId: string): Promise<ReputationRecord | null> {
     return this.records.get(playerId) ?? null;
+  }
+
+  async findMany(playerIds: readonly string[]): Promise<ReputationRecord[]> {
+    return playerIds.map((id) => this.records.get(id)).filter((rec) => rec !== undefined);
   }
 
   // 读与写之间没有 await，单线程下天然原子
