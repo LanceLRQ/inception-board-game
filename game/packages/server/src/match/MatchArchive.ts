@@ -24,6 +24,18 @@ export interface StepRow {
   at: Date;
 }
 
+export interface StepQuery {
+  from?: number;
+  to?: number;
+  take?: number;
+}
+
+export interface StepSummary {
+  min: number | null;
+  max: number | null;
+  count: number;
+}
+
 /** 对局的结束时间与座位归属，供接口层决定回放能否提供、观察者坐哪个座位 */
 export interface MatchInfo {
   /** 对局未结束为 null */
@@ -70,7 +82,8 @@ export interface MatchArchive {
   ): Promise<void>;
   /** 主动中止：记录结束时间，不公开阵营、不产生胜负。 */
   recordStop(matchID: string): Promise<void>;
-  listSteps(matchID: string): Promise<StepRow[]>;
+  listSteps(matchID: string, query?: StepQuery): Promise<StepRow[]>;
+  stepSummary(matchID: string): Promise<StepSummary>;
   /** 记一段缺失的步骤；同一个 to 已记过视为已记录 */
   recordGap(matchID: string, fromStateID: number, toStateID: number): Promise<void>;
   listGaps(matchID: string): Promise<StepGap[]>;
@@ -156,9 +169,26 @@ export class InMemoryMatchArchive implements MatchArchive {
     };
   }
 
-  async listSteps(matchID: string): Promise<StepRow[]> {
-    const rows = [...(this.steps.get(matchID)?.values() ?? [])];
-    return structuredClone(rows.sort((a, b) => a.stateID - b.stateID));
+  async listSteps(
+    matchID: string,
+    { from = -Infinity, to = Infinity, take }: StepQuery = {},
+  ): Promise<StepRow[]> {
+    const rows = [...(this.steps.get(matchID)?.values() ?? [])]
+      .filter((row) => row.stateID >= from && row.stateID <= to)
+      .sort((a, b) => a.stateID - b.stateID);
+    return structuredClone(rows.slice(0, take));
+  }
+
+  async stepSummary(matchID: string): Promise<StepSummary> {
+    const rows = this.steps.get(matchID);
+    if (!rows?.size) return { min: null, max: null, count: 0 };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const id of rows.keys()) {
+      min = Math.min(min, id);
+      max = Math.max(max, id);
+    }
+    return { min, max, count: rows.size };
   }
 
   async recordGap(matchID: string, fromStateID: number, toStateID: number): Promise<void> {
@@ -182,6 +212,7 @@ export class InMemoryMatchArchive implements MatchArchive {
 
 /** PrismaMatchArchive 实际用到的最小接口，便于测试打桩 */
 export interface PrismaArchiveClient {
+  $queryRaw: PrismaClient['$queryRaw'];
   $transaction: PrismaClient['$transaction'];
   match: Pick<PrismaClient['match'], 'upsert' | 'update' | 'findUnique' | 'findMany'>;
   matchPlayer: Pick<
@@ -463,23 +494,63 @@ export class PrismaMatchArchive implements MatchArchive {
     }));
   }
 
-  async listSteps(matchID: string): Promise<StepRow[]> {
-    const rows = await this.prisma.matchEvent.findMany({
-      where: { matchId: matchID, eventKind: 'step' },
-      orderBy: { moveCounter: 'asc' },
-    });
+  async listSteps(matchID: string, { from, to, take }: StepQuery = {}): Promise<StepRow[]> {
+    // PostgreSQL 的 int4 边界外没有版本号。保留旧接口对大数及负数区间的行为。
+    if ((from !== undefined && from > 2147483647) || (to !== undefined && to < -2147483648))
+      return [];
+    let lower = from !== undefined && from >= -2147483648 ? from : undefined;
+    const upper = to !== undefined && to <= 2147483647 ? to : undefined;
     const out: StepRow[] = [];
-    for (const r of rows) {
-      if (r.eventKind !== 'step' || !isStepPayload(r.payload)) continue;
-      out.push({
-        matchID: r.matchId,
-        stateID: r.moveCounter,
-        request: r.payload.request,
-        events: r.payload.events,
-        at: r.createdAt,
+    while (take === undefined || out.length < take) {
+      const remaining = take === undefined ? undefined : take - out.length;
+      const rows = await this.prisma.matchEvent.findMany({
+        where: {
+          matchId: matchID,
+          eventKind: 'step',
+          ...(lower !== undefined || upper !== undefined
+            ? {
+                moveCounter: {
+                  ...(lower !== undefined && { gte: lower }),
+                  ...(upper !== undefined && { lte: upper }),
+                },
+              }
+            : {}),
+        },
+        orderBy: { moveCounter: 'asc' },
+        ...(remaining !== undefined && { take: remaining }),
       });
+      for (const r of rows) {
+        if (r.eventKind !== 'step' || !isStepPayload(r.payload)) continue;
+        out.push({
+          matchID: r.matchId,
+          stateID: r.moveCounter,
+          request: r.payload.request,
+          events: r.payload.events,
+          at: r.createdAt,
+        });
+      }
+      const last = rows.at(-1);
+      if (
+        remaining === undefined ||
+        rows.length < remaining ||
+        !last ||
+        last.moveCounter === 2147483647
+      )
+        break;
+      lower = last.moveCounter + 1;
     }
     return out;
+  }
+
+  async stepSummary(matchID: string): Promise<StepSummary> {
+    const [summary] = await this.prisma.$queryRaw<StepSummary[]>`
+      SELECT min(move_counter) AS min, max(move_counter) AS max, count(*)::int AS count
+      FROM match_events
+      WHERE match_id = ${matchID}::uuid AND event_kind = 'step'
+        AND jsonb_typeof(payload -> 'request') IN ('object', 'array')
+        AND jsonb_typeof(payload -> 'events') = 'array'
+    `;
+    return summary!;
   }
 
   /**

@@ -389,6 +389,18 @@ describe('GET /replays/:id', () => {
 });
 
 describe('回放接口 · 记录完整性', () => {
+  it('分页与区间只读取所需的步骤，帧总览不读取步骤内容', async () => {
+    const { server, archive } = await setup();
+    const list = vi.spyOn(archive, 'listSteps');
+    await server.get(`/replays/${FINISHED_ID}/events?limit=2`);
+    await server.get(`/replays/${FINISHED_ID}/range?from=2&to=3`);
+    await server.get(`/replays/${FINISHED_ID}/frames`);
+    expect(list.mock.calls).toEqual([
+      [FINISHED_ID, { take: 3 }],
+      [FINISHED_ID, { from: 2, to: 3 }],
+    ]);
+  });
+
   it('完整归档：四个读取接口都带 complete=true 与空 gaps', async () => {
     const { server } = await setup();
     for (const suffix of ['events', 'range', 'frames', 'download']) {

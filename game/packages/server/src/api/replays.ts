@@ -21,12 +21,18 @@ import { z } from 'zod';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { isUuid } from '../infra/uuid.js';
-import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
+import { paginationSchema, decodeCursor } from '../infra/pagination.js';
 import { authMiddleware } from '../middleware/auth.js';
-import type { MatchArchive, StepRow } from '../match/MatchArchive.js';
+import type { MatchArchive } from '../match/MatchArchive.js';
 import { prismaShortLinkStore } from '../services/PrismaShortLinkStore.js';
 import { ShortLinkService } from '../services/ShortLinkService.js';
-import { loadFinishedMatch, optionalAccountId, toStepView } from './archiveEvents.js';
+import {
+  loadFinishedMatch,
+  optionalAccountId,
+  readReplay,
+  readReplayPage,
+  toStepView,
+} from './archiveEvents.js';
 import { toMatchOutcome, toMatchPlayerViews, type MatchMetaRow } from './matchMeta.js';
 
 /** 导出文件里的对局信息 */
@@ -46,7 +52,7 @@ export interface ReplaysRouterDeps {
   loadDownloadMeta?: (matchID: string) => Promise<ReplayDownloadMeta | null>;
   /** 读对局元信息（含玩家）；不给时读数据库 */
   loadMatch?: (matchID: string) => Promise<MatchMetaRow | null>;
-  /** 统计对局事件条数；不给时读数据库 */
+  /** 统计对局事件条数；不给时读归档 */
   countEvents?: (matchID: string) => Promise<number>;
 }
 
@@ -70,13 +76,6 @@ async function loadDownloadMetaFromDb(matchID: string): Promise<ReplayDownloadMe
       isBot: mp.isBot,
     })),
   };
-}
-
-/** 纯函数：取版本号落在闭区间 [from, to] 内的步骤；任一端缺省表示不限 */
-export function sliceByStateID(steps: readonly StepRow[], from?: number, to?: number): StepRow[] {
-  return steps.filter(
-    (s) => (from === undefined || s.stateID >= from) && (to === undefined || s.stateID <= to),
-  );
 }
 
 function parseOptionalInt(raw: unknown, name: string): number | undefined {
@@ -149,10 +148,7 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
     ((matchID: string) =>
       prisma.match.findUnique({ where: { id: matchID }, include: { matchPlayers: true } }));
   const countEvents =
-    deps.countEvents ??
-    ((matchID: string) =>
-      // 只数步骤行：同一张表里还有缺口记录，不能算进步数
-      prisma.matchEvent.count({ where: { matchId: matchID, eventKind: 'step' } }));
+    deps.countEvents ?? (async (matchID: string) => (await archive.stepSummary(matchID)).count);
 
   // GET /replays/:id - 回放元信息（需登录；未结束时不含阵营与胜负）
   router.get('/replays/:id', authMiddleware, async (ctx) => {
@@ -183,24 +179,14 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
       throw new AppError('VALIDATION_ERROR', 'invalid cursor');
     }
 
-    const { viewer, steps, complete, gaps } = await loadFinishedMatch(
+    const { viewer, ...page } = await readReplayPage(
       archive,
       id!,
       await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
+      after,
+      limit,
     );
-    const rest = after === undefined ? steps : steps.filter((s) => s.stateID > after);
-    const page = rest.slice(0, limit);
-    const hasMore = rest.length > limit;
-    const last = page[page.length - 1];
-
-    ctx.body = {
-      data: page.map((s) => toStepView(s, viewer)),
-      nextCursor: hasMore && last ? encodeCursor({ stateID: last.stateID }) : null,
-      hasMore,
-      viewerID: viewer,
-      complete,
-      gaps,
-    };
+    ctx.body = { ...page, viewerID: viewer };
   });
 
   // GET /replays/:id/range - 步进切片
@@ -213,23 +199,21 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
     if (from !== undefined && to !== undefined && from > to)
       throw new AppError('VALIDATION_ERROR', 'from must be <= to');
 
-    const { viewer, steps, complete, gaps } = await loadFinishedMatch(
+    const { viewer, steps, complete, gaps, summary } = await readReplay(
       archive,
       id!,
       await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
+      { ...(from !== undefined && { from }), ...(to !== undefined && { to }) },
     );
-    const picked = sliceByStateID(steps, from, to);
-    const first = picked[0]?.stateID;
-    const last = picked[picked.length - 1]?.stateID;
-    const minID = steps[0]?.stateID;
-    const maxID = steps[steps.length - 1]?.stateID;
+    const first = steps[0]?.stateID;
+    const last = steps.at(-1)?.stateID;
 
     ctx.body = {
-      data: picked.map((s) => toStepView(s, viewer)),
+      data: steps.map((s) => toStepView(s, viewer)),
       from: from ?? null,
       to: to ?? null,
-      hasPrev: minID !== undefined && first !== undefined && first > minID,
-      hasNext: maxID !== undefined && last !== undefined && last < maxID,
+      hasPrev: summary.min !== null && first !== undefined && first > summary.min,
+      hasNext: summary.max !== null && last !== undefined && last < summary.max,
       viewerID: viewer,
       complete,
       gaps,
@@ -240,15 +224,15 @@ export function createReplaysRouter(deps: ReplaysRouterDeps): Router {
   //   返回：{ minMoveCounter, maxMoveCounter, totalFrames }，前两项是起止版本号；不含事件
   router.get('/replays/:id/frames', async (ctx) => {
     const { id } = ctx.params;
-    const { steps, complete, gaps } = await loadFinishedMatch(
+    const { summary, complete, gaps } = await readReplay(
       archive,
       id!,
       await optionalAccountId(ctx.headers.authorization, ctx.state.banChecker),
     );
     ctx.body = {
-      minMoveCounter: steps[0]?.stateID ?? null,
-      maxMoveCounter: steps[steps.length - 1]?.stateID ?? null,
-      totalFrames: steps.length,
+      minMoveCounter: summary.min,
+      maxMoveCounter: summary.max,
+      totalFrames: summary.count,
       complete,
       gaps,
     };

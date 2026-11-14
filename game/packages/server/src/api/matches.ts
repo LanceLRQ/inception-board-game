@@ -14,9 +14,9 @@ import { authMiddleware } from '../middleware/auth.js';
 import { prisma } from '../infra/postgres.js';
 import { AppError } from '../infra/errors.js';
 import { isUuid } from '../infra/uuid.js';
-import { paginationSchema, encodeCursor, decodeCursor } from '../infra/pagination.js';
+import { paginationSchema, decodeCursor } from '../infra/pagination.js';
 import type { MatchArchive } from '../match/MatchArchive.js';
-import { isComplete, loadFinishedMatch, toStepView } from './archiveEvents.js';
+import { isComplete, readReplayPage, toStepView } from './archiveEvents.js';
 import { toMatchOutcome, toMatchPlayerViews, type MatchMetaRow } from './matchMeta.js';
 
 export interface MatchesRouterDeps {
@@ -37,7 +37,7 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
   // 当局历史只向本局成员提供，始终按旁观者裁剪，连本人的秘密也不带。
   router.get('/matches/:id/history', authMiddleware, async (ctx) => {
     const id = ctx.params.id!;
-    const info = await archive.matchInfo(id);
+    const info = isUuid(id) ? await archive.matchInfo(id) : null;
     if (!info) throw new AppError('NOT_FOUND', 'Match not found');
     if (!info.seats.some((seat) => seat.playerId === ctx.state.player.playerId)) {
       throw new AppError('FORBIDDEN', 'Not a match participant');
@@ -78,23 +78,14 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
       throw new AppError('VALIDATION_ERROR', 'invalid cursor');
     }
 
-    const { viewer, steps, complete, gaps } = await loadFinishedMatch(
+    const { data, nextCursor, hasMore, complete, gaps } = await readReplayPage(
       archive,
       id!,
       ctx.state.player.playerId,
+      after,
+      limit,
     );
-    const rest = after === undefined ? steps : steps.filter((s) => s.stateID > after);
-    const page = rest.slice(0, limit);
-    const hasMore = rest.length > limit;
-    const last = page[page.length - 1];
-
-    ctx.body = {
-      data: page.map((s) => toStepView(s, viewer)),
-      nextCursor: hasMore && last ? encodeCursor({ stateID: last.stateID }) : null,
-      hasMore,
-      complete,
-      gaps,
-    };
+    ctx.body = { data, nextCursor, hasMore, complete, gaps };
   });
 
   // POST /matches/local-upload - 人机对局上传（骨架）

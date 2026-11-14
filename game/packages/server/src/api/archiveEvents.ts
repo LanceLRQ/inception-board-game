@@ -6,7 +6,9 @@
 import { eventsFor, type MatchEvent } from '@icgame/game-engine/runner';
 import { AppError } from '../infra/errors.js';
 import { extractBearerToken, verifyToken } from '../infra/jwt.js';
-import type { MatchArchive, StepGap, StepRow } from '../match/MatchArchive.js';
+import { isUuid } from '../infra/uuid.js';
+import { encodeCursor } from '../infra/pagination.js';
+import type { MatchArchive, StepGap, StepQuery, StepRow } from '../match/MatchArchive.js';
 import type { BanChecker } from '../services/BanChecker.js';
 
 /** 返回给客户端的一步 */
@@ -71,12 +73,59 @@ export async function loadFinishedMatch(
   matchID: string,
   accountId: string | null,
 ): Promise<FinishedMatchSteps> {
-  const info = await archive.matchInfo(matchID);
+  const viewer = await finishedMatchViewer(archive, matchID, accountId);
+  const [steps, gaps] = await Promise.all([archive.listSteps(matchID), archive.listGaps(matchID)]);
+  return { viewer, steps, complete: isComplete(steps, gaps), gaps };
+}
+
+async function finishedMatchViewer(
+  archive: MatchArchive,
+  matchID: string,
+  accountId: string | null,
+) {
+  const info = isUuid(matchID) ? await archive.matchInfo(matchID) : null;
   if (!info) throw new AppError('NOT_FOUND', 'Match not found');
   if (info.endedAt === null) throw new AppError('CONFLICT', 'Match not finished');
-  const seat =
-    accountId === null ? undefined : info.seats.find((s) => s.playerId === accountId)?.seat;
-  const steps = await archive.listSteps(matchID);
-  const gaps = await archive.listGaps(matchID);
-  return { viewer: seat ?? null, steps, complete: isComplete(steps, gaps), gaps };
+  return accountId === null
+    ? null
+    : (info.seats.find((s) => s.playerId === accountId)?.seat ?? null);
+}
+
+export async function readReplay(
+  archive: MatchArchive,
+  matchID: string,
+  accountId: string | null,
+  query?: StepQuery,
+) {
+  const viewer = await finishedMatchViewer(archive, matchID, accountId);
+  const [summary, gaps, steps] = await Promise.all([
+    archive.stepSummary(matchID),
+    archive.listGaps(matchID),
+    query === undefined ? [] : archive.listSteps(matchID, query),
+  ]);
+  const complete = gaps.length === 0 && summary.min === 1 && summary.max === summary.count;
+  return { viewer, summary, steps, complete, gaps };
+}
+
+export async function readReplayPage(
+  archive: MatchArchive,
+  matchID: string,
+  accountId: string | null,
+  after: number | undefined,
+  limit: number,
+) {
+  const { viewer, steps, complete, gaps } = await readReplay(archive, matchID, accountId, {
+    ...(after !== undefined && { from: Math.floor(after) + 1 }),
+    take: limit + 1,
+  });
+  const hasMore = steps.length > limit;
+  const page = steps.slice(0, limit);
+  return {
+    viewer,
+    data: page.map((step) => toStepView(step, viewer)),
+    hasMore,
+    nextCursor: hasMore ? encodeCursor({ stateID: page.at(-1)!.stateID }) : null,
+    complete,
+    gaps,
+  };
 }
