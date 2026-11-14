@@ -48,6 +48,66 @@ function firstState(base: string, token: string, matchID: string): Promise<{ sea
 
 const redisUrl = process.env.TEST_REDIS_URL;
 describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
+  it('配桌前移走信誉已跨档的玩家，旧票据也能原地迁移且保留顺序', async () => {
+    const prefix = `ico-test-${crypto.randomUUID()}:`;
+    const redis = new Redis(redisUrl!, { keyPrefix: prefix });
+    const store = new InMemoryReputationStore();
+    const reputation = new ReputationService(store);
+    try {
+      dev = await startDevServer({ matchmakingRedis: redis, reputation });
+      const { url, rt } = dev;
+      const [changed, a, b, c, d, legacy, trusted] = await Promise.all(
+        Array.from({ length: 7 }, (_, i) =>
+          api<{ playerId: string; token: string }>(url, 'POST', '/identity/init', undefined, {
+            nickname: `分池玩家${i}`,
+          }),
+        ),
+      );
+      const request = (user: { token: string }, method = 'GET') =>
+        api<{ status: string; ticketId?: number }>(
+          url,
+          method,
+          '/matchmake',
+          user.token,
+          method === 'POST' ? { playerCount: 4 } : undefined,
+        );
+      const ticket = await request(changed!, 'POST');
+      await request(a!, 'POST');
+      await request(b!, 'POST');
+      await store.applyDelta(changed!.playerId, -12, 50);
+
+      // 跨档的玩家还没来得及轮询，由其他玩家触发配桌。
+      expect(await request(c!, 'POST')).toMatchObject({ status: 'queued' });
+      expect(rt.matches.activeCount()).toBe(0);
+      expect(await request(changed!)).toEqual({ ...ticket, lowReputation: true });
+      expect(await request(d!, 'POST')).toMatchObject({ status: 'matched' });
+      expect(rt.matches.activeCount()).toBe(1);
+
+      await store.applyDelta(trusted!.playerId, 20, 50, 20);
+      const trustedTicket = await request(trusted!, 'POST');
+      const trustedRaw = await redis.get(RedisKeys.matchmakingTicket(trusted!.playerId));
+      expect(trustedRaw && JSON.parse(trustedRaw)).toMatchObject({ queue: '4:classic:trusted' });
+      expect(trustedTicket).toMatchObject({ status: 'queued' });
+
+      const key = RedisKeys.matchmakingTicket(legacy!.playerId);
+      const baseQueue = `${RedisKeys.matchmaking()}:queue:`;
+      await redis.set(
+        key,
+        JSON.stringify({ queue: '4:classic:normal', playerCount: 4, order: 1000 }),
+        'EX',
+        60,
+      );
+      await redis.zadd(`${baseQueue}4:classic:normal`, 1000, legacy!.playerId);
+      expect(await request(legacy!)).toEqual({ status: 'queued', playerCount: 4, ticketId: 1000 });
+      expect(await redis.zscore(`${baseQueue}4:classic:normal`, legacy!.playerId)).toBeNull();
+      expect(await redis.zscore(`${baseQueue}4:classic:regular`, legacy!.playerId)).toBe('1000');
+    } finally {
+      const keys = await redis.keys(`${prefix}*`);
+      if (keys.length) await redis.del(...keys.map((key) => key.slice(prefix.length)));
+      await redis.quit();
+    }
+  });
+
   it('按人数和信誉分池，取消或掉线票据不会占位，并发请求只建一局', async () => {
     const prefix = `ico-test-${crypto.randomUUID()}:`;
     const redis = new Redis(redisUrl!, { keyPrefix: prefix });

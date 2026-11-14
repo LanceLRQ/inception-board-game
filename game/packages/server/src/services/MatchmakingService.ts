@@ -5,14 +5,14 @@ import { RedisKeys } from '../infra/redisKeys.js';
 import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from './BanChecker.js';
 import type { LobbyPrisma } from './LobbyService.js';
-import { type ReputationService } from './ReputationService.js';
+import type { ReputationService } from './ReputationService.js';
 
 const TICKET_TTL = 60;
 const ASSIGNMENT_TTL = 86_400;
 
 type MatchmakingStatus =
   | { status: 'idle' }
-  | { status: 'queued' | 'matching'; playerCount: number; ticketId: number }
+  | { status: 'queued' | 'matching'; playerCount: number; ticketId: number; lowReputation?: true }
   | { status: 'matched'; matchId: string };
 
 interface Ticket {
@@ -37,7 +37,7 @@ redis.call('EXPIRE', queue, ARGV[4])
 return ticket
 `;
 
-// 续期、取消和移除已分配的票据均检查当前值，避免过时请求误删新票据。
+// 续期、迁移和取消检查当前票据，避免过时请求影响同一账号的新票据。
 const UPDATE_TICKET = `
 local key = KEYS[1] .. ':ticket:' .. ARGV[1]
 local current = redis.call('GET', key)
@@ -47,6 +47,15 @@ local queue = KEYS[1] .. ':queue:' .. ticket.queue
 if ARGV[2] == 'refresh' and not ticket.matchId then
   redis.call('EXPIRE', key, ARGV[3])
   redis.call('EXPIRE', queue, ARGV[3])
+elseif ARGV[2] == 'move' and not ticket.matchId and ticket.order == tonumber(ARGV[3])
+  and ticket.queue == ARGV[5] and ticket.queue ~= ARGV[6] then
+  redis.call('ZREM', queue, ARGV[1])
+  ticket.queue = ARGV[6]
+  local destination = KEYS[1] .. ':queue:' .. ticket.queue
+  current = cjson.encode(ticket)
+  redis.call('SET', key, current, 'EX', ARGV[4])
+  redis.call('ZADD', destination, ticket.order, ARGV[1])
+  redis.call('EXPIRE', destination, ARGV[4])
 elseif ARGV[2] == 'cancel' and not ticket.matchId
   and (ARGV[3] == '' or ticket.order == tonumber(ARGV[3])) then
   redis.call('ZREM', queue, ARGV[1])
@@ -102,16 +111,17 @@ redis.call('ZREM', queue, unpack(players))
 return players
 `;
 
-// 建局失败时让有效票据按原顺序回队，已封禁或已删除的账号直接移除。
+// 按原顺序将有效票据放入各自当前的分池。
 const REQUEUE = `
-local keep = cjson.decode(ARGV[3])
+local destinations = cjson.decode(ARGV[3])
 for _, id in ipairs(cjson.decode(ARGV[4])) do
   local key = KEYS[1] .. ':ticket:' .. id
   local raw = redis.call('GET', key)
   if raw then
     local ticket = cjson.decode(raw)
     if ticket.matchId == ARGV[1] then
-      if keep[id] then
+      if destinations[id] then
+        ticket.queue = destinations[id]
         local queue = KEYS[1] .. ':queue:' .. ticket.queue
         ticket.matchId = nil
         ticket.queuedUntil = nil
@@ -157,8 +167,7 @@ export class MatchmakingService {
     if (this.deps.matches.isPlayerInActiveMatch(playerId)) {
       throw new AppError('CONFLICT', '你还有一场进行中的对局');
     }
-    const { level } = await this.deps.reputation.get(playerId);
-    const queue = `${playerCount}:classic:${level}`;
+    const queue = await this.queueFor(playerId, playerCount);
     const raw = await this.run(ENQUEUE, playerId, queue, playerCount, TICKET_TTL);
     return this.advance(playerId, JSON.parse(raw as string) as Ticket);
   }
@@ -198,11 +207,35 @@ export class MatchmakingService {
   }
 
   private async advance(playerId: string, ticket: Ticket): Promise<MatchmakingStatus> {
-    if (!ticket.matchId) {
-      await this.tryMatch(playerId, ticket);
-      return this.toStatus(playerId, await this.updateTicket(playerId, 'refresh'));
+    if (ticket.matchId) {
+      const status = await this.toStatus(playerId, ticket);
+      if (status.status !== 'queued') return status;
+      const restored = await this.updateTicket(playerId, 'refresh');
+      if (!restored || restored.matchId) return this.toStatus(playerId, restored);
+      ticket = restored;
     }
-    return this.toStatus(playerId, ticket);
+    const queue = await this.queueFor(playerId, ticket.playerCount);
+    if (ticket.queue !== queue) {
+      const raw = await this.run(
+        UPDATE_TICKET,
+        playerId,
+        'move',
+        ticket.order,
+        TICKET_TTL,
+        ticket.queue,
+        queue,
+      );
+      if (!raw) return { status: 'idle' };
+      ticket = JSON.parse(raw as string) as Ticket;
+      if (ticket.matchId) return this.toStatus(playerId, ticket);
+    }
+    await this.tryMatch(playerId, ticket);
+    return this.toStatus(playerId, await this.updateTicket(playerId, 'refresh'));
+  }
+
+  private async queueFor(playerId: string, playerCount: number): Promise<string> {
+    const { level } = await this.deps.reputation.get(playerId);
+    return `${playerCount}:classic:${level}`;
   }
 
   private async tryMatch(playerId: string, ticket: Ticket): Promise<void> {
@@ -219,15 +252,16 @@ export class MatchmakingService {
       )) as string[];
       if (!players.length) return;
 
-      let eligible = players;
+      let destinations = Object.fromEntries(players.map((id) => [id, ticket.queue]));
       let creating = false;
       let started = false;
       try {
         const profiles = await Promise.all(
           players.map(async (id, seat) => {
-            const [profile, banned] = await Promise.all([
+            const [profile, banned, queue] = await Promise.all([
               this.deps.prisma.player.findUnique({ where: { id } }),
               this.deps.bans.isBanned(id),
+              this.queueFor(id, ticket.playerCount),
             ]);
             if (!profile || banned) return null;
             return {
@@ -237,16 +271,23 @@ export class MatchmakingService {
               seat,
               isBot: false,
               joinedAt: Date.now(),
+              queue,
             };
           }),
         );
         const verified = profiles
           .filter((profile) => profile !== null)
           .filter(({ playerId }) => !this.deps.matches.isPlayerInActiveMatch(playerId));
-        eligible = verified.map(({ playerId }) => playerId);
-        if (verified.length === players.length) {
+        destinations = Object.fromEntries(verified.map(({ playerId, queue }) => [playerId, queue]));
+        if (
+          verified.length === players.length &&
+          verified.every(({ queue }) => queue === ticket.queue)
+        ) {
           creating = true;
-          await this.deps.matches.createMatchedMatch(id, verified);
+          await this.deps.matches.createMatchedMatch(
+            id,
+            verified.map(({ queue: _queue, ...profile }) => profile),
+          );
           started = true;
         }
       } finally {
@@ -256,7 +297,7 @@ export class MatchmakingService {
             REQUEUE,
             id,
             TICKET_TTL,
-            JSON.stringify(Object.fromEntries(eligible.map((player) => [player, true]))),
+            JSON.stringify(destinations),
             JSON.stringify(players),
           );
         }
@@ -268,10 +309,15 @@ export class MatchmakingService {
 
   private async toStatus(playerId: string, ticket: Ticket | null): Promise<MatchmakingStatus> {
     if (!ticket) return { status: 'idle' };
-    const { matchId, playerCount } = ticket;
-    if (!matchId) return { status: 'queued', playerCount, ticketId: ticket.order };
+    const { matchId, playerCount, order, queue } = ticket;
+    const details = {
+      playerCount,
+      ticketId: order,
+      ...(queue.endsWith(':low') && { lowReputation: true as const }),
+    };
+    if (!matchId) return { status: 'queued', ...details };
     if (this.forming.has(matchId)) {
-      return { status: 'matching', playerCount, ticketId: ticket.order };
+      return { status: 'matching', ...details };
     }
     const match = this.deps.matches.get(matchId);
     if (!match && ticket.queuedUntil !== undefined) {

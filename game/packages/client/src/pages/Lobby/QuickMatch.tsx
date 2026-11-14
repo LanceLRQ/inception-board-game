@@ -8,7 +8,7 @@ import { requestErrorMessage } from '../../lib/roomQueries';
 
 type MatchmakingStatus =
   | { status: 'idle' }
-  | { status: 'queued' | 'matching'; playerCount: number; ticketId: number }
+  | { status: 'queued' | 'matching'; playerCount: number; ticketId: number; lowReputation?: true }
   | { status: 'matched'; matchId: string };
 
 export function QuickMatch({
@@ -89,6 +89,9 @@ export function QuickMatch({
         <>
           <p role="status" className="mb-3 text-sm text-dim">
             {t(`matchmaking.${ticket.status}`, { count: ticket.playerCount })}
+            {ticket.lowReputation && (
+              <span className="mt-1 block">{t('matchmaking.lowReputation')}</span>
+            )}
           </p>
           <Button
             type="button"
