@@ -4,6 +4,7 @@ import { EffectSettings } from '../../components/EffectSettings';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { AudioControls } from '../../components/AudioControls';
 import { AccountSection } from './AccountSection';
+import { AchievementsSection } from './AchievementsSection';
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -12,6 +13,7 @@ export default function Settings() {
       <h1 className="mb-6 text-2xl font-bold">{t('settings.title')}</h1>
 
       <AccountSection />
+      <AchievementsSection />
 
       <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">

@@ -139,6 +139,37 @@
     "resumeNew": "Start a new match",
     "resumeFailed": "The saved match could not be restored. A new match has been started."
   },
+  "achievements": {
+    "title": "Achievements",
+    "empty": "No achievements unlocked yet.",
+    "loadFailed": "Achievements could not be loaded.",
+    "items": {
+      "first_kill": {
+        "name": "First kill",
+        "description": "Defeat at least one player in a match."
+      },
+      "unlock_master": {
+        "name": "Lock breaker",
+        "description": "Unlock successfully at least five times in a match."
+      },
+      "rich_kingdom": {
+        "name": "Fortune",
+        "description": "Receive three bribes in a match and remain a Dream Thief."
+      },
+      "double_agent": {
+        "name": "Double agent",
+        "description": "Switch sides after a bribe and win with the Dream Master."
+      },
+      "blitzkrieg": {
+        "name": "Blitzkrieg",
+        "description": "Win as a Dream Thief within ten turns."
+      },
+      "unbreakable": {
+        "name": "Unbreakable",
+        "description": "Win a match after being defeated at least three times."
+      }
+    }
+  },
   "replay": {
     "title": "Match replay",
     "open": "Watch replay",

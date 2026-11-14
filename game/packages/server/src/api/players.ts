@@ -125,4 +125,23 @@ router.get('/players/me/matches', authMiddleware, async (ctx) => {
   };
 });
 
+router.get('/players/me/achievements', authMiddleware, async (ctx) => {
+  const { playerId } = ctx.state.player;
+  const achievements = await prisma.achievement.findMany({
+    where: { playerAchievements: { some: { playerId } } },
+    orderBy: [{ sort: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      playerAchievements: { where: { playerId }, select: { unlockedAt: true } },
+    },
+  });
+  ctx.body = {
+    data: achievements.flatMap(({ playerAchievements, ...achievement }) =>
+      playerAchievements.map(({ unlockedAt }) => ({ ...achievement, unlockedAt })),
+    ),
+  };
+});
+
 export { router as playersRouter };
