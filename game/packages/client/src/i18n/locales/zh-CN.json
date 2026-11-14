@@ -47,6 +47,15 @@
     "resume_match": "回到对局",
     "loading": "正在联系服务器..."
   },
+  "matchmaking": {
+    "title": "快速匹配",
+    "players": "对局人数",
+    "start": "开始匹配",
+    "queued": "正在匹配 {{count}} 人局…",
+    "matching": "已凑齐 {{count}} 人，正在开局…",
+    "enter": "进入对局",
+    "cancel": "取消匹配"
+  },
   "room": {
     "title": "房间 {{code}}",
     "waiting": "等待玩家加入...",
@@ -883,6 +892,7 @@
   },
   "outcome": {
     "mvp": "本局 MVP",
+    "score": "本局积分 {{score}} 分",
     "aria": "对局结果"
   },
   "preload": {

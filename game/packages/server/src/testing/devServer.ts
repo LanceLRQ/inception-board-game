@@ -6,6 +6,7 @@
 // 只在测试目录下使用，生产入口不引用它。
 
 import { pathToFileURL } from 'node:url';
+import type Redis from 'ioredis';
 import { buildRealtime, timingFromEnv, type Realtime } from '../bootstrap.js';
 import { logger } from '../infra/logger.js';
 import { InMemoryMatchArchive } from '../match/MatchArchive.js';
@@ -100,6 +101,8 @@ export interface DevServerOptions {
   corsOrigin?: string;
   /** 对局种子来源；默认读环境变量 MATCH_FIXED_SEED，没配置就每局随机 */
   randomSeed?: () => string;
+  matchmakingRedis?: Pick<Redis, 'eval'>;
+  reputation?: ReputationService;
 }
 
 export interface DevServer {
@@ -150,6 +153,12 @@ export async function startDevServer(opts: DevServerOptions = {}): Promise<DevSe
     chatLog: new InMemoryChatLog(),
     lobbyRedis: redis,
     lobbyPrisma: identity,
+    ...(opts.matchmakingRedis && {
+      matchmaking: {
+        redis: opts.matchmakingRedis,
+        reputation: opts.reputation ?? new ReputationService(new InMemoryReputationStore()),
+      },
+    }),
     identityPrisma: identity,
     reports: memoryReports(() => started),
     heartbeatRedis: redis,

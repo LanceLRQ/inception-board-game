@@ -193,6 +193,39 @@ describe('MatchService 建局', () => {
     expect(g.rngSeed).toBe(SEED);
   });
 
+  it('匹配局存盘后重启，未写入的建局归档会补齐并允许继续结算', async () => {
+    const h = makeHarness();
+    const { players } = makeRoom(4, [0, 1, 2, 3]);
+    const id = await h.svc.createMatchedMatch('matching-restore', players);
+    const snapshot = (await h.store.load(id))!;
+    h.svc.shutdown();
+    const missingArchive = new InMemoryMatchArchive();
+    const restored = makeHarness({}, { store: h.store, archive: missingArchive });
+
+    expect(await restored.svc.restoreAll()).toEqual({ restored: 1, discarded: 0, failed: [] });
+    expect(restored.svc.get(id)?.mode).toBe('matchmaking');
+    expect((await missingArchive.matchInfo(id))?.seats).toEqual(
+      snapshot.seats.map(({ seat, playerId }) => ({ seat, playerId })),
+    );
+    restored.svc.shutdown();
+  });
+
+  it('匹配与好友房并发开局时，同一个真人只进入一局', async () => {
+    const first = makeHarness();
+    const room = makeRoom(4, [0, 1, 2, 3]);
+    const match = first.svc.createMatchedMatch('matching-first', room.players);
+    await expect(first.svc.createFromRoom(room)).rejects.toMatchObject({ code: 'CONFLICT' });
+    await match;
+
+    const second = makeHarness();
+    await second.svc.createFromRoom(room);
+    await expect(
+      second.svc.createMatchedMatch('matching-second', room.players),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    first.svc.shutdown();
+    second.svc.shutdown();
+  });
+
   it('人数不在 4-10 时抛 CONFLICT 且不留痕迹', async () => {
     const h = makeHarness();
     for (const n of [3, 11]) {

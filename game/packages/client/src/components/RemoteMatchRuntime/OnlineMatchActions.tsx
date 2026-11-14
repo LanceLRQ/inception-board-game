@@ -7,11 +7,11 @@ import { logger } from '../../lib/logger';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export function OnlineMatchActions({
-  code,
+  path,
   isOwner,
   onExit,
 }: {
-  code: string;
+  path: string;
   isOwner: boolean;
   onExit: () => void;
 }) {
@@ -22,9 +22,9 @@ export function OnlineMatchActions({
   const confirm = () => {
     setPending(true);
     setError(null);
-    void api.post(`/rooms/${encodeURIComponent(code)}/${isOwner ? 'end' : 'leave'}`).then(
+    void api.post(path).then(
       () => {
-        logger.flow('room', isOwner ? 'ended match' : 'left match', { code });
+        logger.flow('room', isOwner ? 'ended match' : 'left match');
         forgetOnlineMatch();
         onExit();
       },

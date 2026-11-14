@@ -31,6 +31,7 @@ import {
   recoverErrorKey,
 } from '../../lib/recoveryCode';
 import { Button } from '@/components/ui/button';
+import { QuickMatch } from './QuickMatch';
 
 /** 待展示的恢复码；只存在于本页组件状态里，确认后即丢弃 */
 interface PendingRecoveryCode {
@@ -62,6 +63,7 @@ export default function Lobby() {
   const onlineLobby = isAuthenticated && !!token && !isOfflineIdentity(token) && !isMockMode();
   const [isPublic, setIsPublic] = useState(false);
   const [publicSize, setPublicSize] = useState<number | null>(null);
+  const [matchmakingWaiting, setMatchmakingWaiting] = useState(false);
   const [seriesMode, setSeriesMode] = useState('unlimited');
   const [seriesLength, setSeriesLength] = useState(7);
   // 加入房间
@@ -166,6 +168,7 @@ export default function Lobby() {
   });
 
   const roomBusy = createRoomMutation.isPending || joinRoomMutation.isPending;
+  const roomActionsDisabled = roomBusy || matchmakingWaiting;
 
   const handleCreateRoom = useCallback(() => {
     if (!playerId) return;
@@ -341,6 +344,16 @@ export default function Lobby() {
         </Button>
       )}
 
+      {onlineLobby && playerId && !resumable && (
+        <QuickMatch
+          key={playerId}
+          playerId={playerId}
+          sizes={PLAYER_COUNT_OPTIONS}
+          roomBusy={roomBusy}
+          onWaitingChange={setMatchmakingWaiting}
+        />
+      )}
+
       <section className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
           <Plus size={18} />
@@ -403,7 +416,7 @@ export default function Lobby() {
           onClick={handleCreateRoom}
           disabled={
             loading ||
-            roomBusy ||
+            roomActionsDisabled ||
             (seriesMode === 'custom' &&
               (!Number.isInteger(seriesLength) || seriesLength < 1 || seriesLength > 99))
           }
@@ -435,7 +448,7 @@ export default function Lobby() {
           type="button"
           variant="outline"
           onClick={handleJoinRoom}
-          disabled={loading || roomBusy || joinCode.length !== 6}
+          disabled={loading || roomActionsDisabled || joinCode.length !== 6}
           className="h-10 w-full border-line-strong px-4 font-bold"
           data-testid="lobby-join"
         >
@@ -506,7 +519,7 @@ export default function Lobby() {
                       type="button"
                       variant="outline"
                       aria-label={t('lobby.joinPublicRoom', { code: room.code })}
-                      disabled={roomBusy}
+                      disabled={roomActionsDisabled}
                       onClick={() => {
                         setError(null);
                         joinRoomMutation.mutate({ roomCode: room.code, fromPublicList: true });

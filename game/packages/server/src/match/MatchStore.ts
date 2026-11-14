@@ -12,8 +12,9 @@ import type { RoomSeat } from './MatchRoom.js';
 
 export interface MatchSnapshot {
   matchID: string;
-  roomCode: string;
+  roomCode?: string;
   roomId?: string;
+  mode?: 'matchmaking';
   seats: RoomSeat[];
   /** 建局参数：重放与排查用，永不外发 */
   setup: { numPlayers: number; seed: string; setupData: Record<string, unknown> };

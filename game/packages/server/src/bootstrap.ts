@@ -30,6 +30,7 @@ import {
   type RoomState,
 } from './services/LobbyService.js';
 import { MoveGateway } from './services/MoveGateway.js';
+import { MatchmakingService } from './services/MatchmakingService.js';
 import { InMemoryRateGuard, type RateGuardMutable } from './services/RateGuardService.js';
 import { ConnectionRegistry } from './ws/connectionRegistry.js';
 import { SocketGateway } from './ws/gateway.js';
@@ -42,6 +43,7 @@ export interface RealtimeDeps {
   archive: MatchArchive;
   lobbyRedis?: LobbyRedis;
   lobbyPrisma?: LobbyPrisma;
+  matchmaking?: Pick<ConstructorParameters<typeof MatchmakingService>[0], 'redis' | 'reputation'>;
   /** 身份接口的数据库访问；默认全局数据库客户端 */
   identityPrisma?: IdentityPrisma;
   /** 恢复码失败限速计数器；默认进程内实现（生产入口传 Redis 实现） */
@@ -169,6 +171,14 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
   });
   const app = createApp({
     lobby,
+    ...(deps.matchmaking && {
+      matchmaking: new MatchmakingService({
+        ...deps.matchmaking,
+        prisma: deps.lobbyPrisma ?? prisma,
+        bans,
+        matches,
+      }),
+    }),
     metrics,
     rateLimit: deps.httpRateLimit,
     archive: deps.archive,

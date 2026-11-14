@@ -29,6 +29,7 @@ interface MatchPage {
     abandoned: boolean;
     isMvp: boolean;
     score: number | null;
+    mode: string;
   }>;
   nextCursor: string | null;
 }
@@ -159,6 +160,9 @@ export default function PlayerProfile() {
                           )}
                         </strong>
                         {match.isMvp && <span className="text-primary">MVP</span>}
+                        {match.mode === 'matchmaking' && (
+                          <span className="text-muted-foreground">{t('matchmaking.title')}</span>
+                        )}
                         {match.score !== null && (
                           <span>{t('series.points', { score: match.score })}</span>
                         )}

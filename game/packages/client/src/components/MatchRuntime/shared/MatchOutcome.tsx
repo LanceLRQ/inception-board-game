@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Film, RotateCcw, Trophy } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { api } from '../../../lib/api';
+import { api, ApiRequestError } from '../../../lib/api';
 import { useIdentityStore } from '../../../stores/useIdentityStore';
 import type { ReportModel } from '../controllerTypes';
 import { Dialog, DialogTitle } from '../../ui/dialog';
@@ -39,10 +39,23 @@ export function MatchOutcome({
     queryFn: ({ signal }) =>
       api.get<{
         endedAt: string | null;
+        score: number | null;
         players: Array<{ seat: number; nickname: string; isMvp?: boolean }>;
       }>(`/matches/${encodeURIComponent(matchId!)}`, { signal, cache: 'no-store' }),
     enabled: open && isRemote && Boolean(matchId && playerId),
-    refetchInterval: (query) => (open && query.state.data?.endedAt === null ? 1000 : false),
+    refetchInterval: ({ state }) => {
+      if (!open || state.data?.endedAt) return false;
+      const error = state.error;
+      if (
+        error instanceof ApiRequestError &&
+        error.status >= 400 &&
+        error.status < 500 &&
+        error.status !== 404
+      ) {
+        return false;
+      }
+      return 2000;
+    },
   });
   const mvps = settlement?.players.filter((player) => player.isMvp) ?? [];
   const title = winner === 'thief' ? t('localMatch.thiefWins') : t('localMatch.masterWins');
@@ -69,6 +82,11 @@ export function MatchOutcome({
         {winReason && (
           <p className="mt-3 text-sm text-dim" data-testid="win-reason">
             {t(`localMatch.winReason.${winReason}`, { defaultValue: winReason })}
+          </p>
+        )}
+        {settlement?.score != null && (
+          <p className="mt-4 text-sm" data-testid="match-score">
+            {t('outcome.score', { score: settlement.score })}
           </p>
         )}
         {mvps.length > 0 && (

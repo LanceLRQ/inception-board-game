@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { authMiddleware } from '../middleware/auth.js';
 import type { LobbyService } from '../services/LobbyService.js';
+import type { MatchmakingService } from '../services/MatchmakingService.js';
 import { AppError } from '../infra/errors.js';
 import { paginationSchema } from '../infra/pagination.js';
 
@@ -12,7 +13,10 @@ const publicRoomsSchema = paginationSchema.extend({
 });
 
 /** 房间路由；大厅服务由调用方注入 */
-export function createRoomsRouter(lobby: LobbyService): Router {
+export function createRoomsRouter(
+  lobby: LobbyService,
+  matchmaking?: Pick<MatchmakingService, 'switchToRoom'>,
+): Router {
   const router = new Router();
 
   // 所有房间路由需要认证
@@ -35,6 +39,7 @@ export function createRoomsRouter(lobby: LobbyService): Router {
   router.post('/rooms', async (ctx) => {
     const body = createRoomSchema.parse(ctx.request.body);
     const { playerId } = ctx.state.player;
+    await matchmaking?.switchToRoom(playerId);
     const room = await lobby.createRoom(playerId, body);
 
     ctx.status = 201;
@@ -74,6 +79,7 @@ export function createRoomsRouter(lobby: LobbyService): Router {
   router.post('/rooms/:code/join', async (ctx) => {
     const code = ctx.params.code!;
     const { playerId } = ctx.state.player;
+    await matchmaking?.switchToRoom(playerId);
     const room = await lobby.joinRoom(code, playerId);
     ctx.body = { room };
   });

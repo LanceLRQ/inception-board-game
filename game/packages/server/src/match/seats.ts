@@ -29,7 +29,11 @@ export interface MatchSetup {
 }
 
 /** 给运行器与引擎的建局参数；同一个种子同时用作运行器种子与 setupData.rngSeed */
-export function buildSetup(room: RoomState, seats: readonly RoomSeat[], seed: string): MatchSetup {
+export function buildSetup(
+  rules: Pick<RoomState, 'ruleVariant' | 'exCardsEnabled' | 'expansionEnabled'>,
+  seats: readonly RoomSeat[],
+  seed: string,
+): MatchSetup {
   return {
     numPlayers: seats.length,
     seed,
@@ -37,9 +41,9 @@ export function buildSetup(room: RoomState, seats: readonly RoomSeat[], seed: st
       rngSeed: seed,
       nicknames: seats.map((s) => s.nickname),
       botSeats: seats.filter((s) => s.isBot).map((s) => s.seat),
-      ruleVariant: room.ruleVariant,
-      exCardsEnabled: room.exCardsEnabled,
-      expansionEnabled: room.expansionEnabled,
+      ruleVariant: rules.ruleVariant,
+      exCardsEnabled: rules.exCardsEnabled,
+      expansionEnabled: rules.expansionEnabled,
     },
   };
 }

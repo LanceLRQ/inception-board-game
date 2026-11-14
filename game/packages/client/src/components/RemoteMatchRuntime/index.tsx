@@ -120,11 +120,18 @@ export function RemoteMatchRuntime({
                 room.status === 'playing' &&
                 room.players.some((p) => p.playerId === playerId) && (
                   <OnlineMatchActions
-                    code={room.code}
+                    path={`/rooms/${encodeURIComponent(room.code)}/${room.ownerPlayerId === playerId ? 'end' : 'leave'}`}
                     isOwner={room.ownerPlayerId === playerId}
                     onExit={onExit}
                   />
                 )}
+              {!roomCode && !finished && source.seat !== null && (
+                <OnlineMatchActions
+                  path={`/matches/${encodeURIComponent(matchID)}/leave`}
+                  isOwner={false}
+                  onExit={onExit}
+                />
+              )}
             </>
           }
           onRestart={onExit}

@@ -8,8 +8,10 @@ import { healthRouter } from './api/health.js';
 import type { MetricsRegistry } from './infra/metrics.js';
 import { createIdentityRouter, type IdentityPrisma } from './api/identity.js';
 import { createRoomsRouter } from './api/rooms.js';
+import { createMatchmakingRouter } from './api/matchmaking.js';
 import { createInviteRouter, inviteConfigFromEnv, type InviteConfig } from './api/invite.js';
 import { LobbyService } from './services/LobbyService.js';
+import type { MatchmakingService } from './services/MatchmakingService.js';
 import { playersRouter } from './api/players.js';
 import { createMatchesRouter } from './api/matches.js';
 import { createReplaysRouter } from './api/replays.js';
@@ -29,6 +31,7 @@ import { shortLinkRouter } from './api/shortLink.js';
 
 export interface AppDeps {
   lobby?: LobbyService;
+  matchmaking?: MatchmakingService;
   /** 全局限流中间件；不给时用基于 Redis 的 IP 限流 */
   rateLimit?: Middleware;
   /** 对局归档；回放与对局事件接口从这里读。不给时用 PrismaMatchArchive */
@@ -115,9 +118,14 @@ export function createApp(deps: AppDeps = {}): Koa {
   app.use(identityRouter.allowedMethods());
 
   const lobby = deps.lobby ?? new LobbyService();
-  const roomsRouter = createRoomsRouter(lobby);
+  const roomsRouter = createRoomsRouter(lobby, deps.matchmaking);
   app.use(roomsRouter.routes());
   app.use(roomsRouter.allowedMethods());
+  if (deps.matchmaking) {
+    const matchmakingRouter = createMatchmakingRouter(deps.matchmaking);
+    app.use(matchmakingRouter.routes());
+    app.use(matchmakingRouter.allowedMethods());
+  }
 
   // 房间邀请链接：预览抓取器得到分享卡片，浏览器跳转到房间页
   const inviteRouter = createInviteRouter({

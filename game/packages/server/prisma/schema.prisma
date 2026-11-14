@@ -78,6 +78,7 @@ model DeviceFingerprint {
 model Match {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   roomId           String?   @map("room_id") @db.Uuid
+  mode             String    @default("friend") @db.VarChar(16)
   ruleVariant      String?   @map("rule_variant") @db.VarChar(20)
   exEnabled        Boolean?  @map("ex_enabled")
   expansionEnabled Boolean?  @map("expansion_enabled")

@@ -69,8 +69,9 @@ export interface MatchArchive {
    * 建局时：写对局元信息与各座位。
    * 同一个 id 已有记录时（上一次建局被撤销、或覆盖了残留快照）先清掉旧的步骤与座位，
    * 不让另一条时间线的内容混进来。
+   * 从快照恢复时只补齐缺失记录。
    */
-  recordStart(snapshot: MatchSnapshot): Promise<void>;
+  recordStart(snapshot: MatchSnapshot, restore?: boolean): Promise<void>;
   /** 删掉这局全部逐步记录（含缺口行）与座位行；对局行本身保留 */
   resetMatch(matchID: string): Promise<void>;
   /** 删掉步号大于 stateID 的步骤行与缺口行（缺口按结束版本号判断） */
@@ -104,8 +105,9 @@ export class InMemoryMatchArchive implements MatchArchive {
   /** 缺口按 to 去重，与数据库实现的唯一约束一致 */
   private readonly gaps = new Map<string, Map<number, StepGap>>();
 
-  async recordStart(snapshot: MatchSnapshot): Promise<void> {
-    await this.resetMatch(snapshot.matchID);
+  async recordStart(snapshot: MatchSnapshot, restore = false): Promise<void> {
+    if (restore && this.started.has(snapshot.matchID)) return;
+    if (!restore) await this.resetMatch(snapshot.matchID);
     this.started.set(snapshot.matchID, structuredClone(snapshot));
   }
 
@@ -148,7 +150,12 @@ export class InMemoryMatchArchive implements MatchArchive {
   async roomResults(roomId: string): Promise<RoomMatchResult[]> {
     const results: RoomMatchResult[] = [];
     for (const [id, snapshot] of this.started) {
-      if ((snapshot.roomId ?? id) !== roomId || !this.endedAt.has(id)) continue;
+      if (
+        snapshot.mode === 'matchmaking' ||
+        (snapshot.roomId ?? id) !== roomId ||
+        !this.endedAt.has(id)
+      )
+        continue;
       const final = this.finished.get(id);
       const winner = final ? matchOutcome(final.ctx.gameover, final.G).winner : null;
       const scores = (this.finishedSeats.get(id) ?? []).flatMap((seat) => {
@@ -289,12 +296,12 @@ export class PrismaMatchArchive implements MatchArchive {
     });
   }
 
-  async recordStart(snapshot: MatchSnapshot): Promise<void> {
-    await this.resetMatch(snapshot.matchID);
+  async recordStart(snapshot: MatchSnapshot, restore = false): Promise<void> {
+    if (!restore) await this.resetMatch(snapshot.matchID);
     const g = snapshot.state.G;
     // 元数据只挑字段：setupData 里有种子，不能整体写入
     const metadata = {
-      roomCode: snapshot.roomCode,
+      ...(snapshot.roomCode && { roomCode: snapshot.roomCode }),
       seats: snapshot.seats.map((s) => ({ seat: s.seat, isBot: s.isBot, nickname: s.nickname })),
       setup: {
         numPlayers: snapshot.setup.numPlayers,
@@ -304,7 +311,8 @@ export class PrismaMatchArchive implements MatchArchive {
       },
     };
     const fields = {
-      roomId: snapshot.roomId ?? snapshot.matchID,
+      roomId: snapshot.mode === 'matchmaking' ? null : (snapshot.roomId ?? snapshot.matchID),
+      mode: snapshot.mode ?? 'friend',
       ruleVariant: g.ruleVariant,
       exEnabled: g.exCardsEnabled,
       expansionEnabled: g.expansionEnabled,
@@ -320,7 +328,8 @@ export class PrismaMatchArchive implements MatchArchive {
     await this.prisma.match.upsert({
       where: { id: snapshot.matchID },
       create: { id: snapshot.matchID, startedAt: new Date(snapshot.createdAt), ...fields },
-      update: fields,
+      // 重启补齐缺失的对局或座位，保留已归档的事件与已结算的结果。
+      update: restore ? {} : fields,
     });
 
     const data = snapshot.seats.map((s) => {

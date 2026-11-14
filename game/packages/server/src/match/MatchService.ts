@@ -16,7 +16,7 @@ import {
 import { AppError } from '../infra/errors.js';
 import { logger } from '../infra/logger.js';
 import type { BotManager } from '../services/BotManager.js';
-import type { RoomState } from '../services/LobbyService.js';
+import type { RoomPlayer, RoomState } from '../services/LobbyService.js';
 import type { MatchArchive } from './MatchArchive.js';
 import { MatchRoom, type RoomDeps, type RoomSeat, type StepOutput } from './MatchRoom.js';
 import type { MatchSnapshot, MatchStore } from './MatchStore.js';
@@ -55,8 +55,11 @@ export interface MatchServiceDeps {
 
 export class MatchService {
   private readonly rooms = new Map<string, MatchRoom>();
-  /** 正在建局的 id，防止并发建出两局 */
-  private readonly creating = new Set<string>();
+  /** 正在建局及其预留的真人账号 */
+  private readonly creating = new Map<
+    string,
+    { players: readonly string[]; matchmaking: boolean }
+  >();
   private readonly lingerTimers = new Set<unknown>();
   private readonly unsubscribe: Array<() => void> = [];
   private readonly archiver: StepArchiver;
@@ -70,25 +73,47 @@ export class MatchService {
   }
 
   /** 房间点开始：首局沿用房间 id，后续局使用独立编号。 */
-  async createFromRoom(room: RoomState, matchID = room.id): Promise<string> {
+  createFromRoom(room: RoomState, matchID = room.id): Promise<string> {
+    return this.createMatch(matchID, room.players, room, { roomCode: room.code, roomId: room.id });
+  }
+
+  createMatchedMatch(matchID: string, players: readonly RoomPlayer[]): Promise<string> {
+    return this.createMatch(
+      matchID,
+      players,
+      { ruleVariant: 'classic', exCardsEnabled: false, expansionEnabled: false },
+      { mode: 'matchmaking' },
+    );
+  }
+
+  private async createMatch(
+    matchID: string,
+    players: readonly RoomPlayer[],
+    rules: Parameters<typeof buildSetup>[0],
+    origin: Pick<MatchSnapshot, 'roomCode' | 'roomId' | 'mode'>,
+  ): Promise<string> {
     if (this.rooms.has(matchID) || this.creating.has(matchID)) {
       throw new AppError('CONFLICT', '该对局已存在');
     }
-    if (!isMatchPlayerCount(room.players.length)) {
+    if (!isMatchPlayerCount(players.length)) {
       throw new AppError('CONFLICT', `需要 ${MATCH_MIN_PLAYERS}–${MATCH_MAX_PLAYERS} 名玩家`);
     }
 
-    this.creating.add(matchID);
+    const humans = players.filter((player) => !player.isBot).map(({ playerId }) => playerId);
+    const matchmaking = origin.mode === 'matchmaking';
+    if (humans.some((playerId) => this.isPlayerInActiveMatch(playerId, !matchmaking))) {
+      throw new AppError('CONFLICT', '有玩家正在参与另一场对局');
+    }
+    this.creating.set(matchID, { players: humans, matchmaking });
     try {
       const seed = this.deps.randomSeed?.() ?? randomBytes(32).toString('hex');
-      const seats = buildSeats(room.players);
-      const setup = buildSetup(room, seats, seed);
+      const seats = buildSeats(players);
+      const setup = buildSetup(rules, seats, seed);
       const state = createMatch(game, setup);
       const now = this.deps.timers.now();
       const snapshot: MatchSnapshot = {
         matchID,
-        roomCode: room.code,
-        roomId: room.id,
+        ...origin,
         seats,
         setup,
         state,
@@ -107,7 +132,7 @@ export class MatchService {
         this.archiver.enqueueStart(snapshot);
 
         this.deps.bot.registerMatch(matchID);
-        this.mount(matchID, seats, state);
+        this.mount(matchID, seats, state, false, origin.mode);
       } catch (err) {
         await this.teardown(matchID);
         throw err;
@@ -115,7 +140,7 @@ export class MatchService {
       logger.info(
         {
           matchID,
-          roomCode: room.code,
+          roomCode: origin.roomCode,
           numPlayers: seats.length,
           bots: seats.filter((s) => s.isBot).length,
         },
@@ -197,6 +222,22 @@ export class MatchService {
     return this.rooms.size;
   }
 
+  isPlayerInActiveMatch(playerId: string, matchmakingOnly = false): boolean {
+    for (const match of this.creating.values()) {
+      if ((!matchmakingOnly || match.matchmaking) && match.players.includes(playerId)) return true;
+    }
+    for (const [id, room] of this.rooms) {
+      if (
+        (!matchmakingOnly || room.mode === 'matchmaking') &&
+        room.current().ctx.gameover === undefined &&
+        this.seatOf(id, playerId) !== null
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** 账号在这局里的座位；只认真人座位，不在返回 null */
   seatOf(matchID: string, playerId: string): string | null {
     if (playerId === '') return null;
@@ -272,8 +313,10 @@ export class MatchService {
       return 'discarded';
     }
     const state = matchFromSnapshot<SetupState>(snapshot.state, game);
-    if (replacing === undefined) await this.checkArchiveTail(matchID, state.stateID);
-    else await this.reconcileArchive(matchID, replacing.current().stateID, state.stateID);
+    if (replacing === undefined) {
+      if (snapshot.mode === 'matchmaking') this.archiver.enqueueStart(snapshot, true);
+      await this.checkArchiveTail(matchID, state.stateID);
+    } else await this.reconcileArchive(matchID, replacing.current().stateID, state.stateID);
     if (!stillCurrent()) return 'superseded';
 
     if (state.ctx.gameover === undefined && (await this.deps.archive.matchInfo(matchID))?.endedAt) {
@@ -287,7 +330,7 @@ export class MatchService {
     }
 
     if (!inPlace) this.deps.bot.registerMatch(matchID);
-    this.mount(matchID, snapshot.seats, state, inPlace);
+    this.mount(matchID, snapshot.seats, state, inPlace, snapshot.mode);
     logger.info(
       { matchID, stateID: state.stateID, numPlayers: snapshot.seats.length, inPlace },
       'match restored',
@@ -302,7 +345,7 @@ export class MatchService {
    */
   private async isOrphanSnapshot(snapshot: MatchSnapshot): Promise<boolean> {
     const { lookupRoom } = this.deps;
-    if (lookupRoom === undefined) return false;
+    if (lookupRoom === undefined || snapshot.roomCode === undefined) return false;
     try {
       const room = await lookupRoom(snapshot.roomCode);
       return room !== null && room.status === 'waiting';
@@ -410,9 +453,10 @@ export class MatchService {
     seats: readonly RoomSeat[],
     state: MatchState<SetupState>,
     inPlace = false,
+    mode?: MatchSnapshot['mode'],
   ): void {
     const { deps } = this;
-    const room: MatchRoom = new MatchRoom(matchID, seats, state, {
+    const roomDeps: RoomDeps = {
       game,
       persist: (next, expectedStateID, nextSeats) =>
         deps.store.save(matchID, next, expectedStateID, deps.timers.now(), nextSeats),
@@ -442,7 +486,8 @@ export class MatchService {
       },
       timing: deps.timing,
       timers: deps.timers,
-    });
+    };
+    const room: MatchRoom = new MatchRoom(matchID, seats, state, roomDeps, mode);
     this.rooms.set(matchID, room);
     // 真人座位先记为离线：没连上来的座位（建局后不来、重启后不回来）也能走到接管阈值；
     // 连接建立时的 onReconnect 会清掉这条记录

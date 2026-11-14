@@ -55,9 +55,16 @@ export function createMatchesRouter(deps: MatchesRouterDeps): Router {
     const match = isUuid(matchID) ? await loadMatch(matchID) : null;
     if (!match) throw new AppError('NOT_FOUND', 'Match not found');
 
+    ctx.set('Cache-Control', 'private, no-store');
     ctx.body = {
       id: match.id,
       roomId: match.roomId,
+      mode: match.mode ?? 'friend',
+      score:
+        match.endedAt === null
+          ? null
+          : (match.matchPlayers.find((row) => row.playerId === ctx.state.player.playerId)?.score ??
+            null),
       ruleVariant: match.ruleVariant,
       exEnabled: match.exEnabled,
       expansionEnabled: match.expansionEnabled,

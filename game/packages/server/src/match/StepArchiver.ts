@@ -28,7 +28,7 @@ interface GapRange {
 
 interface MatchQueue {
   /** 对局元信息：步骤与缺口都以它为外键，写成功之前后面的一律不写 */
-  start: MatchSnapshot | null;
+  start: { snapshot: MatchSnapshot; restore: boolean } | null;
   rows: StepRow[];
   gaps: GapRange[];
   /** 正在等待 await 归档写入返回 */
@@ -55,13 +55,13 @@ export class StepArchiver {
    * 对局元信息作为这一局队列的首项：写成功之前这一局的步骤和缺口都不写（它们引用这一行），
    * 失败按同样的退避重试。立即返回，数据库不可用不该挡住开局。
    */
-  enqueueStart(snapshot: MatchSnapshot): void {
+  enqueueStart(snapshot: MatchSnapshot, restore = false): void {
     if (this.stopped) {
       logger.warn({ matchID: snapshot.matchID }, 'archive stopped, match start dropped');
       return;
     }
     const q = this.queueOf(snapshot.matchID);
-    q.start = snapshot;
+    q.start = { snapshot, restore };
     this.kick(snapshot.matchID, q, false);
   }
 
@@ -191,7 +191,8 @@ export class StepArchiver {
         if (!start && !gap && !row) break;
         try {
           if (start) {
-            await this.archive.recordStart(start);
+            if (start.restore) await this.archive.recordStart(start.snapshot, true);
+            else await this.archive.recordStart(start.snapshot);
           } else if (gap) {
             q.writingGap = gap;
             await this.archive.recordGap(matchID, gap.from, gap.to);

@@ -47,6 +47,15 @@
     "resume_match": "Back to match",
     "loading": "Connecting to server..."
   },
+  "matchmaking": {
+    "title": "Quick Match",
+    "players": "Players per match",
+    "start": "Find Match",
+    "queued": "Finding a {{count}}-player match…",
+    "matching": "{{count}} players found. Starting match…",
+    "enter": "Enter Match",
+    "cancel": "Cancel Search"
+  },
   "room": {
     "title": "Room {{code}}",
     "waiting": "Waiting for players...",
@@ -909,6 +918,7 @@
   },
   "outcome": {
     "mvp": "Match MVP",
+    "score": "Match points: {{score}}",
     "aria": "Match result"
   },
   "preload": {

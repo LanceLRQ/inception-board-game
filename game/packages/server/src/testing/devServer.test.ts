@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { io, type Socket } from 'socket.io-client';
+import Redis from 'ioredis';
 import { startDevServer, type DevServer } from './devServer.js';
+import { RedisKeys } from '../infra/redisKeys.js';
+import { InMemoryReputationStore, ReputationService } from '../services/ReputationService.js';
 
 vi.mock('../infra/logger.js', () => ({
   logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -42,6 +45,133 @@ function firstState(base: string, token: string, matchID: string): Promise<{ sea
     socket.on('connect_error', reject);
   });
 }
+
+const redisUrl = process.env.TEST_REDIS_URL;
+describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
+  it('按人数和信誉分池，取消或掉线票据不会占位，并发请求只建一局', async () => {
+    const prefix = `ico-test-${crypto.randomUUID()}:`;
+    const redis = new Redis(redisUrl!, { keyPrefix: prefix });
+    const reputationStore = new InMemoryReputationStore();
+    const reputation = new ReputationService(reputationStore);
+    try {
+      dev = await startDevServer({ matchmakingRedis: redis, reputation });
+      const base = dev.url;
+      const users = await Promise.all(
+        Array.from({ length: 8 }, (_, i) =>
+          api<{ playerId: string; token: string }>(base, 'POST', '/identity/init', undefined, {
+            nickname: `匹配玩家${i}`,
+          }),
+        ),
+      );
+      const [a, b, c, waiter, otherSize, otherReputation, expired, d] = users;
+      type User = (typeof users)[number];
+      const join = (user: User, playerCount = 4) =>
+        api<{ status: string; ticketId: number }>(base, 'POST', '/matchmake', user.token, {
+          playerCount,
+        });
+      const status = (user: User) =>
+        api<{ status: string; matchId: string }>(base, 'GET', '/matchmake', user.token);
+      await reputationStore.applyDelta(otherReputation!.playerId, -300, 1000);
+      expect((await fetch(`${base}/matchmake`)).status).toBe(401);
+      expect(await join(otherSize!, 5)).toMatchObject({ status: 'queued', playerCount: 5 });
+      expect(await join(otherReputation!)).toMatchObject({ status: 'queued' });
+      const cancel = (user: User, ticketId: number) =>
+        api(base, 'DELETE', `/matchmake?ticketId=${ticketId}`, user.token);
+      const firstTicket = await join(waiter!);
+      expect(firstTicket).toMatchObject({ status: 'queued' });
+      expect(await cancel(waiter!, firstTicket.ticketId)).toEqual({ status: 'idle' });
+      const secondTicket = await join(waiter!, 5);
+      expect(await cancel(waiter!, firstTicket.ticketId)).toEqual(secondTicket);
+      expect(await cancel(waiter!, secondTicket.ticketId)).toEqual({ status: 'idle' });
+      const reserved = await join(waiter!, 5);
+      // 模拟 Redis 已分配席位、进程尚未创建出对局就重启。
+      const ticketKey = RedisKeys.matchmakingTicket(waiter!.playerId);
+      const raw = JSON.parse((await redis.get(ticketKey))!) as { queue: string };
+      const [redisNow] = await redis.time();
+      await redis.set(
+        ticketKey,
+        JSON.stringify({
+          ...raw,
+          matchId: crypto.randomUUID(),
+          queuedUntil: Number(redisNow) + 30,
+        }),
+      );
+      await redis.zrem(`${RedisKeys.matchmaking()}:queue:${raw.queue}`, waiter!.playerId);
+      expect(await status(waiter!)).toEqual(reserved);
+      expect(await cancel(waiter!, reserved.ticketId)).toEqual({ status: 'idle' });
+      expect(await join(expired!)).toMatchObject({ status: 'queued' });
+      await redis.del(RedisKeys.matchmakingTicket(expired!.playerId));
+      expect(await join(a!)).toMatchObject({ status: 'queued' });
+      expect(await join(a!, 5)).toMatchObject({ status: 'queued', playerCount: 4 });
+      expect(await join(b!)).toMatchObject({ status: 'queued' });
+      expect(await join(c!)).toMatchObject({ status: 'queued' });
+      const createMatch = vi.spyOn(dev.rt.matches, 'createMatchedMatch');
+      createMatch.mockRejectedValueOnce(new Error('建局暂时失败'));
+      const failed = await fetch(`${base}/matchmake`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${d!.token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ playerCount: 4 }),
+      });
+      expect(failed.status).toBe(500);
+      expect(dev.rt.matches.activeCount()).toBe(0);
+      await Promise.all([join(d!), join(d!), status(a!), status(otherSize!)]);
+
+      const participants = [a!, b!, c!, d!];
+      const results = await Promise.all(participants.map(status));
+      const { matchId } = results[0]!;
+      expect(matchId).toMatch(/^[a-f0-9-]{36}$/);
+      expect(results).toEqual(participants.map(() => ({ status: 'matched', matchId })));
+      expect(dev.rt.matches.activeCount()).toBe(1);
+      expect(createMatch).toHaveBeenCalledTimes(2);
+      expect(
+        dev.rt.matches
+          .get(matchId)
+          ?.seats()
+          .map(({ playerId }) => playerId),
+      ).toEqual(participants.map(({ playerId }) => playerId));
+      const views = await Promise.all(
+        participants.map((user) => firstState(base, user.token, matchId)),
+      );
+      expect(views.map(({ seat }) => seat)).toEqual(['0', '1', '2', '3']);
+      expect(await status(otherSize!)).toMatchObject({ status: 'queued', playerCount: 5 });
+      expect(await status(otherReputation!)).toMatchObject({ status: 'queued', playerCount: 4 });
+      expect(await status(waiter!)).toEqual({ status: 'idle' });
+      expect(await status(expired!)).toEqual({ status: 'idle' });
+
+      const friend = await api<{ code: string }>(base, 'POST', '/rooms', otherSize!.token, {
+        maxPlayers: 4,
+      });
+      expect(await status(otherSize!)).toEqual({ status: 'idle' });
+      const joinRoom = (user: User) =>
+        fetch(`${base}/rooms/${friend.code}/join`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${user.token}` },
+        });
+      expect((await joinRoom(otherReputation!)).status).toBe(200);
+      expect(await status(otherReputation!)).toEqual({ status: 'idle' });
+      expect((await joinRoom(b!)).status).toBe(409);
+
+      const leave = `${base}/matches/${matchId}/leave`;
+      expect(
+        (
+          await fetch(leave, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${waiter!.token}` },
+          })
+        ).status,
+      ).toBe(403);
+      expect(await api(base, 'POST', `/matches/${matchId}/leave`, a!.token)).toEqual({ ok: true });
+      expect(await status(a!)).toEqual({ status: 'idle' });
+      expect(await status(b!)).toEqual({ status: 'matched', matchId });
+      // 响应丢失时重复提交退出仍成功，且已经让出的席位不会恢复。
+      expect(await api(base, 'POST', `/matches/${matchId}/leave`, a!.token)).toEqual({ ok: true });
+    } finally {
+      const keys = await redis.keys(`${prefix}*`);
+      if (keys.length) await redis.del(...keys.map((key) => key.slice(prefix.length)));
+      await redis.quit();
+    }
+  });
+});
 
 describe('全内存开发服务', () => {
   it('公开房间按人数和游标查询，只展示有空位的等待房间', async () => {

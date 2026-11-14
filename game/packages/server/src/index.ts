@@ -1,5 +1,6 @@
 import { trustProxyFromEnv } from './app.js';
 import { purgeExpiredShortLinks } from './api/shortLink.js';
+import { createPrismaReputationStore } from './api/reports.js';
 import { buildRealtime, timingFromEnv } from './bootstrap.js';
 import { logger } from './infra/logger.js';
 import { metricsPortFromEnv, startMetricsServer } from './infra/metrics.js';
@@ -11,6 +12,7 @@ import { archiveColdReplays } from './match/ColdReplay.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
 import { PrismaChatLog } from './services/ChatLog.js';
+import { ReputationService } from './services/ReputationService.js';
 import { isOperatorTokenTooShort, MIN_OPERATOR_TOKEN_LENGTH } from './middleware/operatorAuth.js';
 import { isWildcardInProduction, resolveCorsOrigins } from './middleware/cors.js';
 import { resolveRecoveryPepper } from './infra/recoveryCode.js';
@@ -60,6 +62,7 @@ const realtime = buildRealtime({
   chatLog: new PrismaChatLog(prisma),
   lobbyRedis: redis,
   lobbyPrisma: prisma,
+  matchmaking: { redis, reputation: new ReputationService(createPrismaReputationStore(prisma)) },
   heartbeatRedis: redis,
   recoverLimiter: new FallbackRecoverAttemptLimiter(
     new RedisRecoverAttemptLimiter(redis),

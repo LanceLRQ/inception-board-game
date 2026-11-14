@@ -112,6 +112,7 @@ export function seatActivityKind(
 
 export class MatchRoom {
   readonly matchID: string;
+  readonly mode?: 'matchmaking';
 
   private state: MatchState<SetupState>;
   private seatList: readonly RoomSeat[];
@@ -149,8 +150,10 @@ export class MatchRoom {
     seats: readonly RoomSeat[],
     initial: MatchState<SetupState>,
     deps: RoomDeps,
+    mode?: 'matchmaking',
   ) {
     this.matchID = matchID;
+    this.mode = mode;
     this.seatList = seats;
     this.state = initial;
     this.deps = deps;

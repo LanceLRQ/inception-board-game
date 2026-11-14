@@ -22,7 +22,8 @@ export const RedisKeys = {
   // 恢复码失败计数（全站）
   recoverFailuresGlobal: () => `${PREFIX}:recover:fail-global`,
   rateLimit: (key: string) => `${PREFIX}:ratelimit:${key}`,
-  matchmakingQueue: () => `${PREFIX}:matchmaking:queue`,
+  matchmaking: () => `${PREFIX}:matchmaking`,
+  matchmakingTicket: (playerId: string) => `${PREFIX}:matchmaking:ticket:${playerId}`,
 } as const;
 
 // TTL 常量（秒）

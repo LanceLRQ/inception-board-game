@@ -4,6 +4,8 @@
 
 export interface MatchMetaPlayerRow {
   seat: number;
+  playerId?: string | null;
+  score?: number | null;
   nickname: string;
   isBot: boolean;
   role: string | null;
@@ -16,6 +18,7 @@ export interface MatchMetaPlayerRow {
 export interface MatchMetaRow {
   id: string;
   roomId: string | null;
+  mode?: string;
   ruleVariant: string | null;
   exEnabled: boolean | null;
   expansionEnabled: boolean | null;

@@ -151,6 +151,7 @@ router.get('/players/me/matches', authMiddleware, async (ctx) => {
       abandoned: mp.abandoned,
       isMvp: mp.isMvp,
       score: mp.score,
+      mode: mp.match.mode,
       startedAt: mp.match.startedAt,
       endedAt: mp.match.endedAt,
       winner: mp.match.winner,

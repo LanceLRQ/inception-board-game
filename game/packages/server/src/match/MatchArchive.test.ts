@@ -181,6 +181,26 @@ describe('PrismaMatchArchive', () => {
     expect(p1.characterId).toBe(player.characterId || 'unknown');
   });
 
+  it('匹配局重启补归档不清空已存在的步骤、座位或结算', async () => {
+    const stub = makeStub();
+    const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);
+    const snapshot = { ...makeTestSnapshot('m1'), mode: 'matchmaking' as const };
+    delete snapshot.roomCode;
+    await archive.recordStart(snapshot, true);
+
+    expect(stub.matchEvent.deleteMany).not.toHaveBeenCalled();
+    expect(stub.matchPlayer.deleteMany).not.toHaveBeenCalled();
+    expect(stub.match.upsert).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      create: expect.objectContaining({ mode: 'matchmaking', roomId: null }),
+      update: {},
+    });
+    expect(stub.matchPlayer.createMany).toHaveBeenCalledWith({
+      data: expect.any(Array),
+      skipDuplicates: true,
+    });
+  });
+
   it('appendStep：一步一行，moveCounter 为版本号，payload 含完整事件', async () => {
     const stub = makeStub();
     const archive = new PrismaMatchArchive(stub as unknown as PrismaArchiveClient);

@@ -146,6 +146,33 @@ describe('GET /matches/:id', () => {
       abandoned: false,
     });
   });
+
+  it('仅已结束对局的本人可读取入库积分，零分与无积分有别', async () => {
+    server = await serveRouter(
+      createMatchesRouter({
+        archive: await seedArchive(),
+        loadMatch: async (id) => {
+          const match = fixtureMatchMeta(id)!;
+          return {
+            ...match,
+            mode: 'matchmaking',
+            matchPlayers: match.matchPlayers.map((row, seat) =>
+              seat === 1 ? { ...row, playerId: ACCOUNT_SEAT1, score: 0 } : row,
+            ),
+          };
+        },
+      }),
+    );
+    const member = tokenFor(ACCOUNT_SEAT1);
+    const own = await server.get(`/matches/${FINISHED_ID}`, member);
+    expect(own.json).toMatchObject({ mode: 'matchmaking', score: 0 });
+    expect(own.json.players[1]).not.toHaveProperty('playerId');
+    expect(own.json.players[1]).not.toHaveProperty('score');
+    expect((await server.get(`/matches/${RUNNING_ID}`, member)).json).toHaveProperty('score', null);
+    expect(
+      (await server.get(`/matches/${FINISHED_ID}`, tokenFor(ACCOUNT_OUTSIDER))).json,
+    ).toHaveProperty('score', null);
+  });
 });
 
 describe('GET /matches/:id/events 记录完整性', () => {

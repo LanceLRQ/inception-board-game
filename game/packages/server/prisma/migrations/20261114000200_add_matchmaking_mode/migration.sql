@@ -1,0 +1,1 @@
+ALTER TABLE "matches" ADD COLUMN "mode" VARCHAR(16) NOT NULL DEFAULT 'friend';
