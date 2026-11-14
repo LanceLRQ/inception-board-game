@@ -15,6 +15,7 @@ import {
 import { computeMvpResults, type MvpPlayerStats } from '../services/mvpScore.js';
 import type { RoomSeat } from './MatchRoom.js';
 import type { MatchSnapshot } from './MatchStore.js';
+import { readColdReplay, type ColdEvent, type ReplayObjectStore } from './ColdReplay.js';
 
 export interface StepRow {
   matchID: string;
@@ -253,7 +254,28 @@ function isStepPayload(p: unknown): p is { request: MoveRequest; events: MatchEv
 }
 
 export class PrismaMatchArchive implements MatchArchive {
-  constructor(private readonly prisma: PrismaArchiveClient) {}
+  private readonly coldReads = new Map<string, Promise<ColdEvent[]>>();
+
+  constructor(
+    private readonly prisma: PrismaArchiveClient,
+    private readonly objects?: ReplayObjectStore,
+  ) {}
+
+  private async coldEvents(matchID: string): Promise<ColdEvent[]> {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchID },
+      select: { replayArchiveKey: true },
+    });
+    const key = match?.replayArchiveKey;
+    if (!key) return [];
+    if (!this.objects) throw new Error('Replay archive storage is not configured');
+    let pending = this.coldReads.get(key);
+    if (!pending) {
+      pending = readColdReplay(this.objects, key).finally(() => this.coldReads.delete(key));
+      this.coldReads.set(key, pending);
+    }
+    return pending;
+  }
 
   /** 步骤行与座位行都只通过 matchId 挂在对局行上，彼此没有外键，删除顺序无所谓 */
   async resetMatch(matchID: string): Promise<void> {
@@ -291,6 +313,7 @@ export class PrismaMatchArchive implements MatchArchive {
       metadata,
       // 覆盖上一次留下的对局行时，结束信息也要一并清掉
       endedAt: null,
+      replayArchiveKey: null,
       winner: null,
       winReason: null,
     };
@@ -539,7 +562,28 @@ export class PrismaMatchArchive implements MatchArchive {
         break;
       lower = last.moveCounter + 1;
     }
-    return out;
+    if (take !== undefined && out.length === take) return out;
+    if (take === undefined && out.length > 0) return out;
+    const cold = await this.coldEvents(matchID);
+    if (cold.length === 0) return out;
+    return cold
+      .flatMap(({ moveCounter, eventKind, payload, createdAt }) =>
+        eventKind === 'step' &&
+        (from === undefined || moveCounter >= from) &&
+        (to === undefined || moveCounter <= to) &&
+        isStepPayload(payload)
+          ? [
+              {
+                matchID,
+                stateID: moveCounter,
+                at: createdAt,
+                request: payload.request,
+                events: payload.events,
+              },
+            ]
+          : [],
+      )
+      .slice(0, take);
   }
 
   async stepSummary(matchID: string): Promise<StepSummary> {
@@ -550,7 +594,11 @@ export class PrismaMatchArchive implements MatchArchive {
         AND jsonb_typeof(payload -> 'request') IN ('object', 'array')
         AND jsonb_typeof(payload -> 'events') = 'array'
     `;
-    return summary!;
+    if (summary!.count > 0) return summary!;
+    const counters = (await this.coldEvents(matchID))
+      .filter((row) => row.eventKind === 'step' && isStepPayload(row.payload))
+      .map((row) => row.moveCounter);
+    return { min: counters[0] ?? null, max: counters.at(-1) ?? null, count: counters.length };
   }
 
   /**
@@ -579,11 +627,10 @@ export class PrismaMatchArchive implements MatchArchive {
       where: { matchId: matchID, eventKind: 'gap' },
       orderBy: { moveCounter: 'asc' },
     });
-    const out: StepGap[] = [];
-    for (const r of rows) {
-      if (isGapPayload(r.payload)) out.push({ from: r.payload.from, to: r.payload.to });
-    }
-    return out;
+    const source = rows.length > 0 ? rows : await this.coldEvents(matchID);
+    return source.flatMap(({ eventKind, payload }) =>
+      eventKind === 'gap' && isGapPayload(payload) ? [{ from: payload.from, to: payload.to }] : [],
+    );
   }
 
   async lastStepID(matchID: string): Promise<number> {

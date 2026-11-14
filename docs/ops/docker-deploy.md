@@ -207,6 +207,10 @@ rm -rf deploy/prod/data/pg-data deploy/prod/data/redis-data
 
 ### 备份
 
+设置 `REPLAY_ARCHIVE_BUCKET` 后，API 每小时将已结束至少 30 天的回放移到私有对象存储。先创建桶，给 API 凭证授予回放前缀下的 `s3:PutObject` 和 `s3:GetObject` 权限，按 `game/.env.example` 配置桶、区域和凭证。使用 MinIO 时同时配置 API 容器可访问的 `REPLAY_ARCHIVE_ENDPOINT`。
+
+数据库备份包含冷归档的位置。恢复时需保留同一批对象及其键，并为 API 配置桶的读权限。若已有冷归档，需保持相应对象可读。
+
 数据在 `deploy/prod/data/` 下（`pg-data`、`redis-data`）。数据库的逻辑备份：
 
 ```bash

@@ -6,6 +6,8 @@ import { metricsPortFromEnv, startMetricsServer } from './infra/metrics.js';
 import { startPeriodic } from './infra/periodic.js';
 import { prisma } from './infra/postgres.js';
 import { createRedisClient } from './infra/redis.js';
+import { replayObjectStoreFromEnv } from './infra/replayObjectStore.js';
+import { archiveColdReplays } from './match/ColdReplay.js';
 import { PrismaMatchArchive } from './match/MatchArchive.js';
 import { RedisMatchStore } from './match/MatchStore.js';
 import { PrismaChatLog } from './services/ChatLog.js';
@@ -51,9 +53,10 @@ if (isWildcardInProduction(corsOrigins, process.env)) {
 }
 
 const redis = createRedisClient();
+const replayObjects = replayObjectStoreFromEnv(process.env);
 const realtime = buildRealtime({
   store: new RedisMatchStore(redis),
-  archive: new PrismaMatchArchive(prisma),
+  archive: new PrismaMatchArchive(prisma, replayObjects),
   chatLog: new PrismaChatLog(prisma),
   lobbyRedis: redis,
   lobbyPrisma: prisma,
@@ -72,7 +75,9 @@ const realtime = buildRealtime({
 
 /** 过期短链的清理间隔 */
 const SHORT_LINK_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+const COLD_REPLAY_ARCHIVE_INTERVAL_MS = 60 * 60 * 1000;
 let stopShortLinkCleanup: () => void = () => {};
+let stopColdReplayArchive: () => void = () => {};
 /** 运行指标的单独端口；不设 METRICS_PORT 就不开 */
 const METRICS_PORT = metricsPortFromEnv(process.env.METRICS_PORT);
 let metricsServer: { close(): void } | null = null;
@@ -93,6 +98,16 @@ async function main(): Promise<void> {
       if (removed > 0) logger.info({ removed }, 'expired short links removed');
     },
   );
+  if (replayObjects) {
+    stopColdReplayArchive = startPeriodic(
+      'cold-replay-archive',
+      COLD_REPLAY_ARCHIVE_INTERVAL_MS,
+      async () => {
+        const archived = await archiveColdReplays(prisma, replayObjects);
+        if (archived > 0) logger.info({ archived }, 'cold replays archived');
+      },
+    );
+  }
   logger.info({ port }, 'Server started (HTTP + WS)');
   if (METRICS_PORT !== null) {
     try {
@@ -108,6 +123,7 @@ async function main(): Promise<void> {
 const shutdown = (signal: string, exitCode = 0) => {
   logger.info({ signal }, 'Shutting down');
   stopShortLinkCleanup();
+  stopColdReplayArchive();
   metricsServer?.close();
   realtime
     .stop()

@@ -15,6 +15,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1169.0",
     "@icgame/bot": "workspace:*",
     "@icgame/game-engine": "workspace:*",
     "@icgame/shared": "workspace:*",

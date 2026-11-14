@@ -88,6 +88,7 @@ model Match {
   playerCount      Int?      @map("player_count") @db.SmallInt
   rngSeed          String?   @map("rng_seed") @db.VarChar(64)
   replayCompressed Bytes?    @map("replay_compressed")
+  replayArchiveKey String?   @map("replay_archive_key")
   metadata         Json?
 
   matchPlayers MatchPlayer[]
@@ -96,6 +97,7 @@ model Match {
 
   @@index([roomId], map: "idx_matches_room")
   @@index([startedAt], map: "idx_matches_started")
+  @@index([replayArchiveKey, endedAt], map: "idx_matches_cold_replay")
   @@map("matches")
 }
 
