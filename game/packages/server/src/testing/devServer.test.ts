@@ -44,6 +44,76 @@ function firstState(base: string, token: string, matchID: string): Promise<{ sea
 }
 
 describe('全内存开发服务', () => {
+  it('公开房间按人数和游标查询，只展示有空位的等待房间', async () => {
+    dev = await startDevServer();
+    const base = dev.url;
+    const { token } = await api<{ token: string }>(base, 'POST', '/identity/init', undefined, {
+      nickname: '房主',
+    });
+    const create = (body: unknown) => api<{ code: string }>(base, 'POST', '/rooms', token, body);
+    const list = (query = '') =>
+      api<{ data: { code: string }[]; nextCursor: string | null; hasMore: boolean }>(
+        base,
+        'GET',
+        `/rooms/public${query}`,
+        token,
+      );
+    await create({ maxPlayers: 4 });
+    const four = await create({ maxPlayers: 4, isPublic: true });
+    const five = await create({ maxPlayers: 5, isPublic: true });
+    const full = await create({ maxPlayers: 4, isPublic: true });
+    await api(base, 'POST', `/rooms/${full.code}/fill-ai`, token);
+
+    const page = await list('?limit=1');
+    expect(page).toEqual({
+      data: [{ code: expect.any(String), currentPlayers: 1, maxPlayers: expect.any(Number) }],
+      nextCursor: expect.any(String),
+      hasMore: true,
+    });
+    const next = await list(`?limit=1&cursor=${encodeURIComponent(page.nextCursor!)}`);
+    expect(next).toMatchObject({ nextCursor: null, hasMore: false });
+    expect(new Set([...page.data, ...next.data].map(({ code }) => code))).toEqual(
+      new Set([four.code, five.code]),
+    );
+    expect((await list('?maxPlayers=4')).data).toEqual([
+      { code: four.code, currentPlayers: 1, maxPlayers: 4 },
+    ]);
+
+    await api(base, 'POST', `/rooms/${four.code}/fill-ai`, token);
+    await api(base, 'POST', `/rooms/${four.code}/start`, token);
+    await api(base, 'POST', `/rooms/${five.code}/leave`, token);
+    expect(await list()).toEqual({ data: [], nextCursor: null, hasMore: false });
+  });
+
+  it('公开房间最后一个空位只有一个并发加入请求成功', async () => {
+    dev = await startDevServer();
+    const base = dev.url;
+    const [owner, a, b] = await Promise.all(
+      ['房主', '玩家甲', '玩家乙'].map((nickname) =>
+        api<{ token: string }>(base, 'POST', '/identity/init', undefined, { nickname }),
+      ),
+    );
+    const { code } = await api<{ code: string }>(base, 'POST', '/rooms', owner!.token, {
+      maxPlayers: 4,
+      isPublic: true,
+    });
+    await api(base, 'POST', `/rooms/${code}/fill-ai`, owner!.token, { count: 2 });
+    const joins = await Promise.all(
+      [a!, b!].map(({ token }) =>
+        fetch(`${base}/rooms/${code}/join`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+        }),
+      ),
+    );
+    expect(joins.map(({ status }) => status).sort()).toEqual([200, 409]);
+    const [{ room }, persisted] = await Promise.all([
+      joins.find(({ ok }) => ok)!.json(),
+      api(base, 'GET', `/rooms/code/${code}`, owner!.token),
+    ]);
+    expect(persisted).toMatchObject({ players: room.players, currentPlayers: 4 });
+  });
+
   it('建档、建房、加入、补 Bot、开始后，两个连接都收到首包', async () => {
     dev = await startDevServer({ port: 0 });
     const base = dev.url;

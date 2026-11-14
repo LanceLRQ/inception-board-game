@@ -46,6 +46,40 @@ async function openTab(browser: Browser, name: string): Promise<Tab> {
   return { page, polls: () => polls, roomSocketFrames };
 }
 
+test('大厅可筛选公开房间并直接加入，默认建房保持私密', async ({ browser }) => {
+  const host = await openTab(browser, '公开房主');
+  const guest = await openTab(browser, '公开访客');
+  try {
+    const create = host.page.getByTestId('lobby-create');
+    await create.click();
+    await expect(host.page).toHaveURL(/\/room\/[A-Z0-9]{6}$/);
+    const privateCode = host.page.url().split('/').at(-1)!;
+    await host.page.goto('/lobby');
+    await host.page.locator('#lobby-maxPlayers').selectOption('4');
+    await host.page
+      .getByRole('checkbox', { name: /在公开房间列表显示|Show in public rooms/ })
+      .check();
+    await create.click();
+    await expect(host.page).toHaveURL(/\/room\/[A-Z0-9]{6}$/);
+    const publicCode = host.page.url().split('/').at(-1)!;
+
+    const section = guest.page.getByRole('region', { name: /公开房间|Public Rooms/ });
+    await section.getByRole('button', { name: /刷新公开房间|Refresh public rooms/ }).click();
+    const joinPublic = section.getByRole('button', { name: new RegExp(publicCode) });
+    await expect(joinPublic).toBeVisible();
+    await expect(section.getByText(privateCode)).toHaveCount(0);
+    await section.getByRole('combobox').selectOption('5');
+    await expect(section.getByText(/暂无可加入|No public rooms/)).toBeVisible();
+    await section.getByRole('combobox').selectOption('4');
+    await joinPublic.click();
+    await expect(guest.page).toHaveURL(new RegExp(`/room/${publicCode}$`));
+    await expect(host.page.getByTestId('room-count')).toContainText('2 / 4');
+  } finally {
+    await host.page.context().close();
+    await guest.page.context().close();
+  }
+});
+
 test('成员加入与补 Bot 即时出现在房主页面上，不靠轮询；推送带房间码与令牌握手', async ({
   browser,
 }) => {

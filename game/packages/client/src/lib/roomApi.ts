@@ -47,10 +47,16 @@ export interface StartGameResult {
   online: boolean;
 }
 
+interface PublicRoomPage {
+  data: { code: string; currentPlayers: number; maxPlayers: number }[];
+  nextCursor: string | null;
+}
+
 export interface CreateRoomOptions {
   maxPlayers?: number;
   ruleVariant?: string;
   seriesLength?: number;
+  isPublic?: boolean;
 }
 
 export interface IdentityInfo {
@@ -256,11 +262,22 @@ export const roomApi = {
   createRoom: (owner: IdentityInfo, opts: CreateRoomOptions = {}) =>
     withFallback(
       () => realRoomApi.createRoom(owner, opts),
-      () =>
-        opts.seriesLength === undefined
+      () => {
+        if (opts.isPublic) {
+          return Promise.reject(new ApiRequestError(503, 'UNAVAILABLE', '公开房间需要连接服务端'));
+        }
+        return opts.seriesLength === undefined
           ? mockRoomApi.createRoom(owner, opts)
-          : Promise.reject(new ApiRequestError(503, 'UNAVAILABLE', '系列赛需要连接服务端')),
+          : Promise.reject(new ApiRequestError(503, 'UNAVAILABLE', '系列赛需要连接服务端'));
+      },
     ),
+  listPublicRooms: (maxPlayers: number | null, cursor: string | null, signal: AbortSignal) => {
+    const params = new URLSearchParams({ limit: '10' });
+    if (maxPlayers !== null) params.set('maxPlayers', String(maxPlayers));
+    if (cursor !== null) params.set('cursor', cursor);
+    return api.get<PublicRoomPage>(`/rooms/public?${params}`, { signal });
+  },
+  joinPublicRoom: (code: string) => realRoomApi.joinRoom(code),
   joinRoom: (code: string, me: IdentityInfo) =>
     withFallback(
       () => realRoomApi.joinRoom(code),

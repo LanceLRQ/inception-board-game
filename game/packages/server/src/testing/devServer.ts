@@ -23,6 +23,7 @@ import { createMemoryIdentityPrisma } from './memoryIdentity.js';
 /** 进程内的 Redis 子集：键值与过期时间，足够大厅与心跳使用 */
 export class MemoryRedis implements LobbyRedis {
   private readonly data = new Map<string, { value: string; expiresAt: number }>();
+  private readonly lexSets = new Map<string, Set<string>>();
 
   private live(key: string): string | null {
     const hit = this.data.get(key);
@@ -61,6 +62,34 @@ export class MemoryRedis implements LobbyRedis {
 
   async exists(key: string): Promise<number> {
     return this.live(key) === null ? 0 : 1;
+  }
+
+  async zadd(key: string, _score: number, member: string): Promise<number> {
+    const set = this.lexSets.get(key) ?? new Set<string>();
+    const added = !set.has(member);
+    set.add(member);
+    this.lexSets.set(key, set);
+    return Number(added);
+  }
+
+  async zrevrangebylex(
+    key: string,
+    max: string,
+    _min: string,
+    _limit: 'LIMIT',
+    offset: number,
+    count: number,
+  ): Promise<string[]> {
+    return [...(this.lexSets.get(key) ?? [])]
+      .filter((member) => max === '+' || member < max.slice(1))
+      .sort()
+      .reverse()
+      .slice(offset, offset + count);
+  }
+
+  async zrem(key: string, ...members: string[]): Promise<number> {
+    const set = this.lexSets.get(key);
+    return members.filter((member) => set?.delete(member)).length;
   }
 }
 

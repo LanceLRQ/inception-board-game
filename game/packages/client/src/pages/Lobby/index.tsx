@@ -1,9 +1,9 @@
-// Lobby · 好友房入口
+// Lobby · 多人房间入口
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
 import { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useMutation } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
 import {
@@ -12,7 +12,7 @@ import {
   RECOVERY_CODE_FORMATTED_LENGTH,
 } from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
-import { roomApi } from '../../lib/roomApi';
+import { isMockMode, roomApi } from '../../lib/roomApi';
 import { isOfflineIdentity } from '../../lib/identityApi';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 import { requestErrorMessage } from '../../lib/roomQueries';
@@ -48,6 +48,7 @@ const PLAYER_COUNT_OPTIONS = Array.from(
 export default function Lobby() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAuthenticated, isInitialized, initIdentity, recoverIdentity, nickname, playerId } =
     useAuth();
   const avatar = useAvatar();
@@ -58,6 +59,9 @@ export default function Lobby() {
   // 创建房间参数
   const [maxPlayers, setMaxPlayers] = useState(6);
   const token = useIdentityStore((state) => state.token);
+  const onlineLobby = isAuthenticated && !!token && !isOfflineIdentity(token) && !isMockMode();
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicSize, setPublicSize] = useState<number | null>(null);
   const [seriesMode, setSeriesMode] = useState('unlimited');
   const [seriesLength, setSeriesLength] = useState(7);
   // 加入房间
@@ -74,6 +78,15 @@ export default function Lobby() {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreError, setRestoreError] = useState<string | null>(null);
+
+  const publicRooms = useInfiniteQuery({
+    queryKey: ['lobby', 'publicRooms', playerId, publicSize],
+    queryFn: ({ pageParam, signal }) => roomApi.listPublicRooms(publicSize, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: onlineLobby,
+    staleTime: 0,
+  });
 
   const handleInitIdentity = useCallback(async () => {
     const name = inputNickname.trim();
@@ -119,6 +132,7 @@ export default function Lobby() {
         { playerId: playerId ?? '', nickname, avatarSeed },
         {
           maxPlayers: size,
+          ...(onlineLobby && isPublic && { isPublic: true }),
           seriesLength:
             seriesMode === 'unlimited'
               ? undefined
@@ -136,17 +150,19 @@ export default function Lobby() {
 
   const joinRoomMutation = useMutation({
     mutationKey: ['lobby', 'joinRoom'],
-    mutationFn: (roomCode: string) =>
-      roomApi.joinRoom(roomCode, {
-        playerId: playerId ?? '',
-        nickname,
-        avatarSeed,
-      }),
-    onSuccess: (_room, roomCode) => {
+    mutationFn: ({ roomCode, fromPublicList }: { roomCode: string; fromPublicList?: boolean }) =>
+      fromPublicList
+        ? roomApi.joinPublicRoom(roomCode)
+        : roomApi.joinRoom(roomCode, { playerId: playerId ?? '', nickname, avatarSeed }),
+    onSuccess: (_room, { roomCode }) => {
       logger.flow('lobby', 'joinRoom ok', { code: roomCode });
       navigate(`/room/${roomCode}`);
     },
-    onError: (e) => setError(t('lobby.errorGeneric', { message: requestErrorMessage(e) })),
+    onError: (e, { fromPublicList }) => {
+      setError(t('lobby.errorGeneric', { message: requestErrorMessage(e) }));
+      if (fromPublicList)
+        void queryClient.invalidateQueries({ queryKey: ['lobby', 'publicRooms'] });
+    },
   });
 
   const roomBusy = createRoomMutation.isPending || joinRoomMutation.isPending;
@@ -165,7 +181,7 @@ export default function Lobby() {
     }
     if (!playerId) return;
     setError(null);
-    joinRoomMutation.mutate(roomCode);
+    joinRoomMutation.mutate({ roomCode });
   }, [joinCode, playerId, joinRoomMutation, t]);
 
   const handleResume = useCallback(() => {
@@ -287,7 +303,7 @@ export default function Lobby() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 bg-background p-6 text-foreground">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
+        <h1 className="text-2xl font-bold">{t('landing.multiplayer')}</h1>
         {playerId && token && !isOfflineIdentity(token) ? (
           <Link
             to={`/players/${encodeURIComponent(playerId)}`}
@@ -371,6 +387,17 @@ export default function Lobby() {
             className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2"
           />
         )}
+        {onlineLobby && (
+          <label className="mb-3 flex min-h-10 cursor-pointer items-center gap-2 text-sm text-dim">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+            />
+            {t('lobby.listRoomPublicly')}
+          </label>
+        )}
         <Button
           type="button"
           onClick={handleCreateRoom}
@@ -415,6 +442,110 @@ export default function Lobby() {
           {t('lobby.joinRoom')}
         </Button>
       </section>
+
+      {onlineLobby && (
+        <section
+          aria-labelledby="lobby-public-heading"
+          className="rounded-lg border border-line bg-panel p-4"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 id="lobby-public-heading" className="text-lg font-semibold">
+              {t('lobby.publicRooms')}
+            </h2>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('lobby.refreshPublicRooms')}
+              disabled={publicRooms.isFetching}
+              onClick={() => void publicRooms.refetch()}
+            >
+              <RotateCcw size={16} aria-hidden="true" />
+            </Button>
+          </div>
+          <label className="mb-2 block text-sm text-dim" htmlFor="lobby-public-size">
+            {t('lobby.maxPlayers')}
+          </label>
+          <select
+            id="lobby-public-size"
+            value={publicSize ?? ''}
+            onChange={(e) => setPublicSize(e.target.value ? Number(e.target.value) : null)}
+            className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 text-foreground"
+          >
+            <option value="">{t('lobby.allSizes')}</option>
+            {PLAYER_COUNT_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          {publicRooms.isPending && (
+            <p role="status" className="text-sm text-dim">
+              {t('common.loading')}
+            </p>
+          )}
+          {publicRooms.isSuccess && publicRooms.data.pages[0]?.data.length === 0 && (
+            <p role="status" className="text-sm text-dim">
+              {t('lobby.noPublicRooms')}
+            </p>
+          )}
+          {publicRooms.data?.pages[0]?.data.length ? (
+            <ul className="divide-y divide-line">
+              {publicRooms.data.pages
+                .flatMap((page) => page.data)
+                .map((room) => (
+                  <li
+                    key={room.code}
+                    className="flex min-h-12 items-center justify-between gap-3 py-1.5"
+                  >
+                    <span className="font-mono text-sm tracking-widest">{room.code}</span>
+                    <span className="ml-auto whitespace-nowrap text-sm tabular-nums text-dim">
+                      {room.currentPlayers} / {room.maxPlayers}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={t('lobby.joinPublicRoom', { code: room.code })}
+                      disabled={roomBusy}
+                      onClick={() => {
+                        setError(null);
+                        joinRoomMutation.mutate({ roomCode: room.code, fromPublicList: true });
+                      }}
+                    >
+                      {t('lobby.joinButton')}
+                    </Button>
+                  </li>
+                ))}
+            </ul>
+          ) : null}
+          {publicRooms.isError && (
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p role="alert" className="text-sm text-destructive">
+                {t('lobby.publicRoomsError')}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={publicRooms.isFetching}
+                onClick={() => void publicRooms.refetch()}
+              >
+                {t('common.retry')}
+              </Button>
+            </div>
+          )}
+          {publicRooms.hasNextPage && !publicRooms.isError && (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 w-full"
+              disabled={publicRooms.isFetching}
+              onClick={() => void publicRooms.fetchNextPage()}
+            >
+              {publicRooms.isFetchingNextPage ? t('common.loading') : t('lobby.loadMoreRooms')}
+            </Button>
+          )}
+        </section>
+      )}
 
       {error && (
         <div className="rounded-md bg-blood/20 p-3 text-sm text-destructive" role="alert">

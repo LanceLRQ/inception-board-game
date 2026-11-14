@@ -4,6 +4,12 @@ import { MATCH_MAX_PLAYERS, MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { authMiddleware } from '../middleware/auth.js';
 import type { LobbyService } from '../services/LobbyService.js';
 import { AppError } from '../infra/errors.js';
+import { paginationSchema } from '../infra/pagination.js';
+
+const publicRoomsSchema = paginationSchema.extend({
+  cursor: z.string().max(128).optional(),
+  maxPlayers: z.coerce.number().int().min(MATCH_MIN_PLAYERS).max(MATCH_MAX_PLAYERS).optional(),
+});
 
 /** 房间路由；大厅服务由调用方注入 */
 export function createRoomsRouter(lobby: LobbyService): Router {
@@ -18,7 +24,12 @@ export function createRoomsRouter(lobby: LobbyService): Router {
     ruleVariant: z.string().default('classic'),
     exCardsEnabled: z.boolean().default(false),
     expansionEnabled: z.boolean().default(false),
+    isPublic: z.boolean().default(false),
     seriesLength: z.number().int().min(1).max(99).optional(),
+  });
+
+  router.get('/rooms/public', async (ctx) => {
+    ctx.body = await lobby.listPublicRooms(publicRoomsSchema.parse(ctx.query));
   });
 
   router.post('/rooms', async (ctx) => {
