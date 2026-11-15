@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const get = vi.fn();
 const post = vi.fn();
 const patch = vi.fn();
+const loadFingerprint = vi.fn();
+const getFingerprint = vi.fn();
+
+vi.mock('@fingerprintjs/fingerprintjs', () => ({ load: loadFingerprint }));
 
 vi.mock('./api', () => {
   class ApiRequestError extends Error {
@@ -14,7 +18,11 @@ vi.mock('./api', () => {
       super(message);
     }
   }
-  return { api: { get, post, patch }, ApiRequestError };
+  return {
+    api: { get, post, patch },
+    ApiRequestError,
+    getAuthToken: () => localStorage.getItem('icgame-token'),
+  };
 });
 vi.mock('./logger', () => ({
   logger: { flow: vi.fn(), warn: vi.fn(), error: vi.fn(), ai: vi.fn() },
@@ -44,6 +52,8 @@ describe('identityApi', () => {
     get.mockReset();
     post.mockReset();
     patch.mockReset();
+    loadFingerprint.mockReset().mockResolvedValue({ get: getFingerprint });
+    getFingerprint.mockReset();
     stubLocalStorage();
   });
 
@@ -69,6 +79,60 @@ describe('identityApi', () => {
     expect(isOfflineIdentity('mock-p-abc')).toBe(true);
     expect(isOfflineIdentity('eyJhbGciOi')).toBe(false);
     expect(isOfflineIdentity(null)).toBe(false);
+  });
+
+  it('同一登录只上报一次 visitorId，并关闭第三方遥测', async () => {
+    const { identityApi } = await import('./identityApi');
+    localStorage.setItem('icgame-token', realInit.token);
+    const visitorId = 'a'.repeat(32);
+    getFingerprint.mockResolvedValue({ visitorId, components: { raw: '只在本机' } });
+    post.mockResolvedValue({ registered: true });
+
+    await Promise.all([
+      identityApi.registerFingerprint(realInit.token),
+      identityApi.registerFingerprint(realInit.token),
+    ]);
+    await identityApi.registerFingerprint(realInit.token);
+    expect(loadFingerprint).toHaveBeenCalledExactlyOnceWith({ monitoring: false });
+    expect(post).toHaveBeenCalledExactlyOnceWith('/identity/fingerprint', {
+      fingerprint: visitorId,
+    });
+  });
+
+  it('模拟身份跳过采集，浏览器阻断采集不影响身份并允许下次重试', async () => {
+    const { identityApi } = await import('./identityApi');
+    localStorage.setItem('icgame-token', 'mock-identity');
+    await identityApi.registerFingerprint('mock-identity');
+    expect(loadFingerprint).not.toHaveBeenCalled();
+
+    localStorage.setItem('icgame-token', realInit.token);
+    loadFingerprint.mockRejectedValueOnce(new Error('浏览器阻断采集'));
+    await expect(identityApi.registerFingerprint(realInit.token)).resolves.toBeUndefined();
+    expect(post).not.toHaveBeenCalled();
+    getFingerprint.mockResolvedValue({ visitorId: 'b'.repeat(32) });
+    post.mockResolvedValue({ registered: true });
+    await identityApi.registerFingerprint(realInit.token);
+    expect(post).toHaveBeenCalledOnce();
+  });
+
+  it('采集途中切换身份时，旧登录的上报不会发给新登录', async () => {
+    const { identityApi } = await import('./identityApi');
+    localStorage.setItem('icgame-token', realInit.token);
+    const visitorId = 'c'.repeat(32);
+    getFingerprint
+      .mockImplementationOnce(async () => {
+        localStorage.setItem('icgame-token', 'recovered');
+        return { visitorId };
+      })
+      .mockResolvedValue({ visitorId });
+    post.mockResolvedValue({ registered: true });
+
+    await identityApi.registerFingerprint(realInit.token);
+    expect(post).not.toHaveBeenCalled();
+    await identityApi.registerFingerprint('recovered');
+    expect(post).toHaveBeenCalledExactlyOnceWith('/identity/fingerprint', {
+      fingerprint: visitorId,
+    });
   });
 
   it('recover 走 POST /identity/recover，返回新恢复码', async () => {

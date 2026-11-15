@@ -6,7 +6,11 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimitMiddleware } from './middleware/rateLimit.js';
 import { healthRouter } from './api/health.js';
 import type { MetricsRegistry } from './infra/metrics.js';
-import { createIdentityRouter, type IdentityPrisma } from './api/identity.js';
+import {
+  createIdentityRouter,
+  type IdentityPrisma,
+  type IdentityRouterDeps,
+} from './api/identity.js';
 import { createRoomsRouter } from './api/rooms.js';
 import { createMatchmakingRouter } from './api/matchmaking.js';
 import { createInviteRouter, inviteConfigFromEnv, type InviteConfig } from './api/invite.js';
@@ -38,6 +42,7 @@ export interface AppDeps {
   archive?: MatchArchive;
   /** 身份接口的数据库访问；不给时用全局数据库客户端 */
   identityPrisma?: IdentityPrisma;
+  fingerprints?: IdentityRouterDeps['fingerprints'];
   /** 恢复码失败限速计数器；不给时用进程内实现 */
   recoverLimiter?: RecoverAttemptLimiter;
   /** 封禁查询器；鉴权中间件与运营接口共用。不给时用全局数据库 */
@@ -111,6 +116,7 @@ export function createApp(deps: AppDeps = {}): Koa {
   // API 路由（按前缀挂载）
   const identityRouter = createIdentityRouter({
     prisma: deps.identityPrisma,
+    fingerprints: deps.fingerprints,
     recoverLimiter: deps.recoverLimiter,
     ...(deps.disconnectPlayer ? { disconnectPlayer: deps.disconnectPlayer } : {}),
   });

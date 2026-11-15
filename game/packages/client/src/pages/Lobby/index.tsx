@@ -1,7 +1,7 @@
 // Lobby · 多人房间入口
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import {
 } from '@icgame/shared';
 import { ApiRequestError } from '../../lib/api';
 import { isMockMode, roomApi } from '../../lib/roomApi';
-import { isOfflineIdentity } from '../../lib/identityApi';
+import { identityApi, isOfflineIdentity } from '../../lib/identityApi';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 import { requestErrorMessage } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
@@ -61,6 +61,9 @@ export default function Lobby() {
   const [maxPlayers, setMaxPlayers] = useState(6);
   const token = useIdentityStore((state) => state.token);
   const onlineLobby = isAuthenticated && !!token && !isOfflineIdentity(token) && !isMockMode();
+  useEffect(() => {
+    if (isInitialized && onlineLobby && token) void identityApi.registerFingerprint(token);
+  }, [isInitialized, onlineLobby, token]);
   const [isPublic, setIsPublic] = useState(false);
   const [publicSize, setPublicSize] = useState<number | null>(null);
   const [matchmakingWaiting, setMatchmakingWaiting] = useState(false);
@@ -212,6 +215,9 @@ export default function Lobby() {
       onConfirm={() => setPendingCode(null)}
     />
   );
+  const fingerprintNotice = !isMockMode() && (
+    <p className="text-xs text-dim">{t('lobby.fingerprintNotice')}</p>
+  );
 
   if (!isAuthenticated) {
     return (
@@ -244,6 +250,7 @@ export default function Lobby() {
           {t('lobby.continue')}
           <ArrowRight size={16} />
         </Button>
+        {fingerprintNotice}
 
         <div className="mt-4 border-t border-line pt-4">
           <Button
@@ -322,6 +329,7 @@ export default function Lobby() {
           </span>
         )}
       </div>
+      {onlineLobby && fingerprintNotice}
 
       <AvatarPicker
         seed={avatar.seed}

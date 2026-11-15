@@ -30,6 +30,7 @@
     "players": "玩家",
     "nicknameLabel": "先给自己起个名字",
     "nicknamePlaceholder": "3-12 个字符",
+    "fingerprintNotice": "在线登录会向游戏服务器上报浏览器指纹哈希，用于快速匹配反作弊。",
     "continue": "继续",
     "maxPlayers": "最多玩家数",
     "codeHint": "请输入 6 位房间码",

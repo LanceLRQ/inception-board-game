@@ -4,7 +4,7 @@
 //
 // 用途：保证 VITE_USE_MOCK_API=1 或后端不可达时，pnpm dev 也能走完好友房流程
 
-import { api, ApiRequestError } from './api';
+import { api, ApiRequestError, getAuthToken } from './api';
 import { logger } from './logger';
 
 export interface InitResponse {
@@ -64,6 +64,7 @@ function randomId(): string {
 }
 
 let fallbackToMock = MOCK_FLAG;
+let fingerprintRegistration: { token: string; attempt: Promise<void> } | undefined;
 
 /** 当前是否处于本地模拟身份（后端不可达回落，或令牌本身就是模拟令牌） */
 export function isOfflineIdentity(token?: string | null): boolean {
@@ -144,6 +145,30 @@ export const identityApi = {
       });
       throw err;
     }
+  },
+
+  async registerFingerprint(token: string): Promise<void> {
+    if (isOfflineIdentity(token) || getAuthToken() !== token) return;
+    if (fingerprintRegistration?.token === token) return fingerprintRegistration.attempt;
+
+    const attempt: Promise<void> = import('@fingerprintjs/fingerprintjs')
+      .then(async ({ load }) => {
+        const agent = await load({ monitoring: false });
+        const { visitorId } = await agent.get();
+        if (getAuthToken() !== token) return false;
+        const { registered } = await api.post<{ registered: boolean }>('/identity/fingerprint', {
+          fingerprint: visitorId,
+        });
+        return registered;
+      })
+      .catch(() => false)
+      .then((registered) => {
+        if (!registered && fingerprintRegistration?.attempt === attempt) {
+          fingerprintRegistration = undefined;
+        }
+      });
+    fingerprintRegistration = { token, attempt };
+    return attempt;
   },
 
   /** 重新生成恢复码，旧码立即作废；返回新码明文 */

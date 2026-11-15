@@ -10,6 +10,7 @@ import { generateRecoveryCode, hashRecoveryCode } from '../infra/recoveryCode.js
 import { AppError } from '../infra/errors.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { isBanActive, type BanChecker } from '../services/BanChecker.js';
+import { DeviceFingerprintService } from '../services/DeviceFingerprintService.js';
 import {
   InMemoryRecoverAttemptLimiter,
   recoverLimitKey,
@@ -83,23 +84,45 @@ export interface IdentityTables {
 
 export interface IdentityRouterDeps {
   prisma?: IdentityPrisma;
+  fingerprints?: Pick<DeviceFingerprintService, 'register'>;
   recoverLimiter?: RecoverAttemptLimiter;
   /** 断开某账号现有的全部实时连接，返回断开数；恢复成功后用来踢掉旧设备 */
   disconnectPlayer?: (playerId: string, code?: string, message?: string) => number;
 }
 
+const visitorIdSchema = z
+  .string()
+  .regex(/^[0-9a-f]{32}$/i)
+  .toLowerCase();
+const fingerprintBody = z.object({ fingerprint: visitorIdSchema });
+// 旧的身份请求曾接受任意不超过 128 个字符的占位值，继续只收集有效的 visitorId。
+const optionalVisitorId = z
+  .string()
+  .max(128)
+  .transform((value) => visitorIdSchema.safeParse(value).data)
+  .optional();
+
 /** 身份路由；数据库访问由调用方注入，缺省用全局客户端 */
 export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
   const prisma = deps.prisma ?? (defaultPrisma as unknown as IdentityPrisma);
+  const fingerprints =
+    deps.fingerprints ?? (deps.prisma ? undefined : new DeviceFingerprintService(defaultPrisma));
   const recoverLimiter = deps.recoverLimiter ?? new InMemoryRecoverAttemptLimiter();
   const router = new Router();
+
+  function recordOptionalFingerprint(playerId: string, fingerprint: string | undefined): void {
+    if (!fingerprint || !fingerprints) return;
+    void fingerprints.register(playerId, fingerprint).catch(() => {
+      logger.warn({ playerId }, 'device fingerprint registration failed');
+    });
+  }
 
   // POST /identity/init - 首次访问建档
   const initSchema = z.object({
     nickname: nicknameSchema.default('旅行者'),
     // 长度上限与数据库列宽一致，超长在入口就拒绝，不要落成 500
     locale: z.string().max(10).default('zh-CN'),
-    fingerprint: z.string().max(128).optional(),
+    fingerprint: optionalVisitorId,
   });
 
   router.post('/identity/init', async (ctx) => {
@@ -130,6 +153,7 @@ export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
       nickname: player.nickname,
       tokenVersion: player.tokenVersion,
     });
+    recordOptionalFingerprint(player.id, body.fingerprint);
 
     ctx.status = 201;
     ctx.body = {
@@ -145,12 +169,12 @@ export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
   // POST /identity/recover - 凭恢复码恢复身份
   const recoverSchema = z.object({
     code: z.string().refine(isRecoveryCodeShape),
-    fingerprint: z.string().max(128).optional(),
+    fingerprint: optionalVisitorId,
   });
 
   router.post('/identity/recover', async (ctx) => {
     // 先校验形状再占额度：格式不对的请求直接 400，不消耗额度也不查库
-    const { code } = recoverSchema.parse(ctx.request.body);
+    const { code, fingerprint } = recoverSchema.parse(ctx.request.body);
 
     // 先占额度再校验：并发请求各自原子占用，不会在失败计数落地之前全部越过检查
     // 限速器（含回落的进程内计数）自身抛错时拒绝请求：宁可让恢复暂时不可用，也不放开对恢复码的穷举
@@ -224,6 +248,7 @@ export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
       nickname: claimed.nickname,
       tokenVersion: claimed.tokenVersion,
     });
+    recordOptionalFingerprint(playerId, fingerprint);
 
     ctx.body = {
       playerId,
@@ -233,6 +258,12 @@ export function createIdentityRouter(deps: IdentityRouterDeps = {}): Router {
       recoveryCode: newCode,
       recoveryCodeWarning: '此码只显示一次，请妥善保存；刚用过的恢复码已失效',
     };
+  });
+
+  router.post('/identity/fingerprint', authMiddleware, async (ctx) => {
+    const { fingerprint } = fingerprintBody.parse(ctx.request.body);
+    await fingerprints?.register(ctx.state.player.playerId, fingerprint);
+    ctx.body = { registered: fingerprints !== undefined };
   });
 
   // GET /identity/me - 当前玩家信息

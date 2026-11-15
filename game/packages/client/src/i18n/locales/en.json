@@ -30,6 +30,7 @@
     "players": "Players",
     "nicknameLabel": "Pick a nickname",
     "nicknamePlaceholder": "3–12 characters",
+    "fingerprintNotice": "Online sign-in sends a browser fingerprint hash to the game server to help detect cheating in matchmaking.",
     "continue": "Continue",
     "maxPlayers": "Max Players",
     "codeHint": "Enter a 6-digit room code",
