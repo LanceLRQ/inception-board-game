@@ -3,8 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { api, ApiRequestError } from '../../lib/api';
+import { api, ApiRequestError, getAuthToken } from '../../lib/api';
+import { identityApi } from '../../lib/identityApi';
 import { requestErrorMessage } from '../../lib/roomQueries';
+
+const FINGERPRINT_MATCH_WAIT_MS = 800;
 
 type MatchmakingStatus =
   | { status: 'idle' }
@@ -41,10 +44,24 @@ export function QuickMatch({
       state.data?.status === 'queued' || state.data?.status === 'matching' ? 3000 : false,
   });
   const change = useMutation({
-    mutationFn: (cancelTicket?: number) =>
-      cancelTicket === undefined
-        ? api.post<MatchmakingStatus>('/matchmake', { playerCount })
-        : api.del<MatchmakingStatus>(`/matchmake?ticketId=${cancelTicket}`),
+    mutationFn: async (cancelTicket?: number): Promise<MatchmakingStatus> => {
+      if (cancelTicket !== undefined) {
+        return api.del<MatchmakingStatus>(`/matchmake?ticketId=${cancelTicket}`);
+      }
+      const token = getAuthToken();
+      if (token) {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          identityApi.registerFingerprint(token),
+          new Promise<void>((resolve) => {
+            timeout = setTimeout(resolve, FINGERPRINT_MATCH_WAIT_MS);
+          }),
+        ]);
+        clearTimeout(timeout);
+        if (getAuthToken() !== token) return { status: 'idle' };
+      }
+      return api.post<MatchmakingStatus>('/matchmake', { playerCount });
+    },
     onMutate: () => client.cancelQueries({ queryKey: key }),
     onSuccess: async (ticket) => {
       await client.cancelQueries({ queryKey: key });

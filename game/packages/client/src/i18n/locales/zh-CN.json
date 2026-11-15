@@ -54,7 +54,7 @@
     "start": "开始匹配",
     "queued": "正在匹配 {{count}} 人局…",
     "matching": "已凑齐 {{count}} 人，正在开局…",
-    "lowReputation": "你正在低信誉池匹配。完成对局有助于恢复常规匹配资格。",
+    "lowReputation": "你正在低信誉池匹配。",
     "enter": "进入对局",
     "cancel": "取消匹配"
   },

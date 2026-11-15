@@ -23,6 +23,7 @@ import type { RecoverAttemptLimiter } from './services/RecoverAttemptLimiter.js'
 import { BotManager } from './services/BotManager.js';
 import type { ChatLog } from './services/ChatLog.js';
 import { ChatService } from './services/ChatService.js';
+import { DeviceFingerprintService } from './services/DeviceFingerprintService.js';
 import {
   LobbyService,
   type LobbyPrisma,
@@ -46,6 +47,7 @@ export interface RealtimeDeps {
   matchmaking?: Pick<ConstructorParameters<typeof MatchmakingService>[0], 'redis' | 'reputation'>;
   /** 身份接口的数据库访问；默认全局数据库客户端 */
   identityPrisma?: IdentityPrisma;
+  fingerprints?: Pick<DeviceFingerprintService, 'register' | 'linkedToActiveBans'>;
   /** 恢复码失败限速计数器；默认进程内实现（生产入口传 Redis 实现） */
   recoverLimiter?: RecoverAttemptLimiter;
   /** 封禁查询器；默认在身份数据库（未给时用全局数据库）上建带缓存的实现 */
@@ -113,6 +115,8 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
   const heartbeat = new HeartbeatManager(deps.heartbeatRedis);
   const moveGateway = new MoveGateway(deps.rateGuard ?? new InMemoryRateGuard());
   const bans = deps.bans ?? createBanChecker(deps.identityPrisma ?? prisma);
+  const fingerprints =
+    deps.fingerprints ?? (deps.identityPrisma ? undefined : new DeviceFingerprintService(prisma));
 
   // 聊天先挂一个转调网关的广播函数；网关建好之后才有真正的广播
   const chat = new ChatService((matchID, msg) => gateway.broadcastToMatch(matchID, msg), {
@@ -176,6 +180,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
         ...deps.matchmaking,
         prisma: deps.lobbyPrisma ?? prisma,
         bans,
+        fingerprints,
         matches,
       }),
     }),
@@ -183,6 +188,7 @@ export function buildRealtime(deps: RealtimeDeps): Realtime {
     rateLimit: deps.httpRateLimit,
     archive: deps.archive,
     identityPrisma: deps.identityPrisma,
+    fingerprints,
     recoverLimiter: deps.recoverLimiter,
     bans,
     // 对局连接与房间推送连接都要断开

@@ -1,15 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
 import { AppError } from '../infra/errors.js';
+import { logger } from '../infra/logger.js';
 import { RedisKeys } from '../infra/redisKeys.js';
 import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from './BanChecker.js';
+import type { DeviceFingerprintService } from './DeviceFingerprintService.js';
 import type { LobbyPrisma } from './LobbyService.js';
-import type { ReputationRecord, ReputationService } from './ReputationService.js';
+import {
+  computeReputationLevel,
+  type ReputationRecord,
+  type ReputationService,
+} from './ReputationService.js';
 
 const TICKET_TTL = 60;
 const ASSIGNMENT_TTL = 86_400;
 const NOVICE_MATCHES = 3;
+const LINKED_BAN_SCORE_CAP = 30;
 
 type MatchmakingStatus =
   | { status: 'idle' }
@@ -26,9 +33,13 @@ interface Ticket {
 
 function queueKey(
   playerCount: number,
-  { level, completedMatches }: Pick<ReputationRecord, 'level' | 'completedMatches'>,
+  { level, score, completedMatches }: ReputationRecord,
+  linkedToBan: boolean,
 ): string {
-  const pool = completedMatches < NOVICE_MATCHES ? 'novice' : level;
+  const effectiveLevel = linkedToBan
+    ? computeReputationLevel(Math.min(score, LINKED_BAN_SCORE_CAP), completedMatches)
+    : level;
+  const pool = completedMatches < NOVICE_MATCHES ? 'novice' : effectiveLevel;
   return `${playerCount}:classic:${pool}`;
 }
 
@@ -152,7 +163,8 @@ export class MatchmakingService {
   constructor(
     private readonly deps: {
       redis: Pick<Redis, 'eval'>;
-      reputation: Pick<ReputationService, 'get' | 'getMany'>;
+      reputation: Pick<ReputationService, 'getMany'>;
+      fingerprints?: Pick<DeviceFingerprintService, 'linkedToActiveBans'>;
       prisma: LobbyPrisma;
       bans: Pick<BanChecker, 'isBanned'>;
       matches: Pick<
@@ -251,7 +263,26 @@ export class MatchmakingService {
   }
 
   private async queueFor(playerId: string, playerCount: number): Promise<string> {
-    return queueKey(playerCount, await this.deps.reputation.get(playerId));
+    return (await this.queuesFor(playerCount, [playerId]))[playerId]!;
+  }
+
+  private async queuesFor(
+    playerCount: number,
+    playerIds: readonly string[],
+  ): Promise<Record<string, string>> {
+    const [reputations, linked] = await Promise.all([
+      this.deps.reputation.getMany(playerIds),
+      this.deps.fingerprints?.linkedToActiveBans(playerIds).catch(() => {
+        logger.warn('device fingerprint association lookup failed');
+        return undefined;
+      }),
+    ]);
+    return Object.fromEntries(
+      reputations.map((record) => [
+        record.playerId,
+        queueKey(playerCount, record, linked?.has(record.playerId) ?? false),
+      ]),
+    );
   }
 
   private async tryMatch(playerId: string, ticket: Ticket): Promise<void> {
@@ -289,13 +320,11 @@ export class MatchmakingService {
             };
           }),
         );
-        // 账号检查后，用同一次查询读取整桌候选人的信誉。
+        // 账号检查后，批量复核整桌候选人的分池。
         const candidates = profiles.filter((profile) => profile !== null);
-        const reputations = await this.deps.reputation.getMany(
+        destinations = await this.queuesFor(
+          ticket.playerCount,
           candidates.map(({ playerId }) => playerId),
-        );
-        destinations = Object.fromEntries(
-          reputations.map((record) => [record.playerId, queueKey(ticket.playerCount, record)]),
         );
         const verified = candidates.filter(({ playerId }) => {
           if (!this.deps.matches.isPlayerInActiveMatch(playerId)) return true;

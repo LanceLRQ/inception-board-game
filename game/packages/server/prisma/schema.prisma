@@ -70,6 +70,7 @@ model DeviceFingerprint {
 
   @@id([fingerprint, playerId])
   @@index([fingerprint], map: "idx_fp_by_fp")
+  @@index([playerId], map: "idx_fp_by_player")
   @@index([lastSeenAt], map: "idx_fp_last_seen")
   @@map("device_fingerprints")
 }

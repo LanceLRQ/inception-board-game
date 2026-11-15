@@ -54,7 +54,7 @@
     "start": "Find Match",
     "queued": "Finding a {{count}}-player match…",
     "matching": "{{count}} players found. Starting match…",
-    "lowReputation": "You’re in the low-reputation pool. Completing matches helps you return to regular matchmaking.",
+    "lowReputation": "You’re in the low-reputation pool.",
     "enter": "Enter Match",
     "cancel": "Cancel Search"
   },
