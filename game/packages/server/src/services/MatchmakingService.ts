@@ -5,10 +5,11 @@ import { RedisKeys } from '../infra/redisKeys.js';
 import type { MatchService } from '../match/MatchService.js';
 import type { BanChecker } from './BanChecker.js';
 import type { LobbyPrisma } from './LobbyService.js';
-import type { ReputationLevel, ReputationService } from './ReputationService.js';
+import type { ReputationRecord, ReputationService } from './ReputationService.js';
 
 const TICKET_TTL = 60;
 const ASSIGNMENT_TTL = 86_400;
+const NOVICE_MATCHES = 3;
 
 type MatchmakingStatus =
   | { status: 'idle' }
@@ -23,8 +24,12 @@ interface Ticket {
   queuedUntil?: number;
 }
 
-function queueKey(playerCount: number, level: ReputationLevel): string {
-  return `${playerCount}:classic:${level}`;
+function queueKey(
+  playerCount: number,
+  { level, completedMatches }: Pick<ReputationRecord, 'level' | 'completedMatches'>,
+): string {
+  const pool = completedMatches < NOVICE_MATCHES ? 'novice' : level;
+  return `${playerCount}:classic:${pool}`;
 }
 
 // 同一账号的票据跨队列唯一；用自增序号保持同一毫秒入队时的先后顺序。
@@ -154,6 +159,7 @@ export class MatchmakingService {
         MatchService,
         | 'createMatchedMatch'
         | 'get'
+        | 'matchSettlement'
         | 'seatOf'
         | 'leaveMatch'
         | 'discardMatch'
@@ -165,7 +171,7 @@ export class MatchmakingService {
   async enqueue(playerId: string, playerCount: number): Promise<MatchmakingStatus> {
     const current = await this.updateTicket(playerId, 'refresh');
     if (current) {
-      const status = await this.advance(playerId, current);
+      const status = await this.advance(playerId, current, true);
       if (status.status !== 'idle') return status;
     }
     if (this.deps.matches.isPlayerInActiveMatch(playerId)) {
@@ -173,7 +179,7 @@ export class MatchmakingService {
     }
     const queue = await this.queueFor(playerId, playerCount);
     const raw = await this.run(ENQUEUE, playerId, queue, playerCount, TICKET_TTL);
-    return this.advance(playerId, JSON.parse(raw as string) as Ticket);
+    return this.advance(playerId, JSON.parse(raw as string) as Ticket, true);
   }
 
   async poll(playerId: string): Promise<MatchmakingStatus> {
@@ -206,13 +212,20 @@ export class MatchmakingService {
     if (room?.mode !== 'matchmaking' || !room.seats().some((seat) => seat.playerId === playerId)) {
       throw new AppError('FORBIDDEN', '你不在这场匹配对局中');
     }
+    if (room.current().ctx.gameover !== undefined) return;
     await this.deps.matches.leaveMatch(matchId, playerId);
-    await this.updateTicket(playerId, 'clear', matchId);
+    if (this.deps.matches.seatOf(matchId, playerId) === null) {
+      await this.updateTicket(playerId, 'clear', matchId);
+    }
   }
 
-  private async advance(playerId: string, ticket: Ticket): Promise<MatchmakingStatus> {
+  private async advance(
+    playerId: string,
+    ticket: Ticket,
+    joining = false,
+  ): Promise<MatchmakingStatus> {
     if (ticket.matchId) {
-      const status = await this.toStatus(playerId, ticket);
+      const status = await this.toStatus(playerId, ticket, joining);
       if (status.status !== 'queued') return status;
       const restored = await this.updateTicket(playerId, 'refresh');
       if (!restored || restored.matchId) return this.toStatus(playerId, restored);
@@ -238,8 +251,7 @@ export class MatchmakingService {
   }
 
   private async queueFor(playerId: string, playerCount: number): Promise<string> {
-    const { level } = await this.deps.reputation.get(playerId);
-    return queueKey(playerCount, level);
+    return queueKey(playerCount, await this.deps.reputation.get(playerId));
   }
 
   private async tryMatch(playerId: string, ticket: Ticket): Promise<void> {
@@ -279,11 +291,11 @@ export class MatchmakingService {
         );
         // 账号检查后，用同一次查询读取整桌候选人的信誉。
         const candidates = profiles.filter((profile) => profile !== null);
-        const levels = await this.deps.reputation.getMany(
+        const reputations = await this.deps.reputation.getMany(
           candidates.map(({ playerId }) => playerId),
         );
         destinations = Object.fromEntries(
-          levels.map(({ playerId, level }) => [playerId, queueKey(ticket.playerCount, level)]),
+          reputations.map((record) => [record.playerId, queueKey(ticket.playerCount, record)]),
         );
         const verified = candidates.filter(({ playerId }) => {
           if (!this.deps.matches.isPlayerInActiveMatch(playerId)) return true;
@@ -315,7 +327,11 @@ export class MatchmakingService {
     }
   }
 
-  private async toStatus(playerId: string, ticket: Ticket | null): Promise<MatchmakingStatus> {
+  private async toStatus(
+    playerId: string,
+    ticket: Ticket | null,
+    joining = false,
+  ): Promise<MatchmakingStatus> {
     if (!ticket) return { status: 'idle' };
     const { matchId, playerCount, order, queue } = ticket;
     const details = {
@@ -328,10 +344,6 @@ export class MatchmakingService {
       return { status: 'matching', ...details };
     }
     const match = this.deps.matches.get(matchId);
-    if (!match && ticket.queuedUntil !== undefined) {
-      const recovered = await this.updateTicket(playerId, 'restore', matchId);
-      return recovered ? this.toStatus(playerId, recovered) : { status: 'idle' };
-    }
     if (
       match &&
       match.current().ctx.gameover === undefined &&
@@ -339,8 +351,18 @@ export class MatchmakingService {
     ) {
       return { status: 'matched', matchId };
     }
+    const settlement = await this.deps.matches.matchSettlement(matchId);
+    if (settlement === 'pending') {
+      // 成绩和信誉一起入库后，玩家才能用最新的完成局数重新排队。
+      if (joining) throw new AppError('CONFLICT', '上一场匹配正在结算，请稍后再试');
+      return { status: 'idle' };
+    }
+    if (!match && settlement === null && ticket.queuedUntil !== undefined) {
+      const recovered = await this.updateTicket(playerId, 'restore', matchId);
+      return recovered ? this.toStatus(playerId, recovered, joining) : { status: 'idle' };
+    }
     const latest = await this.updateTicket(playerId, 'clear', matchId);
-    return latest ? this.toStatus(playerId, latest) : { status: 'idle' };
+    return latest ? this.toStatus(playerId, latest, joining) : { status: 'idle' };
   }
 
   private async updateTicket(

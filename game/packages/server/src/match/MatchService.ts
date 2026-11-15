@@ -228,6 +228,13 @@ export class MatchService {
     return this.rooms.get(matchID) ?? null;
   }
 
+  async matchSettlement(matchID: string): Promise<'pending' | 'settled' | null> {
+    const state =
+      this.rooms.get(matchID)?.current() ?? (await this.deps.store.load(matchID))?.state;
+    if (state?.ctx.gameover === undefined) return null;
+    return (await this.deps.archive.matchInfo(matchID))?.endedAt ? 'settled' : 'pending';
+  }
+
   /** 本进程里正在运行的对局数（含刚结束、还在延迟移除的） */
   activeCount(): number {
     return this.rooms.size;

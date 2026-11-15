@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { io, type Socket } from 'socket.io-client';
 import Redis from 'ioredis';
+import { nextAutoAction } from '@icgame/bot';
 import { startDevServer, type DevServer } from './devServer.js';
 import { RedisKeys } from '../infra/redisKeys.js';
+import { InMemoryMatchArchive } from '../match/MatchArchive.js';
 import { InMemoryReputationStore, ReputationService } from '../services/ReputationService.js';
 
 vi.mock('../infra/logger.js', () => ({
@@ -71,6 +73,7 @@ describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
           user.token,
           method === 'POST' ? { playerCount: 4 } : undefined,
         );
+      for (const user of [changed, a, b, c, d]) await store.applyDelta(user!.playerId, 0, 50, 3);
       const ticket = await request(changed!, 'POST');
       await request(a!, 'POST');
       await request(b!, 'POST');
@@ -109,8 +112,166 @@ describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
       await redis.zadd(`${baseQueue}4:classic:normal`, 1000, legacy!.playerId);
       expect(await request(legacy!)).toEqual({ status: 'queued', playerCount: 4, ticketId: 1000 });
       expect(await redis.zscore(`${baseQueue}4:classic:normal`, legacy!.playerId)).toBeNull();
-      expect(await redis.zscore(`${baseQueue}4:classic:regular`, legacy!.playerId)).toBe('1000');
+      expect(await redis.zscore(`${baseQueue}4:classic:novice`, legacy!.playerId)).toBe('1000');
     } finally {
+      const keys = await redis.keys(`${prefix}*`);
+      if (keys.length) await redis.del(...keys.map((key) => key.slice(prefix.length)));
+      await redis.quit();
+    }
+  });
+
+  it('前三场按新手分池，凑桌时已完成第三场的账号保留票据迁出', async () => {
+    const prefix = `ico-test-${crypto.randomUUID()}:`;
+    const redis = new Redis(redisUrl!, { keyPrefix: prefix });
+    const store = new InMemoryReputationStore();
+    const reputation = new ReputationService(store);
+    try {
+      dev = await startDevServer({ matchmakingRedis: redis, reputation });
+      const { url, rt } = dev;
+      const users = await Promise.all(
+        Array.from({ length: 6 }, (_, i) =>
+          api<{ playerId: string; token: string }>(url, 'POST', '/identity/init', undefined, {
+            nickname: `新手池玩家${i}`,
+          }),
+        ),
+      );
+      const [graduating, lowNovice, a, b, c, veteran] = users;
+      const request = (user: (typeof users)[number], method = 'GET') =>
+        api<{ status: string; matchId?: string; ticketId?: number }>(
+          url,
+          method,
+          '/matchmake',
+          user.token,
+          method === 'POST' ? { playerCount: 4 } : undefined,
+        );
+      await store.applyDelta(graduating!.playerId, 0, 50, 2);
+      await store.applyDelta(lowNovice!.playerId, -15, 50);
+      await store.applyDelta(veteran!.playerId, 0, 50, 3);
+
+      const ticket = await request(graduating!, 'POST');
+      expect(await request(veteran!, 'POST')).toMatchObject({ status: 'queued' });
+      expect(await request(lowNovice!, 'POST')).not.toHaveProperty('lowReputation');
+      expect(await request(a!, 'POST')).toMatchObject({ status: 'queued' });
+      expect(rt.matches.activeCount()).toBe(0);
+
+      await reputation.adjust(graduating!.playerId, 'abandon');
+      expect(await request(graduating!)).toEqual(ticket);
+      await reputation.adjust(graduating!.playerId, 'complete');
+      expect(await request(b!, 'POST')).toMatchObject({ status: 'queued' });
+      const regularQueue = `${RedisKeys.matchmaking()}:queue:4:classic:regular`;
+      expect(await redis.zscore(regularQueue, graduating!.playerId)).toBe(String(ticket.ticketId));
+      expect(await request(graduating!)).toEqual(ticket);
+
+      const { status, matchId } = await request(c!, 'POST');
+      expect(status).toBe('matched');
+      expect(
+        rt.matches
+          .get(matchId!)
+          ?.seats()
+          .map(({ playerId }) => playerId),
+      ).toEqual([lowNovice, a, b, c].map((user) => user!.playerId));
+      expect(await request(veteran!)).toMatchObject({ status: 'queued' });
+    } finally {
+      const keys = await redis.keys(`${prefix}*`);
+      if (keys.length) await redis.del(...keys.map((key) => key.slice(prefix.length)));
+      await redis.quit();
+    }
+  });
+
+  it('第三场还在结算时复用原票据，入库后才能进入常规池', async () => {
+    const prefix = `ico-test-${crypto.randomUUID()}:`;
+    const redis = new Redis(redisUrl!, { keyPrefix: prefix });
+    const store = new InMemoryReputationStore();
+    const reputation = new ReputationService(store);
+    let release = (): void => {};
+    let entered = (): void => {};
+    const releaseFinish = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const enteredFinish = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const recordFinish = InMemoryMatchArchive.prototype.recordFinish;
+    const slowFinish = vi
+      .spyOn(InMemoryMatchArchive.prototype, 'recordFinish')
+      .mockImplementationOnce(async function (this: InMemoryMatchArchive, ...args) {
+        entered();
+        await releaseFinish;
+        await recordFinish.apply(this, args);
+      });
+    let lastMove: Promise<unknown> | undefined;
+    try {
+      dev = await startDevServer({
+        matchmakingRedis: redis,
+        reputation,
+        randomSeed: () => 'ab'.repeat(32),
+      });
+      const { url, rt } = dev;
+      const users = await Promise.all(
+        Array.from({ length: 7 }, (_, i) =>
+          api<{ playerId: string; token: string }>(url, 'POST', '/identity/init', undefined, {
+            nickname: `结算玩家${i}`,
+          }),
+        ),
+      );
+      const join = (user: (typeof users)[number]) =>
+        api<{ status: string; matchId?: string }>(url, 'POST', '/matchmake', user.token, {
+          playerCount: 4,
+        });
+      const graduating = users[0]!;
+      await store.applyDelta(graduating.playerId, 0, 50, 2);
+      for (const user of users.slice(0, 3)) await join(user);
+      const { matchId } = await join(users[3]!);
+      const room = rt.matches.get(matchId!)!;
+      for (const user of users.slice(4)) await join(user);
+
+      for (let i = 0; i < 1000 && room.current().ctx.gameover === undefined; i++) {
+        const action = nextAutoAction(room.current(), { humanPlayerIDs: [] })!;
+        lastMove = room
+          .submit(action.playerID, { ...action, intentId: String(i) })
+          .then((result) => {
+            expect(result.ok).toBe(true);
+          });
+        await Promise.race([lastMove, enteredFinish]);
+      }
+      expect(room.current().ctx.gameover).toBeDefined();
+      expect((await reputation.get(graduating.playerId)).completedMatches).toBe(2);
+      const headers = {
+        authorization: `Bearer ${graduating.token}`,
+        'content-type': 'application/json',
+      };
+      const retry = await fetch(`${url}/matchmake`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ playerCount: 4 }),
+      });
+      expect(retry.status).toBe(409);
+      expect(rt.matches.activeCount()).toBe(1);
+      const ticket = await redis.get(RedisKeys.matchmakingTicket(graduating.playerId));
+      const assignment = JSON.parse(ticket!) as { matchId: string; order: number };
+      expect(assignment.matchId).toBe(matchId);
+      expect(
+        await api(url, 'DELETE', `/matchmake?ticketId=${assignment.order}`, graduating.token),
+      ).toEqual({ status: 'idle' });
+      expect(await api(url, 'POST', `/matches/${matchId}/leave`, graduating.token)).toEqual({
+        ok: true,
+      });
+      expect(await redis.get(RedisKeys.matchmakingTicket(graduating.playerId))).toBe(ticket);
+
+      release();
+      await lastMove;
+      expect((await reputation.get(graduating.playerId)).completedMatches).toBe(3);
+      expect(await join(graduating)).toMatchObject({ status: 'queued' });
+      expect(
+        await redis.zscore(
+          `${RedisKeys.matchmaking()}:queue:4:classic:regular`,
+          graduating.playerId,
+        ),
+      ).not.toBeNull();
+    } finally {
+      release();
+      await lastMove;
+      slowFinish.mockRestore();
       const keys = await redis.keys(`${prefix}*`);
       if (keys.length) await redis.del(...keys.map((key) => key.slice(prefix.length)));
       await redis.quit();
@@ -140,7 +301,7 @@ describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
         });
       const status = (user: User) =>
         api<{ status: string; matchId: string }>(base, 'GET', '/matchmake', user.token);
-      await reputationStore.applyDelta(otherReputation!.playerId, -15, 50);
+      await reputationStore.applyDelta(otherReputation!.playerId, -15, 50, 3);
       expect((await fetch(`${base}/matchmake`)).status).toBe(401);
       expect(await join(otherSize!, 5)).toMatchObject({ status: 'queued', playerCount: 5 });
       expect(await join(otherReputation!)).toMatchObject({ status: 'queued' });
@@ -203,7 +364,11 @@ describe.skipIf(!redisUrl)('快速匹配 HTTP 与真实 Redis', () => {
       );
       expect(views.map(({ seat }) => seat)).toEqual(['0', '1', '2', '3']);
       expect(await status(otherSize!)).toMatchObject({ status: 'queued', playerCount: 5 });
-      expect(await status(otherReputation!)).toMatchObject({ status: 'queued', playerCount: 4 });
+      expect(await status(otherReputation!)).toMatchObject({
+        status: 'queued',
+        playerCount: 4,
+        lowReputation: true,
+      });
       expect(await status(waiter!)).toEqual({ status: 'idle' });
       expect(await status(expired!)).toEqual({ status: 'idle' });
 
