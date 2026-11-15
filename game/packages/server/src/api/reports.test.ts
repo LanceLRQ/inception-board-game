@@ -27,6 +27,8 @@ const fakePrisma: ReportsPrisma = {
       if (where.id.toLowerCase() !== MATCH_ID) return null;
       return {
         id: MATCH_ID,
+        mode: 'friend',
+        endedAt: null,
         matchPlayers: [
           { seat: 0, playerId: ACCOUNT_A, isBot: false },
           { seat: 1, playerId: ACCOUNT_B, isBot: false },
@@ -44,13 +46,13 @@ afterEach(async () => {
   server = null;
 });
 
-async function setup() {
+async function setup(prisma = fakePrisma) {
   const archive = new InMemoryReportArchive();
   const reportService = new ReportService({ archive });
   const app = new Koa();
   app.use(errorHandler);
   app.use(bodyParser());
-  app.use(createReportsRouter({ prisma: fakePrisma, reportService }).routes());
+  app.use(createReportsRouter({ prisma, reportService }).routes());
   server = createServer(app.callback());
   await new Promise<void>((resolve) => server!.listen(0, resolve));
   const { port } = server.address() as AddressInfo;
@@ -99,6 +101,30 @@ describe('POST /matches/:id/report', () => {
     const rows = await archive.list({});
     expect(rows).toHaveLength(1);
     expect(rows[0]?.matchID).toBe(MATCH_ID);
+  });
+
+  it('匹配局尚未结算时可重试，结算后提交同一举报成功', async () => {
+    let endedAt: Date | null = null;
+    const { post, archive } = await setup({
+      match: {
+        async findUnique(args) {
+          const match = await fakePrisma.match.findUnique(args);
+          return match && { ...match, mode: 'matchmaking', endedAt };
+        },
+      },
+    });
+    const report = { targetSeat: 1, reason: 'afk' };
+    const early = await post(MATCH_ID, ACCOUNT_A, report);
+    expect(early.status).toBe(503);
+    expect(early.json).toMatchObject({ error: { code: 'MATCH_NOT_SETTLED' } });
+    expect(archive.size()).toBe(0);
+
+    endedAt = new Date();
+    expect(await post(MATCH_ID, ACCOUNT_A, report)).toEqual({
+      status: 201,
+      json: { reported: true },
+    });
+    expect(archive.size()).toBe(1);
   });
 
   it('对局不存在 404（含不是 UUID 的对局 ID）', async () => {

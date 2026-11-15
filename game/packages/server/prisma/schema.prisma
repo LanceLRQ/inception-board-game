@@ -276,7 +276,7 @@ model Report {
   @@unique([matchId, reporterId, targetId], map: "uq_reports_match_reporter_target")
   @@index([status, createdAt(sort: Desc)], map: "idx_reports_status_created")
   @@index([matchId], map: "idx_reports_match")
-  @@index([targetId], map: "idx_reports_target")
+  @@index([targetId, createdAt(sort: Desc)], map: "idx_reports_target_created")
   @@index([reporterId], map: "idx_reports_reporter")
   @@index([createdAt(sort: Desc)], map: "idx_reports_created")
   @@map("reports")

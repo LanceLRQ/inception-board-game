@@ -5,7 +5,7 @@
 //   - 请求体：{ targetSeat, reason, description? }；目标由座位号在这局的成员里解析，
 //     不接受客户端传来的账号 ID，避免举报与本局无关的人
 //   - 举报人必须是这局的真人成员；目标必须是另一个真人座位
-//   - 提交只入库；重复举报由数据库唯一约束拦截
+//   - 快速匹配结算后开放举报，可触发信誉扣分；重复举报由数据库唯一约束拦截
 
 import Router from '@koa/router';
 import { z } from 'zod';
@@ -27,10 +27,14 @@ export interface ReportsPrisma {
       where: { id: string };
       select: {
         id: true;
+        mode: true;
+        endedAt: true;
         matchPlayers: { select: { seat: true; playerId: true; isBot: true } };
       };
     }): Promise<{
       id: string;
+      mode: string;
+      endedAt: Date | null;
       matchPlayers: Array<{ seat: number; playerId: string | null; isBot: boolean }>;
     } | null>;
   };
@@ -75,6 +79,8 @@ export function createReportsRouter(deps: ReportsRouterDeps): Router {
           where: { id: matchID },
           select: {
             id: true,
+            mode: true,
+            endedAt: true,
             matchPlayers: { select: { seat: true, playerId: true, isBot: true } },
           },
         })
@@ -95,6 +101,11 @@ export function createReportsRouter(deps: ReportsRouterDeps): Router {
       return rejectTarget('INVALID_TARGET', 'Target seat is not a human player');
     }
     if (target.playerId === playerId) return rejectTarget('SELF_REPORT', 'Cannot report yourself');
+    if (match.mode === 'matchmaking' && match.endedAt === null) {
+      ctx.status = 503;
+      ctx.body = { error: { code: 'MATCH_NOT_SETTLED', message: '对局尚未结算，请稍后再举报' } };
+      return;
+    }
 
     const result = await reportService.submit({
       // 用库里的规范 ID 去重落库：URL 里的写法大小写不定，原样写入会让唯一约束失效

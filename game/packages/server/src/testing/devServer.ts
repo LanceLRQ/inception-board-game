@@ -123,6 +123,8 @@ function memoryReports(getRealtime: () => Realtime | null) {
         if (room === null) return null;
         return {
           id: where.id,
+          mode: room.mode ?? 'friend',
+          endedAt: room.current().ctx.gameover === undefined ? null : new Date(),
           matchPlayers: room.seats().map((s) => ({
             seat: Number(s.seat),
             playerId: s.playerId,
