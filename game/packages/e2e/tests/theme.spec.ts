@@ -76,7 +76,7 @@ test.describe('主题 Theme', () => {
     await expect(page.getByRole('radiogroup', { name: /选择主题|Choose theme/ })).toBeVisible();
     const noir = page.getByRole('radio', { name: /深眠影院|Cinematic Noir/ });
     await expect(noir).toBeVisible();
-    await expect(noir).toHaveAttribute('aria-checked', 'true');
+    await expect(noir).toBeChecked();
   });
 
   test('localStorage 里的无效旧值刷新后回落到 noir', async ({ page }) => {
@@ -99,9 +99,9 @@ test.describe('主题 Theme', () => {
 
       const radio = page.getByRole('radio', { name: theme.name });
       await expect(radio).toBeVisible();
-      await expect(radio).toHaveAttribute('aria-checked', 'false');
+      await expect(radio).not.toBeChecked();
       await radio.click();
-      await expect(radio).toHaveAttribute('aria-checked', 'true');
+      await expect(radio).toBeChecked();
 
       const html = page.locator('html');
       await expect(html).toHaveAttribute('data-theme', theme.id);
@@ -110,10 +110,7 @@ test.describe('主题 Theme', () => {
       await page.reload();
       await waitForAppReady(page);
       await expect(html).toHaveAttribute('data-theme', theme.id);
-      await expect(page.getByRole('radio', { name: theme.name })).toHaveAttribute(
-        'aria-checked',
-        'true',
-      );
+      await expect(page.getByRole('radio', { name: theme.name })).toBeChecked();
     });
   }
 
@@ -622,7 +619,7 @@ test.describe('主题 Theme · 效果开关', () => {
 
     await page.getByRole('radio', { name: /深眠影院|Cinematic Noir/ }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'noir');
-    await expect(page.getByRole('switch')).toHaveCount(0);
+    await expect(page.getByTestId('effect-settings').getByRole('switch')).toHaveCount(0);
     await expect(page.getByTestId('effect-switches')).toHaveCount(0);
     // 减少动效对所有主题都有意义，始终在
     await expect(page.getByTestId('motion-pref')).toBeVisible();

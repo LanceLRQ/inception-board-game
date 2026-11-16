@@ -21,6 +21,7 @@ import { logger } from '../../lib/logger';
 import { useIdentityStore } from '../../stores/useIdentityStore';
 import { useAvatar } from '../../hooks/useAvatar';
 import { AvatarPicker } from '../../components/AvatarPicker';
+import { SettingsGroup } from './SettingsGroup';
 
 export function AccountSection() {
   const { t } = useTranslation();
@@ -88,16 +89,9 @@ export function AccountSection() {
   }
 
   return (
-    <section
-      className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border"
-      data-testid="settings-account"
-    >
-      <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
-        {t('recovery.account.heading')}
-      </h2>
-
+    <SettingsGroup title={t('recovery.account.heading')} testId="settings-account">
       {!signedIn ? (
-        <div className="flex flex-col gap-3 text-sm">
+        <div className="flex max-w-md flex-col gap-3 text-sm">
           <p>{t('recovery.account.notSignedIn')}</p>
           <Link
             to="/lobby"
@@ -107,7 +101,7 @@ export function AccountSection() {
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 text-sm">
+        <div className="flex max-w-md flex-col gap-3 text-sm">
           {!offline && (
             <Link
               to={`/players/${encodeURIComponent(playerId)}`}
@@ -121,9 +115,10 @@ export function AccountSection() {
             onRoll={avatar.roll}
             rolling={avatar.rolling}
             failed={avatar.failed}
+            size={48}
             testId="settings-avatar"
           />
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
             <span>{t('recovery.account.nickname')}</span>
             <span className="font-medium" data-testid="settings-nickname">
               {nickname}
@@ -135,9 +130,9 @@ export function AccountSection() {
             </p>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
                 <span>{t('recovery.account.status')}</span>
-                <span className="text-right text-muted-foreground" data-testid="settings-status">
+                <span className="text-muted-foreground sm:text-right" data-testid="settings-status">
                   {statusText}
                 </span>
               </div>
@@ -149,7 +144,7 @@ export function AccountSection() {
               <Button
                 type="button"
                 variant="outline"
-                className="self-start"
+                className="min-h-11 self-start"
                 onClick={() => setConfirmOpen(true)}
                 disabled={busy}
                 data-testid="settings-rotate"
@@ -157,6 +152,7 @@ export function AccountSection() {
                 <KeyRound />
                 {t('recovery.account.rotate')}
               </Button>
+              <p className="text-xs text-muted-foreground">{t('lobby.fingerprintNotice')}</p>
             </>
           )}
         </div>
@@ -197,6 +193,6 @@ export function AccountSection() {
       {newCode && (
         <RecoveryCodeDialog open code={newCode} kind="rotated" onConfirm={() => setNewCode(null)} />
       )}
-    </section>
+    </SettingsGroup>
   );
 }

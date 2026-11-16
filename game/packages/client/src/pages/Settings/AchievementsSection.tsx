@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { api } from '../../lib/api';
 import { isOfflineIdentity } from '../../lib/identityApi';
 import { useIdentityStore } from '../../stores/useIdentityStore';
+import { SettingsGroup } from './SettingsGroup';
 
 interface Achievement {
   id: string;
@@ -29,13 +30,7 @@ export function AchievementsSection() {
 
   const date = new Intl.DateTimeFormat(i18n.resolvedLanguage, { dateStyle: 'medium' });
   return (
-    <section
-      className="mb-6 space-y-3 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border"
-      aria-labelledby="settings-achievements"
-    >
-      <h2 id="settings-achievements" className="text-sm font-semibold text-muted-foreground">
-        {t('achievements.title')}
-      </h2>
+    <SettingsGroup title={t('achievements.title')}>
       {achievements.isPending && (
         <p role="status" className="text-sm">
           {t('common.loading')}
@@ -44,7 +39,11 @@ export function AchievementsSection() {
       {achievements.isError && (
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <p role="alert">{t('achievements.loadFailed')}</p>
-          <Button variant="outline" onClick={() => void achievements.refetch()}>
+          <Button
+            variant="outline"
+            className="min-h-11"
+            onClick={() => void achievements.refetch()}
+          >
             {t('common.retry')}
           </Button>
         </div>
@@ -53,7 +52,7 @@ export function AchievementsSection() {
         <p className="text-sm text-muted-foreground">{t('achievements.empty')}</p>
       )}
       {achievements.data && achievements.data.data.length > 0 && (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {achievements.data.data.map(({ id, name, description, unlockedAt }) => (
             <li
               key={id}
@@ -75,6 +74,6 @@ export function AchievementsSection() {
           ))}
         </ul>
       )}
-    </section>
+    </SettingsGroup>
   );
 }

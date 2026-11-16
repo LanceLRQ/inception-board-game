@@ -59,19 +59,18 @@ test('头像：换一个后保存到账号，房间成员列表与对局座位�
     await createProfile(a);
     await createProfile(b);
 
-    // 甲在大厅摇一个新头像：保存成功后换图，刷新页面后仍是它（账号上存着）
-    const avatarA = a.page.getByTestId('lobby-avatar').getByTestId('pixel-avatar');
+    // 甲在设置页更换头像，刷新后验证仍是账号上保存的头像
+    await a.page.goto('/settings');
+    const avatarA = a.page.getByTestId('settings-avatar').getByTestId('pixel-avatar');
     const before = await avatarA.getAttribute('data-seed');
-    await a.page.getByTestId('lobby-avatar-roll').click();
+    await a.page.getByTestId('settings-avatar-roll').click();
     await expect.poll(() => avatarA.getAttribute('data-seed')).not.toBe(before);
     const rolled = (await avatarA.getAttribute('data-seed'))!;
     await a.page.reload();
-    await expect(a.page.getByTestId('lobby-avatar').getByTestId('pixel-avatar')).toHaveAttribute(
-      'data-seed',
-      rolled,
-    );
+    await expect(avatarA).toHaveAttribute('data-seed', rolled);
 
     // 甲建房、乙加入：乙的房间成员列表里，甲的头像就是甲刚摇出的那个
+    await a.page.goto('/lobby');
     await a.page.locator('#lobby-maxPlayers').selectOption('4');
     await a.page.getByTestId('lobby-create').click();
     await expect(a.page).toHaveURL(/\/room\/[A-Z0-9]{6}/);

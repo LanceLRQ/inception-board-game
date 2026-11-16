@@ -13,33 +13,32 @@ test.describe('设置 Settings', () => {
     await expect(page.getByRole('heading', { name: /音效|Audio/ })).toBeVisible();
   });
 
-  test('音效音量滑块可见且可调', async ({ page }) => {
+  test('手机首屏可切换音效，静音时不能调整音量', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/settings');
-    await waitForAppReady(page);
-
-    const slider = page.getByRole('slider').first();
-    if (await slider.isVisible().catch(() => false)) {
-      await slider.focus();
-      await slider.press('ArrowRight');
-      // 断言聚焦态保持（滑块可交互）
-      expect(await slider.isVisible()).toBe(true);
-    }
+    const sound = page.getByRole('switch', { name: /^(音效|Sound)$/ });
+    const slider = page.getByRole('slider');
+    await expect(sound).toBeInViewport({ ratio: 1 });
+    await expect(slider).toBeInViewport({ ratio: 1 });
+    await expect(sound).toBeChecked();
+    await sound.press('Space');
+    await expect(sound).not.toBeChecked();
+    await expect(slider).toBeDisabled();
+    await sound.press('Space');
+    await expect(slider).toBeEnabled();
+    await slider.press('Home');
+    await slider.press('ArrowRight');
+    await expect(slider).toHaveValue('0.05');
   });
 
-  test('静音开关存在且可切换', async ({ page }) => {
+  test('主题可用方向键切换，刷新后保留选择', async ({ page }) => {
     await page.goto('/settings');
-    await waitForAppReady(page);
-
-    const muteToggle = page.getByRole('button', { name: /静音|Mute/ }).first();
-    const checkboxMute = page.getByRole('checkbox', { name: /静音|Mute/ }).first();
-
-    if (await muteToggle.isVisible().catch(() => false)) {
-      await muteToggle.click();
-      await expect(muteToggle).toBeVisible();
-    } else if (await checkboxMute.isVisible().catch(() => false)) {
-      await checkboxMute.click();
-      await expect(checkboxMute).toBeVisible();
-    }
-    // 没有找到也不算失败：UI 可能用其他控件实现
+    const themes = page.getByRole('radiogroup', { name: /选择主题|Choose theme/ });
+    const first = themes.getByRole('radio').first();
+    const second = themes.getByRole('radio').nth(1);
+    await first.press('ArrowRight');
+    await expect(second).toBeChecked();
+    await page.reload();
+    await expect(second).toBeChecked();
   });
 });

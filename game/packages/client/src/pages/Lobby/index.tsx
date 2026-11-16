@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
+import { ArrowRight, ChevronDown, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
 import {
   MATCH_MAX_PLAYERS,
   MATCH_MIN_PLAYERS,
@@ -20,7 +20,8 @@ import { logger } from '../../lib/logger';
 import { readOnlineMatch } from '../../lib/onlineMatchMemo';
 import { useAuth } from '../../hooks/useAuth';
 import { useAvatar } from '../../hooks/useAvatar';
-import { AvatarPicker } from '../../components/AvatarPicker';
+import { PixelAvatar } from '../../components/PixelAvatar';
+import { SitePage } from '../../components/SitePage';
 import {
   RecoveryCodeDialog,
   type RecoveryCodeDialogKind,
@@ -52,8 +53,7 @@ export default function Lobby() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isInitialized, initIdentity, recoverIdentity, nickname, playerId } =
     useAuth();
-  const avatar = useAvatar();
-  const avatarSeed = avatar.seed;
+  const { seed: avatarSeed } = useAvatar();
 
   // 昵称初始化
   const [inputNickname, setInputNickname] = useState('');
@@ -71,6 +71,7 @@ export default function Lobby() {
   const [seriesLength, setSeriesLength] = useState(7);
   // 加入房间
   const [joinCode, setJoinCode] = useState('');
+  const [joinCodeInvalid, setJoinCodeInvalid] = useState(false);
 
   // 进行中的联机对局（刷新或误退后可回去）
   const [resumable] = useState(() => readOnlineMatch());
@@ -150,7 +151,6 @@ export default function Lobby() {
       logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers: size });
       navigate(`/room/${res.code}`);
     },
-    onError: (e) => setError(t('lobby.errorGeneric', { message: requestErrorMessage(e) })),
   });
 
   const joinRoomMutation = useMutation({
@@ -163,8 +163,7 @@ export default function Lobby() {
       logger.flow('lobby', 'joinRoom ok', { code: roomCode });
       navigate(`/room/${roomCode}`);
     },
-    onError: (e, { fromPublicList }) => {
-      setError(t('lobby.errorGeneric', { message: requestErrorMessage(e) }));
+    onError: (_error, { fromPublicList }) => {
       if (fromPublicList)
         void queryClient.invalidateQueries({ queryKey: ['lobby', 'publicRooms'] });
     },
@@ -175,20 +174,18 @@ export default function Lobby() {
 
   const handleCreateRoom = useCallback(() => {
     if (!playerId) return;
-    setError(null);
     createRoomMutation.mutate(maxPlayers);
   }, [playerId, maxPlayers, createRoomMutation]);
 
-  const handleJoinRoom = useCallback(() => {
+  const handleJoinRoom = () => {
+    if (!playerId || roomActionsDisabled || loading || joinCode.length !== 6) return;
     const roomCode = joinCode.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(roomCode)) {
-      setError(t('lobby.codeInvalid'));
+      setJoinCodeInvalid(true);
       return;
     }
-    if (!playerId) return;
-    setError(null);
     joinRoomMutation.mutate({ roomCode });
-  }, [joinCode, playerId, joinRoomMutation, t]);
+  };
 
   const handleResume = useCallback(() => {
     if (!resumable) return;
@@ -310,164 +307,221 @@ export default function Lobby() {
     );
   }
 
+  const publicJoin = joinRoomMutation.variables?.fromPublicList;
+  const profilePath =
+    playerId && token && !isOfflineIdentity(token)
+      ? `/players/${encodeURIComponent(playerId)}`
+      : null;
+  const manualJoinError = joinCodeInvalid
+    ? t('lobby.codeInvalid')
+    : !publicJoin && joinRoomMutation.error
+      ? t('lobby.errorGeneric', { message: requestErrorMessage(joinRoomMutation.error) })
+      : null;
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 bg-background p-6 text-foreground">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t('landing.multiplayer')}</h1>
-        {playerId && token && !isOfflineIdentity(token) ? (
+    <SitePage
+      title={t('landing.multiplayer')}
+      actions={
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3">
           <Link
-            to={`/players/${encodeURIComponent(playerId)}`}
-            className="min-w-0 truncate rounded px-2 py-2 text-sm text-primary underline-offset-4 hover:underline"
-            data-testid="lobby-nickname"
-            aria-label={t('profile.openFor', { nickname })}
+            to={profilePath ?? '/settings'}
+            state={{ returnTo: '/lobby' }}
+            className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-md text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            aria-label={profilePath ? t('profile.openFor', { nickname }) : t('settings.title')}
           >
-            {nickname}
+            <PixelAvatar seed={avatarSeed} size={28} />
+            <span className="truncate" data-testid="lobby-nickname">
+              {nickname}
+            </span>
           </Link>
-        ) : (
-          <span className="min-w-0 truncate text-sm text-dim" data-testid="lobby-nickname">
-            {nickname}
-          </span>
-        )}
-      </div>
-      {onlineLobby && fingerprintNotice}
-
-      <AvatarPicker
-        seed={avatar.seed}
-        onRoll={avatar.roll}
-        rolling={avatar.rolling}
-        failed={avatar.failed}
-        testId="lobby-avatar"
-      />
-
-      {resumable && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleResume}
-          className="h-11 gap-2 border-primary/50 bg-primary/20 px-4 font-bold text-foreground hover:bg-primary/30"
-          data-testid="resume-online-match"
-        >
-          <RotateCcw size={16} />
-          {t('lobby.resume_match', { defaultValue: '回到对局' })}
-        </Button>
-      )}
-
-      {onlineLobby && playerId && !resumable && (
-        <QuickMatch
-          key={playerId}
-          playerId={playerId}
-          sizes={PLAYER_COUNT_OPTIONS}
-          roomBusy={roomBusy}
-          onWaitingChange={setMatchmakingWaiting}
-        />
-      )}
-
-      <section className="rounded-lg border border-line bg-panel p-4">
-        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-          <Plus size={18} />
-          {t('lobby.createRoom')}
-        </h2>
-        <label className="mb-2 block text-sm text-dim" htmlFor="lobby-maxPlayers">
-          {t('lobby.maxPlayers')}
-        </label>
-        <select
-          id="lobby-maxPlayers"
-          className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 text-foreground"
-          value={maxPlayers}
-          onChange={(e) => setMaxPlayers(Number(e.target.value))}
-        >
-          {PLAYER_COUNT_OPTIONS.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <label className="mb-2 block text-sm text-dim" htmlFor="lobby-series">
-          {t('series.format')}
-        </label>
-        <select
-          id="lobby-series"
-          className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 text-foreground"
-          value={seriesMode}
-          onChange={(e) => setSeriesMode(e.target.value)}
-        >
-          <option value="unlimited">{t('series.unlimited')}</option>
-          <option value="3">BO3</option>
-          <option value="5">BO5</option>
-          <option value="custom">{t('series.custom')}</option>
-        </select>
-        {seriesMode === 'custom' && (
-          <input
-            aria-label={t('series.rounds')}
-            type="number"
-            min={1}
-            max={99}
-            step={1}
-            value={Number.isNaN(seriesLength) ? '' : seriesLength}
-            onChange={(e) => setSeriesLength(e.target.valueAsNumber)}
-            className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2"
-          />
-        )}
-        {onlineLobby && (
-          <label className="mb-3 flex min-h-10 cursor-pointer items-center gap-2 text-sm text-dim">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={isPublic}
-              onChange={(e) => setIsPublic(e.target.checked)}
+          {resumable && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResume}
+              className="min-h-11 gap-2"
+              data-testid="resume-online-match"
+            >
+              <RotateCcw size={16} aria-hidden="true" />
+              {t('lobby.resume_match', { defaultValue: '回到对局' })}
+            </Button>
+          )}
+        </div>
+      }
+    >
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <div className="min-w-0 space-y-4">
+          <section className="rounded-lg border border-line bg-panel p-4">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+              <DoorOpen size={18} aria-hidden="true" />
+              {t('lobby.joinRoom')}
+            </h2>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleJoinRoom();
+              }}
+            >
+              <label className="mb-2 block text-sm text-dim" htmlFor="lobby-joinCode">
+                {t('lobby.codeHint')}
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  id="lobby-joinCode"
+                  type="text"
+                  className="min-h-11 min-w-28 flex-1 rounded-md border border-line-strong bg-background px-3 py-2 font-mono text-lg uppercase tracking-widest text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  placeholder="ABC123"
+                  value={joinCode}
+                  onChange={(e) => {
+                    setJoinCode(e.target.value.toUpperCase());
+                    setJoinCodeInvalid(false);
+                    if (!publicJoin && joinRoomMutation.isError) joinRoomMutation.reset();
+                  }}
+                  aria-invalid={joinCodeInvalid || undefined}
+                  aria-describedby={manualJoinError ? 'lobby-join-error' : undefined}
+                  maxLength={6}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  enterKeyHint="go"
+                  spellCheck={false}
+                />
+                <Button
+                  type="submit"
+                  disabled={loading || roomActionsDisabled || joinCode.length !== 6}
+                  className="min-h-11 font-bold"
+                  data-testid="lobby-join"
+                >
+                  {t(
+                    joinRoomMutation.isPending && !publicJoin
+                      ? 'lobby.joiningRoom'
+                      : 'lobby.joinButton',
+                  )}
+                </Button>
+              </div>
+              {manualJoinError && (
+                <p
+                  id="lobby-join-error"
+                  role="alert"
+                  className="mt-3 rounded-md border border-blood/50 px-3 py-2 text-sm"
+                >
+                  {manualJoinError}
+                </p>
+              )}
+            </form>
+          </section>
+          {onlineLobby && playerId && !resumable && (
+            <QuickMatch
+              key={playerId}
+              playerId={playerId}
+              sizes={PLAYER_COUNT_OPTIONS}
+              roomBusy={roomBusy}
+              onWaitingChange={setMatchmakingWaiting}
             />
-            {t('lobby.listRoomPublicly')}
+          )}
+        </div>
+        <section className="rounded-lg border border-line bg-panel p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+            <Plus size={18} aria-hidden="true" />
+            {t('lobby.createRoom')}
+          </h2>
+          <label className="mb-2 block text-sm text-dim" htmlFor="lobby-maxPlayers">
+            {t('lobby.maxPlayers')}
           </label>
-        )}
-        <Button
-          type="button"
-          onClick={handleCreateRoom}
-          disabled={
-            loading ||
-            roomActionsDisabled ||
-            (seriesMode === 'custom' &&
-              (!Number.isInteger(seriesLength) || seriesLength < 1 || seriesLength > 99))
-          }
-          className="h-10 w-full px-4 font-bold"
-          data-testid="lobby-create"
-        >
-          {t('lobby.createRoom')}
-        </Button>
-      </section>
-
-      <section className="rounded-lg border border-line bg-panel p-4">
-        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-          <DoorOpen size={18} />
-          {t('lobby.joinRoom')}
-        </h2>
-        <label className="mb-2 block text-sm text-dim" htmlFor="lobby-joinCode">
-          {t('lobby.codeHint')}
-        </label>
-        <input
-          id="lobby-joinCode"
-          type="text"
-          className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 font-mono text-lg uppercase tracking-widest text-foreground"
-          placeholder="ABC123"
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-          maxLength={6}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleJoinRoom}
-          disabled={loading || roomActionsDisabled || joinCode.length !== 6}
-          className="h-10 w-full border-line-strong px-4 font-bold"
-          data-testid="lobby-join"
-        >
-          {t('lobby.joinRoom')}
-        </Button>
-      </section>
+          <select
+            id="lobby-maxPlayers"
+            className="mb-3 min-h-11 w-full rounded-md border border-line-strong bg-background px-3 py-2 focus-visible:outline-2 focus-visible:outline-ring text-foreground"
+            value={maxPlayers}
+            onChange={(e) => setMaxPlayers(Number(e.target.value))}
+          >
+            {PLAYER_COUNT_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <details className="group mb-3 rounded-md border border-line">
+            <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+              <span className="font-medium">{t('lobby.roomOptions')}</span>
+              <span className="flex items-center gap-2 text-xs text-dim">
+                {onlineLobby && (
+                  <>{t(isPublic ? 'lobby.visibilityPublic' : 'lobby.visibilityPrivate')} · </>
+                )}
+                {seriesMode === 'unlimited'
+                  ? t('series.unlimited')
+                  : seriesMode === 'custom'
+                    ? Number.isNaN(seriesLength)
+                      ? t('series.custom')
+                      : t('lobby.seriesRounds', { count: seriesLength })
+                    : `BO${seriesMode}`}
+                <ChevronDown className="size-4 shrink-0 group-open:rotate-180" aria-hidden="true" />
+              </span>
+            </summary>
+            <div className="border-t border-line px-3 pt-3 pb-1">
+              <label className="mb-2 block text-sm text-dim" htmlFor="lobby-series">
+                {t('series.format')}
+              </label>
+              <select
+                id="lobby-series"
+                className="mb-3 min-h-11 w-full rounded-md border border-line-strong bg-background px-3 py-2 focus-visible:outline-2 focus-visible:outline-ring text-foreground"
+                value={seriesMode}
+                onChange={(e) => setSeriesMode(e.target.value)}
+              >
+                <option value="unlimited">{t('series.unlimited')}</option>
+                <option value="3">BO3</option>
+                <option value="5">BO5</option>
+                <option value="custom">{t('series.custom')}</option>
+              </select>
+              {seriesMode === 'custom' && (
+                <input
+                  aria-label={t('series.rounds')}
+                  type="number"
+                  min={1}
+                  max={99}
+                  step={1}
+                  value={Number.isNaN(seriesLength) ? '' : seriesLength}
+                  onChange={(e) => setSeriesLength(e.target.valueAsNumber)}
+                  className="mb-3 min-h-11 w-full rounded-md border border-line-strong bg-background px-3 py-2 focus-visible:outline-2 focus-visible:outline-ring"
+                />
+              )}
+              {onlineLobby && (
+                <label className="mb-2 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-dim">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                  />
+                  {t('lobby.listRoomPublicly')}
+                </label>
+              )}
+            </div>
+          </details>
+          {createRoomMutation.error && (
+            <p role="alert" className="mb-3 rounded-md border border-blood/50 px-3 py-2 text-sm">
+              {t('lobby.errorGeneric', { message: requestErrorMessage(createRoomMutation.error) })}
+            </p>
+          )}
+          <Button
+            type="button"
+            onClick={handleCreateRoom}
+            disabled={
+              loading ||
+              roomActionsDisabled ||
+              (seriesMode === 'custom' &&
+                (!Number.isInteger(seriesLength) || seriesLength < 1 || seriesLength > 99))
+            }
+            className="min-h-11 w-full font-bold"
+            data-testid="lobby-create"
+          >
+            {t(createRoomMutation.isPending ? 'lobby.creatingRoom' : 'lobby.createRoom')}
+          </Button>
+        </section>
+      </div>
 
       {onlineLobby && (
         <section
           aria-labelledby="lobby-public-heading"
-          className="rounded-lg border border-line bg-panel p-4"
+          className="mt-4 rounded-lg border border-line bg-panel p-4"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 id="lobby-public-heading" className="text-lg font-semibold">
@@ -477,6 +531,7 @@ export default function Lobby() {
               type="button"
               variant="ghost"
               size="icon"
+              className="size-11"
               aria-label={t('lobby.refreshPublicRooms')}
               disabled={publicRooms.isFetching}
               onClick={() => void publicRooms.refetch()}
@@ -491,7 +546,7 @@ export default function Lobby() {
             id="lobby-public-size"
             value={publicSize ?? ''}
             onChange={(e) => setPublicSize(e.target.value ? Number(e.target.value) : null)}
-            className="mb-3 w-full rounded-md border border-line-strong bg-background px-3 py-2 text-foreground"
+            className="mb-3 min-h-11 w-full max-w-48 rounded-md border border-line-strong bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
             <option value="">{t('lobby.allSizes')}</option>
             {PLAYER_COUNT_OPTIONS.map((n) => (
@@ -527,26 +582,38 @@ export default function Lobby() {
                       type="button"
                       variant="outline"
                       aria-label={t('lobby.joinPublicRoom', { code: room.code })}
+                      className="min-h-11"
                       disabled={roomActionsDisabled}
-                      onClick={() => {
-                        setError(null);
-                        joinRoomMutation.mutate({ roomCode: room.code, fromPublicList: true });
-                      }}
+                      onClick={() =>
+                        joinRoomMutation.mutate({ roomCode: room.code, fromPublicList: true })
+                      }
                     >
-                      {t('lobby.joinButton')}
+                      {t(
+                        joinRoomMutation.isPending &&
+                          publicJoin &&
+                          joinRoomMutation.variables?.roomCode === room.code
+                          ? 'lobby.joiningRoom'
+                          : 'lobby.joinButton',
+                      )}
                     </Button>
                   </li>
                 ))}
             </ul>
           ) : null}
+          {publicJoin && joinRoomMutation.error && (
+            <p role="alert" className="mt-3 rounded-md border border-blood/50 px-3 py-2 text-sm">
+              {t('lobby.errorGeneric', { message: requestErrorMessage(joinRoomMutation.error) })}
+            </p>
+          )}
           {publicRooms.isError && (
             <div className="mt-2 flex items-center justify-between gap-3">
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-foreground">
                 {t('lobby.publicRoomsError')}
               </p>
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-11"
                 disabled={publicRooms.isFetching}
                 onClick={() => void publicRooms.refetch()}
               >
@@ -558,7 +625,7 @@ export default function Lobby() {
             <Button
               type="button"
               variant="outline"
-              className="mt-3 w-full"
+              className="mt-3 min-h-11 w-full sm:w-auto"
               disabled={publicRooms.isFetching}
               onClick={() => void publicRooms.fetchNextPage()}
             >
@@ -568,12 +635,7 @@ export default function Lobby() {
         </section>
       )}
 
-      {error && (
-        <div className="rounded-md bg-blood/20 p-3 text-sm text-destructive" role="alert">
-          {error}
-        </div>
-      )}
       {recoveryDialog}
-    </div>
+    </SitePage>
   );
 }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAudioStore } from '../../stores/useAudioStore.js';
 import { useSoundEffect } from '../../hooks/useSoundEffect.js';
 import { cn } from '../../lib/utils.js';
+import { Switch } from '../ui/switch';
 
 export function AudioControls({ className }: { className?: string }) {
   const { t } = useTranslation();
@@ -15,23 +16,11 @@ export function AudioControls({ className }: { className?: string }) {
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex items-center justify-between">
-        <span className="text-sm">{t('settings.audio.muted', { defaultValue: '静音' })}</span>
-        <button
-          type="button"
-          onClick={toggleMuted}
-          aria-pressed={muted}
-          className={cn(
-            'rounded-full px-3 py-1 text-xs transition-colors coarse:min-h-11 coarse:px-4',
-            muted
-              ? 'bg-destructive/20 text-destructive'
-              : 'bg-primary/20 text-primary hover:bg-primary/30',
-          )}
-        >
-          {muted
-            ? t('settings.audio.on', { defaultValue: '已静音' })
-            : t('settings.audio.off', { defaultValue: '开启音效' })}
-        </button>
+      <div className="flex items-center gap-3">
+        <Switch aria-label={t('settings.sound')} checked={!muted} onCheckedChange={toggleMuted} />
+        <span aria-hidden="true" className="text-sm">
+          {t(muted ? 'settings.audio.on' : 'settings.audio.off')}
+        </span>
       </div>
 
       <label className="flex items-center gap-3">
@@ -48,11 +37,11 @@ export function AudioControls({ className }: { className?: string }) {
           onMouseUp={() => play('dice-land')}
           onTouchEnd={() => play('dice-land')}
           disabled={muted}
-          className="h-11 flex-1 accent-primary disabled:opacity-50"
+          className="h-11 min-w-0 flex-1 accent-primary focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
           aria-label={t('settings.audio.volume', { defaultValue: '音量' })}
         />
-        <span className="w-8 text-right text-xs text-muted-foreground">
-          {Math.round(volume * 100)}
+        <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+          {Math.round(volume * 100)}%
         </span>
       </label>
     </div>

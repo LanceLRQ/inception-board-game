@@ -3,36 +3,30 @@ import { ThemePicker } from '../../components/ThemePicker';
 import { EffectSettings } from '../../components/EffectSettings';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
 import { AudioControls } from '../../components/AudioControls';
+import { SitePage } from '../../components/SitePage';
 import { AccountSection } from './AccountSection';
 import { AchievementsSection } from './AchievementsSection';
+import { SettingsGroup } from './SettingsGroup';
 
 export default function Settings() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-dvh bg-background p-4 text-foreground">
-      <h1 className="mb-6 text-2xl font-bold">{t('settings.title')}</h1>
-
+    <SitePage title={t('settings.title')}>
+      <SettingsGroup title={t('settings.sound')}>
+        <AudioControls className="max-w-md" />
+      </SettingsGroup>
+      <SettingsGroup title={t('settings.appearance')}>
+        <div className="max-w-xl space-y-3">
+          <h3 className="text-sm font-semibold">{t('settings.theme')}</h3>
+          <ThemePicker compact />
+          <EffectSettings className="mt-5 border-t border-line pt-4" />
+        </div>
+      </SettingsGroup>
       <AccountSection />
       <AchievementsSection />
 
-      <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
-          {t('settings.appearance')}
-        </h2>
-        <div className="space-y-3">
-          <span className="block text-sm">{t('settings.theme')}</span>
-          <ThemePicker />
-        </div>
-        <EffectSettings className="mt-5 border-t border-border pt-4" />
-      </section>
-
-      <section className="mb-6 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border">
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{t('settings.sound')}</h2>
-        <AudioControls />
-      </section>
-
       {/* 第 4 处版权展示：设置页底部（替代结算页占位，兼做结算页外的长驻入口） */}
-      <CopyrightNotice variant="footer" className="mt-8" />
-    </div>
+      <CopyrightNotice variant="footer" className="mt-6 border-t border-line pt-5" />
+    </SitePage>
   );
 }

@@ -56,12 +56,19 @@ test('大厅可筛选公开房间并直接加入，默认建房保持私密', as
     const privateCode = host.page.url().split('/').at(-1)!;
     await host.page.goto('/lobby');
     await host.page.locator('#lobby-maxPlayers').selectOption('4');
+    const options = host.page.getByText(/^(房间选项|Room Options)$/);
+    await options.click();
     await host.page
       .getByRole('checkbox', { name: /在公开房间列表显示|Show in public rooms/ })
       .check();
+    await host.page.locator('#lobby-series').selectOption('5');
+    await options.click();
+    await expect(host.page.locator('summary')).toContainText(/公开|Public/);
+    await expect(host.page.locator('summary')).toContainText('BO5');
     await create.click();
     await expect(host.page).toHaveURL(/\/room\/[A-Z0-9]{6}$/);
     const publicCode = host.page.url().split('/').at(-1)!;
+    await expect(host.page.getByText(/0 \/ 5/)).toBeVisible();
 
     const section = guest.page.getByRole('region', { name: /公开房间|Public Rooms/ });
     await section.getByRole('button', { name: /刷新公开房间|Refresh public rooms/ }).click();

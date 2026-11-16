@@ -98,7 +98,7 @@ export function QuickMatch({
       {ticket?.status === 'matched' ? (
         <Link
           to={`/game/${encodeURIComponent(ticket.matchId)}?online=1`}
-          className={buttonVariants({ className: 'h-10 w-full font-bold' })}
+          className={buttonVariants({ className: 'min-h-11 w-full font-bold' })}
         >
           {t('matchmaking.enter')}
         </Link>
@@ -113,7 +113,7 @@ export function QuickMatch({
           <Button
             type="button"
             variant="outline"
-            className="h-10 w-full font-bold"
+            className="min-h-11 w-full font-bold"
             disabled={change.isPending || ticket.status === 'matching'}
             onClick={() => change.mutate(ticket.ticketId)}
           >
@@ -121,7 +121,7 @@ export function QuickMatch({
           </Button>
         </>
       ) : (
-        <div className="flex items-end gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1">
             <label className="mb-2 block text-sm text-dim" htmlFor="lobby-quick-size">
               {t('matchmaking.players')}
@@ -131,7 +131,7 @@ export function QuickMatch({
               value={playerCount}
               onChange={(e) => setPlayerCount(Number(e.target.value))}
               disabled={change.isPending}
-              className="h-10 w-full rounded-md border border-line-strong bg-background px-3 text-foreground"
+              className="min-h-11 w-full rounded-md border border-line-strong bg-background px-3 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
               {sizes.map((size) => (
                 <option key={size} value={size}>
@@ -142,7 +142,7 @@ export function QuickMatch({
           </div>
           <Button
             type="button"
-            className="h-10 font-bold"
+            className="min-h-11 font-bold"
             onClick={() => {
               wasWaiting.current = true;
               change.mutate(undefined);
@@ -155,12 +155,13 @@ export function QuickMatch({
       )}
       {error && (
         <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-sm text-destructive" role="alert">
+          <p className="text-sm text-foreground" role="alert">
             {requestErrorMessage(error)}
           </p>
           <Button
             type="button"
             variant="outline"
+            className="min-h-11"
             disabled={queue.isFetching}
             onClick={() => {
               change.reset();

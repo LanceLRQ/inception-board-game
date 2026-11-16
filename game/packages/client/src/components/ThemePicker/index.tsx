@@ -3,6 +3,7 @@
 // 预览卡自己用该主题的令牌上色，所以无论当前是哪个主题，五张卡都各是各的样子；
 // 这里只引用字体栈而不加载字体（庄周梦蝶的楷体只有切到该主题才会请求）。
 
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 import { useThemeStore } from '../../stores/useThemeStore';
@@ -13,10 +14,12 @@ import { previewStripe } from './preview';
 
 export interface ThemePickerProps {
   readonly className?: string;
+  readonly compact?: boolean;
 }
 
-export function ThemePicker({ className }: ThemePickerProps) {
+export function ThemePicker({ className, compact = false }: ThemePickerProps) {
   const { t } = useTranslation();
+  const groupName = useId();
   const themeId = useThemeStore((s) => s.themeId);
   const setThemeId = useThemeStore((s) => s.setThemeId);
 
@@ -24,12 +27,65 @@ export function ThemePicker({ className }: ThemePickerProps) {
     <div
       role="radiogroup"
       aria-label={t('theme.pick')}
-      className={cn('grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3', className)}
+      className={cn(
+        'grid gap-3',
+        compact
+          ? 'grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))]'
+          : 'grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]',
+        className,
+      )}
     >
       {THEME_IDS.map((id) => {
         const theme = THEMES[id];
         const checked = id === themeId;
         const [bg, panel, acc] = previewStripe(theme);
+        const name = (
+          <span
+            className="min-w-0 font-semibold leading-tight break-words"
+            style={{ fontFamily: theme.tokens.serif }}
+          >
+            {t(theme.nameKey)}
+          </span>
+        );
+        const selection = checked && (
+          <Check
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0"
+            style={{ color: theme.tokens.acc }}
+          />
+        );
+        if (compact) {
+          return (
+            <label
+              key={id}
+              className={cn(
+                'relative flex min-h-12 min-w-0 items-center gap-2 rounded-md border border-line-strong px-2 py-1 text-sm',
+                'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+                checked && 'ring-1 ring-ring',
+              )}
+              style={{ background: panel, color: theme.tokens.ink }}
+            >
+              <input
+                type="radio"
+                name={groupName}
+                checked={checked}
+                onChange={() => setThemeId(id)}
+                data-testid={`theme-option-${id}`}
+                className="absolute inset-0 size-full cursor-pointer opacity-0"
+              />
+              <span aria-hidden="true" className="block w-10 shrink-0 overflow-hidden rounded-sm">
+                <MotifArt id={id} />
+                <span className="flex h-1">
+                  <span className="flex-1" style={{ background: bg }} />
+                  <span className="flex-1" style={{ background: panel }} />
+                  <span className="flex-1" style={{ background: acc }} />
+                </span>
+              </span>
+              {name}
+              {selection}
+            </label>
+          );
+        }
         return (
           <button
             key={id}
@@ -59,19 +115,8 @@ export function ThemePicker({ className }: ThemePickerProps) {
               className="flex min-w-0 items-center justify-between gap-1 px-2.5 py-2 text-sm"
               style={{ background: theme.tokens.panel, color: theme.tokens.ink }}
             >
-              <span
-                className="min-w-0 font-semibold leading-tight break-words"
-                style={{ fontFamily: theme.tokens.serif }}
-              >
-                {t(theme.nameKey)}
-              </span>
-              {checked && (
-                <Check
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0"
-                  style={{ color: theme.tokens.acc }}
-                />
-              )}
+              {name}
+              {selection}
             </span>
           </button>
         );
