@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { getCardImageUrl } from '../../lib/cardImages';
+import { CardArt } from '../CardArt';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { PlayerName, type PlayerNameProps } from './PlayerName';
 
@@ -50,11 +51,12 @@ export function PlayerAvatar({
           data-master={characterId?.startsWith('dm_') || undefined}
         >
           {characterId ? (
-            <img
+            <CardArt
               src={
                 cropped ? `/tabletop/portraits/${characterId}.webp` : getCardImageUrl(characterId)
               }
-              alt=""
+              fallback={name.slice(0, 1)}
+              trimBorder={false}
             />
           ) : (
             name.slice(0, 1)

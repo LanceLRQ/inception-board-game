@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { TriangleAlert } from 'lucide-react';
 import { getCardImageUrl } from '../../../../lib/cardImages';
 import { getCardName } from '../../../../lib/cards';
+import { CardArt } from '../../../CardArt';
 import { Die } from '../../../Die';
 import { PlayerAvatar } from '../../../PlayerIdentity/PlayerAvatar';
 import type { BoardLayer, BoardOccupant } from '../../model/boardModel';
@@ -44,6 +45,7 @@ export function DreamLayerCard({ row, focus, onFocus, onOpenCard }: DreamLayerCa
       : vault?.contentType === 'coin'
         ? 'vault_gold'
         : 'vault_back';
+  const vaultName = getCardName(face);
   const status = vault?.opened
     ? '已公开'
     : vault?.contentType !== 'hidden' && vault
@@ -86,10 +88,12 @@ export function DreamLayerCard({ row, focus, onFocus, onOpenCard }: DreamLayerCa
             </span>
           </span>
           <span className="tabletop-layer-back" aria-hidden={!flipped}>
-            <img
+            <CardArt
               className="tabletop-vault-cover"
               src={getCardImageUrl(face)}
-              alt={getCardName(face)}
+              alt={vaultName}
+              fallback={vaultName}
+              trimBorder={false}
             />
           </span>
         </span>
