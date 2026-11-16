@@ -66,7 +66,8 @@ jobs:
       - run: pnpm --filter @icgame/bot regression
 
   e2e-desktop:
-    runs-on: ubuntu-latest
+    # 锁定 Playwright 1.59 支持的 Ubuntu 版本。
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: game/packages/e2e
@@ -103,7 +104,7 @@ jobs:
           retention-days: 3
 
   e2e-mobile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: game/packages/e2e
@@ -137,7 +138,7 @@ jobs:
 
   # iOS Safari 用的是 WebKit 内核；这组用例还没有在 WebKit 上跑通过，先不阻塞合并
   e2e-mobile-webkit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     defaults:
       run:
