@@ -1703,6 +1703,7 @@ body:has(.ms-tabletop-runtime) [role='dialog'] button {
   .tabletop-mobile .tabletop-hand-card,
   .tabletop-mobile .tabletop-hand-card:hover,
   .tabletop-mobile .tabletop-hand-card[aria-pressed='true'] {
+    position: relative;
     width: 100%;
     min-width: 0;
     transform: none;

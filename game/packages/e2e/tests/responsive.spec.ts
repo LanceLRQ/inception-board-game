@@ -51,7 +51,7 @@ const SCENES = [
   { name: '响应窗口', url: '/game/debug?pending=1', players: 6 },
   { name: '10 人', url: '/game/debug?players=10', players: 10 },
   { name: '梦主应答土星·律令', url: '/game/debug?as=master&pending=saturn', players: 6 },
-  { name: '弃牌阶段', url: '/game/debug?discard=1', players: 6 },
+  { name: '弃牌阶段', url: '/game/debug?tabletop=discard', players: 6 },
   { name: '本人在迷失层（复活入口）', url: '/game/debug?dead=1', players: 6 },
   { name: '同伴在迷失层（复活同伴入口）', url: '/game/debug?dead=mate', players: 6 },
   { name: '梦主（移动入口）', url: '/game/debug?as=master', players: 6 },
@@ -239,14 +239,17 @@ for (const vp of VIEWPORTS) {
           await expectInViewport(page, cancel, '响应：打出解封');
           await expectInViewport(page, pass, '响应：放弃');
           expect(boxesOverlap(cancel, pass), '两个响应按钮不重叠').toBe(false);
-          await expect(page.getByRole('dialog')).toHaveCount(0);
+          await expect(page.getByRole('dialog')).toHaveAttribute(
+            'data-testid',
+            'unlock-response-window',
+          );
         }
-        if (scene.url.includes('discard=1')) {
+        if (scene.url.includes('tabletop=discard')) {
           // 手牌超出上限：选够要弃的两张后，「确认弃牌」可用且在视口内
           const confirm = page.getByTestId('action-confirm-discard');
-          await expect(confirm).toBeVisible();
-          await expect(confirm).toBeDisabled();
+          await expect(confirm).toHaveCount(0);
           await page.getByTestId('card-0').click();
+          await expect(confirm).toBeDisabled();
           await page.getByTestId('card-1').click();
           await expect(confirm).toBeEnabled();
           await expectInViewport(page, (await confirm.boundingBox())!, '确认弃牌');
@@ -336,7 +339,11 @@ for (const vp of VIEWPORTS) {
 
     test('金库详情没有翻面按钮', async ({ page }) => {
       await openScene(page, '/game/debug', vp.layout);
-      await page.locator('[data-testid^="vault-thumb-"]').first().click();
+      const firstLayer = page.getByTestId('layer-row-1');
+      await firstLayer.locator('[data-testid^="vault-thumb-"]').first().click();
+      if (vp.layout === 'desktop') {
+        await firstLayer.getByRole('button', { name: '第 1 层说明' }).click();
+      }
       const detail = page.getByTestId('card-detail-modal');
       await expect(detail).toBeVisible();
       await expect(page.getByTestId('card-detail-flip')).toHaveCount(0);
