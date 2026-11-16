@@ -77,6 +77,27 @@ describe('roomApi', () => {
     await expect(roomApi.getRoom('ZZZZZZ')).rejects.toMatchObject({ status: 404 });
   });
 
+  it('邀请入房即使有同码本地房间也不得回落，网络恢复后可重试', async () => {
+    localStorage.setItem(
+      'icgame-mock-rooms',
+      JSON.stringify({
+        ABC234: { code: 'ABC234', status: 'waiting', players: [me], maxPlayers: 6 },
+      }),
+    );
+    post.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    get.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { roomApi, isMockMode } = await import('./roomApi');
+    await expect(roomApi.joinRoom('ABC234', me, { onlineOnly: true })).rejects.toBeInstanceOf(
+      TypeError,
+    );
+    await expect(roomApi.getRoom('ABC234', { onlineOnly: true })).rejects.toBeInstanceOf(TypeError);
+    expect(isMockMode()).toBe(false);
+    post.mockResolvedValueOnce({ room: { code: 'ABC234', players: [me], id: 'real-room' } });
+    await expect(roomApi.joinRoom('ABC234', me, { onlineOnly: true })).resolves.toMatchObject({
+      id: 'real-room',
+    });
+  });
+
   it('真实请求成功过之后遇到网络错误：直接抛错，不切到本地模拟', async () => {
     get.mockResolvedValueOnce({ code: 'ABC234', status: 'waiting', players: [] });
     const { roomApi, isMockMode } = await import('./roomApi');

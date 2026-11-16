@@ -17,6 +17,7 @@ export interface UseRoomSyncOptions {
   code: string;
   /** 已进入房间之后才开始同步 */
   enabled: boolean;
+  onlineOnly?: boolean;
   settledMatchId?: string;
   /** 服务端告知本人已被移出房间 */
   onRemoved: () => void;
@@ -32,6 +33,7 @@ export interface RoomSync {
 export function useRoomSync({
   code,
   enabled,
+  onlineOnly = false,
   settledMatchId,
   onRemoved,
 }: UseRoomSyncOptions): RoomSync {
@@ -78,7 +80,7 @@ export function useRoomSync({
 
   const query = useQuery({
     queryKey: roomKeys.detail(code),
-    queryFn: () => roomApi.getRoom(code),
+    queryFn: () => roomApi.getRoom(code, { onlineOnly }),
     enabled: enabled && !!code,
     refetchInterval: (query) =>
       visible &&

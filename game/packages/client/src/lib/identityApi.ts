@@ -114,14 +114,15 @@ async function mockMe(): Promise<MeResponse> {
 }
 
 export const identityApi = {
-  async init(nickname: string): Promise<InitResponse> {
-    if (fallbackToMock) return mockInit(nickname);
+  async init(nickname: string, { onlineOnly = false } = {}): Promise<InitResponse> {
+    if (fallbackToMock && !onlineOnly) return mockInit(nickname);
     try {
       const res = await api.post<RealIdentityResponse>('/identity/init', { nickname });
+      fallbackToMock = false;
       logger.flow('identity', 'real init ok', { playerId: res.playerId });
       return { ...res, offline: false };
     } catch (err) {
-      if (isNetworkDown(err)) {
+      if (!onlineOnly && isNetworkDown(err)) {
         logger.warn('identity', 'backend unavailable, fallback to mock');
         fallbackToMock = true;
         return mockInit(nickname);
@@ -132,10 +133,11 @@ export const identityApi = {
   },
 
   /** 凭恢复码恢复；不回落到模拟身份（模拟身份没有可恢复的账号） */
-  async recover(code: string): Promise<InitResponse> {
-    if (fallbackToMock) throw offlineError();
+  async recover(code: string, { onlineOnly = false } = {}): Promise<InitResponse> {
+    if (fallbackToMock && !onlineOnly) throw offlineError();
     try {
       const res = await api.post<RealIdentityResponse>('/identity/recover', { code });
+      fallbackToMock = false;
       logger.flow('identity', 'recover ok', { playerId: res.playerId });
       return { ...res, offline: false };
     } catch (err) {
@@ -202,12 +204,14 @@ export const identityApi = {
     return res.avatarSeed;
   },
 
-  async me(): Promise<MeResponse> {
-    if (fallbackToMock) return mockMe();
+  async me({ onlineOnly = false } = {}): Promise<MeResponse> {
+    if (fallbackToMock && !onlineOnly) return mockMe();
     try {
-      return await api.get<MeResponse>('/identity/me');
+      const me = await api.get<MeResponse>('/identity/me');
+      if (onlineOnly) fallbackToMock = false;
+      return me;
     } catch (err) {
-      if (isNetworkDown(err)) {
+      if (!onlineOnly && isNetworkDown(err)) {
         fallbackToMock = true;
         return mockMe();
       }

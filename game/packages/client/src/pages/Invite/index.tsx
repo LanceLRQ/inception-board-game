@@ -3,13 +3,12 @@
 
 import { Navigate, useParams } from 'react-router';
 
-const ROOM_CODE_PATTERN = /^[A-Za-z0-9]{6}$/;
+import { normalizeInviteCode } from '../../lib/inviteLink';
 
 /** 邀请链接要跳去的页面；房间码格式不对回大厅 */
 export function inviteTarget(code: string | undefined): string {
-  return code !== undefined && ROOM_CODE_PATTERN.test(code)
-    ? `/room/${code.toUpperCase()}`
-    : '/lobby';
+  const normalized = normalizeInviteCode(code);
+  return normalized ? `/room/${normalized}` : '/lobby?invite=invalid';
 }
 
 export default function Invite() {

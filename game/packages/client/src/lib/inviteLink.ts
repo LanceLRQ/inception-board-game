@@ -29,3 +29,8 @@ export function publicOrigin(
 export function buildInviteUrl(code: string, origin: string = publicOrigin()): string {
   return `${origin}${INVITE_PATH}/${encodeURIComponent(code.toUpperCase())}`;
 }
+
+/** 邀请只携带六位房间码，不接受任意返回地址。 */
+export function normalizeInviteCode(raw: string | null | undefined): string | null {
+  return raw && /^[A-Za-z0-9]{6}$/.test(raw) ? raw.toUpperCase() : null;
+}

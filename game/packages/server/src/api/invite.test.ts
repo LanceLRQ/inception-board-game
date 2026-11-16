@@ -237,6 +237,6 @@ describe('GET /invite/:code', () => {
     const ok = await get('/invite/ABC234', { ua: CHROME_UA, config });
     expect(ok.headers.get('location')).toBe('https://ico.example.com/room/ABC234');
     const bad = await get('/invite/nope', { ua: CHROME_UA, config });
-    expect(bad.headers.get('location')).toBe('https://ico.example.com/lobby');
+    expect(bad.headers.get('location')).toBe('https://ico.example.com/lobby?invite=invalid');
   });
 });

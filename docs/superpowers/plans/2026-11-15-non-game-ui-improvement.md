@@ -1,6 +1,6 @@
 # 非对局 UI 分阶段改进方案
 
-状态：阶段 1–2 已实施并完成专项验证，尚未提交；阶段 3–5 未开始。
+状态：阶段 1–3 已实施并完成专项验证，尚未提交；阶段 4–5 未开始。
 
 目标：先接通导航、教程和邀请流程，再统一大厅与设置页布局，让新用户能够找到入口、理解操作结果，并在失败后继续完成任务。
 
@@ -144,6 +144,21 @@
 | 取消邀请后正常访问大厅         | 不再次执行旧邀请                           |
 | 生产分享链接                   | 经过真实服务端跳转后仍满足以上路径         |
 
+### 阶段 3 实施记录
+
+- 邀请和直接访问房间统一通过 `/lobby?invite=ABC234` 衔接身份；昵称页刷新和令牌撤销后保留目标，取消邀请移除参数。非法邀请在客户端及服务端跳转后均显示明确错误和返回入口。
+- 昵称及恢复表单显示目标房间；创建或恢复账号失败保留输入。新恢复码仍只保存在页面状态中，完成原有保存确认后再进入房间，由房间页执行一次加入。
+- 在邀请及直接房间入口启用真实请求：身份、加入及同步失败不会回落到本地模拟。正常大厅的原有模拟建房流程保留，用路由状态继续到对应模拟房间。
+- 首次入房失败与加载互斥，保留服务端业务错误，补充网络、身份失效提示、重试及返回大厅；已经加入后同步失败保留成员列表，允许手动重试。
+- TDD：先确认邀请目标丢失、错误回落本地模拟、无效邀请跳转、身份页令牌撤销及同步失败缺少重试的测试失败，再完成对应修复。新增客户端 API 测试 3 项、浏览器邀请用例 15 项、真实本地后端用例 3 项。
+- 静态验证：实际直接调用本地 CLI，客户端 `tsc --noEmit`、`eslint src/ ../e2e/tests/invite-flow.spec.ts ../e2e/tests-online/invite-flow.spec.ts ../server/src/api/invite.ts ../server/src/api/invite.test.ts`、涉及文件的 `prettier --check` 及 `git diff --check` 通过；`vite build` 通过。
+- 单元验证：客户端 `vitest run` 为 147 文件 / 2397 项通过；服务端 `vitest run src/api/invite.test.ts` 为 22 项通过，包含普通浏览器跳转和分享卡片。
+- 开发版 `playwright test tests/invite-flow.spec.ts tests/site-navigation.spec.ts tests/friend-room-flow.spec.ts tests/room-share.spec.ts --project=desktop-chrome --project=mobile-android --workers=3` 共 64 项通过。
+- 生产预览 `E2E_BASE_URL=http://localhost:13002 playwright test tests/invite-flow.spec.ts tests/site-navigation.spec.ts --project=desktop-chrome --project=mobile-android --project=tablet-ipad --workers=3` 共 72 项通过，覆盖上方验收矩阵及游戏页面没有新增公共导航的边界。
+- 另以 `VITE_API_URL=http://localhost:13101 vite build --outDir /tmp/inception-stage3-dist` 构建联机预览，在 13100 端口连接现有内存开发服务；通过临时 Playwright 配置运行 `tests-online/invite-flow.spec.ts` 和 `recovery-code.spec.ts`，5 项通过。检查真实邀请 302、分享卡片、新身份入房、恢复确认后入房、旧码与旧令牌失效、满房及非法邀请返回。
+- 1440/768/390 宽度的昵称、恢复、非法邀请及满房状态截图和尺寸检查无横向溢出，窄屏操作可见。browser-harness 的本机浏览器连接不可用，使用隔离 Playwright 浏览器检查；未验证线上数据库部署或手机真机。
+- 保留既有 CSS coarse 变体、包体积和构建工具提示；模拟错误用例中的失败请求与 WebSocket 未连接日志为预期。没有修改游戏主界面、游戏规则、全局主题或共享 UI 默认样式；前两阶段改动保留，本轮未提交。
+
 ## 阶段 4：统一大厅与设置的页面布局
 
 ### 统一规则
@@ -196,7 +211,7 @@
 
 ### 计划执行的检查命令
 
-以下为各阶段的标准命令入口；阶段 1 实际执行结果见上方实施记录，其余阶段尚未执行。工作目录为仓库的 `game/`。
+以下为各阶段的标准命令入口；阶段 1–3 实际执行结果见上方实施记录，阶段 4–5 尚未执行。工作目录为仓库的 `game/`。
 
 - `pnpm --filter @icgame/client typecheck`
 - `pnpm --filter @icgame/client lint`

@@ -4,13 +4,20 @@
 // 开始后：真实后端 → 全体进入同一局联机对局；本地模拟 → 本地人机对局。
 
 import { useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, LogOut, Play, Users } from 'lucide-react';
 import { MATCH_MIN_PLAYERS } from '@icgame/shared';
 import { isMockMode, roomApi } from '../../lib/roomApi';
-import { joinOrAttach, requestErrorMessage, roomKeys } from '../../lib/roomQueries';
+import { ApiRequestError } from '../../lib/api';
+import { normalizeInviteCode } from '../../lib/inviteLink';
+import {
+  roomEntryErrorKey,
+  joinOrAttach,
+  requestErrorMessage,
+  roomKeys,
+} from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useAvatar } from '../../hooks/useAvatar';
@@ -25,21 +32,27 @@ export default function Room() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { code: rawCode } = useParams<{ code: string }>();
-  const settledMatchId = (useLocation().state as { settledMatchId?: string } | null)
-    ?.settledMatchId;
+  const state = useLocation().state as { settledMatchId?: string; allowOffline?: boolean } | null;
+  const settledMatchId = state?.settledMatchId;
+  const onlineOnly = !state?.allowOffline;
   const code = (rawCode ?? '').toUpperCase();
-  const { isAuthenticated, isInitialized, playerId, nickname } = useAuth();
+  const { isAuthenticated, isInitialized, playerId, nickname, initializationError, retryIdentity } =
+    useAuth({ onlineOnly });
   const { seed: avatarSeed } = useAvatar();
 
   // 进入页面时加入一次房间（已在房间里的人刷新页面时按已加入处理）；加入成功后房间数据写进查询缓存
   const join = useMutation({
     mutationKey: ['room', 'join', code],
     mutationFn: () =>
-      joinOrAttach(code, {
-        playerId: playerId ?? '',
-        nickname,
-        avatarSeed,
-      }),
+      joinOrAttach(
+        code,
+        {
+          playerId: playerId ?? '',
+          nickname,
+          avatarSeed,
+        },
+        { onlineOnly },
+      ),
     onSuccess: (next) => {
       logger.flow('room', 'joined', { code, players: next.players.length });
       queryClient.setQueryData(roomKeys.detail(code), next);
@@ -48,20 +61,28 @@ export default function Room() {
   const { mutate: joinMutate } = join;
   const joinedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!isInitialized || !isAuthenticated || !code || !playerId) return;
+    if (
+      !isInitialized ||
+      !isAuthenticated ||
+      initializationError ||
+      !normalizeInviteCode(code) ||
+      !playerId
+    )
+      return;
     // 同一个房间只加入一次（严格模式下 effect 会跑两遍）
     if (joinedFor.current === code) return;
     joinedFor.current = code;
     joinMutate();
-  }, [isInitialized, isAuthenticated, code, playerId, joinMutate]);
+  }, [isInitialized, isAuthenticated, initializationError, code, playerId, joinMutate]);
 
   const sync = useRoomSync({
     code,
     enabled: join.isSuccess,
+    onlineOnly,
     ...(settledMatchId && { settledMatchId }),
     onRemoved: () => navigate('/lobby', { replace: true }),
   });
-  const room = sync.room;
+  const room = join.isSuccess ? sync.room : null;
 
   // 曾经在成员里、后来不在了（被移出）：回大厅
   const wasMember = useRef(false);
@@ -134,9 +155,45 @@ export default function Room() {
   // 未认证时跳回 Lobby（放到 effect 里避免渲染中 setState 警告）
   useEffect(() => {
     if (isInitialized && !isAuthenticated) {
-      navigate('/lobby', { replace: true });
+      navigate(`/lobby?invite=${normalizeInviteCode(code) ?? 'invalid'}`, { replace: true });
     }
-  }, [isInitialized, isAuthenticated, navigate]);
+  }, [isInitialized, isAuthenticated, code, navigate]);
+
+  if (!normalizeInviteCode(code)) return <Navigate to="/lobby?invite=invalid" replace />;
+
+  const entryFailure = initializationError ?? join.error ?? (!room ? sync.error : null);
+  if (entryFailure) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center bg-background p-6 text-foreground">
+        <div className="flex w-full max-w-md flex-col gap-4">
+          <h1 className="text-xl font-bold">{t('invite.title', { code })}</h1>
+          <p role="alert" className="text-destructive">
+            {t(roomEntryErrorKey(entryFailure), { message: requestErrorMessage(entryFailure) })}
+          </p>
+          {entryFailure instanceof ApiRequestError && entryFailure.status === 401 ? (
+            <Link
+              to={`/lobby?invite=${code}`}
+              replace
+              className="inline-flex min-h-11 items-center text-primary"
+            >
+              {t('invite.signInAgain')}
+            </Link>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => (initializationError ? void retryIdentity() : joinMutate())}
+              className="min-h-11"
+            >
+              {t('invite.retry')}
+            </Button>
+          )}
+          <Link to="/lobby" replace className="inline-flex min-h-11 items-center text-primary">
+            {t('match.back_to_lobby')}
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   if (!isInitialized || !isAuthenticated) {
     return (
@@ -149,8 +206,9 @@ export default function Room() {
   if (!room) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-6 text-foreground">
-        <div className="mb-4 text-dim">{t('common.loading')}</div>
-        {error && <div className="text-destructive">{error}</div>}
+        <p role="status" className="text-dim">
+          {t('invite.joining')}
+        </p>
       </div>
     );
   }
@@ -295,7 +353,21 @@ export default function Room() {
 
       {error && (
         <div className="rounded-md bg-blood/20 p-3 text-sm text-destructive" role="alert">
-          {error}
+          {sync.error
+            ? t(roomEntryErrorKey(sync.error), { message: requestErrorMessage(sync.error) })
+            : error}
+          {!!sync.error && (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 min-h-11"
+              onClick={() =>
+                void queryClient.invalidateQueries({ queryKey: roomKeys.detail(code) })
+              }
+            >
+              {t('invite.retry')}
+            </Button>
+          )}
         </div>
       )}
     </div>

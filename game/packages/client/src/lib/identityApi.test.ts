@@ -81,6 +81,25 @@ describe('identityApi', () => {
     expect(isOfflineIdentity(null)).toBe(false);
   });
 
+  it('邀请建档网络失败不生成模拟身份，重试成功后仍返回真实恢复码', async () => {
+    post.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(realInit);
+    const { identityApi, isOfflineIdentity } = await import('./identityApi');
+    await expect(identityApi.init('A', { onlineOnly: true })).rejects.toBeInstanceOf(TypeError);
+    expect(localStorage.getItem('icgame-mock-identity')).toBeNull();
+    expect(isOfflineIdentity()).toBe(false);
+    await expect(identityApi.init('A', { onlineOnly: true })).resolves.toMatchObject({
+      offline: false,
+      recoveryCode: realInit.recoveryCode,
+    });
+  });
+
+  it('邀请验证身份失败保留网络错误，不读取本地模拟身份', async () => {
+    get.mockRejectedValue(new TypeError('Failed to fetch'));
+    const { identityApi, isOfflineIdentity } = await import('./identityApi');
+    await expect(identityApi.me({ onlineOnly: true })).rejects.toBeInstanceOf(TypeError);
+    expect(isOfflineIdentity()).toBe(false);
+  });
+
   it('同一登录只上报一次 visitorId，并关闭第三方遥测', async () => {
     const { identityApi } = await import('./identityApi');
     localStorage.setItem('icgame-token', realInit.token);

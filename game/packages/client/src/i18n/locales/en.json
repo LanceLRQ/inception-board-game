@@ -1,4 +1,16 @@
 {
+  "invite": {
+    "title": "Join room {{code}}",
+    "cancel": "Cancel invitation",
+    "invalidTitle": "Invalid invitation",
+    "retry": "Retry",
+    "joining": "Joining room…",
+    "confirmCode": "Save your recovery code to continue joining",
+    "networkError": "Unable to reach the server. Check your connection and retry.",
+    "identityExpired": "Your session has expired. Sign in again to join.",
+    "requestError": "{{message}}",
+    "signInAgain": "Sign in again"
+  },
   "navigation": {
     "label": "Site navigation",
     "menu": "Menu",

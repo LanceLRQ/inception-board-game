@@ -1,4 +1,16 @@
 {
+  "invite": {
+    "title": "加入房间 {{code}}",
+    "cancel": "取消邀请",
+    "invalidTitle": "邀请链接无效",
+    "retry": "重试",
+    "joining": "正在加入房间…",
+    "confirmCode": "保存恢复码后继续加入房间",
+    "networkError": "暂时无法连接服务器，请检查网络后重试。",
+    "identityExpired": "登录已失效，请重新登录后加入房间。",
+    "requestError": "{{message}}",
+    "signInAgain": "重新登录"
+  },
   "navigation": {
     "label": "站点导航",
     "menu": "菜单",

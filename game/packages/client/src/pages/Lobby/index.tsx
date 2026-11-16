@@ -2,7 +2,7 @@
 // 首次访问若没有 identity，先走 initIdentity；之后显示创建/加入入口。
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, ChevronDown, DoorOpen, KeyRound, Plus, RotateCcw } from 'lucide-react';
@@ -15,7 +15,8 @@ import { ApiRequestError } from '../../lib/api';
 import { isMockMode, roomApi } from '../../lib/roomApi';
 import { identityApi, isOfflineIdentity } from '../../lib/identityApi';
 import { useIdentityStore } from '../../stores/useIdentityStore';
-import { requestErrorMessage } from '../../lib/roomQueries';
+import { normalizeInviteCode } from '../../lib/inviteLink';
+import { roomEntryErrorKey, requestErrorMessage } from '../../lib/roomQueries';
 import { logger } from '../../lib/logger';
 import { readOnlineMatch } from '../../lib/onlineMatchMemo';
 import { useAuth } from '../../hooks/useAuth';
@@ -51,8 +52,20 @@ export default function Lobby() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isInitialized, initIdentity, recoverIdentity, nickname, playerId } =
-    useAuth();
+  const [search] = useSearchParams();
+  const inviteParam = search.get('invite');
+  const invitedCode = normalizeInviteCode(inviteParam);
+  const hasInvite = inviteParam !== null;
+  const {
+    isAuthenticated,
+    isInitialized,
+    initIdentity,
+    recoverIdentity,
+    nickname,
+    playerId,
+    initializationError,
+    retryIdentity,
+  } = useAuth({ onlineOnly: hasInvite });
   const { seed: avatarSeed } = useAvatar();
 
   // 昵称初始化
@@ -90,7 +103,7 @@ export default function Lobby() {
     queryFn: ({ pageParam, signal }) => roomApi.listPublicRooms(publicSize, pageParam, signal),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
-    enabled: onlineLobby,
+    enabled: onlineLobby && !hasInvite,
     staleTime: 0,
   });
 
@@ -107,11 +120,11 @@ export default function Lobby() {
       }
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
-      setError(t('lobby.errorGeneric', { message: msg }));
+      setError(t(hasInvite ? roomEntryErrorKey(e) : 'lobby.errorGeneric', { message: msg }));
     } finally {
       setLoading(false);
     }
-  }, [inputNickname, initIdentity, t]);
+  }, [inputNickname, initIdentity, hasInvite, t, setError]);
 
   const handleRestore = useCallback(async () => {
     if (!isRecoveryCodeComplete(restoreInput)) return;
@@ -149,7 +162,7 @@ export default function Lobby() {
       ),
     onSuccess: (res, size) => {
       logger.flow('lobby', 'createRoom ok', { code: res.code, maxPlayers: size });
-      navigate(`/room/${res.code}`);
+      navigate(`/room/${res.code}`, { state: { allowOffline: isMockMode() } });
     },
   });
 
@@ -161,7 +174,7 @@ export default function Lobby() {
         : roomApi.joinRoom(roomCode, { playerId: playerId ?? '', nickname, avatarSeed }),
     onSuccess: (_room, { roomCode }) => {
       logger.flow('lobby', 'joinRoom ok', { code: roomCode });
-      navigate(`/room/${roomCode}`);
+      navigate(`/room/${roomCode}`, { state: { allowOffline: isMockMode() } });
     },
     onError: (_error, { fromPublicList }) => {
       if (fromPublicList)
@@ -195,6 +208,61 @@ export default function Lobby() {
     navigate(`/game/${resumable.matchID}?${params.toString()}`);
   }, [resumable, navigate]);
 
+  // 身份写入发生在异步返回之前；loading 和 pendingCode 都结束后才离开本页。
+  useEffect(() => {
+    if (
+      invitedCode &&
+      isInitialized &&
+      isAuthenticated &&
+      !initializationError &&
+      !loading &&
+      !pendingCode
+    ) {
+      navigate(`/room/${invitedCode}`, { replace: true });
+    }
+  }, [
+    invitedCode,
+    isInitialized,
+    isAuthenticated,
+    initializationError,
+    loading,
+    pendingCode,
+    navigate,
+  ]);
+
+  if (hasInvite && !invitedCode) {
+    return (
+      <div className="mx-auto flex w-full flex-1 max-w-md flex-col justify-center gap-4 p-6">
+        <h1 className="text-xl font-bold">{t('invite.invalidTitle')}</h1>
+        <p role="alert" className="text-dim">
+          {t('lobby.codeInvalid')}
+        </p>
+        <Link to="/lobby" replace className="inline-flex min-h-11 items-center text-primary">
+          {t('match.back_to_lobby')}
+        </Link>
+      </div>
+    );
+  }
+
+  if (hasInvite && initializationError) {
+    return (
+      <div className="mx-auto flex w-full flex-1 max-w-md flex-col justify-center gap-4 p-6">
+        <h1 className="text-xl font-bold">{t('invite.title', { code: invitedCode })}</h1>
+        <p role="alert" className="text-destructive">
+          {t(roomEntryErrorKey(initializationError), {
+            message: requestErrorMessage(initializationError),
+          })}
+        </p>
+        <Button onClick={() => void retryIdentity()} className="min-h-11">
+          {t('invite.retry')}
+        </Button>
+        <Link to="/lobby" replace className="inline-flex min-h-11 items-center text-primary">
+          {t('invite.cancel')}
+        </Link>
+      </div>
+    );
+  }
+
   if (!isInitialized) {
     return (
       <div className="flex flex-1 items-center justify-center bg-background text-dim">
@@ -216,10 +284,33 @@ export default function Lobby() {
     <p className="text-xs text-dim">{t('lobby.fingerprintNotice')}</p>
   );
 
+  if (invitedCode && isAuthenticated) {
+    return (
+      <div className="mx-auto flex w-full flex-1 max-w-md flex-col justify-center gap-4 p-6">
+        <h1 className="text-xl font-bold">{t('invite.title', { code: invitedCode })}</h1>
+        <p role="status" className="text-dim">
+          {t(pendingCode ? 'invite.confirmCode' : 'invite.joining')}
+        </p>
+        {recoveryDialog}
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="mx-auto flex w-full flex-1 max-w-md flex-col justify-center gap-4 bg-background p-6 text-foreground">
-        <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
+        <h1 className="text-2xl font-bold">
+          {invitedCode ? t('invite.title', { code: invitedCode }) : t('lobby.title')}
+        </h1>
+        {invitedCode && (
+          <Link
+            to="/lobby"
+            replace
+            className="inline-flex min-h-11 items-center text-sm text-primary"
+          >
+            {t('invite.cancel')}
+          </Link>
+        )}
         <label className="block text-sm text-dim" htmlFor="lobby-nickname">
           {t('lobby.nicknameLabel')}
         </label>

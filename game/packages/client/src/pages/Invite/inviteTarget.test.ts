@@ -6,10 +6,10 @@ describe('inviteTarget', () => {
     expect(inviteTarget('abc234')).toBe('/room/ABC234');
   });
 
-  it('房间码缺失或格式不对回大厅', () => {
-    expect(inviteTarget(undefined)).toBe('/lobby');
-    expect(inviteTarget('abc')).toBe('/lobby');
-    expect(inviteTarget('abc 234')).toBe('/lobby');
-    expect(inviteTarget('<script>')).toBe('/lobby');
+  it('房间码缺失或格式不对到大厅显示邀请错误', () => {
+    expect(inviteTarget(undefined)).toBe('/lobby?invite=invalid');
+    expect(inviteTarget('abc')).toBe('/lobby?invite=invalid');
+    expect(inviteTarget('abc 234')).toBe('/lobby?invite=invalid');
+    expect(inviteTarget('<script>')).toBe('/lobby?invite=invalid');
   });
 });

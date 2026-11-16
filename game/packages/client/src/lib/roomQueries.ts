@@ -25,12 +25,16 @@ export function roomPollInterval(pushStatus: RoomPushStatus, pageVisible: boolea
  * 进入房间：先加入。已在房间里的人刷新页面可能因「游戏已开始」等原因加入失败，
  * 此时若查得到房间且本人在成员里，就按已加入处理；否则抛出加入时的错误。
  */
-export async function joinOrAttach(code: string, me: IdentityInfo): Promise<RoomState> {
+export async function joinOrAttach(
+  code: string,
+  me: IdentityInfo,
+  options?: { onlineOnly: boolean },
+): Promise<RoomState> {
   try {
-    return await roomApi.joinRoom(code, me);
+    return await roomApi.joinRoom(code, me, options);
   } catch (joinError) {
     try {
-      const existing = await roomApi.getRoom(code);
+      const existing = await roomApi.getRoom(code, options);
       if (existing.players.some((p) => p.playerId === me.playerId)) return existing;
     } catch {
       /* 查询也失败时报告加入时的错误 */
@@ -42,4 +46,13 @@ export async function joinOrAttach(code: string, me: IdentityInfo): Promise<Room
 /** 错误 → 给用户看的文案 */
 export function requestErrorMessage(err: unknown): string {
   return err instanceof ApiRequestError ? err.message : String(err);
+}
+
+/** 入房及身份校验的失败提示；具体业务错误仍保留服务端说明。 */
+export function roomEntryErrorKey(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 0 || error.status >= 500) return 'invite.networkError';
+    if (error.status === 401) return 'invite.identityExpired';
+  }
+  return 'invite.requestError';
 }

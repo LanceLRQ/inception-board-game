@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { getAuthToken } from '../lib/api';
@@ -7,6 +7,7 @@ import { bindIdentityRevokedHandler } from '../lib/identityRevoked';
 import { forgetOnlineMatch } from '../lib/onlineMatchMemo';
 import { toast } from '../lib/toast';
 import { useIdentityStore } from '../stores/useIdentityStore';
+import { normalizeInviteCode } from '../lib/inviteLink';
 
 /** 本机登录令牌在 localStorage 里的键（与 useAuth、api 一致） */
 const TOKEN_STORAGE_KEY = 'icgame-token';
@@ -20,6 +21,7 @@ const NOTICE_DURATION_MS = 8000;
  */
 export function useRevokedIdentityHandler(): void {
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
@@ -41,9 +43,14 @@ export function useRevokedIdentityHandler(): void {
           toast.warn(t('recovery.revoked'), { duration: NOTICE_DURATION_MS });
         },
         goToLobby: () => {
-          void navigate('/lobby', { replace: true });
+          const inviteCode = normalizeInviteCode(
+            pathname === '/lobby'
+              ? new URLSearchParams(search).get('invite')
+              : /^\/room\/([A-Za-z0-9]{6})$/.exec(pathname)?.[1],
+          );
+          void navigate(inviteCode ? `/lobby?invite=${inviteCode}` : '/lobby', { replace: true });
         },
       }),
-    [navigate, queryClient, t],
+    [navigate, pathname, search, queryClient, t],
   );
 }

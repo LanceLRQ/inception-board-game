@@ -240,14 +240,19 @@ function isNetworkOrServerDown(err: unknown): boolean {
   return true;
 }
 
-async function withFallback<T>(real: () => Promise<T>, mock: () => Promise<T>): Promise<T> {
-  if (fallbackToMock) return mock();
+async function withFallback<T>(
+  real: () => Promise<T>,
+  mock: () => Promise<T>,
+  onlineOnly = false,
+): Promise<T> {
+  if (fallbackToMock && !onlineOnly) return mock();
   try {
     const result = await real();
     realBackendReached = true;
+    if (onlineOnly) fallbackToMock = false;
     return result;
   } catch (err) {
-    if (isNetworkOrServerDown(err) && !realBackendReached) {
+    if (!onlineOnly && isNetworkOrServerDown(err) && !realBackendReached) {
       // 后端不可达 → 一次性切到 mock 模式（后续调用全走 localStorage）
       logger.warn('room', 'backend unavailable, fallback to mock');
       fallbackToMock = true;
@@ -278,15 +283,17 @@ export const roomApi = {
     return api.get<PublicRoomPage>(`/rooms/public?${params}`, { signal });
   },
   joinPublicRoom: (code: string) => realRoomApi.joinRoom(code),
-  joinRoom: (code: string, me: IdentityInfo) =>
+  joinRoom: (code: string, me: IdentityInfo, { onlineOnly = false } = {}) =>
     withFallback(
       () => realRoomApi.joinRoom(code),
       () => mockRoomApi.joinRoom(code, me),
+      onlineOnly,
     ),
-  getRoom: (code: string) =>
+  getRoom: (code: string, { onlineOnly = false } = {}) =>
     withFallback(
       () => realRoomApi.getRoom(code),
       () => mockRoomApi.getRoom(code),
+      onlineOnly,
     ),
   fillAI: (code: string) =>
     withFallback(

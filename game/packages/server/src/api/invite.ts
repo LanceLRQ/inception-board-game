@@ -177,7 +177,7 @@ export function createInviteRouter({ lobby, config }: InviteRouterDeps): Router 
     if (!preview) {
       // 普通浏览器：交给客户端；站点地址没配置时用相对地址（与前端同源部署）
       const origin = config.publicBaseUrl ?? '';
-      ctx.redirect(code === null ? `${origin}/lobby` : `${origin}/room/${code}`);
+      ctx.redirect(code === null ? `${origin}/lobby?invite=invalid` : `${origin}/room/${code}`);
       return;
     }
 
