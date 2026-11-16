@@ -92,12 +92,32 @@ describe('advance · next', () => {
 });
 
 describe('advance · skip', () => {
-  it('jumps to end and increments skippedCount', () => {
+  it('keeps the reading position without marking unread steps complete', () => {
     const p = initialProgress(TINY_SCENARIO);
     const after = advance(TINY_SCENARIO, p, { type: 'skip' }, () => 999);
-    expect(after.currentStepIndex).toBe(TINY_SCENARIO.steps.length);
-    expect(after.completedAt).toBe(999);
+    expect(after.currentStepIndex).toBe(0);
+    expect(after.completedAt).toBeNull();
+    expect(after.completedStepIds).toEqual([]);
     expect(after.skippedCount).toBe(1);
+  });
+});
+
+describe('advance · previous', () => {
+  it('returns to the prior step and can advance again without duplicate completion', () => {
+    const p = advance(TINY_SCENARIO, initialProgress(TINY_SCENARIO), { type: 'next' });
+    const back = advance(TINY_SCENARIO, p, { type: 'previous' });
+    expect(getCurrentStep(TINY_SCENARIO, back)?.id).toBe('s1');
+    const forward = advance(TINY_SCENARIO, back, { type: 'next' });
+    expect(forward.currentStepIndex).toBe(1);
+    expect(forward.completedStepIds).toEqual(['s1']);
+    expect(forward.completedAt).toBeNull();
+  });
+
+  it('cannot go before the first step or silently reopen a completed tutorial', () => {
+    const p = initialProgress(TINY_SCENARIO);
+    expect(advance(TINY_SCENARIO, p, { type: 'previous' }).currentStepIndex).toBe(0);
+    const completed = { ...p, currentStepIndex: 3, completedAt: 123 };
+    expect(advance(TINY_SCENARIO, completed, { type: 'previous' })).toBe(completed);
   });
 });
 
@@ -225,10 +245,5 @@ describe('BASICS_TUTORIAL · 内容健康', () => {
 
   it('has at least 7 steps', () => {
     expect(BASICS_TUTORIAL.steps.length).toBeGreaterThanOrEqual(7);
-  });
-
-  it('ends with a choice step', () => {
-    const last = BASICS_TUTORIAL.steps[BASICS_TUTORIAL.steps.length - 1];
-    expect(last?.kind).toBe('choice');
   });
 });

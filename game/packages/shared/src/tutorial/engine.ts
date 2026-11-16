@@ -48,7 +48,8 @@ export function computeProgressPercent(
  * 纯函数：推进进度（不可变）。
  *
  * - next: 推进到下一步并把当前步 id 加入 completedStepIds
- * - skip: 同 next，但 skippedCount++
+ * - previous: 回看上一步，首步不再后退
+ * - skip: 保留阅读位置并记录跳过，不标记为完成；退出目的地由页面处理
  * - choose: 记录选择 + 前进（当前实现不做分支跳转，留作扩展）
  * - restart: 重置到第一步（保留 startedAt）
  */
@@ -67,6 +68,8 @@ export function advance(
       : progress.completedStepIds;
 
   switch (event.type) {
+    case 'previous':
+      return { ...progress, currentStepIndex: Math.max(0, progress.currentStepIndex - 1) };
     case 'next': {
       const nextIdx = progress.currentStepIndex + 1;
       const atEnd = nextIdx >= scenario.steps.length;
@@ -78,12 +81,8 @@ export function advance(
       };
     }
     case 'skip': {
-      // 直接跳到末尾
       return {
         ...progress,
-        currentStepIndex: scenario.steps.length,
-        completedStepIds: markDone(),
-        completedAt: now(),
         skippedCount: progress.skippedCount + 1,
       };
     }

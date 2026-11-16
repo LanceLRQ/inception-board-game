@@ -47,6 +47,7 @@ export interface TutorialProgress {
 /** 用户交互事件 */
 export type TutorialEvent =
   | { readonly type: 'next' }
+  | { readonly type: 'previous' }
   | { readonly type: 'skip' }
   | { readonly type: 'choose'; readonly choiceId: string }
   | { readonly type: 'restart' };

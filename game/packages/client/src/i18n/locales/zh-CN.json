@@ -399,7 +399,13 @@
     "step_count": "第 {{current}} / {{total}} 步",
     "next": "继续",
     "skip": "跳过教学",
-    "finish": "完成"
+    "finish": "完成",
+    "previous": "上一步",
+    "completed": "已读完基础介绍",
+    "practice": "单机练习",
+    "lobby": "进入大厅",
+    "restart": "重新阅读",
+    "progress": "阅读进度"
   },
   "about": {
     "title": "关于",

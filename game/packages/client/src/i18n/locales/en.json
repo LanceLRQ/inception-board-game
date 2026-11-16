@@ -426,7 +426,13 @@
     "step_count": "Step {{current}} / {{total}}",
     "next": "Next",
     "skip": "Skip Tutorial",
-    "finish": "Finish"
+    "finish": "Finish",
+    "previous": "Previous",
+    "completed": "Basic introduction read",
+    "practice": "Solo practice",
+    "lobby": "Enter lobby",
+    "restart": "Read again",
+    "progress": "Reading progress"
   },
   "about": {
     "title": "About",
