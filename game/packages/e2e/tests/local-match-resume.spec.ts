@@ -7,6 +7,8 @@ import {
   LOCAL_MATCH_URL,
   test,
   expect,
+  disableAutoDraw,
+  getDiscardPrompt,
   waitForAppReady,
   waitVisibleAnswering,
 } from './fixtures/index.js';
@@ -42,6 +44,7 @@ async function handOf(page: Page): Promise<Array<string | null>> {
 
 /** 开一局 4 人局，抽一张牌后停在行动阶段（此时没有任何东西会自己往前走） */
 async function startAndDraw(page: Page): Promise<void> {
+  await disableAutoDraw(page);
   await page.goto(LOCAL_MATCH_URL);
   await waitForAppReady(page);
   await page.getByRole('button', { name: /开始游戏|Start/ }).click();
@@ -79,9 +82,9 @@ test.describe('人机对局本地存档', () => {
 
     // 恢复后的对局能继续往下走：结束行动后 Bot 接着走，不会被拒
     await page.getByRole('button', { name: /结束行动|End Action/ }).click();
-    await expect(
-      page.getByTestId('action-skip-discard').or(page.getByTestId('action-confirm-discard')),
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('action-skip-discard').or(getDiscardPrompt(page))).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test('选「开新局」：存档被清除，之后重新选人数开局', async ({ page }) => {
@@ -113,6 +116,7 @@ test.describe('人机对局本地存档', () => {
     });
     page.on('pageerror', (err) => errors.push(err.message));
 
+    await disableAutoDraw(page);
     await page.goto(LOCAL_MATCH_URL);
     await waitForAppReady(page);
     // 摘要合法、状态是垃圾

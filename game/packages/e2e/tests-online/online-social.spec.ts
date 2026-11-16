@@ -50,9 +50,7 @@ function seatOf(player: Player): string {
   throw new Error(`${player.name} 还没收到对局状态`);
 }
 
-test('头像：换一个后保存到账号，房间成员列表与对局座位上别人看到的是同一个头像', async ({
-  browser,
-}) => {
+test('账号头像同步到房间成员列表，对局座位可打开对应的角色说明', async ({ browser }) => {
   const a = await newPlayer(browser, '甲甲');
   const b = await newPlayer(browser, '乙乙');
   try {
@@ -94,11 +92,12 @@ test('头像：换一个后保存到账号，房间成员列表与对局座位�
       await expect(p.page.getByTestId('turn-indicator')).toBeVisible({ timeout: 20_000 });
     }
 
-    // 对局里：乙的界面上甲的座位（未翻露时是头像，翻露后是角色卡面 + 角标）带着同一个头像种子
+    // 进入对局后，甲的座位显示本局角色头像，乙可以打开对应角色说明。
     const seatA = seatOf(a);
-    await expect(
-      b.page.getByTestId(`player-seat-${seatA}`).locator('[data-testid="pixel-avatar"]').first(),
-    ).toHaveAttribute('data-seed', rolled);
+    const seat = b.page.getByTestId(`player-seat-${seatA}`);
+    await expect(seat).toContainText('甲甲');
+    await seat.getByRole('button', { name: '查看甲甲角色', exact: true }).click();
+    await expect(b.page.getByTestId('card-detail-modal')).toBeVisible();
   } finally {
     await a.context.close();
     await b.context.close();

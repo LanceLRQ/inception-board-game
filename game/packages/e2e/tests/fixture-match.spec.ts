@@ -1,13 +1,7 @@
 // 固定场景对局 E2E：调试路由（/game/:matchId 不带 online / friend）渲染的是真实对局界面，
 // 状态来自确定的固定场景。三个调试入口各打开一次。
 
-import {
-  test,
-  expect,
-  isNarrowViewport,
-  selectAndPlayCard,
-  waitForAppReady,
-} from './fixtures/index.js';
+import { test, expect, selectAndPlayCard, waitForAppReady } from './fixtures/index.js';
 
 const SCENES: Array<{ name: string; url: string }> = [
   { name: '缺省（盗梦者视角）', url: '/game/debug' },
@@ -29,24 +23,22 @@ for (const scene of SCENES) {
   });
 }
 
-test('固定场景 pending=1 出现解封响应入口，缺省场景没有（宽屏响应窗口，窄屏响应条，都不弹窗）', async ({
-  page,
-}) => {
-  // 宽屏用舞台右上角的响应窗口承载，窄屏用手牌坞上方的响应条；两种布局都不再弹窗
-  const narrow = isNarrowViewport(page);
-  const dialog = page.getByTestId('unlock-response-dialog');
-  const inline = page.getByTestId(narrow ? 'unlock-response-bar' : 'unlock-response-window');
+test('固定场景 pending=1 在两种布局都弹出解封响应窗口，缺省场景没有', async ({ page }) => {
+  const dialog = page.getByTestId('unlock-response-window');
 
   await page.goto('/game/debug');
   await waitForAppReady(page);
   await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
   await expect(dialog).toHaveCount(0);
-  await expect(inline).toHaveCount(0);
 
   await page.goto('/game/debug?pending=1');
   await waitForAppReady(page);
-  await expect(inline).toBeVisible({ timeout: 10_000 });
-  await expect(dialog).toHaveCount(0);
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+  await expect(dialog).toHaveRole('dialog');
+  await expect(dialog.getByTestId('unlock-response-cancel')).toBeEnabled();
+  await expect(dialog.getByTestId('unlock-response-pass')).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
 });
 
 test('固定场景：选一张需要目标的牌并打出（两步出牌），两种布局都会弹出选目标弹窗', async ({

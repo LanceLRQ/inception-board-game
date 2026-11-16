@@ -9,10 +9,9 @@ const SERVER_URL = 'http://localhost:13101';
 
 interface Tab {
   page: Page;
-  /** 页面发出的 GET /rooms/code/:code 次数（轮询） */
-  polls: () => number;
   /** 页面发出过的 /rooms 命名空间连接帧 */
   roomSocketFrames: string[];
+  roomPushes: { code: string; status: string; players: unknown[] }[];
 }
 
 async function openTab(browser: Browser, name: string): Promise<Tab> {
@@ -25,16 +24,22 @@ async function openTab(browser: Browser, name: string): Promise<Tab> {
     }
   });
   const page = await context.newPage();
-  let polls = 0;
   const roomSocketFrames: string[] = [];
-  page.on('request', (req) => {
-    if (req.method() === 'GET' && /\/rooms\/code\//.test(req.url())) polls += 1;
-  });
+  const roomPushes: Tab['roomPushes'] = [];
   page.on('websocket', (ws) => {
     ws.on('framesent', (frame) => {
       if (typeof frame.payload === 'string' && frame.payload.startsWith('40/rooms')) {
         roomSocketFrames.push(frame.payload);
       }
+    });
+    ws.on('framereceived', ({ payload }) => {
+      const prefix = '42/rooms,';
+      if (typeof payload !== 'string' || !payload.startsWith(prefix)) return;
+      const [event, message] = JSON.parse(payload.slice(prefix.length)) as [
+        string,
+        { room: Tab['roomPushes'][number] },
+      ];
+      if (event === 'icg:room') roomPushes.push(message.room);
     });
   });
   await page.goto('/lobby');
@@ -43,7 +48,7 @@ async function openTab(browser: Browser, name: string): Promise<Tab> {
   await expect(page.getByTestId('recovery-code-value')).toBeVisible();
   await page.getByTestId('recovery-code-confirm').click();
   await expect(page.getByTestId('lobby-create')).toBeVisible();
-  return { page, polls: () => polls, roomSocketFrames };
+  return { page, roomSocketFrames, roomPushes };
 }
 
 test('大厅可筛选公开房间并直接加入，默认建房保持私密', async ({ browser }) => {
@@ -99,28 +104,36 @@ test('成员加入与补 Bot 即时出现在房主页面上，不靠轮询；推
     const code = /\/room\/([A-Z0-9]{6})/.exec(a.page.url())![1]!;
     await expect(a.page.getByTestId('room-count')).toContainText('1 / 4');
 
-    // 房主页面的推送连接建立后才不再轮询
-    await expect.poll(() => a.roomSocketFrames.length, { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect
+      .poll(() => a.roomPushes.some((room) => room.code === code && room.players.length === 1))
+      .toBe(true);
     expect(a.roomSocketFrames[0]).toContain(`"code":"${code}"`);
-    const pollsBefore = a.polls();
+    expect(a.roomSocketFrames[0]?.includes('"token":"')).toBe(true);
 
     await b.page.locator('#lobby-joinCode').fill(code);
     await b.page.getByTestId('lobby-join').click();
     await expect(b.page).toHaveURL(new RegExp(`/room/${code}`));
 
-    // 轮询兜底是 15 秒一次；这里 5 秒内就看到了，只能是推送
+    await expect
+      .poll(() => a.roomPushes.some((room) => room.code === code && room.players.length === 2))
+      .toBe(true);
     await expect(a.page.getByTestId('room-count')).toContainText('2 / 4', { timeout: 5_000 });
     await expect(b.page.getByTestId('room-count')).toContainText('2 / 4', { timeout: 5_000 });
 
     await a.page.getByTestId('room-fill-ai').click();
+    await expect
+      .poll(() => b.roomPushes.some((room) => room.code === code && room.players.length === 4))
+      .toBe(true);
     await expect(b.page.getByTestId('room-count')).toContainText('4 / 4', { timeout: 5_000 });
     // 乙不是房主：看不到开始按钮
     await expect(b.page.getByTestId('room-start')).toHaveCount(0);
 
     // 房主开始游戏：乙的页面被推送带进对局，没有轮询也没有刷新
     await a.page.getByTestId('room-start').click();
+    await expect
+      .poll(() => b.roomPushes.some((room) => room.code === code && room.status === 'playing'))
+      .toBe(true);
     await expect(b.page).toHaveURL(/\/game\//, { timeout: 10_000 });
-    expect(a.polls() - pollsBefore).toBe(0);
   } finally {
     await a.page.context().close();
     await b.page.context().close();
@@ -164,7 +177,7 @@ test('邀请链接：浏览器落到房间页；预览抓取器拿到不含成�
       headers: { 'user-agent': 'Mozilla/5.0 Chrome/126' },
     });
     expect(redirect.status()).toBe(302);
-    expect(redirect.headers()['location']).toBe(`/room/${code}`);
+    expect(redirect.headers()['location']).toBe(new URL(`/room/${code}`, link).href);
   } finally {
     await a.page.context().close();
     await b.page.context().close();

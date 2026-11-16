@@ -5,6 +5,10 @@
 import type { Page } from '@playwright/test';
 import { test, expect, selectAndPlayCard, waitForAppReady } from './fixtures/index.js';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('icgame-log-level', 'info'));
+});
+
 interface SentMove {
   move: string;
   args: unknown[];
@@ -78,7 +82,8 @@ test.describe('复活 · 本人在迷失层', () => {
     await openScene(page, '/game/debug?dead=1');
     const first = page.getByTestId('card-0');
     await first.click();
-    await expect(page.getByTestId('hand-commit-play')).toHaveCount(0);
+    await expect(page.getByTestId('hand-commit-play')).toBeDisabled();
+    await expect(page.getByTestId('hand-dock').getByRole('status')).toContainText('你在迷失层');
   });
 
   test('缺省场景（本人存活、没有人在迷失层）没有任何操作入口', async ({ page }) => {
@@ -143,11 +148,12 @@ test.describe('梦主 · 免费移动', () => {
     await expect(page.getByTestId('dock-entry-move')).toHaveCount(0);
   });
 
-  test('梦主本人手里的【解封】打不出，信息条 / 身份块给出原因', async ({ page }) => {
+  test('梦主本人手里的【解封】打不出，手牌区给出原因', async ({ page }) => {
     await openScene(page, '/game/debug?as=master');
     const unlock = await handIndexOf(page, '解封');
     await page.getByTestId(`card-${unlock}`).click();
-    await expect(page.getByTestId('hand-commit-play')).toHaveCount(0);
+    await expect(page.getByTestId('hand-commit-play')).toBeDisabled();
+    await expect(page.getByTestId('hand-dock').getByRole('status')).toContainText('梦主不能用');
   });
 });
 
@@ -156,7 +162,8 @@ test.describe('梦主 · 梦境窥视（效果②）', () => {
     await openScene(page, '/game/debug?as=master');
     const peek = await handIndexOf(page, '梦境窥视');
     await page.getByTestId(`card-${peek}`).click();
-    await expect(page.getByTestId('hand-commit-play')).toHaveCount(0);
+    await expect(page.getByTestId('hand-commit-play')).toBeDisabled();
+    await expect(page.getByTestId('hand-dock').getByRole('status')).toContainText('没有持有贿赂牌');
   });
 
   test('有盗梦者持有贿赂牌：打出后选目标玩家，只列持有者，发出 playPeekMaster(牌, 目标)', async ({
@@ -171,6 +178,7 @@ test.describe('梦主 · 梦境窥视（效果②）', () => {
     const options = page.getByTestId(/^target-player-\d+$/);
     await expect(options).toHaveCount(1);
     await options.first().click();
+    await page.getByTestId('target-player-confirm').click();
 
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
     expect(sent[0]!.move).toBe('playPeekMaster');

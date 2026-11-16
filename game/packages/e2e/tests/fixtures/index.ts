@@ -53,6 +53,23 @@ export function isMobileProject(projectName: string): boolean {
  */
 export const LOCAL_MATCH_URL = '/local?seed=e2e-local-1&botpace=fast';
 
+/** 保留手动抽牌按钮，供明确要验证抽牌这一步的用例使用。 */
+export async function disableAutoDraw(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'ico:draw:prefs',
+      JSON.stringify({ state: { autoDraw: false }, version: 0 }),
+    );
+  });
+}
+
+export function getDiscardPrompt(page: Page): Locator {
+  return page
+    .locator('.tabletop-hand-actions')
+    .getByRole('status')
+    .filter({ hasText: /张弃牌/ });
+}
+
 // 等待页面就绪
 // - 不依赖 networkidle（Web Worker / WS 长连接会让它永不触发）
 // - 仅等待 DOM 完成 + React 懒加载根节点挂载
@@ -166,21 +183,23 @@ export async function answerAwaitedResponse(page: Page): Promise<boolean> {
   return true;
 }
 
-/** 等某个元素出现，等待期间随时答复轮到真人的应答；超时则抛出 */
+/** 等操作出现且掷骰窗关闭，等待期间随时答复轮到真人的应答。 */
 export async function waitVisibleAnswering(
   page: Page,
   target: Locator,
   timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  const diceGate = page.getByTestId('dice-gate');
   while (Date.now() < deadline) {
-    if (await target.isVisible()) return;
     try {
-      await answerAwaitedResponse(page);
+      if (await answerAwaitedResponse(page)) continue;
     } catch {
       /* 窗口刚好消失，下一轮再看 */
     }
+    if ((await target.isVisible()) && !(await diceGate.isVisible())) return;
     await page.waitForTimeout(250);
   }
+  await expect(diceGate).toBeHidden({ timeout: 1_000 });
   await target.waitFor({ state: 'visible', timeout: 1_000 });
 }

@@ -117,8 +117,11 @@ async function actOnce(page: Page): Promise<boolean> {
   const dice = page.getByTestId('dice-gate');
   if (await dice.isVisible()) {
     const roll = page.getByTestId('dice-roll-button');
-    if ((await roll.isVisible()) && (await roll.isEnabled())) await roll.click();
-    else await dice.getByRole('button', { name: '收起', exact: true }).click();
+    if ((await roll.isVisible()) && (await roll.isEnabled({ timeout: 1_500 }))) {
+      await roll.click({ timeout: 1_500 });
+    } else {
+      await dice.getByRole('button', { name: '收起', exact: true }).click({ timeout: 1_500 });
+    }
     return true;
   }
   const draw = page.getByTestId('action-draw');
@@ -143,12 +146,14 @@ async function actOnce(page: Page): Promise<boolean> {
     await skip.click({ timeout: 1_500 });
     return true;
   }
-  const note = (await page.locator('.tabletop-hand-actions [role="status"]').textContent()) ?? '';
+  const [note = ''] = await page
+    .locator('.tabletop-hand-actions [role="status"]')
+    .allTextContents();
   const required = Number(/选择 (\d+) 张弃牌/.exec(note)?.[1]);
   if (required > 0) {
     const cards = page.getByTestId('human-hand').locator('[data-testid^="card-"]');
     for (let i = 0; i < required; i++) await cards.nth(i).click({ timeout: 1_500 });
-    if (await confirm.isEnabled()) {
+    if (await confirm.isEnabled({ timeout: 1_500 })) {
       await confirm.click({ timeout: 1_500 });
       return true;
     }
@@ -214,8 +219,10 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
       [b, seatA],
     ] as const) {
       await expect(me.page.getByTestId('human-hand')).toHaveCount(1);
-      // 桌面布局里本人不占座位环（由底部坞承载），环上只有其他座位
-      await expect(me.page.getByTestId(`player-seat-${seatOf(me)}`)).toHaveCount(0);
+      await expect(me.page.getByTestId(`player-seat-${seatOf(me)}`)).toHaveAttribute(
+        'data-self',
+        'true',
+      );
       await expect(me.page.getByTestId(`player-seat-${other}`)).toBeVisible();
       // 对方座位上没有任何手牌牌面，只显示张数
       await expect(
@@ -228,9 +235,9 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
             const expected = latestHandCount(me, other);
             const shown = await me.page
               .getByTestId(`player-seat-${other}`)
-              .locator('.tabular-nums')
-              .allTextContents();
-            return expected !== undefined && shown.some((t) => t.trim() === String(expected));
+              .getByText(/^手牌 \d+$/)
+              .textContent();
+            return expected !== undefined && shown === `手牌 ${expected}`;
           },
           { timeout: 10_000 },
         )
@@ -351,6 +358,13 @@ test('两个浏览器在同一房间里打完一局', async ({ browser }) => {
 test('真人一直不操作会被托管，提示条出现，取消托管后提示条消失', async ({ browser }) => {
   const a = await newPlayer(browser, '挂机甲');
   try {
+    // 这条测试要求玩家持续超时；客户端自动抽牌也会提交操作。
+    await a.page.addInitScript(() => {
+      localStorage.setItem(
+        'ico:draw:prefs',
+        JSON.stringify({ state: { autoDraw: false }, version: 0 }),
+      );
+    });
     await createProfile(a);
     await a.page.locator('#lobby-maxPlayers').selectOption('4');
     await a.page.getByTestId('lobby-create').click();
@@ -371,8 +385,16 @@ test('真人一直不操作会被托管，提示条出现，取消托管后提�
     const marker = a.page.getByTestId(`seat-marker-idle_takeover-${seat}`);
     await expect(marker).toHaveCount(1);
 
-    // 提示条的按钮点得到，且不挡住操作栏：点击后提示条消失
-    await a.page.getByTestId('self-takeover-resume').click();
+    // 快速测试局会连续展示 Bot 的掷骰结果，先收起当前弹窗，再取消托管。
+    const closeDice = a.page.getByTestId('dice-gate').getByRole('button', {
+      name: '收起',
+      exact: true,
+    });
+    const resume = a.page.getByTestId('self-takeover-resume');
+    await expect(async () => {
+      if (await closeDice.isVisible()) await closeDice.click({ timeout: 500 });
+      await resume.click({ timeout: 500 });
+    }).toPass({ timeout: 8_000, intervals: [100] });
     await expect(banner).toBeHidden({ timeout: 5_000 });
     await expect(marker).toHaveCount(0);
 

@@ -51,12 +51,13 @@ test.describe('手机牌桌 · iPhone 12/13 基线', () => {
     await expect(page.getByTestId('layer-row-0')).toBeVisible();
     await expect(page.getByRole('button', { name: '复活', exact: true })).toBeVisible();
   });
-  test('应答条保留操作，终局按需查看结算', async ({ page }) => {
+  test('应答窗口保留操作，终局按需查看结算', async ({ page }) => {
     await page.goto('/game/debug?pending=1');
     await waitForAssetsReady(page);
-    await expect(page.getByTestId('unlock-response-bar')).toBeVisible();
-    await expect(page.getByTestId('unlock-response-cancel')).toBeVisible();
-    await expect(page.getByTestId('unlock-response-pass')).toBeVisible();
+    const response = page.getByRole('dialog').and(page.getByTestId('unlock-response-window'));
+    await expect(response).toBeVisible();
+    await expect(response.getByTestId('unlock-response-cancel')).toBeEnabled();
+    await expect(response.getByTestId('unlock-response-pass')).toBeEnabled();
     await page.goto('/game/debug?tabletop=outcome');
     await waitForAssetsReady(page);
     await expect(page.getByTestId('winner-banner')).toBeVisible();

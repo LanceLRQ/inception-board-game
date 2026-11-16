@@ -22,7 +22,6 @@ function recordMoves(page: Page): SentMove[] {
         sent.push({ move: ctx.move, args: ctx.args });
       });
   });
-  await page.getByTestId('target-player-confirm').click();
   return sent;
 }
 

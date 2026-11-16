@@ -35,6 +35,7 @@ export default defineConfig({
       env: {
         PORT: String(SERVER_PORT),
         WS_CORS_ORIGIN: CLIENT_URL,
+        PUBLIC_BASE_URL: CLIENT_URL,
         MATCH_BOT_STEP_DELAY_MS: '50',
         MATCH_PENDING_TIMEOUT_MS: '1500',
         MATCH_TURN_TIMEOUT_MS: '2500',
