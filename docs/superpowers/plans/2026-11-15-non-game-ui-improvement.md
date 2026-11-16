@@ -96,7 +96,7 @@
 
 ### 阶段 2 实施记录
 
-- 保留八步介绍，修正当前人数范围（直接引用共享常量）、阵营与背叛者、心锁与金库、回合方向、行动牌名称及效果、规则优先级和胜负条件。依据为 `docs/manual/02-game-setup.md`、`03-game-flow.md`、`04-action-cards.md`，以及 `shared/src/rules/playerCount.ts`、`game-engine/src/config.ts`、`endCondition.ts`。
+- 保留八步介绍，修正当前人数范围（直接引用共享常量）、阵营与背叛者、心锁与金库、回合方向、行动牌名称及效果、规则优先级和胜负条件。依据为[游戏设置](../../manual/02-game-setup.md)、[游戏流程](../../manual/03-game-flow.md)、[行动牌](../../manual/04-action-cards.md)，以及 `shared/src/rules/playerCount.ts`、`game-engine/src/config.ts`、`endCondition.ts`。
 - 补充四层梦境和回合顺序的静态示意；沿用现有主题及 Dialog，仅调整独立教程的内容和操作区。正文可独立滚动，操作按钮至少 44px，步骤切换重置正文滚动位置。
 - 关闭保留阅读位置；跳过记录跳过并返回原入口，不再写入完成状态；完成显示「已读完基础介绍」。重新阅读从第一步开始；旧版跳过造成的未完整阅读却标为完成的记录重新开始介绍。
 - 新增上一步事件及首步边界；移除未接通的角色图鉴选项。完成页提供单机练习与进入大厅，从首页进入时另有返回首页；大厅入口兼作返回，不重复放置同目的地链接。

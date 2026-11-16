@@ -1,6 +1,6 @@
 # 现代暗色牌桌与 2.5D 交互原型
 
-日期：2026-11-02。用户已选择「现代暗色牌桌＋2.5D」方向，并要求桌面与手机原型、原版卡片、完整文字、选牌／出牌／掷骰演示。本文记录本次交付，前期讨论见 [UI 现代化讨论记录](../../discussion/2026-11-02-ui-modernization.md)。
+日期：2026-11-02。用户已选择「现代暗色牌桌＋2.5D」方向，并要求桌面与手机原型、原版卡片、完整文字、选牌／出牌／掷骰演示。本文记录本次交付。
 
 ## 打开与体验
 
@@ -65,7 +65,7 @@ python3 -m http.server 13001 --bind 127.0.0.1
 
 - 103 个 WebP 文件逐字节复制自 `game/packages/client/public/cards/`，这些文件没有重绘或修改；牌桌层数面板现按用户要求使用原图底纹裁片与透明数字图片，原版层数卡仍在说明书中保留。全部原始路径和 SHA-256 在 [guide.js](guide.js)，演示卡的补充全文在 [cards.js](cards.js)。卡图仍归原权利人所有，页面保留现有项目的版权标识。
 - 行动牌全文来自 `docs/manual/04-action-cards.md`，保留数量、使用时机、使用目标、发动效果与解析；短摘要只用于牌桌旁的快速预览，不能代替全文。
-- 角色和梦主原始文字来自 `docs/_internal/reference/assets/cards-data.json`；梦境、梦主优势及牌库说明补充自 `docs/manual/03-game-flow.md`、`docs/manual/02-game-setup.md`。
+- 角色和梦主原始文字来自项目整理的原版卡牌数据；梦境、梦主优势及牌库说明补充自 `docs/manual/03-game-flow.md`、`docs/manual/02-game-setup.md`。
 - 5 张角色头像从原版角色牌头部区域裁出，输出为 96 × 96 WebP，共 11,496 字节；不修改原卡文件。梦主“盛夏”原卡没有人物头部，保留世界观原图缩略图。
 - 6 个操作图标由本机已安装的 `lucide-react` 1.8.0 导出为 SVG，位于 `assets/icons/`，[许可证](assets/icons/LICENSE.txt) 随文件保留。不依赖 CDN，不需要浏览器加载 React 来显示图标。
 
@@ -180,4 +180,4 @@ node --check guide.js
 | `assets/portraits/`         | 5 张从原版角色卡裁出的 WebP 头像         |
 | `assets/environment/`       | 4 个生成素材 WebP、来源与最终提示词      |
 
-所有新增文件位于项目约定的内部文档目录。本目录受 `.gitignore` 的 `docs/_internal/` 规则影响，已保存本机，未提交或上传；没有执行 Git 写操作。后续若将设计接入正式游戏，应单独评审正式组件改动与规则联动。
+本目录保存原型的冻结副本。后续若将设计接入正式游戏，应单独评审正式组件改动与规则联动。

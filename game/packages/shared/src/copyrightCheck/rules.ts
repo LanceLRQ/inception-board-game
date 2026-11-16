@@ -27,6 +27,20 @@ export interface Violation {
   readonly suggestion?: string;
 }
 
+const PUBLIC_MANUAL_CHAPTERS = [
+  '01-game-overview',
+  '02-game-setup',
+  '03-game-flow',
+  '04-action-cards',
+  '05-dream-thieves',
+  '06-dream-master',
+  '07-nightmare-cards',
+  '08-appendix',
+  '09-credits',
+].join('|');
+// 公开章节可用仓库路径或从文档出发的相对路径引用。
+const PUBLIC_MANUAL_PATH = String.raw`(?<![\w./-])(?:/?docs/manual/|(?:\.\./)+manual/)`;
+
 /** 对外产物禁止出现的内部术语规则（与 CLAUDE.local.md 第 1 条对齐） */
 export const INTERNAL_TERM_RULES: readonly Rule[] = [
   {
@@ -85,7 +99,10 @@ export const INTERNAL_TERM_RULES: readonly Rule[] = [
   },
   {
     name: 'design_doc_number',
-    pattern: /\b\d{2}-[a-z]+(?:-[a-z]+)*\.md\b/i,
+    pattern: new RegExp(
+      String.raw`\b(?!(?<=${PUBLIC_MANUAL_PATH})(?:${PUBLIC_MANUAL_CHAPTERS})\.md(?![\w./-]))\d{2}-[a-z]+(?:-[a-z]+)*\.md\b`,
+      'i',
+    ),
     description: '内部设计文档编号文件名（如 03-data-model.md）',
     suggestion: '不在对外文档中引用内部设计文件名',
   },

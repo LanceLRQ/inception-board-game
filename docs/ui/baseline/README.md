@@ -2,7 +2,7 @@
 
 2026-11-03，初步接入提交 `3b39128` 之后、视觉重做之前。
 
-- `demo/` 是已确认原型的完整副本，HTML、CSS、JS、原卡、头像、环境图均随 Git 保存。`manifest.json` 为逐文件 SHA-256；冻结后不再改动。
+- `demo/` 是已确认原型的冻结副本，HTML、CSS、JS、原卡、头像、环境图均随 Git 保存。`manifest.json` 记录逐文件 SHA-256。
 - 从仓库根目录执行 `python3 -m http.server 13001 --directory docs/ui/baseline/demo` 可独立复现。原型中的模拟控制仅用于基线，不进入正式包。
 - 正式对照入口：`/game/debug?tabletop=normal|discard|peeked|dice|outcome`，固定六人及 demo 的角色、昵称、层数、锁数、五张／七张手牌。来源仍经 `viewMatch` 过滤，调试 move 不推进状态。
 - `screenshots/` 保存 1440×900、390×844 的默认、选牌、弃牌、翻牌、目标、骰子、教程、终局共 32 张 WebP。捕获前等全部图片和字体加载；使用真实点击进入界面状态。
@@ -32,4 +32,4 @@
 - `git diff --check`：通过。原有 Vite 配置兼容警告不属于此次改动。
 - 后续各阶段截图单独保存，不覆盖本目录初始截图。
 
-原型自带的 `state.test.mjs` 也原样冻结，其中素材对照测试依赖原目录的 `../../reference/`，不可在副本路径直接运行（会报 ENOENT）。已在源目录运行 `node --test docs/_internal/ui-demo/modern-tabletop/state.test.mjs`，10 项通过；副本的跨机器完整性以 `manifest.json` 校验，网页本身无此路径依赖。
+原型自带的 `state.test.mjs` 也原样冻结，其中素材对照测试依赖原型的源素材，直接在冻结副本中运行会报 ENOENT。源目录已运行 `node --test state.test.mjs`，10 项通过；副本的跨机器完整性以 `manifest.json` 校验，网页本身无此路径依赖。

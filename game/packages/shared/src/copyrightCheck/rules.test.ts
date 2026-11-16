@@ -69,6 +69,23 @@ describe('checkLine · 规则命中', () => {
     expect(v.map((x) => x.rule)).toContain('design_doc_number');
   });
 
+  it.each([
+    '参见 `docs/manual/02-game-setup.md`、`docs/manual/04-action-cards.md`',
+    '参见 [弃牌阶段规则](../../../manual/03-game-flow.md#游戏流程)',
+  ])('allows public manual chapter references in %s', (line) => {
+    expect(checkLine(line, 'docs/ui/baseline/demo/README.md', 1)).toEqual([]);
+  });
+
+  it.each([
+    '参见 `03-game-flow.md`',
+    '参见 `docs/manual/03-data-model.md`',
+    '参见 `docs/manual/03-game-flow.md.bak`',
+    '参见 `docs/_internal/reference/docs/manual/03-game-flow.md`',
+    '参见 `docs/manual/03-game-flow.md` 和 `03-data-model.md`',
+  ])('still flags numbered filenames outside public manual references in %s', (line) => {
+    expect(checkLine(line, 'readme.md', 1).map((v) => v.rule)).toContain('design_doc_number');
+  });
+
   it('flags internal risk code T17', () => {
     const v = checkLine('blocked on T17 resolution', 'notes.md', 1);
     expect(v.map((x) => x.rule)).toContain('risk_code');
