@@ -35,11 +35,44 @@ import {
 import { Button } from '@/components/ui/button';
 import { QuickMatch } from './QuickMatch';
 
-/** 待展示的恢复码；只存在于本页组件状态里，确认后即丢弃 */
+const INVITE_RECOVERY_KEY = 'icgame-invite-recovery';
+
 interface PendingRecoveryCode {
   code: string;
   warning: string;
-  kind: RecoveryCodeDialogKind;
+  kind: Extract<RecoveryCodeDialogKind, 'created' | 'recovered'>;
+  invite?: string;
+  playerId?: string;
+}
+
+function readInviteRecovery(invite: string | null, playerId: string | null) {
+  if (!invite || !playerId) return null;
+  try {
+    const raw = sessionStorage.getItem(INVITE_RECOVERY_KEY);
+    if (!raw) return null;
+    const pending = JSON.parse(raw) as Partial<PendingRecoveryCode> | null;
+    if (
+      pending?.invite !== invite ||
+      pending.playerId !== playerId ||
+      typeof pending.code !== 'string' ||
+      typeof pending.warning !== 'string' ||
+      (pending.kind !== 'created' && pending.kind !== 'recovered')
+    ) {
+      return null;
+    }
+    return { code: pending.code, warning: pending.warning, kind: pending.kind, invite, playerId };
+  } catch {
+    return null;
+  }
+}
+
+function writeInviteRecovery(pending: PendingRecoveryCode | null) {
+  try {
+    if (pending) sessionStorage.setItem(INVITE_RECOVERY_KEY, JSON.stringify(pending));
+    else sessionStorage.removeItem(INVITE_RECOVERY_KEY);
+  } catch {
+    // 标签页存储不可用时，当前页面仍可展示并确认恢复码。
+  }
 }
 
 /** 建房可选的人数：与服务端、引擎共用的人数范围 */
@@ -93,10 +126,32 @@ export default function Lobby() {
   const [error, setError] = useState<string | null>(null);
 
   // 恢复码弹窗与恢复入口
-  const [pendingCode, setPendingCode] = useState<PendingRecoveryCode | null>(null);
+  const [pendingRecovery, setPendingRecovery] = useState<PendingRecoveryCode | null>(() =>
+    readInviteRecovery(invitedCode, playerId),
+  );
+  const pendingCode =
+    pendingRecovery?.invite &&
+    (pendingRecovery.invite !== invitedCode || pendingRecovery.playerId !== playerId)
+      ? null
+      : pendingRecovery;
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreError, setRestoreError] = useState<string | null>(null);
+
+  const showRecoveryCode = useCallback(
+    (pending: PendingRecoveryCode) => {
+      // 建档或恢复刚更新了身份，以最新的账号为准。
+      const currentPlayerId = useIdentityStore.getState().playerId;
+      if (invitedCode && currentPlayerId) {
+        const inviteRecovery = { ...pending, invite: invitedCode, playerId: currentPlayerId };
+        writeInviteRecovery(inviteRecovery);
+        setPendingRecovery(inviteRecovery);
+      } else {
+        setPendingRecovery(pending);
+      }
+    },
+    [invitedCode],
+  );
 
   const publicRooms = useInfiniteQuery({
     queryKey: ['lobby', 'publicRooms', playerId, publicSize],
@@ -116,7 +171,7 @@ export default function Lobby() {
       const res = await initIdentity(name);
       // 离线模拟身份没有真实恢复码，recoveryCode 为 null 时不弹
       if (res.recoveryCode) {
-        setPendingCode({ code: res.recoveryCode, warning: res.warning, kind: 'created' });
+        showRecoveryCode({ code: res.recoveryCode, warning: res.warning, kind: 'created' });
       }
     } catch (e) {
       const msg = e instanceof ApiRequestError ? e.message : String(e);
@@ -124,7 +179,7 @@ export default function Lobby() {
     } finally {
       setLoading(false);
     }
-  }, [inputNickname, initIdentity, hasInvite, t, setError]);
+  }, [inputNickname, initIdentity, hasInvite, t, setError, showRecoveryCode]);
 
   const handleRestore = useCallback(async () => {
     if (!isRecoveryCodeComplete(restoreInput)) return;
@@ -133,7 +188,7 @@ export default function Lobby() {
     try {
       const res = await recoverIdentity(restoreInput);
       if (res.recoveryCode) {
-        setPendingCode({ code: res.recoveryCode, warning: res.warning, kind: 'recovered' });
+        showRecoveryCode({ code: res.recoveryCode, warning: res.warning, kind: 'recovered' });
       }
       setRestoreInput('');
     } catch (e) {
@@ -141,7 +196,7 @@ export default function Lobby() {
     } finally {
       setLoading(false);
     }
-  }, [restoreInput, recoverIdentity, t]);
+  }, [restoreInput, recoverIdentity, t, showRecoveryCode]);
 
   // 建房与加入房间是写操作：用 mutation 承载，成功后进入房间页
   const createRoomMutation = useMutation({
@@ -277,7 +332,10 @@ export default function Lobby() {
       code={pendingCode.code}
       warning={pendingCode.warning}
       kind={pendingCode.kind}
-      onConfirm={() => setPendingCode(null)}
+      onConfirm={() => {
+        if (pendingCode.invite) writeInviteRecovery(null);
+        setPendingRecovery(null);
+      }}
     />
   );
   const fingerprintNotice = !isMockMode() && (

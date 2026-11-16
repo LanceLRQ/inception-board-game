@@ -1,7 +1,7 @@
 // RecoveryCodeDialog - 恢复码展示弹窗
 //
 // 恢复码只在签发这一刻以明文出现，之后服务端只存哈希，所以弹窗必须点「我已保存」才能关：
-// 不响应遮罩点击与 Esc。恢复码只活在调用方的组件状态里，不写任何持久化位置，也不进日志。
+// 不响应遮罩点击与 Esc。调用方负责恢复码的生命周期，弹窗不保存恢复码，也不记录日志。
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';

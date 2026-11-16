@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Browser } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 const SERVER = 'http://localhost:13101';
 async function createRoom(request: APIRequestContext) {
@@ -17,7 +17,17 @@ async function visitor(browser: Browser) {
   return context;
 }
 
-test('服务端邀请 302 → 新身份 → 保存恢复码 → 原房间，分享卡片保留', async ({
+async function expectRecoveryConfirmationAfterReload(page: Page, code: string) {
+  const value = page.getByTestId('recovery-code-value');
+  await expect(value).not.toBeEmpty();
+  const issuedCode = (await value.innerText()).trim();
+  await page.reload();
+  await expect(page.getByTestId('recovery-code-dialog')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/lobby\\?invite=${code}$`));
+  await expect(value).toHaveText(issuedCode);
+}
+
+test('服务端邀请 302 保留分享卡片，新建身份后刷新仍须确认原恢复码', async ({
   browser,
   request,
 }) => {
@@ -36,16 +46,23 @@ test('服务端邀请 302 → 新身份 → 保存恢复码 → 原房间，分�
   await expect(page.getByTestId('recovery-code-dialog')).toBeVisible();
   const before = await (await request.get(`${SERVER}/rooms/code/${code}`, { headers })).json();
   expect(before.players).toHaveLength(1);
+  await expectRecoveryConfirmationAfterReload(page, code);
+  const reloaded = await (await request.get(`${SERVER}/rooms/code/${code}`, { headers })).json();
+  expect(reloaded.players).toHaveLength(1);
   await page.getByTestId('recovery-code-confirm').click();
+  await expect(page).toHaveURL(new RegExp(`/room/${code}$`));
   await expect(page.getByTestId('room-players')).toContainText('受邀新玩家');
   const after = await (await request.get(`${SERVER}/rooms/code/${code}`, { headers })).json();
   expect(after.players).toHaveLength(2);
   await page.reload();
   await expect(page.getByTestId('room-count')).toContainText('2');
+  await page.goto(`/lobby?invite=${code}`);
+  await expect(page).toHaveURL(new RegExp(`/room/${code}$`));
+  await expect(page.getByTestId('recovery-code-dialog')).toHaveCount(0);
   await context.close();
 });
 
-test('真实恢复账号确认新码后加入邀请房间，旧码作废', async ({ browser, request }) => {
+test('恢复账号后刷新仍须确认刚签发的恢复码，旧码作废', async ({ browser, request }) => {
   const { code, headers } = await createRoom(request);
   const account = await (
     await request.post(`${SERVER}/identity/init`, { data: { nickname: '恢复受邀玩家' } })
@@ -61,8 +78,17 @@ test('真实恢复账号确认新码后加入邀请房间，旧码作废', async
   expect(
     (await (await request.get(`${SERVER}/rooms/code/${code}`, { headers })).json()).players,
   ).toHaveLength(1);
+  await expectRecoveryConfirmationAfterReload(page, code);
+  await expect(page.getByTestId('recovery-code-old-revoked')).toBeVisible();
+  expect(
+    (await (await request.get(`${SERVER}/rooms/code/${code}`, { headers })).json()).players,
+  ).toHaveLength(1);
   await page.getByTestId('recovery-code-confirm').click();
+  await expect(page).toHaveURL(new RegExp(`/room/${code}$`));
   await expect(page.getByTestId('room-players')).toContainText('恢复受邀玩家');
+  expect(
+    (await (await request.get(`${SERVER}/rooms/code/${code}`, { headers })).json()).players,
+  ).toHaveLength(2);
   const oldCode = await request.post(`${SERVER}/identity/recover`, {
     data: { code: account.recoveryCode },
   });
