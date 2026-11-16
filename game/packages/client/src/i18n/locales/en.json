@@ -1,4 +1,12 @@
 {
+  "navigation": {
+    "label": "Site navigation",
+    "menu": "Menu",
+    "menuTitle": "Navigation",
+    "lobby": "Lobby",
+    "tutorial": "Tutorial",
+    "about": "About"
+  },
   "common": {
     "loading": "Loading...",
     "confirm": "Confirm",

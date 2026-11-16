@@ -1,15 +1,18 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { CopyrightNotice, CopyrightModal } from '../../components/CopyrightNotice';
 import { hasAcknowledgedCopyright } from '../../lib/copyright';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export default function Landing() {
+  const { t } = useTranslation();
   // 首次渲染时一次性读取 localStorage（lazy init，避免 effect 中 setState）
   const [showModal, setShowModal] = useState<boolean>(() => !hasAcknowledgedCopyright());
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-between bg-background py-8 text-foreground">
+    <div className="flex flex-1 flex-col items-center justify-between bg-background py-8 text-foreground">
       <div className="flex flex-1 flex-col items-center justify-center">
         <h1 className="mb-2 text-4xl font-bold">盗梦都市</h1>
         <p className="mb-8 text-dim">Inception City Online</p>
@@ -30,12 +33,19 @@ export default function Landing() {
             多人房间
           </a>
         </div>
+        <Link
+          to="/tutorial"
+          state={{ returnTo: '/' }}
+          className="mt-4 inline-flex min-h-11 items-center rounded-md px-3 text-sm text-dim underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          {t('navigation.tutorial')}
+        </Link>
       </div>
 
       {/* 第 1 处版权展示：首屏底部常驻 */}
       <CopyrightNotice variant="footer" className="mt-6 px-4" />
 
-      {/* 第 3 处版权展示：教学前首次弹窗（localStorage ack 记忆） */}
+      {/* 第 3 处版权展示：首次进站弹窗（localStorage ack 记忆） */}
       <CopyrightModal open={showModal} onAcknowledge={() => setShowModal(false)} />
     </div>
   );

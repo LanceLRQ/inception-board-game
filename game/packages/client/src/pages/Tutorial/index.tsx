@@ -3,6 +3,8 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
+import { useSiteReturnTo } from '../../hooks/useSiteReturnTo';
 import { BASICS_TUTORIAL, getCurrentStep, isCompleted } from '@icgame/shared';
 import { TutorialOverlay } from '../../components/TutorialOverlay';
 import { CopyrightNotice } from '../../components/CopyrightNotice';
@@ -11,6 +13,8 @@ import { PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Tutorial() {
+  const { t } = useTranslation();
+  const returnTo = useSiteReturnTo();
   const progress = useTutorialStore((s) => s.progress);
   const start = useTutorialStore((s) => s.start);
   const dispatch = useTutorialStore((s) => s.dispatch);
@@ -48,8 +52,8 @@ export default function Tutorial() {
           >
             重新教学
           </Button>
-          <Button type="button" onClick={() => navigate('/')} className="rounded-full px-6">
-            返回首页
+          <Button type="button" onClick={() => navigate(returnTo)} className="rounded-full px-6">
+            {t(returnTo === '/' ? 'error.home' : 'match.back_to_lobby')}
           </Button>
         </div>
         <CopyrightNotice variant="footer" className="mt-8" />
@@ -71,7 +75,7 @@ export default function Tutorial() {
         onNext={() => dispatch(BASICS_TUTORIAL, { type: 'next' })}
         onSkip={() => dispatch(BASICS_TUTORIAL, { type: 'skip' })}
         onChoose={(choiceId) => dispatch(BASICS_TUTORIAL, { type: 'choose', choiceId })}
-        onClose={() => navigate('/')}
+        onClose={() => navigate(returnTo)}
       />
     </div>
   );

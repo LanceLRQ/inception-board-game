@@ -19,12 +19,14 @@ import { identityApi, isOfflineIdentity, type RecoveryStatus } from '../../lib/i
 import { rotateErrorKey } from '../../lib/recoveryCode';
 import { logger } from '../../lib/logger';
 import { useIdentityStore } from '../../stores/useIdentityStore';
+import { useSiteReturnTo } from '../../hooks/useSiteReturnTo';
 import { useAvatar } from '../../hooks/useAvatar';
 import { AvatarPicker } from '../../components/AvatarPicker';
 import { SettingsGroup } from './SettingsGroup';
 
 export function AccountSection() {
   const { t } = useTranslation();
+  const returnTo = useSiteReturnTo();
   const playerId = useIdentityStore((s) => s.playerId);
   const token = useIdentityStore((s) => s.token);
   const nickname = useIdentityStore((s) => s.nickname);
@@ -105,6 +107,7 @@ export function AccountSection() {
           {!offline && (
             <Link
               to={`/players/${encodeURIComponent(playerId)}`}
+              state={{ returnTo }}
               className="inline-flex min-h-11 items-center self-start text-primary underline-offset-4 hover:underline"
             >
               {t('profile.title')}

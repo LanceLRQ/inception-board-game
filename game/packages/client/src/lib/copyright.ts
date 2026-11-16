@@ -38,7 +38,7 @@ export function getTutorialCopyrightText(): string {
     `• 素材：保留所有权利，爱好者 Fair Use 范畴内使用`,
     `• ${COPYRIGHT.usageNote}`,
     '',
-    '继续教程即视为你已阅读并同意上述声明。',
+    '请阅读上述声明，确认同意后进入网站。',
   ].join('\n');
 }
 

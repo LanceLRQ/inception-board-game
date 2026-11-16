@@ -197,7 +197,7 @@ export default function Lobby() {
 
   if (!isInitialized) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-background text-dim">
+      <div className="flex flex-1 items-center justify-center bg-background text-dim">
         {t('lobby.loading')}
       </div>
     );
@@ -218,7 +218,7 @@ export default function Lobby() {
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 bg-background p-6 text-foreground">
+      <div className="mx-auto flex w-full flex-1 max-w-md flex-col justify-center gap-4 bg-background p-6 text-foreground">
         <h1 className="text-2xl font-bold">{t('lobby.title')}</h1>
         <label className="block text-sm text-dim" htmlFor="lobby-nickname">
           {t('lobby.nicknameLabel')}

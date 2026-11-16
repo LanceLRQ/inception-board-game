@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { lazy, Suspense } from 'react';
 import App from './App';
+import { SiteLayout } from './components/SiteLayout';
 import { RouteErrorFallback } from './components/ErrorBoundary';
 
 import Invite from './pages/Invite';
@@ -33,17 +34,21 @@ export const router = createBrowserRouter([
       {
         path: '/',
         element: (
-          <Suspense fallback={<PageLoader />}>
-            <Landing />
-          </Suspense>
+          <SiteLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Landing />
+            </Suspense>
+          </SiteLayout>
         ),
       },
       {
         path: '/lobby',
         element: (
-          <Suspense fallback={<PageLoader />}>
-            <Lobby />
-          </Suspense>
+          <SiteLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Lobby />
+            </Suspense>
+          </SiteLayout>
         ),
       },
       {
@@ -85,25 +90,31 @@ export const router = createBrowserRouter([
       {
         path: '/players/:playerId',
         element: (
-          <Suspense fallback={<PageLoader />}>
-            <PlayerProfile />
-          </Suspense>
+          <SiteLayout>
+            <Suspense fallback={<PageLoader />}>
+              <PlayerProfile />
+            </Suspense>
+          </SiteLayout>
         ),
       },
       {
         path: '/settings',
         element: (
-          <Suspense fallback={<PageLoader />}>
-            <Settings />
-          </Suspense>
+          <SiteLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Settings />
+            </Suspense>
+          </SiteLayout>
         ),
       },
       {
         path: '/about',
         element: (
-          <Suspense fallback={<PageLoader />}>
-            <About />
-          </Suspense>
+          <SiteLayout>
+            <Suspense fallback={<PageLoader />}>
+              <About />
+            </Suspense>
+          </SiteLayout>
         ),
       },
       {

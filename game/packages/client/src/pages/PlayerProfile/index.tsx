@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Film } from 'lucide-react';
+import { Film } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { PixelAvatar } from '../../components/PixelAvatar';
@@ -71,16 +71,8 @@ export default function PlayerProfile() {
   });
 
   return (
-    <div className="min-h-dvh bg-background p-4 text-foreground sm:p-8">
+    <div className="flex-1 bg-background p-4 text-foreground sm:p-8">
       <div className="mx-auto max-w-3xl space-y-5">
-        <Link
-          to="/lobby"
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ArrowLeft size={16} aria-hidden />
-          {t('match.back_to_lobby')}
-        </Link>
-
         {profile.isPending && <p role="status">{t('common.loading')}</p>}
         {profile.isError && (
           <div className="flex flex-wrap items-center gap-3">

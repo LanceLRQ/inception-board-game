@@ -1,4 +1,12 @@
 {
+  "navigation": {
+    "label": "站点导航",
+    "menu": "菜单",
+    "menuTitle": "导航菜单",
+    "lobby": "大厅",
+    "tutorial": "新手教程",
+    "about": "关于"
+  },
   "common": {
     "loading": "加载中...",
     "confirm": "确认",
