@@ -13,7 +13,9 @@ test('首页进入设置，刷新并跨辅助页后仍可返回首页', async ({
   await page.goto('/');
   await (await openNavigation(page)).getByRole('link', { name: '设置', exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
   await page.reload();
+  await expect(page.getByRole('link', { name: '返回首页', exact: true })).toBeVisible();
   await (await openNavigation(page)).getByRole('link', { name: '关于', exact: true }).click();
   await expect(page.getByRole('heading', { name: '关于', exact: true })).toBeVisible();
   await page.getByRole('link', { name: '返回首页', exact: true }).click();
