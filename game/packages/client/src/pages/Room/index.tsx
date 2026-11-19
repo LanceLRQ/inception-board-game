@@ -257,7 +257,7 @@ export default function Room() {
               ) : (
                 <Link
                   to={`/players/${encodeURIComponent(p.playerId)}`}
-                  className="truncate underline-offset-4 hover:underline"
+                  className="truncate underline-offset-4 hover:underline coarse:min-w-11 coarse:leading-11"
                   data-testid={`room-player-${p.seat}`}
                 >
                   {p.nickname}

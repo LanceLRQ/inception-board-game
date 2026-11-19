@@ -67,7 +67,7 @@ export interface SmallTarget {
  *
  * 命中区用 elementFromPoint 逐点探测，伪元素扩展、overflow 裁剪、被相邻元素盖住都如实反映，
  * 所以靠 padding / min-h / 伪元素扩大点击区域都算数。
- * 有打开的对话框时只审计对话框内（遮罩之下的内容点不到）。
+ * 复选框和单选框也计入包裹它们的可点击标签；有打开的对话框时只审计对话框内。
  *
  * 豁免（在页面内判定，原因写在这里）：
  *   - 行内文字链接：夹在正文里的链接（父元素的文字比链接自己多），按 WCAG 2.5.8 的行内例外不要求尺寸；
@@ -107,8 +107,20 @@ export async function auditTouchTargets(page: Page): Promise<SmallTarget[]> {
         const ownText = (el.textContent ?? '').replace(/\s+/g, '');
         if (parentText.length > ownText.length + 2) continue;
       }
-      el.scrollIntoView({ block: 'center', inline: 'center' });
-      const r = el.getBoundingClientRect();
+      const wrapper = el.closest('label');
+      const target =
+        el instanceof HTMLInputElement &&
+        (el.type === 'checkbox' || el.type === 'radio') &&
+        wrapper?.control === el &&
+        root.contains(wrapper)
+          ? wrapper
+          : el;
+      target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      const r = target.getBoundingClientRect();
+      const hitsControl = (hit: Element) =>
+        hit === el ||
+        el.contains(hit) ||
+        (target !== el && target.contains(hit) && !hit.closest(SEL));
       const x0 = Math.max(0, Math.floor(r.left - PAD));
       const x1 = Math.min(innerWidth - 1, Math.ceil(r.right + PAD));
       const y0 = Math.max(0, Math.floor(r.top - PAD));
@@ -120,7 +132,7 @@ export async function auditTouchTargets(page: Page): Promise<SmallTarget[]> {
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           const t = document.elementFromPoint(x, y);
-          if (t && (t === el || el.contains(t))) {
+          if (t && hitsControl(t)) {
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
@@ -141,9 +153,17 @@ export async function auditTouchTargets(page: Page): Promise<SmallTarget[]> {
       ) {
         for (let x = Math.max(0, r.left + 1); x < Math.min(innerWidth, r.right - 1); x += stepX) {
           const t = document.elementFromPoint(x, y);
-          if (!t || t === el || el.contains(t) || t.contains(el)) continue;
+          if (!t || hitsControl(t) || t.contains(el)) continue;
           const c = t.closest(SEL);
-          if (c && c !== el && interactive.has(c) && !el.contains(c) && !c.contains(el)) {
+          // 圆角矩形的包围盒含有点不到的角。只有目标确实在该点的命中栈里才算被盖住。
+          if (
+            c &&
+            c !== el &&
+            interactive.has(c) &&
+            !el.contains(c) &&
+            !c.contains(el) &&
+            document.elementsFromPoint(x, y).some(hitsControl)
+          ) {
             covered = label(c);
             break;
           }
@@ -157,7 +177,7 @@ export async function auditTouchTargets(page: Page): Promise<SmallTarget[]> {
         hit: `${Math.round(w)}x${Math.round(h)}`,
         box: `${Math.round(r.width)}x${Math.round(r.height)}`,
       };
-      if (w < MIN || h < MIN) out.push({ ...common, reason: 'small' });
+      if (w < MIN || h < MIN) out.push({ ...common, reason: 'small', covered });
       else if (covered) out.push({ ...common, reason: 'covered', covered });
     }
     return out;
