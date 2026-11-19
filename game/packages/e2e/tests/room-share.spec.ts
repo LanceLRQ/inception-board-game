@@ -18,8 +18,16 @@ test.describe('房间码分享', () => {
     await expect(page.getByTestId('room-share-link')).toHaveValue(`${baseURL}/invite/${ROOM_CODE}`);
   });
 
-  test('一键复制：房间码与链接都进剪贴板，并给出提示', async ({ page, context, baseURL }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  test('一键复制：房间码与链接写入剪贴板，并给出提示', async ({
+    page,
+    context,
+    browserName,
+    baseURL,
+  }) => {
+    // WebKit 允许用户点击时写入，仅支持预授予剪贴板读取权限。
+    await context.grantPermissions(
+      browserName === 'webkit' ? ['clipboard-read'] : ['clipboard-read', 'clipboard-write'],
+    );
     await page.goto(`/room/${ROOM_CODE}`);
     await waitForAppReady(page);
     await expect(page.getByTestId('room-share')).toBeVisible({ timeout: 10_000 });
