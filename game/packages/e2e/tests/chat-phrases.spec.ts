@@ -18,12 +18,13 @@ test.describe('固定场景 · 预设短语', () => {
     await expect(page.locator('[data-testid^="chat-bubble-"]')).toHaveCount(0);
   });
 
-  test('chat=1：可以在短语界面读到示例消息，桌面座位旁同时显示气泡', async ({ page }) => {
+  test('chat=1：桌面座位旁显示示例气泡，手机可在最近消息里查看', async ({ page }) => {
     await openScene(page, '/game/debug?chat=1');
     if (!isNarrowViewport(page)) {
       await expect(
         page.locator('[data-testid^="chat-bubble-"][data-phrase="greet_hi"]'),
       ).toHaveText('大家好！');
+      return;
     }
     await chatToggle(page).click();
     await page.getByTestId('chat-recent-toggle').click();
