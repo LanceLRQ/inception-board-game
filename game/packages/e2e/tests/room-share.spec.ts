@@ -24,23 +24,44 @@ test.describe('房间码分享', () => {
     browserName,
     baseURL,
   }) => {
-    // WebKit 允许用户点击时写入，仅支持预授予剪贴板读取权限。
-    await context.grantPermissions(
-      browserName === 'webkit' ? ['clipboard-read'] : ['clipboard-read', 'clipboard-write'],
-    );
+    const writes: string[] = [];
+    if (browserName === 'webkit') {
+      // Linux WebKit 拒绝后台读取剪贴板。点按钮仍可真实写入，只在原生写入成功后记录文本。
+      await page.exposeFunction('observeClipboardWrite', (value: string) => {
+        writes.push(value);
+      });
+      await page.addInitScript(() => {
+        const clipboard = navigator.clipboard;
+        const writeText = clipboard.writeText.bind(clipboard);
+        clipboard.writeText = async (value) => {
+          await writeText(value);
+          await (
+            window as Window & { observeClipboardWrite: (text: string) => Promise<void> }
+          ).observeClipboardWrite(value);
+        };
+      });
+    } else {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    }
+
     await page.goto(`/room/${ROOM_CODE}`);
     await waitForAppReady(page);
     await expect(page.getByTestId('room-share')).toBeVisible({ timeout: 10_000 });
 
+    const invite = `${baseURL}/invite/${ROOM_CODE}`;
     await page.getByTestId('room-copy').click();
     await expect(page.getByTestId('room-share-feedback')).toHaveText('已复制');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(ROOM_CODE);
+    if (browserName !== 'webkit') {
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(ROOM_CODE);
+    }
 
     await page.getByTestId('room-copy-link').click();
     await expect(page.getByTestId('room-share-feedback')).toHaveText('链接已复制');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-      `${baseURL}/invite/${ROOM_CODE}`,
-    );
+    if (browserName === 'webkit') {
+      expect(writes).toEqual([ROOM_CODE, invite]);
+    } else {
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(invite);
+    }
   });
 
   test('剪贴板被拒绝：链接被选中，提示手动复制', async ({ page, baseURL }) => {
