@@ -24,6 +24,8 @@ export const test = base.extend({
     await page.addInitScript(() => {
       try {
         localStorage.setItem('icgame-copyright-ack', '1');
+        // 固定场景的操作通过结构化日志断言，生产构建默认不输出 INFO。
+        if (location.pathname === '/game/debug') localStorage.setItem('icgame-log-level', 'info');
       } catch {
         /* ignore */
       }
@@ -116,6 +118,12 @@ export function isNarrowViewport(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1280) < 1024;
 }
 
+export function chatToggle(page: Page): Locator {
+  return isNarrowViewport(page)
+    ? page.getByTestId('hand-dock').getByRole('button', { name: '聊天', exact: true })
+    : page.getByTestId('chat-toggle');
+}
+
 /**
  * 点第 index 张手牌并打出（不区分布局）：两种布局都是两步出牌，
  * 点牌选中后，再点「打出」按钮才进入出牌流程。
@@ -159,24 +167,27 @@ export async function answerAwaitedResponse(page: Page): Promise<boolean> {
     await unlockPass.click({ timeout: 1_500 });
     return true;
   }
-  const panel = page.locator('[data-testid="awaited-window"], [data-testid="awaited-bar"]').first();
+  const panel = page.getByTestId('awaited-window');
   if (!(await panel.isVisible())) return false;
   const decline = panel.locator('[data-testid^="awaited-action-"][data-decline="true"]').first();
   if (await decline.isVisible()) {
     await decline.click({ timeout: 1_500 });
     return true;
   }
-  const kind = await panel.getAttribute('data-kind');
-  if (kind === 'libra-split') {
-    await panel.getByTestId('awaited-action-split').click({ timeout: 1_500 });
+  const split = panel.getByTestId('awaited-action-split');
+  const pick = panel.getByTestId('awaited-action-pick');
+  const dice = panel.getByTestId('awaited-action-pick-a');
+  const discard = panel.getByTestId('awaited-action-discard');
+  if (await split.isVisible()) {
+    await split.click({ timeout: 1_500 });
     await page.getByTestId('awaited-sheet-confirm').click({ timeout: 1_500 });
-  } else if (kind === 'libra-pick') {
-    await panel.getByTestId('awaited-action-pick').click({ timeout: 1_500 });
+  } else if (await pick.isVisible()) {
+    await pick.click({ timeout: 1_500 });
     await page.getByTestId('awaited-take-1').click({ timeout: 1_500 });
-  } else if (kind === 'sudger') {
-    await panel.getByTestId('awaited-action-pick-a').click({ timeout: 1_500 });
-  } else if (kind === 'aries') {
-    await panel.getByTestId('awaited-action-discard').click({ timeout: 1_500 });
+  } else if (await dice.isVisible()) {
+    await dice.click({ timeout: 1_500 });
+  } else if (await discard.isVisible()) {
+    await discard.click({ timeout: 1_500 });
   } else {
     return false;
   }

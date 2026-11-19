@@ -1,7 +1,7 @@
 // 抽牌阶段入口、角色技能面板（背面技能、药剂师、空间女王、黑洞、皇城、土星、金星、密道、梦魇）、
 // 【解封】预判、SHOOT 跨层目标与射手·禁足的端到端用例。
 // 固定场景里发出的 move 只记日志（频道 game/fixture），所以读控制台日志断言发出了什么。
-// 桌面与移动两种布局都跑：技能面板在桌面是「技能」按钮的浮层，在移动是从坞升起的抽屉，内容是同一个面板。
+// 桌面与移动布局共用技能弹窗。
 
 import type { Page } from '@playwright/test';
 import { test, expect, selectAndPlayCard, waitForAppReady } from './fixtures/index.js';
@@ -153,7 +153,8 @@ test.describe('现有参数形态补上的技能入口', () => {
     const sent = recordMoves(page);
     await openScene(page, '/game/debug?skill=space-queen-other');
     // 不是本人回合，主操作不可用，但技能入口可用
-    await expect(page.getByTestId('action-wait')).toBeDisabled();
+    await expect(page.getByTestId('turn-indicator')).not.toHaveAttribute('data-mine', 'true');
+    await expect(page.getByTestId('action-confirm-discard')).toHaveCount(0);
     await openSkillPanel(page);
 
     const button = skillButton(page, 'useSpaceQueenStashTop');
@@ -390,18 +391,18 @@ test.describe('界面可点但引擎必拒：按引擎条件过滤', () => {
     await openScene(page, '/game/debug?skill=unlock-none');
     const unlock = await handIndexOf(page, '解封');
     await page.getByTestId(`card-${unlock}`).click();
-    await expect(page.getByTestId('hand-commit-play')).toHaveCount(0);
+    await expect(page.getByTestId('hand-commit-play')).toBeDisabled();
   });
 
   test('【解封】：本回合解封次数用尽时打不出；缺省场景可以打', async ({ page }) => {
     await openScene(page, '/game/debug?skill=unlock-spent');
     const unlock = await handIndexOf(page, '解封');
     await page.getByTestId(`card-${unlock}`).click();
-    await expect(page.getByTestId('hand-commit-play')).toHaveCount(0);
+    await expect(page.getByTestId('hand-commit-play')).toBeDisabled();
 
     await openScene(page, '/game/debug');
     await page.getByTestId(`card-${await handIndexOf(page, '解封')}`).click();
-    await expect(page.getByTestId('hand-commit-play')).toBeVisible();
+    await expect(page.getByTestId('hand-commit-play')).toBeEnabled();
   });
 });
 
@@ -425,10 +426,13 @@ test.describe('SHOOT 的目标限制与射手·禁足', () => {
     const options = page.getByTestId(/^target-player-\d+$/);
     const total = await options.count();
     await expect(options.and(page.locator(':enabled'))).toHaveCount(total);
-    // 点一个跨层的目标，发出 playShoot
-    await options.and(page.locator('[title*="允许"]')).first().click();
+    const target = options.and(page.locator('[title*="允许"]')).first();
+    const targetId = (await target.getAttribute('data-testid'))!.replace('target-player-', '');
+    await target.click();
+    expect(sent).toHaveLength(0);
+    await page.getByTestId('target-player-confirm').click();
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
-    expect(sent[0]!.move).toBe('playShoot');
+    expect(sent[0]).toEqual({ move: 'playShoot', args: [targetId, 'action_shoot'] });
   });
 
   test('射手：目标弹窗里有「禁足」开关，勾选后 playShoot 末位带 true', async ({ page }) => {
@@ -447,6 +451,7 @@ test.describe('SHOOT 的目标限制与射手·禁足', () => {
       .and(page.locator(':enabled'))
       .first()
       .click();
+    await page.getByTestId('target-player-confirm').click();
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
     expect(sent[0]!.move).toBe('playShoot');
     expect(sent[0]!.args[1]).toBe('action_shoot');
@@ -462,6 +467,7 @@ test.describe('SHOOT 的目标限制与射手·禁足', () => {
       .and(page.locator(':enabled'))
       .first()
       .click();
+    await page.getByTestId('target-player-confirm').click();
     await expect.poll(() => sent.length, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
     expect(sent[0]!.args).toHaveLength(2);
 

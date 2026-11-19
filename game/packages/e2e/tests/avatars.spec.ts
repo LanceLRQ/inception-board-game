@@ -1,44 +1,40 @@
-// 像素头像：座位牌（桌面）、行动轴（移动）、中央舞台的占位者标签旁都有头像；
-// 角色牌开局全员翻开：座位显示角色卡面，头像只做角上的小徽标，不挤掉角色信息
+import { test, expect, isNarrowViewport, waitForAppReady } from './fixtures/index.js';
 
-import { test, expect, waitForAppReady } from './fixtures/index.js';
-
-test.describe('固定场景 · 像素头像', () => {
+test.describe('固定场景 · 对局角色头像', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/game/debug?players=8');
     await waitForAppReady(page);
     await expect(page.getByTestId('runtime-stage')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('每个座位头像按钮里都有像素头像，且各不相同', async ({ page }) => {
-    const buttons = page.locator('[data-testid^="player-avatar-"]');
-    const n = await buttons.count();
-    expect(n).toBeGreaterThanOrEqual(7);
-    const seeds = new Set<string>();
-    for (let i = 0; i < n; i++) {
-      const avatar = buttons.nth(i).getByTestId('pixel-avatar').first();
-      await expect(avatar).toBeVisible();
-      seeds.add((await avatar.getAttribute('data-seed')) ?? '');
+  test('同桌列表显示 8 名玩家，各有对应的角色头像', async ({ page }) => {
+    let seats = page.getByTestId(/^player-avatar-\d+$/);
+    if (isNarrowViewport(page)) {
+      await page.getByRole('button', { name: '同桌与世界观' }).click();
+      seats = page.getByTestId('mobile-table-info').getByRole('button', { name: /^查看.+角色$/ });
     }
-    expect(seeds.size).toBe(n);
+    await expect(seats).toHaveCount(8);
+    const characters = new Set<string>();
+    for (const seat of await seats.all()) {
+      const face = seat.locator('[data-character]');
+      await expect(face).toHaveAttribute('data-character', /.+/);
+      await expect(face.locator('img, [data-testid="card-art-fallback"]')).toBeVisible();
+      characters.add((await face.getAttribute('data-character'))!);
+    }
+    expect(characters.size).toBe(8);
+    await seats.first().click();
+    await expect(page.getByTestId('card-detail-modal')).toBeVisible();
   });
 
-  test('每个座位都显示角色卡面（有卡图或卡名占位）', async ({ page }) => {
-    const buttons = page.locator('[data-testid^="player-avatar-"]');
-    const n = await buttons.count();
-    expect(n).toBeGreaterThanOrEqual(7);
-    for (let i = 0; i < n; i++) {
-      const button = buttons.nth(i);
-      await expect(button.locator('img, [data-testid="card-art-fallback"]').first()).toBeVisible();
+  test('层条上的占位者各显示角色头像，点击可打开角色详情', async ({ page }) => {
+    const occupants = page.getByTestId(/^occupant-\d+$/);
+    await expect(occupants).toHaveCount(8);
+    for (const occupant of await occupants.all()) {
+      const face = occupant.locator('[data-character]');
+      await expect(face).toHaveAttribute('data-character', /.+/);
+      await expect(face.locator('img, [data-testid="card-art-fallback"]')).toBeVisible();
     }
-  });
-
-  test('中央舞台 / 层塔里的占位者标签旁有头像', async ({ page }) => {
-    const occupants = page.locator('[data-testid^="occupant-"]');
-    await expect(occupants.first()).toBeVisible();
-    const n = await occupants.count();
-    for (let i = 0; i < n; i++) {
-      await expect(occupants.nth(i).getByTestId('pixel-avatar')).toHaveCount(1);
-    }
+    await occupants.first().click();
+    await expect(page.getByTestId('card-detail-modal')).toBeVisible();
   });
 });

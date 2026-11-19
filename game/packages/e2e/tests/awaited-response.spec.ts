@@ -1,12 +1,11 @@
 // 轮到本人应答的待决状态：固定场景里操作界面出现、选项正确、点击后发出预期的 move。
 //
 // 固定场景里发出的 move 只记日志、不推进状态（日志频道 game/fixture），所以这里读控制台日志断言发出了什么。
-// 宽屏用舞台右上角的应答窗口（awaited-window），窄屏用手牌坞上方的响应条（awaited-bar），
-// 两套布局的按钮测试 ID 相同（awaited-action-*）；要选牌 / 分牌 / 选层的打开同一个应答弹窗（awaited-sheet）。
+// 两套布局都使用应答窗口；要选牌 / 分牌 / 选层的打开同一个应答弹窗（awaited-sheet）。
 // 另含棋局·易位弹窗的关闭与重新打开。
 
 import type { Page } from '@playwright/test';
-import { test, expect, isNarrowViewport, waitForAppReady } from './fixtures/index.js';
+import { test, expect, waitForAppReady } from './fixtures/index.js';
 
 interface SentMove {
   move: string;
@@ -36,8 +35,7 @@ async function openScene(page: Page, url: string): Promise<SentMove[]> {
   return sent;
 }
 
-const panelOf = (page: Page) =>
-  page.getByTestId(isNarrowViewport(page) ? 'awaited-bar' : 'awaited-window');
+const panelOf = (page: Page) => page.getByTestId('awaited-window').and(page.getByRole('dialog'));
 const action = (page: Page, id: string) => page.getByTestId(`awaited-action-${id}`);
 
 /** 等日志里出现一条 move（日志经异步序列化，轮询等待） */
@@ -49,14 +47,12 @@ async function lastMove(sent: SentMove[], count: number): Promise<SentMove> {
 test.describe('固定场景 · 应答窗口', () => {
   test('缺省场景没有应答窗口', async ({ page }) => {
     await openScene(page, '/game/debug');
-    await expect(page.getByTestId('awaited-window')).toHaveCount(0);
-    await expect(page.getByTestId('awaited-bar')).toHaveCount(0);
+    await expect(panelOf(page)).toHaveCount(0);
   });
 
   test('被 SHOOT 的双鱼：可游离也可放弃，各发对应的 move', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=shoot');
-    await expect(panelOf(page)).toBeVisible({ timeout: 10_000 });
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'shoot-evade');
+    await expect(panelOf(page).getByRole('heading', { name: '被 SHOOT 瞄准' })).toBeVisible();
     await expect(action(page, 'evade')).toBeEnabled();
     await expect(action(page, 'evade')).toContainText('1');
     await expect(action(page, 'pass')).toBeEnabled();
@@ -69,7 +65,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('恐怖分子狂热：接受惩罚直接发；弃牌要先在弹窗里选一张', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=terrorist');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'shoot-zealot', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '狂热' })).toBeVisible();
 
     await action(page, 'accept').click();
     expect(await lastMove(sent, 1)).toEqual({ move: 'respondTerroristAccept', args: [] });
@@ -91,7 +87,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('天秤分牌：把牌切到第 2 份后确认，发两堆牌；返回不发任何 move', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=libra-split');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'libra-split', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '天秤 · 平衡' })).toBeVisible();
 
     await action(page, 'split').click();
     await expect(page.getByTestId('awaited-sheet')).toBeVisible();
@@ -115,7 +111,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('天秤挑一份：看得到两份内容，点哪份发哪份', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=libra-pick');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'libra-pick', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '天秤 · 平衡' })).toBeVisible();
 
     await action(page, 'pick').click();
     await expect(page.getByTestId('awaited-pile-1')).toBeVisible();
@@ -126,7 +122,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('意念判官：两个骰值各标出结果，点哪个发哪个', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=sudger');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'sudger', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '意念判官 · 定罪' })).toBeVisible();
     await expect(action(page, 'pick-a')).toContainText('1');
     await expect(action(page, 'pick-a')).toContainText('击杀');
     await expect(action(page, 'pick-b')).toContainText('4');
@@ -140,7 +136,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('处女·完美：抽 2 张 / 不发动直接发；复活与传送要在弹窗里选完才能确认', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=virgo');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'virgo', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '处女 · 完美' })).toBeVisible();
 
     await action(page, 'draw-two').click();
     expect(await lastMove(sent, 1)).toEqual({
@@ -176,7 +172,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('白羊·星尘：弃掉直接发；回音萦绕发动要选层与方式', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=aries');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'aries', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '白羊 · 星尘' })).toBeVisible();
     await expect(panelOf(page)).toContainText('回音萦绕');
 
     await action(page, 'discard').click();
@@ -198,7 +194,7 @@ test.describe('固定场景 · 应答窗口', () => {
     page,
   }) => {
     const sent = await openScene(page, '/game/debug?pending=aries-plague');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'aries', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '白羊 · 星尘' })).toBeVisible();
     await expect(panelOf(page)).toContainText('邪念瘟疫');
 
     await action(page, 'activate').click();
@@ -233,7 +229,7 @@ test.describe('固定场景 · 应答窗口', () => {
     page,
   }) => {
     const sent = await openScene(page, '/game/debug?pending=levy');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'levy', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '黑洞 · 吞噬' })).toBeVisible();
     await expect(panelOf(page)).toContainText('黑洞');
     await expect(action(page, 'give')).toBeEnabled();
     await expect(page.getByTestId(/^awaited-action-/)).toHaveCount(1);
@@ -254,7 +250,7 @@ test.describe('固定场景 · 应答窗口', () => {
     page,
   }) => {
     const sent = await openScene(page, '/game/debug?pending=darwin');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'darwin', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '达尔文 · 淘汰' })).toBeVisible();
     await action(page, 'return').click();
     await expect(page.getByTestId('awaited-sheet')).toBeVisible();
     const confirm = page.getByTestId('awaited-sheet-confirm');
@@ -292,7 +288,7 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('雅典娜·急智：可以放弃直接发 null；或在弹窗里从弃牌堆选一张再确认', async ({ page }) => {
     const sent = await openScene(page, '/game/debug?pending=athena');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'athena', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '雅典娜 · 急智' })).toBeVisible();
     await expect(panelOf(page)).toContainText('雅典娜');
 
     await action(page, 'pass').click();
@@ -317,7 +313,7 @@ test.describe('固定场景 · 应答窗口', () => {
     page,
   }) => {
     const sent = await openScene(page, '/game/debug?as=master&pending=saturn');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'saturn', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '土星 · 律令' })).toBeVisible();
     await expect(panelOf(page)).toContainText('律令');
     await expect(action(page, 'counter')).toBeEnabled();
     await expect(action(page, 'pass')).toBeEnabled();
@@ -345,7 +341,7 @@ test.describe('固定场景 · 应答窗口', () => {
     page,
   }) => {
     const sent = await openScene(page, '/game/debug?as=master&pending=saturn-nomatch');
-    await expect(panelOf(page)).toHaveAttribute('data-kind', 'saturn', { timeout: 10_000 });
+    await expect(panelOf(page).getByRole('heading', { name: '土星 · 律令' })).toBeVisible();
     await expect(action(page, 'counter')).toBeDisabled();
     await expect(panelOf(page)).toContainText('没有与之同名');
     await action(page, 'pass').click();
@@ -354,12 +350,11 @@ test.describe('固定场景 · 应答窗口', () => {
 
   test('土星·律令（旁观的盗梦者）：没有应答界面，只提示在等梦主', async ({ page }) => {
     await openScene(page, '/game/debug?pending=saturn');
-    await expect(page.getByTestId('awaited-window')).toHaveCount(0);
-    await expect(page.getByTestId('awaited-bar')).toHaveCount(0);
+    await expect(panelOf(page)).toHaveCount(0);
     await expect(page.getByTestId('awaiting-notice').first()).toContainText('等待梦主应答');
   });
 
-  test('应答窗口不挡住别的界面：舞台仍在，页面没有报错', async ({ page }) => {
+  test('应答窗口打开时仍保留舞台，页面没有报错', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await openScene(page, '/game/debug?pending=virgo');
